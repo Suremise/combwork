@@ -1,19 +1,19 @@
 {
   "copy.assign.noLauncher": {
     "text": "its check copy's job takes no launcher now",
-    "note": "Why hive-progress's launcher wasn't put in its check copy's job: it has one already, or no job."
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: it has one already, or no job."
   },
   "copy.assign.noLease": {
     "text": "no such check copy lease",
-    "note": "Why hive-progress's launcher wasn't put in its check copy's job: the lease it named isn't this agent's."
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: the lease it named isn't this agent's."
   },
   "copy.assign.notOwn": {
     "text": "that process isn't one of this agent's own",
-    "note": "Why hive-progress's launcher wasn't put in its check copy's job: the process isn't the agent's (HR1's #1435 round 1)."
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: the process isn't the agent's (HR1's #1435 round 1)."
   },
   "copy.assign.notPut": {
     "text": "the check's launcher couldn't be put in its check copy's job",
-    "note": "Why hive-progress's launcher wasn't put in its check copy's job: Windows refused it."
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: Windows refused it."
   },
   "copy.assign.returned": {
     "text": "its check copy was returned",
@@ -85,15 +85,15 @@
   },
   "copy.isolated.noLease": {
     "text": "no check copy could be leased",
-    "note": "hive-progress --isolated's refusal: no check copy could be lent, for another reason."
+    "note": "cw-progress --isolated's refusal: no check copy could be lent, for another reason."
   },
   "copy.isolated.noSupervisor": {
     "text": "Combwork's process supervisor isn't running, so an isolated check can't be run",
-    "note": "hive-progress --isolated's refusal: Combwork can't run the check in a job of its own (#1435)."
+    "note": "cw-progress --isolated's refusal: Combwork can't run the check in a job of its own (#1435)."
   },
   "copy.isolated.notLeased": {
     "text": "no check copy could be leased: {error}",
-    "note": "hive-progress --isolated's refusal: leasing its check copy failed. {error} is why."
+    "note": "cw-progress --isolated's refusal: leasing its check copy failed. {error} is why."
   },
   "copy.isolated.setupFailed": {
     "text": "{copy}'s setup failed ({error}), so nothing was run",
@@ -101,15 +101,15 @@
   },
   "copy.isolated.stillInUse": {
     "text": "a check copy ({copy} is still in use by {by})",
-    "note": "What hive-progress --isolated waits for: a check copy, the one it would get still held. {by} says by what."
+    "note": "What cw-progress --isolated waits for: a check copy, the one it would get still held. {by} says by what."
   },
   "copy.isolated.waitCopy": {
     "text": "a check copy",
-    "note": "What hive-progress --isolated waits for (\"waiting for a check copy\"): none is free yet."
+    "note": "What cw-progress --isolated waits for (\"waiting for a check copy\"): none is free yet."
   },
   "copy.isolated.waitSetup": {
     "text": "a check copy to be set up",
-    "note": "What hive-progress --isolated waits for: its check copy is being set up."
+    "note": "What cw-progress --isolated waits for: its check copy is being set up."
   },
   "copy.refusal.noCopy": {
     "text": "no check copy free: the pool's {size} {count, plural, =1 {copy is} other {copies are}} in use",

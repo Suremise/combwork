@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, TaskCard } from '../src/shared/types'
+import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 /** A bound for a hung run (the waits are for conditions). */
@@ -36,7 +36,7 @@ vi.mock('../src/main/boardStore', async (original) => {
   }
 })
 
-const base = tempDir('hive-board-change-reads-')
+const base = tempDir('cw-board-change-reads-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -160,7 +160,7 @@ describe('a board change reads no card documents for the fresh-start nudge (HI-1
     // The first look learns what is Done: no card's document read (the whole board, 200 here, before).
     const first = await readsOf(async () => {
       // Its handler starts the look as it is told (coalesced): waited for until it has run.
-      tellListeners({ type: 'tasks-changed', workspacePath: wsPath } as unknown as HiveEvent)
+      tellListeners({ type: 'tasks-changed', workspacePath: wsPath } as unknown as CombworkEvent)
       await looked()
     })
     expect(first).toBe(0)

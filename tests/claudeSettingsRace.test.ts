@@ -40,7 +40,7 @@ vi.mock('fs/promises', async (importOriginal) => {
 const { SETTINGS_FILE_LIMIT, cliSettings } = await import('../src/main/providers/claude/autoCompact')
 const { userSettings } = await import('../src/main/providers/claude/launchSettings')
 
-const dir = tempDir('hive-settings-race-')
+const dir = tempDir('cw-settings-race-')
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 const file = join(dir, 'mine.json')
 /** JSON of exactly `bytes` bytes. */

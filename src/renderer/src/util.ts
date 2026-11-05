@@ -8,7 +8,7 @@ export function basename(p: string): string {
 
 export { formatBytes, formatTokens } from '@shared/units'
 
-/** A number in the language Hive shows: "12,345", "12 345". */
+/** A number in the language Combwork shows: "12,345", "12 345". */
 export const formatNumber = (n: number): string => fmt.number(n)
 
 export function timeAgo(iso: string | null | undefined): string {

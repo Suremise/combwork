@@ -55,7 +55,7 @@ const tracker = vi.hoisted(() => ({
   bound: (_run: string, _helper: string): boolean => true,
   reading: () => undefined as void,
   keeperForgotten: [] as string[],
-  /** HI-2313: its keeper's answer now (keeperObservation; by default none), and the Hives it was asked for. */
+  /** HI-2313: its keeper's answer now (keeperObservation; by default none), and the Combworks it was asked for. */
   observe: async (_run: string): Promise<{ helper: string; members: Proc[]; more: number } | null> => null,
   observeAsked: [] as string[],
   /** HI-2309: what the one rule (nothingHolds) says holds nothing: here, processes named as Windows Sandbox's broker. */
@@ -77,13 +77,13 @@ vi.mock('../src/main/agentProcesses', async (orig) => ({
   },
   forgetEarlierRun: (run: string) => void tracker.forgotten.push(run),
   endProcessesExactly: async (list: Proc[]) => (tracker.endedExactly.push({ list, at: tracker.writerAt() }), tracker.endWorks),
-  keeperState: async (run: string, hive: string) => {
-    tracker.keeperAsked.push(hive)
+  keeperState: async (run: string, combwork: string) => {
+    tracker.keeperAsked.push(combwork)
     tracker.reading()
     return tracker.keeper.get(run) ?? null
   },
-  keeperObservation: async (run: string, hive: string) => {
-    tracker.observeAsked.push(hive)
+  keeperObservation: async (run: string, combwork: string) => {
+    tracker.observeAsked.push(combwork)
     return tracker.observe(run)
   },
   keeperStillBound: (run: string, helper: string) => tracker.bound(run, helper),
@@ -100,7 +100,7 @@ const { SlotPool, SlotStore, fileSlotConn } = await import('../src/main/slots')
 const { goneWriterCleared, goneWriterSettles, goneWriterStill, heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
 const { releasableSlots, releaseSlot, SlotReleaseRefused } = await import('../src/main/slotRelease')
 const { settleRunForTests } = await import('../src/main/agentProcesses')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { sessions } = await import('../src/main/sessions')
 const { config } = await import('../src/main/config')
 const { providerService } = await import('../src/main/providerService')
@@ -485,7 +485,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
   it("is refused while its run is live in this Combwork; once held, it is released after the user's confirmation and the slot can be taken again", async () => {
     hostOn()
     const run = (await start()).runId
-    expect(await heldWriter(project, 'slot-a')).toMatchObject({ run, agent: 'b1', live: true, hive: { self: true } })
+    expect(await heldWriter(project, 'slot-a')).toMatchObject({ run, agent: 'b1', live: true, combwork: { self: true } })
     expect((await heldSlots(project)).size).toBe(0)
     await expect(releaseHeldWriter(project, 'slot-a', run, { end: false })).rejects.toThrow(/still running in this Combwork/)
     expect(writer()?.run).toBe(run)
@@ -497,7 +497,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     // Its run over and its processes kept running: held, offered in b1's ⋯ (heldSlots), nothing listed of them.
     const held = await heldRun()
     expect([...(await heldSlots(project))]).toEqual([['b1', 'slot-a']])
-    expect(await heldWriter(project, 'slot-a')).toMatchObject({ run: held, live: false, hive: { self: true, alive: true }, processes: null })
+    expect(await heldWriter(project, 'slot-a')).toMatchObject({ run: held, live: false, combwork: { self: true, alive: true }, processes: null })
     await releaseHeldWriter(project, 'slot-a', held, { end: false })
     expect(writer()).toBeNull()
     // Its run's records go with it (HI-2303): its kept record and its keeper's binding.
@@ -512,7 +512,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     for (const others of [true, null, false]) {
       hostOn(others)
       await plant(`other-${others}`)
-      expect(await heldWriter(project, 'slot-a')).toMatchObject({ hive: { self: false, alive: others }, live: false })
+      expect(await heldWriter(project, 'slot-a')).toMatchObject({ combwork: { self: false, alive: others }, live: false })
       expect((await heldSlots(project)).has('b1')).toBe(others === false)
       const release = releaseHeldWriter(project, 'slot-a', `other-${others}`, { end: false })
       if (others === false) {
@@ -692,7 +692,7 @@ describe("a gone Combwork's writer settled by itself after a restart (HI-1886)",
 
   describe("its keeper's state (HI-2055: the helper that held its job, kept past its Combwork)", () => {
     const helper = '4242:133900000000000099'
-    const hive = () => `${me.pid + 1}:5`
+    const combwork = () => `${me.pid + 1}:5`
 
     it('"ended" from the helper its run is bound to: freed at the slot sweep, asked for its own Combwork, its state then forgotten', async () => {
       hostOn(false)
@@ -700,7 +700,7 @@ describe("a gone Combwork's writer settled by itself after a restart (HI-1886)",
       tracker.keeper.set('r-kept', { state: 'ended', helper })
       await pool.settleGoneWriters()
       expect(writer()).toBeNull()
-      expect(tracker.keeperAsked).toEqual([hive()])
+      expect(tracker.keeperAsked).toEqual([combwork()])
       expect(tracker.keeperForgotten).toEqual(['r-kept'])
       expect(tracker.endedExactly).toEqual([])
     })
@@ -711,7 +711,7 @@ describe("a gone Combwork's writer settled by itself after a restart (HI-1886)",
     it('"live" with only Windows Sandbox\'s idle broker: held at the sweep and at its own start, told once that releasing is safe; with anything else, held and not told', async () => {
       hostOn(false)
       const toasts: { title: string; message?: string; actions?: { command: string; args?: unknown[] }[] }[] = []
-      const off = onHiveEvent((e) => {
+      const off = onCombworkEvent((e) => {
         if (e.type === 'toast') toasts.push(e.toast)
       })
       try {
@@ -766,7 +766,7 @@ describe("a gone Combwork's writer settled by itself after a restart (HI-1886)",
         tracker.observe = async () => null
         await pool.settleGoneWriters()
         expect(writer()?.run).toBe('r-repro')
-        expect(tracker.observeAsked).toEqual([hive()])
+        expect(tracker.observeAsked).toEqual([combwork()])
         expect(tracker.keeperForgotten).toEqual([])
         expect(tracker.endedExactly).toEqual([])
         // Its answer lists a writer beside the broker: held.
@@ -976,7 +976,7 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
     await store.clearWriterRun('r-alive')
     hostOn(false)
     await plant('r-gone')
-    expect(await list()).toMatchObject({ carried: [{ slot: 'slot-a' }], held: [{ slot: 'slot-a', run: 'r-gone', agent: 'b1', agentName: 'B1', hive: { self: false, alive: false } }] })
+    expect(await list()).toMatchObject({ carried: [{ slot: 'slot-a' }], held: [{ slot: 'slot-a', run: 'r-gone', agent: 'b1', agentName: 'B1', combwork: { self: false, alive: false } }] })
   })
 
   it("refuses before anything changes: an unknown slot, which of the two when both, a writer's release without the user's confirmation of its slot and run", async () => {

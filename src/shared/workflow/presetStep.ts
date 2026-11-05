@@ -11,7 +11,7 @@ import { agentWorkflowRole, reviewsWork, type WorkflowRole } from './roles'
 
 /**
  * Whether a project asks "How do you work?" for the platform in force. A project with no platform recorded is from
- * before 1.0 (Hive records it as it makes a project.json): its upgrade gives it options, so it never asks, also while
+ * before 1.0 (Combwork records it as it makes a project.json): its upgrade gives it options, so it never asks, also while
  * that upgrade is still to run.
  */
 export function asksPreset(cfg: Pick<ProjectConfig, 'workflow' | 'platform'>, platform: PlatformId): boolean {
@@ -24,7 +24,7 @@ export function asksPreset(cfg: Pick<ProjectConfig, 'workflow' | 'platform'>, pl
 
 /**
  * The preset suggested from the project's agents: Solo for one or none, Pair for a builder and a reviewer, Team for more.
- * Pair is Hive merging for Git (`pair`), as the Pair preset is.
+ * Pair is Combwork merging for Git (`pair`), as the Pair preset is.
  */
 export function suggestPreset(agents: readonly { name: string; role?: string; workflowRole?: WorkflowRole }[]): PresetId {
   if (agents.length <= 1) return 'solo'
@@ -32,6 +32,6 @@ export function suggestPreset(agents: readonly { name: string; role?: string; wo
   return agents.length === 2 && reviewers === 1 ? 'pair' : 'team'
 }
 
-/** The presets the step offers: Solo, Pair and Team (for Git, Pair is Hive merging). */
+/** The presets the step offers: Solo, Pair and Team (for Git, Pair is Combwork merging). */
 export const STEP_PRESETS: readonly PresetId[] = ['solo', 'pair', 'team']
 

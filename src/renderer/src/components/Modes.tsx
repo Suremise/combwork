@@ -11,8 +11,8 @@ import { Icon, IconButton, OneLineDesc, Tooltip } from './ui'
 import { msg, tr } from '@shared/i18n'
 
 /**
- * The Hive Assistant's modes: the workspace's Markdown files in .combwork/modes, each how the
- * Assistant works, in its own words. Listed in the sidebar and edited in the main area; Hive's own four can be restored.
+ * The Combwork Assistant's modes: the workspace's Markdown files in .combwork/modes, each how the
+ * Assistant works, in its own words. Listed in the sidebar and edited in the main area; Combwork's own four can be restored.
  */
 
 export const MODES_TIP = msg({ id: 'assistant.modes.tip', defaultMessage: "A mode is how the Assistant works: what it puts first and how it hands things back, in a Markdown file in the workspace (.combwork/modes). The panel's mode menu switches between them at once, keeping the conversation; Settings → Assistant sets the default.", description: 'Tooltip on the Modes section of the Assistant view. Keep .combwork/modes as it is.' })

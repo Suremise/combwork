@@ -37,7 +37,7 @@ import { carryWorkspaceRuns } from './closeCommand/closeCommands'
 import { emitTo } from './events'
 
 /**
- * A workspace (or project) moved to another folder (#146). Hive records where each was last opened (`lastPath` in
+ * A workspace (or project) moved to another folder (#146). Combwork records where each was last opened (`lastPath` in
  * workspace.json and project.json); when that differs, what is stored by absolute path is out of date: agents'
  * worktrees (and git's links both ways), session folders, Claude Code's per-path transcripts and memory, the recent
  * list. The plan says what Repair would do; repair does it, refusing while agents run. Every step can run again
@@ -93,7 +93,7 @@ async function recordNew(ws: WorkspaceService, projects: string[]): Promise<void
   for (const p of projects) if (!(await ws.projectConfig(p)).lastPath) await ws.mutateProjectConfig(p, (c) => (c.lastPath ? {} : { lastPath: p }))
 }
 
-/** The workspace's project folders that have Hive's files (hidden ones too). */
+/** The workspace's project folders that have Combwork's files (hidden ones too). */
 async function projectFolders(ws: WorkspaceService): Promise<string[]> {
   const all = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))]
   return all.filter((p) => existsSync(join(p, PROJECT_FILE)))
@@ -343,7 +343,7 @@ const F = {
 
 /**
  * The worktrees git's prune would forget (a recreate's refusal, `PruneBlocked`), as Repair's report names them: an
- * agent's by its name, any other (made outside Hive, or whose agent is gone) by its folder's name. Exported for tests.
+ * agent's by its name, any other (made outside Combwork, or whose agent is gone) by its folder's name. Exported for tests.
  */
 export function blockerNames(blockers: readonly string[], worktrees: readonly Pick<MoveWorktree, 'agentName' | 'from' | 'to'>[]): string[] {
   return blockers.map((p) => {
@@ -634,7 +634,7 @@ export async function movePlan(ws: WorkspaceService, opts: MoveOptions = {}): Pr
     planned.push({ path: h.path, name: h.name, from: h.from, folder: h.folder, worktrees, sessions: await sessionCwds(ws, h.path, moves, false), folders: await pathData(moves, false), ...(branches.length ? { branches } : {}) })
   }
   // Branches still named after an old place in projects that didn't move (#1305): a move repaired before, or one made
-  // outside Hive. Each such project is listed for its branches alone.
+  // outside Combwork. Each such project is listed for its branches alone.
   for (const p of await projectFolders(ws)) {
     if (hosts.some((h) => samePath(h.path, p))) continue
     const branches = await branchesOf(ws, p, [])
@@ -664,7 +664,7 @@ export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
   plan && moveHasWork(plan) ? { from: plan.from, projects: plan.projects, pending: plan.pending, ...(plan.cards?.length ? { cards: plan.cards } : {}), ...(plan.branches ? { branches: plan.branches } : {}), ...(plan.profile?.length ? { profile: plan.profile } : {}) } : null
 
 /**
- * What Hive's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin and its close
+ * What Combwork's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin and its close
  * command's runs, and its view preferences, each project's and its panes' (HI-2008, viewPrefs.ts). The Assistant's old token file is left: it is written again at each launch, and deleting it could take
  * a workspace's back there (HR2's round 2). Design HI-2007/s40 and s42:
  * - A move is recorded as the moved workspace opens (config.json's `profileMoves`, one per old folder) only when the
@@ -1135,7 +1135,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
   for (const m of plan.cards ?? []) {
     try {
       // First, in the record of names, that the project had that name (#514): what was saved under it (handovers, kept
-      // comparisons) is then given to it, by this Repair or, if that fails, by the next (or when Hive next follows the
+      // comparisons) is then given to it, by this Repair or, if that fails, by the next (or when Combwork next follows the
       // projects' names, after a restart too), once the cards that told it are moved.
       const id = ws.projectIdsNow().byPath.get(join(ws.path!, m.to).toLowerCase())
       if (id) await noteFormerName(ws, id, m.from)
@@ -1195,7 +1195,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     })
     say(report, 'done', tr(msg({ id: 'main.move.workingMoved', defaultMessage: 'Working on: {projects}, as before the move.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): the projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them." }), { projects: trimList(plan.working) }), { what: { kind: 'working' }, result: tr(R.working, { projects: trimList(plan.working) }) })
   }
-  // Hive's Defender exclusions follow the workspace (#1302): last, so the administrator prompt comes once everything else
+  // Combwork's Defender exclusions follow the workspace (#1302): last, so the administrator prompt comes once everything else
   // is done; only when the dialog's box asked for it. A declined prompt changes nothing and is said; a refusal too.
   if (opts.defender && plan.from) {
     try {

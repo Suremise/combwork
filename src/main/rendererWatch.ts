@@ -4,14 +4,14 @@ import { randomUUID } from 'crypto'
 import { emitTo } from './events'
 import { createLogger, userText } from './logger'
 import { taskText, whereText, type LongTask, type WindowWhere } from '../shared/windowHealth'
-import type { HiveWindow } from './windows'
+import type { CombworkWindow } from './windows'
 import { APP_NAME } from '../shared/appName'
 
 const log = createLogger('window')
 
 /** A second crash within this long doesn't reload again: it asks, so a page that crashes on load can't loop. */
 export const CRASH_LOOP_MS = 60_000
-/** How long a window may hang before Hive offers to reload it. */
+/** How long a window may hang before Combwork offers to reload it. */
 const HANG_MS = 4000
 
 /** What to do about a window's renderer that has gone: reload it, or ask (it crashed again soon after a reload). */
@@ -39,8 +39,8 @@ interface Health {
   /** When it stopped responding (Electron's `unresponsive`), while it hasn't responded since. */
   hungAt: number | null
 }
-const health = new WeakMap<HiveWindow, Health>()
-const healthOf = (entry: HiveWindow): Health => {
+const health = new WeakMap<CombworkWindow, Health>()
+const healthOf = (entry: CombworkWindow): Health => {
   let h = health.get(entry)
   if (!h) health.set(entry, (h = { where: null, inputAt: 0, recent: [], loggedAt: 0, heldBack: 0, hungAt: null }))
   return h
@@ -51,12 +51,12 @@ const LONG_TASK_LOG_MS = 10_000
 const RECENT_TASKS = 5
 
 /** The page says where it is now. */
-export function noteWhere(entry: HiveWindow, where: WindowWhere | null): void {
+export function noteWhere(entry: CombworkWindow, where: WindowWhere | null): void {
   if (where) healthOf(entry).where = where
 }
 
 /** The page's long tasks just ended: logged as one line (its longest, how many, where), at most every LONG_TASK_LOG_MS. */
-export function noteLongTasks(entry: HiveWindow, tasks: LongTask[], where: WindowWhere | null, now = Date.now()): void {
+export function noteLongTasks(entry: CombworkWindow, tasks: LongTask[], where: WindowWhere | null, now = Date.now()): void {
   if (!tasks.length) return
   const h = healthOf(entry)
   if (where) h.where = where
@@ -97,10 +97,10 @@ const stillRunning = (): string => tr(msg({ id: 'main.window.stillRunning', defa
  * unaffected; only the page is reloaded (its terminals reattach, as after View → Reload), and the window
  * keeps its workspace. Each window is watched on its own.
  */
-export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean; openLogs: () => void; quit: () => void }): void {
+export function watchRenderer(entry: CombworkWindow, opts: { quitting: () => boolean; openLogs: () => void; quit: () => void }): void {
   const win = entry.win
   let lastCrashAt: number | null = null
-  // A reload Hive asked for after a hang crashes the page first: not a crash to report.
+  // A reload Combwork asked for after a hang crashes the page first: not a crash to report.
   let expectGone = false
   let hangTimer: NodeJS.Timeout | null = null
   let hangPrompt: AbortController | null = null

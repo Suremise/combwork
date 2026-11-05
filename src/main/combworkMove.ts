@@ -4,21 +4,21 @@ import { join, resolve } from 'path'
 import { Worker } from 'worker_threads'
 import { CW_DIR } from '../shared/defaults'
 import { ASSISTANT_DIR } from '../shared/assistant'
-import { LEGACY_HIVE_DIR, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../shared/hiveFolderMove'
+import { LEGACY_HIVE_DIR, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../shared/combworkFolderMove'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { toast } from './events'
 import { readKeptJson, realPath, writeKeptJson, writeTextAtomic } from './fsutil'
 import { ifAbsent, lstatOrNullAsync, present } from './fsPresence'
 import { git } from './git'
-import { HiveError, errorText, hiveError } from './hiveError'
-import { excludeLine, gitDirOf, vcsOf } from './hiveVcs'
+import { CombworkError, errorText, combworkError } from './combworkError'
+import { excludeLine, gitDirOf, vcsOf } from './combworkVcs'
 import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
-import { ours, type HostKind } from './hiveFolder'
+import { ours, type HostKind } from './combworkFolder'
 import { withNamedLock } from './repoLock'
 import { projectNamesDone, record as recordNames, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
-import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolders, CopyFoldersAnswer } from './hiveMoveWorker'
+import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolders, CopyFoldersAnswer } from './combworkMoveWorker'
 
 /**
  * The move of a workspace's `.hive` folders to `.combwork` (HI-2462, SPEC §4.1.1; the design is the card's: HI-2462/s21,
@@ -39,10 +39,10 @@ import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolde
  *   runs again over all of it (each is idempotent), and the hash is written once the last has worked.
  * - **Never moved**: another tool's `.hive`, a `.hive` beside a `.combwork` with no marker (both: `.combwork` is used,
  *   `.hive` left as it is, a warning), a linked `.hive`, a host whose real place is outside the workspace. Stored paths,
- *   links and a conversation's folder are translated through the map alone (shared/hiveFolderMove.ts).
+ *   links and a conversation's folder are translated through the map alone (shared/combworkFolderMove.ts).
  */
 
-const log = createLogger('hiveMove')
+const log = createLogger('combworkMove')
 
 /** The lock's file, in the workspace folder itself: the one place that doesn't move. */
 export const MOVE_LOCK_FILE = '.combwork-move.lock'
@@ -345,12 +345,12 @@ async function warnRecreated(hosts: Looked[]): Promise<void> {
   for (const h of hosts) if (h.marked && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
 }
 
-const lockBusy = (h: { profile: string }): HiveError => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' })
+const lockBusy = (h: { profile: string }): CombworkError => combworkError(M.busy, { profile: h.profile }, { kind: 'conflict' })
 
 /**
  * Moves a workspace's folders, before anything reads them (WorkspaceService's open, inside its claim): every host with
  * our `.hive` alone, then the early phases when the map isn't the one they last finished for. `only`: a single host (a
- * project that came into the open workspace later, ensureProject). Throws a HiveError (translated, naming the folder)
+ * project that came into the open workspace later, ensureProject). Throws a CombworkError (translated, naming the folder)
  * when it can't, nothing of that host changed.
  */
 export function moveFolders(ws: string, o: MoveOptions & { only?: string } = {}): Promise<MoveOutcome> {
@@ -379,7 +379,7 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
   // under the lock, after the other processes' refusal.
   const namesDue = o.only ? !(await projectNamesDone(o.only)) : await workspaceNeeds(ws)
   const stop = (): void => {
-    if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   }
   if (!planned && !namesDue) {
     const moves = await movesOf(ws, all)
@@ -439,11 +439,11 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
   // presence refuses it before anything is written (HR2's round 3: the lock file's exclude line too).
   for (const dir of [legacy(ws), current(ws)]) {
     const others = othersPresentByProcess(dir)
-    if (others.length) throw hiveError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
+    if (others.length) throw combworkError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
   }
   await excludeMoveLock(ws)
   const id = randomUUID()
-  // The workspace first: a Hive with its board open fails it here, before any project is touched; then its Assistant's
+  // The workspace first: a Combwork with its board open fails it here, before any project is touched; then its Assistant's
   // home (inside the workspace's folder, so looked at after it moved), then the projects.
   let moved = 0
   for (const kind of ['workspace', 'assistant', 'project'] as const) {
@@ -456,7 +456,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       try {
         await renameFolder(legacy(h.host), current(h.host))
       } catch (e) {
-        if (isLocked(e)) throw hiveError(M.locked, { folder: legacy(h.host) }, { kind: 'conflict' })
+        if (isLocked(e)) throw combworkError(M.locked, { folder: legacy(h.host) }, { kind: 'conflict' })
         throw e
       }
       moved++
@@ -478,7 +478,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       await runEarly(ws, moves, phase)
     } catch (e) {
       log.warn(`the folder move's ${phase}`, e)
-      throw hiveError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
+      throw combworkError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
     }
     await moveTestHooks.after?.(`phase:${phase}`)
   }
@@ -498,7 +498,7 @@ async function runEarly(ws: string, moves: FolderMove[], phase: Phase): Promise<
   else if (phase === 'notes') await rewriteNotes(join(current(ws), 'shared'), moves)
 }
 
-/** Hive's exclude line for a moved project's old folder, in its repository's info/exclude, for the new one. */
+/** Combwork's exclude line for a moved project's old folder, in its repository's info/exclude, for the new one. */
 export async function moveExcludeLine(host: string): Promise<boolean> {
   const found = vcsOf(host)
   if (found?.kind !== 'git') return false
@@ -560,24 +560,24 @@ export async function rewriteNotes(dir: string, moves: FolderMove[]): Promise<nu
 }
 
 /** The worker's script, beside main's; in unit tests (no build) its code runs here. */
-const workerScript = (): string => join(__dirname, 'hive-move-worker.js')
+const workerScript = (): string => join(__dirname, 'cw-move-worker.js')
 
-/** Rewrites the board's cards in the worker (hiveMoveWorker.ts). */
+/** Rewrites the board's cards in the worker (combworkMoveWorker.ts). */
 export function rewriteCardsOffMain(job: CardsRewrite): Promise<CardsAnswer> {
-  return inMoveWorker<CardsAnswer>(job, async () => (await import('./hiveMoveWorker')).rewriteCards(job))
+  return inMoveWorker<CardsAnswer>(job, async () => (await import('./combworkMoveWorker')).rewriteCards(job))
 }
 
-/** Checkpoints and closes the board's old file in the worker (hiveMoveWorker.ts), before its rename (HI-2587). */
+/** Checkpoints and closes the board's old file in the worker (combworkMoveWorker.ts), before its rename (HI-2587). */
 export function checkpointOffMain(file: string): Promise<CheckpointAnswer> {
   const job: Checkpoint = { kind: 'checkpoint', file }
-  return inMoveWorker<CheckpointAnswer>(job, async () => (await import('./hiveMoveWorker')).checkpointFile(job))
+  return inMoveWorker<CheckpointAnswer>(job, async () => (await import('./combworkMoveWorker')).checkpointFile(job))
 }
 
 /** The folders the board's skill copies records name, read in the worker (HI-2587's marker step); none without a board. */
 export async function copyFoldersOffMain(file: string): Promise<string[]> {
   if (!present(file)) return []
   const job: CopyFolders = { kind: 'copyFolders', file }
-  const a = await inMoveWorker<CopyFoldersAnswer>(job, async () => (await import('./hiveMoveWorker')).copyFolders(job))
+  const a = await inMoveWorker<CopyFoldersAnswer>(job, async () => (await import('./combworkMoveWorker')).copyFolders(job))
   if (!a.ok) throw new Error(a.error)
   return a.folders
 }
@@ -623,7 +623,7 @@ export interface LateServices {
 export function finishMove(ws: string, svc: LateServices, o: MoveOptions = {}): Promise<void> {
   return inTurn(ws, () => {
     const stop = (): void => {
-      if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+      if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw combworkError(M.closed, undefined, { kind: 'conflict' })
     }
     return withNamedLock(ws, MOVE_LOCK_FILE, () => finishUnderLock(resolve(ws), svc, stop), { waitMs: 0, busy: lockBusy })
   })
@@ -649,7 +649,7 @@ async function finishUnderLock(ws: string, svc: LateServices, stop: () => void):
       }
     } catch (e) {
       log.warn(`the folder move's ${phase}`, e)
-      throw e instanceof HiveError ? e : hiveError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
+      throw e instanceof CombworkError ? e : combworkError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
     }
     await moveTestHooks.after?.(`phase:${phase}`)
   }

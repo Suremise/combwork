@@ -1,4 +1,4 @@
-// Agent text (dialects, HI-2065; plans/2026-11-03-dialects-design.md, sections 2 and 6): the ICU formatter hive-mcp.js
+// Agent text (dialects, HI-2065; plans/2026-11-03-dialects-design.md, sections 2 and 6): the ICU formatter cw-mcp.js
 // can load, say() and its chains (scopes, the resolver hook, the process's dialect file), and the canary dialect over the
 // session contract, the first area extracted (card 1). Later extraction cards add their builders to the canary here.
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ import { inRequestScope } from '../src/shared/agentText/asyncScope'
 import { formatIcu, IcuError, parseIcu, placeholdersOf, type Part } from '../src/shared/agentText/icu'
 import { chainFromFile, loadProcessDialect } from '../src/shared/agentText/processDialect'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
-import { boardSkillsLine, controlRules, hiveInstructions, journalRule, withLatestHandover } from '../src/shared/hiveGuidance'
+import { boardSkillsLine, controlRules, combworkInstructions, journalRule, withLatestHandover } from '../src/shared/combworkGuidance'
 import { deliveredNotes } from '../src/shared/workspaceNotes'
 import { instructionsStarter } from '../src/shared/projectTabs'
 import { shareInstructions } from '../src/shared/instructions'
@@ -159,15 +159,15 @@ describe("hive-mcp.js and hive-progress.js's dialect file", () => {
     writeFileSync(file, JSON.stringify({ texts: { 'contract.docs.outline': 'Read big docs by section.', bad: 3 }, files: ['claude-code/cli.json'] }))
     const loaded = loadProcessDialect({ CW_DIALECT_FILE: file, CW_DIALECT: 'abc123' })
     expect(loaded).toEqual({ texts: { 'contract.docs.outline': 'Read big docs by section.' }, files: ['claude-code/cli.json'], hash: 'abc123' })
-    expect(hiveInstructions('web').split('\n')[2]).toBe('Read big docs by section.')
+    expect(combworkInstructions('web').split('\n')[2]).toBe('Read big docs by section.')
     expect(loadProcessDialect({ CW_DIALECT_FILE: join(dir, 'missing.json') })).toBeNull()
-    expect(hiveInstructions('web').split('\n')[2]).toMatch(/^Markdown over about 20 KB/)
+    expect(combworkInstructions('web').split('\n')[2]).toMatch(/^Markdown over about 20 KB/)
     expect(loadProcessDialect({})).toBeNull()
     for (const raw of ['not json', '[]', '{"texts": []}', '{"files": []}']) expect(chainFromFile(raw), raw).toBeNull()
   })
 
   it('is loaded by each script first, before any text is said', () => {
-    for (const entry of ['src/main/mcp/hive-mcp.ts', 'src/main/progressReporters/hive-progress.ts']) {
+    for (const entry of ['src/main/mcp/cw-mcp.ts', 'src/main/progressReporters/cw-progress.ts']) {
       const imports = [...readFileSync(join(ROOT, entry), 'utf8').matchAll(/^import\s.*$/gm)].map((m) => m[0])
       expect(imports[0], entry).toBe("import '../../shared/agentText/processDialect'")
     }
@@ -192,8 +192,8 @@ describe('the canary dialect over the session contract (card 1)', () => {
     for (let mask = 0; mask < 1 << SKILLS.length; mask += 37) out.push({ name: `board ${mask}`, text: boardSkillsLine(new Set(SKILLS.filter((_, i) => mask & (1 << i)))), values: [] })
     for (const role of ['agent', 'assistant'] as const)
       for (const progress of [true, false])
-        for (const journal of [null, [], ['decision', 'plan']]) out.push({ name: `${role} ${progress} ${JSON.stringify(journal)}`, text: hiveInstructions('webapp', role, progress, undefined, journal), values: ['webapp', 'decision', 'plan'] })
-    out.push({ name: 'no project', text: hiveInstructions(''), values: [] })
+        for (const journal of [null, [], ['decision', 'plan']]) out.push({ name: `${role} ${progress} ${JSON.stringify(journal)}`, text: combworkInstructions('webapp', role, progress, undefined, journal), values: ['webapp', 'decision', 'plan'] })
+    out.push({ name: 'no project', text: combworkInstructions(''), values: [] })
     for (const level of ['look', 'agents', 'projects'] as const) for (const cs of [true, false]) out.push({ name: `control ${level} ${cs}`, text: controlRules(level, cs), values: [] })
     out.push({ name: 'journal', text: journalRule([]), values: [] })
     out.push({ name: 'handover', text: withLatestHandover('', 'handovers/2026-10-03-web.md'), values: ['handovers/2026-10-03-web.md'] })
@@ -219,7 +219,7 @@ describe('the canary dialect over the session contract (card 1)', () => {
 
   it('finds text glued on in code: the check fails where a word bypasses the catalogue', () => {
     setProcessChain(chain(canaryTexts(catalogue)))
-    expect(canaryProblems(`${hiveInstructions('webapp')}\nAlso, be nice.`, ids, ['webapp'])).toEqual([expect.stringMatching(/^text outside the catalogue: Also, be, nice/)])
+    expect(canaryProblems(`${combworkInstructions('webapp')}\nAlso, be nice.`, ids, ['webapp'])).toEqual([expect.stringMatching(/^text outside the catalogue: Also, be, nice/)])
     expect(canaryProblems('⟦no.such.id⟧x⟦/⟧', ids)).toEqual(["markers naming ids the schema hasn't: no.such.id"])
     expect(canaryProblems('⟦contract.docs.outline⟧x', ids)).toEqual(['unbalanced markers'])
   })
@@ -259,7 +259,7 @@ describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-243
     add('numbers, more', wakeLines(Array.from({ length: 200 }, (_, i) => flags(i + 1))))
     // Loop wakes, each kind, and a lane's next card.
     for (const kind of LOOP_WAKE_KINDS) add(`loop ${kind}`, loopWakeLine(commented(1), kind, 'needs logs'))
-    for (const next of ['paused', 'last', ...(['hiveStarts', 'start', 'started', 'waits'] as const).map((is) => ({ card: 9, title: 'Fix the parser', is }))] as const) add(`next ${JSON.stringify(next)}`, loopWakeLine(change(1, { column: 'done' }), 'done', undefined, laneNextWords(next)))
+    for (const next of ['paused', 'last', ...(['combworkStarts', 'start', 'started', 'waits'] as const).map((is) => ({ card: 9, title: 'Fix the parser', is }))] as const) add(`next ${JSON.stringify(next)}`, loopWakeLine(change(1, { column: 'done' }), 'done', undefined, laneNextWords(next)))
     for (const step of ['design', 'followUp', 'proceed', 'ok', 'gaps']) for (const of of ['design', 'followUp']) add(`step ${step} ${of}`, loopWakeLine(change(1), 'step', loopStepWords(step, 'design text', 'd1', of)), ['d1'])
     // The Assistant's card wake with the user's replies, and cards that left a watch.
     const replies = [{ agentName: 'Sam', cards: [1, 2], text: 'needs logs' }]
@@ -432,7 +432,7 @@ describe('the skill status lines in guidance.ts', () => {
     const held = new Promise<void>((r) => (release = r))
     const reading = new Promise<void>((r) => (reached = r))
     let scans = 0
-    vi.spyOn(skills, 'hiveSkills').mockImplementation(async () => {
+    vi.spyOn(skills, 'combworkSkills').mockImplementation(async () => {
       if (scans++ === 0) {
         reached()
         await held

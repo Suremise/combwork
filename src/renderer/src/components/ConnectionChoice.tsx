@@ -45,7 +45,7 @@ function listFor(key: string): NonNullable<typeof listed> {
   return listed
 }
 
-/** Hive's connections and this window's workspace's choice of them, read again as they change. */
+/** Combwork's connections and this window's workspace's choice of them, read again as they change. */
 export function useConnections(): ConnectionsView | null {
   const changed = useStore((s) => s.connectionsChanged)
   const wsPath = useStore((s) => s.workspace?.path ?? null)

@@ -3,7 +3,7 @@ import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { tempDir } from '../tempDir'
 
-// #845 (E10a): errors read by both audiences. A service throws a HiveError: its message is English (the Agent API, the
+// #845 (E10a): errors read by both audiences. A service throws a CombworkError: its message is English (the Agent API, the
 // log), and IPC tells the window its text in the language Combwork shows. The window's text as data beside an English
 // field never reaches agents.
 
@@ -22,7 +22,7 @@ const { setLanguage } = await import('../../src/shared/i18n')
 const { msg } = await import('../../src/shared/i18n/msg')
 const { withValues } = await import('../../src/shared/advanced')
 const { extraArgsProblem } = await import('../../src/shared/providers')
-const { capturedText, englishError, errorData, errorText, HiveError, hiveError, shownError, windowError } = await import('../../src/main/hiveError')
+const { capturedText, englishError, errorData, errorText, CombworkError, combworkError, shownError, windowError } = await import('../../src/main/combworkError')
 const { addedForAgents, apiErrorReply, entryForAgents, metricsForAgents, replyText } = await import('../../src/main/servers')
 const { registerIpc } = await import('../../src/main/ipc')
 const { config } = await import('../../src/main/config')
@@ -58,10 +58,10 @@ describe('the errors area', () => {
   })
 })
 
-describe('HiveError', () => {
+describe('CombworkError', () => {
   it('keeps its English as its message, whatever language Combwork shows, and gives the window its text in that language', () => {
     setLanguage('de', GERMAN)
-    const e = hiveError(M.gone, { n: 12 }, { kind: 'notFound' })
+    const e = combworkError(M.gone, { n: 12 }, { kind: 'notFound' })
     expect(e).toBeInstanceOf(Error)
     expect(e.message).toBe('Card #12 is gone.')
     expect(englishError(e)).toBe('Card #12 is gone.')
@@ -70,15 +70,15 @@ describe('HiveError', () => {
     expect(errorData(e)).toEqual({ text: withValues(M.gone, { n: 12 }), kind: 'notFound' })
   })
 
-  it('formats an error inside another in the same language: a HiveError by its text, any other by its message', () => {
+  it('formats an error inside another in the same language: a CombworkError by its text, any other by its message', () => {
     setLanguage('de', GERMAN)
-    const inner = hiveError(M.gone, { n: 3 })
-    const outer = hiveError(M.wrapped, { why: errorText(inner) }, { cause: inner })
+    const inner = combworkError(M.gone, { n: 3 })
+    const outer = combworkError(M.wrapped, { why: errorText(inner) }, { cause: inner })
     expect(outer.message).toBe('Could not move it: Card #3 is gone.')
     expect(shownError(outer)).toBe('Konnte sie nicht verschieben: Karte #3 gibt es nicht mehr.')
     expect(outer.cause).toBe(inner)
     // Node's own text (or a CLI's) stays as it came, in both.
-    const fromNode = hiveError(M.wrapped, { why: errorText(new Error('EBUSY: resource busy')) })
+    const fromNode = combworkError(M.wrapped, { why: errorText(new Error('EBUSY: resource busy')) })
     expect(shownError(fromNode)).toBe('Konnte sie nicht verschieben: EBUSY: resource busy')
     expect(englishError(fromNode)).toBe('Could not move it: EBUSY: resource busy')
     expect(errorData(new Error('EPERM'))).toEqual({ text: 'EPERM' })
@@ -88,7 +88,7 @@ describe('HiveError', () => {
     setLanguage('de', GERMAN)
     const text = capturedText((t) => extraArgsProblem('--model x -- y', t))
     expect(text).not.toBeNull()
-    const e = new HiveError(text!, { kind: 'invalid' })
+    const e = new CombworkError(text!, { kind: 'invalid' })
     expect(e.message).toBe(extraArgsProblem('--model x -- y'))
     expect(shownError(e)).toBe(GERMAN['agents.provider.extraArgsDashes'])
     expect(capturedText((t) => extraArgsProblem('--model x', t))).toBeNull()
@@ -96,8 +96,8 @@ describe('HiveError', () => {
 
   it('is formatted for the window by IPC, and any other error is passed on as it is', () => {
     setLanguage('de', GERMAN)
-    const shown = windowError(hiveError(M.gone, { n: 7 })) as Error
-    expect(shown).not.toBeInstanceOf(HiveError)
+    const shown = windowError(combworkError(M.gone, { n: 7 })) as Error
+    expect(shown).not.toBeInstanceOf(CombworkError)
     expect(shown.message).toBe('Karte #7 gibt es nicht mehr.')
     const plain = new Error('CONFLICT')
     expect(windowError(plain)).toBe(plain)
@@ -107,7 +107,7 @@ describe('HiveError', () => {
 describe('IPC (#845)', () => {
   it("tells the window a refused call in the window's language, and in English again after a change back", async () => {
     const ws = createWorkspaceService()
-    ws.path = tempDir('hive-errors-ipc-')
+    ws.path = tempDir('cw-errors-ipc-')
     callerWorkspace = ws
     try {
       registerIpc(() => ({}) as never, {} as never)
@@ -122,7 +122,7 @@ describe('IPC (#845)', () => {
       await expect(call('connection:update', 'c-x', { extraArgs: '--x -- y' })).rejects.toThrow(GERMAN['agents.provider.extraArgsDashes'])
       setLanguage('en', {})
       await expect(call('lanes:end', '')).rejects.toThrow(/^Which lane to end is required$/)
-      // Not a HiveError (the workspace's own, until E10f converts it): passed on as it is.
+      // Not a CombworkError (the workspace's own, until E10f converts it): passed on as it is.
       setLanguage('de', GERMAN)
       const plain = await call('files:open', ws.path, 'a.txt').then(() => null, (e: Error) => e)
       expect(plain?.message).toMatch(/^Not a project/)
@@ -135,12 +135,12 @@ describe('IPC (#845)', () => {
 })
 
 describe('the Agent API (#845)', () => {
-  it('answers a HiveError in English, with the status its kind says, whatever language Combwork shows', () => {
+  it('answers a CombworkError in English, with the status its kind says, whatever language Combwork shows', () => {
     setLanguage('de', GERMAN)
-    expect(apiErrorReply(hiveError(M.gone, { n: 4 }, { kind: 'notFound' }))).toEqual({ status: 404, body: { error: 'Card #4 is gone.' } })
-    expect(apiErrorReply(hiveError(msg({ id: 'errors.workspace.none', defaultMessage: 'No workspace is open.', description: 'test' }), undefined, { kind: 'conflict' }))).toEqual({ status: 409, body: { error: 'No workspace is open.' } })
+    expect(apiErrorReply(combworkError(M.gone, { n: 4 }, { kind: 'notFound' }))).toEqual({ status: 404, body: { error: 'Card #4 is gone.' } })
+    expect(apiErrorReply(combworkError(msg({ id: 'errors.workspace.none', defaultMessage: 'No workspace is open.', description: 'test' }), undefined, { kind: 'conflict' }))).toEqual({ status: 409, body: { error: 'No workspace is open.' } })
     // Without a kind, the English message says the status, as for any other error.
-    expect(apiErrorReply(hiveError(msg({ id: 'errors.test.unknownTask', defaultMessage: 'Unknown task #{n}', description: 'test' }), { n: 9 })).status).toBe(404)
+    expect(apiErrorReply(combworkError(msg({ id: 'errors.test.unknownTask', defaultMessage: 'Unknown task #{n}', description: 'test' }), { n: 9 })).status).toBe(404)
     expect(apiErrorReply(new Error('Unknown task #9'))).toEqual({ status: 404, body: { error: 'Unknown task #9' } })
   })
 

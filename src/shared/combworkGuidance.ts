@@ -1,10 +1,10 @@
 /**
- * The session contract: what every session Hive starts is told about Hive, always. The hive MCP server sends it as
- * its instructions (Claude Code shows them to the model), and Hive passes the same text as developer instructions to
+ * The session contract: what every session Combwork starts is told about Combwork, always. The combwork MCP server sends it as
+ * its instructions (Claude Code shows them to the model), and Combwork passes the same text as developer instructions to
  * providers that don't (Codex). Kept here so the MCP server (bundled on its own, Node built-ins only) and the main
  * process say the same thing.
  *
- * It holds only what must hold whatever else is loaded: who and where the session is, where Hive's things live, the
+ * It holds only what must hold whatever else is loaded: who and where the session is, where Combwork's things live, the
  * board's boundaries, and which skill to use for which workflow. Procedures live in the skills (resources/skills),
  * arguments and side effects in the tools' descriptions, and enforcement in the Agent API. The boundaries are
  * repeated here in a line so a session without the skills (deleted, or a provider that didn't load them) still keeps
@@ -19,7 +19,7 @@ import { agentList, agentMsg, say } from './agentText/index.ts'
 /** Settings → Assistant → Control (AssistantControl). */
 type AssistantControlLevel = 'look' | 'agents' | 'projects'
 
-export type HiveRole = 'agent' | 'assistant'
+export type CombworkRole = 'agent' | 'assistant'
 
 const A = {
   agentHost: agentMsg({
@@ -112,7 +112,7 @@ const A = {
   otherWorkspaceNote: agentMsg({ id: 'contract.board.other.workspaceNote', text: 'shared notes', note: 'What the workspace-note skill covers, in the list of the other skills.' }),
   otherMergeReady: agentMsg({ id: 'contract.board.other.mergeReady', text: 'merging', note: 'What the merge-ready skill covers, in the list of the other skills.' }),
   otherSplitWork: agentMsg({ id: 'contract.board.other.splitWork', text: 'splitting work', note: 'What the split-work skill covers, in the list of the other skills.' }),
-  otherUseHiveApi: agentMsg({ id: 'contract.board.other.useCombworkApi', text: 'its HTTP API', note: 'What the use-cw-api skill covers, in the list of the other skills.' }),
+  otherUseCombworkApi: agentMsg({ id: 'contract.board.other.useCombworkApi', text: 'its HTTP API', note: 'What the use-cw-api skill covers, in the list of the other skills.' }),
   otherSkills: agentMsg({
     id: 'contract.board.skills',
     text: "{afterRoutes, select, yes {Combwork's other skills cover {list}.} other {Combwork's skills cover {list}.}}",
@@ -211,7 +211,7 @@ const OTHER_SKILLS = [
   ['workspace-note', A.otherWorkspaceNote],
   ['merge-ready', A.otherMergeReady],
   ['split-work', A.otherSplitWork],
-  ['use-cw-api', A.otherUseHiveApi]
+  ['use-cw-api', A.otherUseCombworkApi]
 ] as const
 
 /**
@@ -237,11 +237,11 @@ export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
 export const assistantSkillsLine = (journal: boolean): string => say(A.assistantSkills, { journal: journal ? 'yes' : 'no' })
 
 /**
- * The session contract alone: what hiveInstructions gives before the journal's rule. `journal`: the Assistant's journal
+ * The session contract alone: what combworkInstructions gives before the journal's rule. `journal`: the Assistant's journal
  * is on, so its skills line leaves out handover (an agent's contract has no such line). launchParts tells the contract
  * from what follows it with this.
  */
-export function sessionContract(project: string, role: HiveRole = 'agent', progress = true, skillsOff?: ReadonlySet<string>, journal = false): string {
+export function sessionContract(project: string, role: CombworkRole = 'agent', progress = true, skillsOff?: ReadonlySet<string>, journal = false): string {
   if (role === 'assistant') return [say(A.assistantHost), assistantSkillsLine(journal), say(A.docs), `${say(A.inboxRule)} ${say(A.inboxAssistant)}`].join('\n')
   return [
     say(A.agentHost, { hasProject: project ? 'yes' : 'no', project }),
@@ -257,26 +257,26 @@ export function sessionContract(project: string, role: HiveRole = 'agent', progr
 }
 
 /**
- * The session contract a launch gives. `progress`: whether agents wrap long commands in hive-progress unasked
+ * The session contract a launch gives. `progress`: whether agents wrap long commands in cw-progress unasked
  * (progressRule). `skillsOff`: the skills a project agent's session isn't given (#1431), which its contract doesn't
  * name. `journal`: the kinds the Assistant's journal stores while it is on (null: off), whose rule then follows the
  * contract and whose skills line leaves out handover (HI-2048); an agent's contract only gains the rule.
  */
-export function hiveInstructions(project: string, role: HiveRole = 'agent', progress = true, skillsOff?: ReadonlySet<string>, journal: readonly string[] | null = null): string {
+export function combworkInstructions(project: string, role: CombworkRole = 'agent', progress = true, skillsOff?: ReadonlySet<string>, journal: readonly string[] | null = null): string {
   const contract = sessionContract(project, role, progress, skillsOff, journal !== null)
   return journal ? `${contract}\n${journalRule(journal)}` : contract
 }
 
 /**
- * Hive's settings (Settings → Assistant → Control → Change settings): reading and explaining them always, changing them
- * only with the switch on and the user's say-so. Hive refuses the sensitive ones and the Assistant's own Control
+ * Combwork's settings (Settings → Assistant → Control → Change settings): reading and explaining them always, changing them
+ * only with the switch on and the user's say-so. Combwork refuses the sensitive ones and the Assistant's own Control
  * (settingsChange in servers.ts); when and how to suggest one is the tune-settings skill's.
  */
 export const settingsRule = (changeSettings: boolean): string => say(changeSettings ? A.settingsChange : A.settingsRead)
 
 /**
  * What the Assistant may do, from Settings → Assistant → Control: the boundaries it keeps whatever else it reads.
- * Hive enforces them too (assistantChange in servers.ts); how to work within them is the coordinate-agents skill's.
+ * Combwork enforces them too (assistantChange in servers.ts); how to work within them is the coordinate-agents skill's.
  */
 export function controlRules(control: AssistantControlLevel, changeSettings = false): string {
   if (control === 'look') return [say(A.controlLook, { changeSettings: changeSettings ? 'yes' : 'no' }), settingsRule(changeSettings)].join('\n')
@@ -295,7 +295,7 @@ export function withLatestHandover(instructions: string, relPath: string | null 
   return relPath ? `${instructions}\n${say(A.latestHandover, { path: relPath })}` : instructions
 }
 
-/** Who wrote a handover: Hive fills this in from the agent whose hive tools wrote it. */
+/** Who wrote a handover: Combwork fills this in from the agent whose Combwork tools wrote it. */
 export interface HandoverAuthor {
   /** "Claude (Claude Code)", or "Assistant". */
   author: string
@@ -304,7 +304,7 @@ export interface HandoverAuthor {
 }
 
 /**
- * The header Hive puts at the top of every handover: its title, then project, author and session (when an
+ * The header Combwork puts at the top of every handover: its title, then project, author and session (when an
  * agent wrote it) and the date, in the machine's time with UTC in brackets.
  */
 export function handoverHeader(title: string, project: string, by: HandoverAuthor | null, at: Date): string {

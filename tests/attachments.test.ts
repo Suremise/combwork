@@ -48,7 +48,7 @@ describe('attachment kinds and labels', () => {
   })
 })
 
-const base = tempDir('hive-attach-')
+const base = tempDir('cw-attach-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

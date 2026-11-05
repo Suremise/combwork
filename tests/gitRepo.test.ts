@@ -115,7 +115,7 @@ const theyPush = (file: string): void => {
 
 /** New repositories for this test: the project on main, pushed to its bare remote, and another clone of that remote. */
 function fresh(): void {
-  const base = tempDir('hive-gitrepo-')
+  const base = tempDir('cw-gitrepo-')
   proj = join(base, 'ws', 'proj')
   remote = join(base, 'remote.git')
   other = join(base, 'other')
@@ -1089,8 +1089,8 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const { withRepoLocks } = await import('../src/main/repoLock')
     // Another Combwork's own queue of workflow writes: a second, independently loaded instance of the module.
     const ours = await import('../src/main/workflow/writes')
-    const otherHive = (await import(/* @vite-ignore */ `../src/main/workflow/writes?another-hive=${Date.now()}`)) as typeof ours
-    expect(otherHive.workflowWrite).not.toBe(ours.workflowWrite)
+    const otherCombwork = (await import(/* @vite-ignore */ `../src/main/workflow/writes?another-hive=${Date.now()}`)) as typeof ours
+    expect(otherCombwork.workflowWrite).not.toBe(ours.workflowWrite)
     const d = door()
     refDoor = d.door
     const deleting = repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }])
@@ -1098,7 +1098,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     // Its target change as Combwork writes one: the project's repository lock first, then its own turn.
     let retargeted = false
     const retarget = withRepoLocks([proj], () =>
-      otherHive.workflowWrite(async () => {
+      otherCombwork.workflowWrite(async () => {
         workTarget = 'cw/hb1'
         retargeted = true
       })

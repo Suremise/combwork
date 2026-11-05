@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
 
 /** The run context's PATH for a test copy without the folders that hold git. */
 function pathWithoutGit() {
-  const env = lib.hiveEnv({ CW_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   return (env[key] ?? '')
     .split(path.delimiter)
@@ -124,7 +124,7 @@ function pathWithoutGit() {
   // --- A narrow window with the Projects sidebar, Progress and the Assistant's rail (#906): the list goes above the
   // detail, which keeps the tab's width (not squeezed to nothing behind Progress), its buttons clickable; then a wide one
   // as before, the list beside it.
-  const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args })
+  const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args })
   const layout = () =>
     page.evaluate(() => {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect() ?? null

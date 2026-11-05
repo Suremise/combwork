@@ -34,7 +34,7 @@ const post = (url, token, body) =>
   lib.trustForCodex(proj)
   fs.rmSync(userData, { recursive: true, force: true })
   lib.enableProviders(userData, ['claude-code', 'codex'])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47894), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47894), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 850 })

@@ -11,7 +11,7 @@ import { brokersWorkingIn, folderInside, parseWorkingIn, type WorkingIn } from '
 
 const ROOT = join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps')
 const BROKER = join(ROOT, 'MicrosoftWindows.WindowsSandbox_0.5.3.0_x64__cw5n1h2txyewy', 'WindowsSandboxServer.exe')
-const dir = tempDir('hive-brokers-working-in-')
+const dir = tempDir('cw-brokers-working-in-')
 const SLOT = join(dir, 'slot-a')
 const SIBLING = join(dir, 'slot-ab')
 for (const d of [SLOT, join(SLOT, 'src'), SIBLING]) mkdirSync(d, { recursive: true })

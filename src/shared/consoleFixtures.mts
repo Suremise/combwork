@@ -2,22 +2,22 @@
  * Developer console recordings as files (#366 decision 5, #638): the JSON Lines a recording is written in, turning a
  * recording into a fixture (tests/fixtures/console/), comparing what a CLI sends now with a fixture (the contract tests),
  * and the part of a recording Copy Diagnostics attaches. No imports, so plain Node runs it as it is
- * (scripts/consoleFixture.mjs, the contract suites), and Hive and the unit tests share it.
+ * (scripts/consoleFixture.mjs, the contract suites), and Combwork and the unit tests share it.
  */
 
 /** The recording file's format, in its first line. */
 export const RECORDING_FORMAT = 1
 
-/** A recording's first line: what was recorded, with which Hive and CLIs, and whether text is in it. */
+/** A recording's first line: what was recorded, with which Combwork and CLIs, and whether text is in it. */
 export interface RecordingHeader {
   type: 'recording'
   format: number
-  hive: string
+  combwork: string
   startedAt: string
   source: { kind: string; label: string; provider?: string }
   /** Prompt and reply text kept (the user's opt-in for this recording); secrets are masked either way. */
   text: boolean
-  /** Each coding agent's CLI as installed when it started, and the version this Hive release was tested with. */
+  /** Each coding agent's CLI as installed when it started, and the version this Combwork release was tested with. */
   clis: { provider: string; version: string | null; tested: string | null }[]
   /** A flight recorder capture (#698): the trigger that fired and what it saw, in English. */
   capture?: { trigger: string; what: string; whatText?: unknown }
@@ -54,7 +54,7 @@ export interface Recording {
   header: RecordingHeader | null
   events: RecordedEvent[]
   end: RecordingEnd | null
-  /** Lines that weren't JSON or no known type (a recording cut short as Hive quit ends mid-line). */
+  /** Lines that weren't JSON or no known type (a recording cut short as Combwork quit ends mid-line). */
   bad: number
 }
 
@@ -79,13 +79,13 @@ export function parseRecording(text: string): Recording {
 
 // --- Fixtures
 
-/** A recording made into a test fixture: what the CLI sent and what Hive made of it, with no machine's paths. */
+/** A recording made into a test fixture: what the CLI sent and what Combwork made of it, with no machine's paths. */
 export interface ConsoleFixture {
   format: number
   provider: string | null
   /** The CLI's version it was recorded with. */
   cli: string | null
-  hive: string
+  combwork: string
   recordedAt: string
   events: FixtureEvent[]
 }
@@ -97,7 +97,7 @@ export interface FixtureEvent {
   made?: unknown
 }
 
-/** What a fixture keeps: what the CLI sends and Hive's reading of it, not Hive's own work (API calls, lines it typed). */
+/** What a fixture keeps: what the CLI sends and Combwork's reading of it, not Combwork's own work (API calls, lines it typed). */
 export const FIXTURE_KINDS: readonly string[] = ['hook', 'statusline', 'transcript', 'terminal', 'launch', 'exit']
 
 /** An absolute path (a drive, a UNC share, or a POSIX root) as a whole string. */
@@ -126,7 +126,7 @@ export function recordingToFixture(text: string): ConsoleFixture {
     format: RECORDING_FORMAT,
     provider,
     cli: r.header.clis.find((c) => c.provider === provider)?.version ?? null,
-    hive: r.header.hive,
+    combwork: r.header.combwork,
     recordedAt: r.header.startedAt,
     events
   }
@@ -149,18 +149,18 @@ export interface ContractFinding {
  */
 export const CONTRACT_KINDS: readonly string[] = ['hook', 'statusline', 'launch', 'exit']
 /**
- * The terminal markers that say only whether Hive recognised the CLI's screen (once a launch, whatever its status:
+ * The terminal markers that say only whether Combwork recognised the CLI's screen (once a launch, whatever its status:
  * screenRecognition.ts): one that stops arriving means the CLI's prompt or footer changed. The others (ready, footer
- * mode, title, startup question) are what Hive did with the screen at the time, so they come and go with timing: their
+ * mode, title, startup question) are what Combwork did with the screen at the time, so they come and go with timing: their
  * readings are compared where both runs have them, and they are never required.
  */
 export const RECOGNITION_MARKERS: readonly string[] = ['prompt shown', 'footer seen']
 const required = (e: FixtureEvent): boolean => CONTRACT_KINDS.includes(e.kind) || (e.kind === 'terminal' && RECOGNITION_MARKERS.includes(e.name))
-/** The kinds whose fields are part of it: a field gone or retyped is a change. A terminal marker's are Hive's own. */
+/** The kinds whose fields are part of it: a field gone or retyped is a change. A terminal marker's are Combwork's own. */
 export const SHAPE_KINDS: readonly string[] = ['hook', 'statusline', 'launch', 'exit']
-/** The kinds whose reading is part of it: what Hive made of the event (its kind, status, actions and the like). */
+/** The kinds whose reading is part of it: what Combwork made of the event (its kind, status, actions and the like). */
 export const READING_KINDS: readonly string[] = ['hook', 'terminal', 'launch', 'exit']
-/** Parts of what Hive made of an event that vary from run to run, or are the CLI's text, never its reading. */
+/** Parts of what Combwork made of an event that vary from run to run, or are the CLI's text, never its reading. */
 const VARYING = new Set(['text', 'lastMessage', 'was', 'at', 'seq'])
 
 const typeOf = (v: unknown): string => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v)
@@ -179,7 +179,7 @@ export function shapeOf(values: unknown[]): Map<string, Set<string>> {
 }
 
 /**
- * What Hive made of an event, as one line: its plain fields (a status, a mode, a flag), a hook's event kind and its
+ * What Combwork made of an event, as one line: its plain fields (a status, a mode, a flag), a hook's event kind and its
  * actions (in order), leaving out text, hidden values and what varies between runs. "kind=stop status=finished
  * actions=releaseLocks,notifyFinished,turnEnded".
  */
@@ -213,7 +213,7 @@ const parentOf = (path: string): string => path.replace(/(?:^|\.)[^.[\]]+$|\[\]$
  * Compares what a CLI sends now (`live`, a fixture made from a new recording of the same scripted run) with a recorded
  * fixture. Per event (its kind and name), these are changes: one that no longer arrives (CONTRACT_KINDS, and the
  * terminal's RECOGNITION_MARKERS), a field gone or of another type (SHAPE_KINDS), and a reading of the fixture's that
- * Hive no longer makes where both runs have the event (READING_KINDS: another event kind, status, actions or mode). A
+ * Combwork no longer makes where both runs have the event (READING_KINDS: another event kind, status, actions or mode). A
  * new event, field or reading is flagged as new. A field gone with a new one beside it, of the same type, is named as a
  * possible rename.
  */
@@ -270,7 +270,7 @@ export function recordingName(at: Date, n: number, kind: string): string {
 
 const RECORDING_NAME = /^console-(\d{8})-(\d{6})-(\d{3})(?:-(\d+))?-[a-z]+\.jsonl$/
 
-/** Whether a file name is one of Hive's recordings. */
+/** Whether a file name is one of Combwork's recordings. */
 export const isRecordingName = (name: string): boolean => RECORDING_NAME.test(name)
 
 /** Recordings' file names, newest first: by the time each started, then by its number within that millisecond. */
@@ -333,6 +333,6 @@ export function diagnosticRecording(text: string, redact: (s: string) => string)
   const h = r.header
   const clis = h.clis.filter((c) => c.version).map((c) => `${c.provider} ${c.version}${c.tested ? ` (tested with ${c.tested})` : ''}`)
   const end = r.end ? `${r.end.events} events, ended (${r.end.reason})${r.end.dropped ? `, ${r.end.dropped} lost` : ''}` : `${r.events.length} events, not ended`
-  const summary = redact(`${h.capture ? `capture (${h.capture.trigger}: ${h.capture.what}) of a ` : ''}${h.source.kind} source${h.source.provider ? ` (${h.source.provider})` : ''}, started ${h.startedAt}, Combwork ${h.hive}; ${end}; CLIs: ${clis.join(', ') || 'none found'}; redacted; the newest ${lines.length}`)
+  const summary = redact(`${h.capture ? `capture (${h.capture.trigger}: ${h.capture.what}) of a ` : ''}${h.source.kind} source${h.source.provider ? ` (${h.source.provider})` : ''}, started ${h.startedAt}, Combwork ${h.combwork}; ${end}; CLIs: ${clis.join(', ') || 'none found'}; redacted; the newest ${lines.length}`)
   return { summary, lines }
 }

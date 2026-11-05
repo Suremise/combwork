@@ -7,7 +7,7 @@ import { cardDecisions, cardReadsBy, newDecisionsOn } from './decisionNotices'
 import { NOTICE_PREFIX } from '../shared/doorbell'
 import { agentMsg, inDialectOf, say, type AgentMsg } from '../shared/agentText'
 import { recordDecisionsReceived } from './workflow/recorder'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -24,19 +24,19 @@ import { scopeOfHost, withCardNames } from './projectKeys'
 /**
  * Decisions reach an agent waiting for the user (#401). An agent asks the user, and its turn ends; the user answers
  * elsewhere (through the Assistant), and the answer is recorded on its card as decisions (#357). An agent waiting makes no
- * tool calls, so the flag in its next reply never comes: Hive gives it one line, a delivery (#649: the user's answer,
+ * tool calls, so the flag in its next reply never comes: Combwork gives it one line, a delivery (#649: the user's answer,
  * which the agent acks), offered as a card watch's wake is (#376, #430: taken, or marked) when its turn has ended (ready
  * or finished: not working, not on background tasks, not watching, whose wake tells it, and never into a question or
- * permission prompt it shows), the user isn't typing there and no line of Hive's waits to be taken. Decisions landing
+ * permission prompt it shows), the user isn't typing there and no line of Combwork's waits to be taken. Decisions landing
  * together are told together: after a short settle. What a line told isn't told again once it is received (in memory);
- * the card's history says whom Hive told. The Assistant's own cards aren't its: project agents only. A line is made again
+ * the card's history says whom Combwork told. The Assistant's own cards aren't its: project agents only. A line is made again
  * just before it is offered, and typed only while it is still true: until Enter, nothing on the board changed and the
  * agent read no card since (else it is made again at the next try).
  */
 
 const log = createLogger('decisions')
 
-/** How long after a board change (or a turn's end) Hive waits before telling, so decisions recorded together are told together. */
+/** How long after a board change (or a turn's end) Combwork waits before telling, so decisions recorded together are told together. */
 const SETTLE_MS = 15_000
 /** However the board keeps changing, it tells at most this long after the first change it waits on. */
 const SETTLE_MAX_MS = 60_000
@@ -56,11 +56,11 @@ const telling = new Set<string>()
 const boardGen = new Map<string, number>()
 const genOf = (ws: WorkspaceService): number => boardGen.get((ws.path ?? '').toLowerCase()) ?? 0
 // Counted from the start, whether or not decision lines are wired in (initDecisionWakes), so tests see it too.
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type === 'tasks-changed') boardGen.set(e.workspacePath.toLowerCase(), (boardGen.get(e.workspacePath.toLowerCase()) ?? 0) + 1)
 })
 
-/** Whether an agent may be told now: its turn has ended, nobody types there, no line of Hive's waits. */
+/** Whether an agent may be told now: its turn has ended, nobody types there, no line of Combwork's waits. */
 const ready = (st: LiveSessionState | null): boolean => !!st && (st.status === 'ready' || st.status === 'finished')
 
 const T = {
@@ -121,7 +121,7 @@ async function lineOf(ws: WorkspaceService, projectPath: string, agentId: string
 /** Whether a watch of the agent's counts a card's decisions now (a decision has no column: any will do). */
 const watchHearsDecisions = (projectPath: string, agentId: string, n: number): boolean => watchCovers(projectPath, agentId, n, 'decision', 'review')
 
-/** The decisions are the user's: Hive relays them. */
+/** The decisions are the user's: Combwork relays them. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const USER = { kind: 'user', name: 'the user' } as const
 
@@ -280,7 +280,7 @@ async function decisionFromAction(a: ActionRow, from: WorkspaceService): Promise
       try {
         await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: await lineOf(ws, projectPath, to.id, cards), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: [...loop].join(',') }, action: a.id })
       } catch (e) {
-        // Another Hive made it meanwhile (the unique row refused this one's): delivered.
+        // Another Combwork made it meanwhile (the unique row refused this one's): delivered.
         if (!actionDelivered(projectPath, a.id)) throw e
         return
       }
@@ -323,7 +323,7 @@ export function initDecisionWakes(): void {
   started = true
   // Its delivery carries the action's id: run until marked, made once.
   onAction('wakeOnDecision', (a, ws) => decisionFromAction(a, ws), 'delivered')
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'tasks-changed') {
       const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())
       // One look at a time (#1011): a slow one isn't overlapped by the next.

@@ -1,5 +1,5 @@
 // Where a card stands with the merge queue (#1354, SPEC §16.9.3), for agents: who merges it, by its own ruleset (the
-// options it started under, or the user's change applied to it), never the project's current options; and, under Hive
+// options it started under, or the user's change applied to it), never the project's current options; and, under Combwork
 // merges, what the queue is doing with it, worked out from the card's facts and the queue's order (queueOrder: its
 // entries in the order they were requested, and the one testing now). One order for every place that says it: a card
 // read, a lane's next, a refusal's next step, and the window's queue model (#1353, queueControls.ts's queueView).
@@ -73,7 +73,7 @@ const Q = {
 export type QueueState =
   /** Waiting in the queue: `position` 1 is next, after the one testing now. */
   | { state: 'queued'; target: string; position: number }
-  /** The queue's entry now, at its step (null: another Hive runs the queue, or its advance is recovered, step unknown). */
+  /** The queue's entry now, at its step (null: another Combwork runs the queue, or its advance is recovered, step unknown). */
   | { state: 'testing'; target: string; step: QueueStep | null }
   /** In the queue, which is paused for its target (`card`: the card it paused on; `stuck`: an interrupted advance, asked in For you). */
   | { state: 'paused'; target: string; reason: PauseReason; card: string; stuck?: true }
@@ -87,7 +87,7 @@ export type QueueState =
   /** Not in the queue yet: it goes in once approved. */
   | { state: 'notYet' }
 
-/** The card's queue state when its own ruleset says Hive merges it, else null (the agent merges, or nobody checks). */
+/** The card's queue state when its own ruleset says Combwork merges it, else null (the agent merges, or nobody checks). */
 export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.state(card)): QueueState | null {
   if (wf.rulesetOf(card, s).options.finish !== 'combworkMerges') return null
   if (s.stage === 'done') return { state: 'merged' }
@@ -108,7 +108,7 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
   return { state: 'notYet' }
 }
 
-/** What runs a target's queue in this Hive now (queueHost's queueLive): whether it runs, and its entry at its step. */
+/** What runs a target's queue in this Combwork now (queueHost's queueLive): whether it runs, and its entry at its step. */
 export interface QueueLive {
   running: boolean
   now: QueueStepInfo | null
@@ -128,8 +128,8 @@ export interface QueueOrder {
 }
 
 /**
- * A target's queue in order (#1353's model, shared with #1354's card states). Testing now: this Hive's entry at its
- * step; else an advance begun (its recovery finishes it), or, when another Hive runs the queue, its first entry (its
+ * A target's queue in order (#1353's model, shared with #1354's card states). Testing now: this Combwork's entry at its
+ * step; else an advance begun (its recovery finishes it), or, when another Combwork runs the queue, its first entry (its
  * step isn't known here).
  */
 export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.queueLive(target)): QueueOrder {
@@ -182,7 +182,7 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
  * (the question to update a checked-out target now, which Resume doesn't stand in for; a stuck advance's Decide, or
  * Resume once settled), a step that needs the user fixed and Resume (a needs-you pause with no question: git's error, an
  * earlier runner's process), the folder its target is checked out in put right (Resume checks it first), or the rules
- * enforced again (Hive resumes it then: queueHost's startOpen); anything else, the user's Resume.
+ * enforced again (Combwork resumes it then: queueHost's startOpen); anything else, the user's Resume.
  */
 export type PauseWait = 'resume' | 'answer' | 'fix' | 'folder' | 'rules'
 
@@ -255,7 +255,7 @@ export function queueLine(q: QueueState, enforced = true): string {
   }
 }
 
-/** What a returned card's wake says of it, at most (watch.ts's room for Hive's own note in a wake line). */
+/** What a returned card's wake says of it, at most (watch.ts's room for Combwork's own note in a wake line). */
 export const WAKE_NOTE_MAX = 600
 /** What a card read says of it, at most, and how many of the log's last lines. */
 const READ_MAX = 1500

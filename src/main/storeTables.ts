@@ -101,7 +101,7 @@ function readOld(db: ReturnType<typeof workspaceDb>['reader'], store: TableStore
 export async function saveTable(workspacePath: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null> = {}, guard?: () => void, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): Promise<void> {
   const path = resolve(workspacePath)
   // Its lock is the board's: inside a board change it would wait for itself.
-  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
+  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Combwork's code, never shown
   // Under way from here, its wait for the lock included (HI-1368: a close command waits for it).
   await countedWrite(path, () => saveTableLocked(path, store, docs, meta, guard, also))
 }

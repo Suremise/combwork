@@ -22,7 +22,7 @@ import { settingEntry, settingReadOnly } from '../src/shared/settingsCatalog'
 import type { AgentDef } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-agentlimit-')
+const base = tempDir('cw-agentlimit-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

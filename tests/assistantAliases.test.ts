@@ -11,7 +11,7 @@ import { junction, shortPath } from './pathAliases'
 import { moveFolder } from './moveFolder'
 import { DEFAULT_JOURNAL, type JournalSettings } from '../src/shared/journal'
 
-const base = tempDir('hive-assistant-aliases-')
+const base = tempDir('cw-assistant-aliases-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).

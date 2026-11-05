@@ -20,7 +20,7 @@ const ws = path.join(lib.WORK, 'purge-ws')
 const claudeHome = path.join(lib.WORK, 'purge-claude-home')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
-const hiveOf = (p) => path.join(p, '.combwork')
+const combworkOf = (p) => path.join(p, '.combwork')
 const cliDirOf = (p) => path.join(claudeHome, 'projects', p.replace(/[^a-zA-Z0-9]/g, '-'))
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -61,20 +61,20 @@ const write = (file, text) => {
     { host: alpha, id: ONE, name: 'Purged alone', archived: false, cli: true, n: 3 },
     { host: beta, id: BETA, name: 'In beta', archived: false, cli: true, n: 4 }
   ]
-  const backup = (s) => path.join(hiveOf(s.host), s.archived ? 'archive' : 'sessions', `${s.id}.jsonl.gz`)
-  const shot = (s) => path.join(hiveOf(s.host), 'attachments', s.id)
+  const backup = (s) => path.join(combworkOf(s.host), s.archived ? 'archive' : 'sessions', `${s.id}.jsonl.gz`)
+  const shot = (s) => path.join(combworkOf(s.host), 'attachments', s.id)
   const cliCopy = (s) => path.join(cliDirOf(s.host), `${s.id}.jsonl`)
   for (const s of fixtures) {
     write(backup(s), zlib.gzipSync(transcript(s.id, s.n)))
     if (s.cli) write(cliCopy(s), transcript(s.id, s.n))
     write(path.join(shot(s), 'shot.png'), lib.samplePng(40 + s.n * 10, 30))
   }
-  write(path.join(hiveOf(alpha), 'attachments', DELETED, 'shot.png'), lib.samplePng(90, 60))
-  const spare = path.join(hiveOf(alpha), 'sessions', `${WITH_CLI}.jsonl.gz.spare`)
+  write(path.join(combworkOf(alpha), 'attachments', DELETED, 'shot.png'), lib.samplePng(90, 60))
+  const spare = path.join(combworkOf(alpha), 'sessions', `${WITH_CLI}.jsonl.gz.spare`)
   write(spare, 'left by a crash')
   for (const host of [alpha, beta]) {
     const mine = fixtures.filter((s) => s.host === host)
-    write(path.join(hiveOf(host), 'sessions.json'), JSON.stringify({ version: 1, sessions: mine.map((s) => ({ id: s.id, agent: 'claude-code', name: s.name, createdAt: ago(21), lastActiveAt: ago(20), archived: s.archived })), deleted: host === alpha ? [DELETED] : [] }))
+    write(path.join(combworkOf(host), 'sessions.json'), JSON.stringify({ version: 1, sessions: mine.map((s) => ({ id: s.id, agent: 'claude-code', name: s.name, createdAt: ago(21), lastActiveAt: ago(20), archived: s.archived })), deleted: host === alpha ? [DELETED] : [] }))
   }
 
   lib.enableProviders(userData)
@@ -85,7 +85,7 @@ const write = (file, text) => {
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47828), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47828), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -100,7 +100,7 @@ const write = (file, text) => {
     await inv('session:start', alpha, { agentId: live.id })
     const state = await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === live.id && s.status === 'ready' && s.sessionId), 20000)
     check('the live agent is running', !!state)
-    const liveShot = path.join(hiveOf(alpha), 'attachments', state?.sessionId ?? 'none', 'now.png')
+    const liveShot = path.join(combworkOf(alpha), 'attachments', state?.sessionId ?? 'none', 'now.png')
     write(liveShot, lib.samplePng(20, 20))
 
     const totals = async () => {
@@ -116,8 +116,8 @@ const write = (file, text) => {
     const dialog = page.locator('.dialog')
     const dialogText = () => dialog.innerText().catch(() => '')
     const rows = () => dialog.locator('.purge-preview tbody [title]').evaluateAll((els) => els.map((e) => e.getAttribute('title')))
-    const rel = (list, host) => list.map((p) => path.relative(hiveOf(host), p).replace(/\\/g, '/')).sort()
-    const binnedFrom = (p) => lib.trashed(hiveOf(alpha)).some((e) => e.from.toLowerCase() === p.toLowerCase())
+    const rel = (list, host) => list.map((p) => path.relative(combworkOf(host), p).replace(/\\/g, '/')).sort()
+    const binnedFrom = (p) => lib.trashed(combworkOf(alpha)).some((e) => e.from.toLowerCase() === p.toLowerCase())
 
     // --- The Sessions tab: one session's files.
     await page.locator('.project-row', { hasText: 'alpha' }).click()
@@ -172,11 +172,11 @@ const write = (file, text) => {
     const go = dialog.locator('.dialog-footer .btn').last()
     check('Delete permanently changes the button', await lib.until(async () => /Delete 6 items \(.+\) permanently/.test(await go.innerText()), HUNG_MS), await go.innerText())
     await page.screenshot({ path: path.join(lib.WORK, 'purge-3-permanent.png') })
-    const binBefore = lib.trashed(hiveOf(alpha)).length
+    const binBefore = lib.trashed(combworkOf(alpha)).length
     await go.click()
     check('the dialog closes', await lib.until(async () => (await dialog.count()) === 0, HUNG_MS))
-    check('the listed files are gone', await lib.until(() => want.every((w) => !fs.existsSync(path.join(hiveOf(alpha), w))), HUNG_MS), want.filter((w) => fs.existsSync(path.join(hiveOf(alpha), w))).join(', '))
-    check('…for good: none went to the Recycle Bin', lib.trashed(hiveOf(alpha)).length === binBefore)
+    check('the listed files are gone', await lib.until(() => want.every((w) => !fs.existsSync(path.join(combworkOf(alpha), w))), HUNG_MS), want.filter((w) => fs.existsSync(path.join(combworkOf(alpha), w))).join(', '))
+    check('…for good: none went to the Recycle Bin', lib.trashed(combworkOf(alpha)).length === binBefore)
     check('the lost session is deleted, as Delete does', !sessionsOf(alpha).sessions.some((s) => s.id === LOST) && sessionsOf(alpha).deleted.includes(LOST))
     check('the session the CLI has stays', sessionsOf(alpha).sessions.some((s) => s.id === WITH_CLI))
     check("the running session's attachment stays", fs.existsSync(liveShot))
@@ -194,7 +194,7 @@ const write = (file, text) => {
     check('…and its title names the workspace', /Purge What Combwork Keeps in purge-ws/.test(await dialogText()))
     await page.screenshot({ path: path.join(lib.WORK, 'purge-4-workspace.png') })
     await dialog.locator('.btn.primary').click()
-    check("beta's files went to the Recycle Bin", await lib.until(() => !fs.existsSync(backup(b)) && !fs.existsSync(shot(b)), HUNG_MS) && lib.trashed(hiveOf(beta)).some((e) => e.from.toLowerCase() === backup(b).toLowerCase()))
+    check("beta's files went to the Recycle Bin", await lib.until(() => !fs.existsSync(backup(b)) && !fs.existsSync(shot(b)), HUNG_MS) && lib.trashed(combworkOf(beta)).some((e) => e.from.toLowerCase() === backup(b).toLowerCase()))
     check('the totals are still unchanged', (await totals()) === before, `${await totals()} vs ${before}`)
 
     await inv('session:stop', alpha, live.id).catch(() => undefined)

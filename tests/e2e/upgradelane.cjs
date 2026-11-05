@@ -119,7 +119,7 @@ function driver(app, page) {
   const lane = (body) => `cw hive_lane ${JSON.stringify(body)}`
   try {
     // 1. The 0.9 Hive runs the loop: c1 built and in Review, c2 in Doing, c3 still in Todo.
-    const oldApp = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ CW_USER_DATA: oldProfile, ...claude }) })
+    const oldApp = await _electron.launch({ executablePath: old.exe, args: [], env: lib.combworkEnv({ CW_USER_DATA: oldProfile, ...claude }) })
     const oldPage = await oldApp.firstWindow()
     const o = driver(oldApp, oldPage)
     open.add(o)

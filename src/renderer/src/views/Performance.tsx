@@ -22,10 +22,10 @@ import { CardsTable } from './PerformanceCards'
 import { StallsTable } from './PerformanceStalls'
 
 /**
- * Performance: what Hive's own parts cost (shared/metrics.ts, recorded by main/metrics.ts), for the whole workspace (the
+ * Performance: what Combwork's own parts cost (shared/metrics.ts, recorded by main/metrics.ts), for the whole workspace (the
  * activity bar's view, with a project filter) or one project (its Performance tab, fixed to it). One page for both:
  * the scope is explicit in every query, and a project's page asks for its project only, so it can't show another
- * project's work, the Assistant's or the workspace's own. It refreshes every minute while it is shown, through Hive's
+ * project's work, the Assistant's or the workspace's own. It refreshes every minute while it is shown, through Combwork's
  * window (not the Agent API, so reading it adds nothing to what it shows).
  */
 
@@ -488,7 +488,7 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
                 {(all.guidance.length > 0 || all.providers.length > 0 || !!report.providersNote || !!report.providersUnreadable || !!filters.provider) && (
                   <ByProvider report={report} sel={sel} range={range.value} provider={filters.provider} setProvider={(provider) => setFilters({ provider })} />
                 )}
-                {/* Hive's tool list isn't per provider: outside the provider's group. */}
+                {/* Combwork's tool list isn't per provider: outside the provider's group. */}
                 <ToolListTable sel={all} />
               </>
             )}
@@ -505,7 +505,7 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
               />
             )}
             {!isTab && report.skills && <SkillService report={report} filtered={filters.role !== 'all'} />}
-            {/* Hive's own main process (HI-1135): app-wide, since it started, so the workspace's page only. */}
+            {/* Combwork's own main process (HI-1135): app-wide, since it started, so the workspace's page only. */}
             {!isTab && <StallsTable refreshAt={loaded.at} />}
             {!isTab && report.app && <AppWide report={report} />}
             <details className="perf-limits">
@@ -638,7 +638,7 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
 
 const roleName = (role: string): string => (role === 'assistant' ? tr(M.assistant) : tr(M.agents))
 
-/** The Hive tools table's columns, in the window's language (made again when it changes). */
+/** The Combwork tools table's columns, in the window's language (made again when it changes). */
 const toolColumns = (): DataColumn<ToolRow>[] => [
   { key: 'tool', header: tr(M.tool), cell: (r) => r.tool, sortValue: (r) => r.tool, filter: { kind: 'text', value: (r) => r.tool } },
   { key: 'calls', header: tr(M.calls), num: true, descFirst: true, cell: (r) => num(r.calls), sortValue: (r) => r.calls },
@@ -746,7 +746,7 @@ function ByProvider({ report, sel, range, provider, setProvider }: { report: Met
 /** A count of characters a start, or — where none was measured (unknown, not zero). */
 const charsCell = (v: number | null): string => (v === null ? '—' : fmt.number(Math.round(v)))
 const charsColumn = (key: string, header: string, value: (r: ToolListRow) => number | null): DataColumn<ToolListRow> => ({ key, header, num: true, descFirst: true, cell: (r) => charsCell(value(r)), sortValue: value })
-/** The Hive tool list table's columns, in the window's language (made again when it changes). */
+/** The Combwork tool list table's columns, in the window's language (made again when it changes). */
 const toolListColumns = (): DataColumn<ToolListRow>[] => [
   { key: 'role', header: tr(M.who), className: 'nowrap', cell: (r) => roleName(r.role), sortValue: (r) => roleName(r.role) },
   { key: 'workflow', header: tr(M.workflow), className: 'nowrap', cell: (r) => tr(M.workflowSide, { side: r.workflow }), sortValue: (r) => tr(M.workflowSide, { side: r.workflow }) },
@@ -759,7 +759,7 @@ const toolListColumns = (): DataColumn<ToolListRow>[] => [
   { key: 'bytes', header: tr(M.toolListBytes), num: true, descFirst: true, cell: (r) => formatBytes(r.bytes), sortValue: (r) => r.bytes }
 ]
 
-/** The hive tools' list as each session got it, a start (HI-2063): every provider's (not recorded per provider). */
+/** The Combwork tools' list as each session got it, a start (HI-2063): every provider's (not recorded per provider). */
 function ToolListTable({ sel }: { sel: PerfSelection }) {
   const language = useLanguage()
   // eslint-disable-next-line react-hooks/exhaustive-deps

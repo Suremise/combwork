@@ -1,6 +1,6 @@
 /**
  * Waiting on cards (#128): what an agent waits for (cards, which changes count, a column to arrive in), what counts as a
- * change since it began waiting, and the one line Hive types to wake it. Pure, so the Agent API's waits, Hive's
+ * change since it began waiting, and the one line Combwork types to wake it. Pure, so the Agent API's waits, Combwork's
  * wake-on-change watches and tests share it.
  *
  * A change is found by comparing each card with a snapshot taken when the wait began: its column, its latest comment's
@@ -53,7 +53,7 @@ export const WATCH_MAX_CARDS = 20
 export const WAIT_MAX_SECONDS = 840
 /** The longest an Agent API agents wait (`POST /v1/agents/wait`, cw_wait_for_agents) holds a call. */
 export const AGENT_WAIT_MAX_SECONDS = 600
-/** A watch's default overall limit with no change before Hive wakes the agent to say so (minutes), and the most allowed. */
+/** A watch's default overall limit with no change before Combwork wakes the agent to say so (minutes), and the most allowed. */
 export const WATCH_DEFAULT_LIMIT_MINUTES = 120
 export const WATCH_MAX_LIMIT_MINUTES = 24 * 60
 
@@ -79,7 +79,7 @@ export function readMark(v: unknown): CardMark | null {
   return { column, comment: v.comment, verdict: v.verdict, agent: v.agent, archived: v.archived }
 }
 
-/** A saved condition, checked (null: not one Hive would have made). */
+/** A saved condition, checked (null: not one Combwork would have made). */
 export function readSavedCondition(v: unknown): WatchCondition | null {
   if (!isObj(v) || !Array.isArray(v.cards) || !Array.isArray(v.changes)) return null
   const cards = v.cards
@@ -447,7 +447,7 @@ export function encodeSince(marks: Map<number, CardMark>, at = Date.now()): stri
     .join(',')
 }
 
-/** Marks read back from `since`, and when it was taken (null: not one Hive wrote). */
+/** Marks read back from `since`, and when it was taken (null: not one Combwork wrote). */
 export function decodeSince(since: string): { marks: Map<number, CardMark>; at: number } | null {
   if (typeof since !== 'string' || since.length > 4000) return null
   const head = /^@([0-9a-z]+);/.exec(since)
@@ -632,7 +632,7 @@ const W = {
   loopSaid: agentMsg({ id: 'wake.loop.said', text: '. {whose, select, reviewerAsks {The reviewer asks} builderReplies {The builder replies} builder {The builder} reviewer {The reviewer} other {Combwork}}: "{text}"', note: "#912, #1382: in a loop wake, what a request, step or Combwork's note says (cut with … to fit), and whose it is." }),
   lanePaused: agentMsg({ id: 'wake.lane.paused', text: 'Your lane is paused: cw_lane next says why', note: "HI-1990: a builder's Done wake when its lane is paused." }),
   laneLast: agentMsg({ id: 'wake.lane.last', text: "That was your lane's last card: the lane ends by itself, so end your turn unless you have other work", note: "HI-1990: a builder's Done wake on its lane's last card." }),
-  laneNextHiveStarts: agentMsg({ id: 'wake.lane.nextCombworkStarts', text: "Your lane's next card is {card} (\"{title}\"): Combwork starts it for you once your turn ends, so end your turn now", note: "HI-1990: a builder's Done wake, its lane's rules on: Combwork starts the next card." }),
+  laneNextCombworkStarts: agentMsg({ id: 'wake.lane.nextCombworkStarts', text: "Your lane's next card is {card} (\"{title}\"): Combwork starts it for you once your turn ends, so end your turn now", note: "HI-1990: a builder's Done wake, its lane's rules on: Combwork starts the next card." }),
   laneNextStart: agentMsg({ id: 'wake.lane.nextStart', text: "Your lane's next card is {card} (\"{title}\"): start it now (cw_lane next, then cw_start_card); this card's own prompt doesn't narrow the lane", note: "HI-1990: a builder's Done wake, its lane's rules off: it starts the next card." }),
   laneNextStarted: agentMsg({ id: 'wake.lane.nextStarted', text: "Your lane's next card, {card} (\"{title}\"), is under way: carry on with it", note: "HI-1990: a builder's Done wake when its next card is already under way." }),
   laneNextWaits: agentMsg({ id: 'wake.lane.nextWaits', text: "Your lane's next card is {card} (\"{title}\"): cw_lane next says when it can start", note: "HI-1990: a builder's Done wake when its next card can't start yet." }),
@@ -685,7 +685,7 @@ export function cardChange(n: number, card: TaskCard | null, changes: WatchChang
 const columnWord = (c: TaskColumn | 'gone'): string => (c === 'gone' ? 'gone' : columnLabel(c))
 
 /**
- * The one line Hive types to wake a watching agent: the card (and whose, when it isn't the watcher's), where it is now
+ * The one line Combwork types to wake a watching agent: the card (and whose, when it isn't the watcher's), where it is now
  * (with the reviewer's verdict when that changed; Passed on another agent's card says it isn't merged yet), and its latest
  * comment's author and first line, then what to do. Kept to one short line (the CLI sends a new line at once).
  */
@@ -694,11 +694,11 @@ export function wakeLine(change: CardChange, more = 0): string {
 }
 
 /**
- * The line of Hive's loop wake (#405), typed with no card watch of the agent's: a card arrived in Review for its
+ * The line of Combwork's loop wake (#405), typed with no card watch of the agent's: a card arrived in Review for its
  * reviewer (`review`), or its review's verdict for its builder (`verdict`). Worded as a card watch's line, so the
  * card-loop skill reads it the same way.
  */
-/** How much of a reviewer's request a wake line quotes, and of Hive's own note (a returned card's needs its next step). */
+/** How much of a reviewer's request a wake line quotes, and of Combwork's own note (a returned card's needs its next step). */
 const REQUEST_MAX = 200
 const NOTE_MAX = 600
 /** And of the user's answer (#1626): its reply whole, up to this; the card's comment has it in full. */
@@ -709,21 +709,21 @@ export const ANSWER_MAX = 4000
  * told in place of carrying on with the card.
  */
 /**
- * HI-2087: whether a loop wake is Hive's note that the merge queue returned the card (queueState's returnedText: a note
- * is only ever Hive's own words, never an agent's), so its line leads with it and its delivery is marked so.
+ * HI-2087: whether a loop wake is Combwork's note that the merge queue returned the card (queueState's returnedText: a note
+ * is only ever Combwork's own words, never an agent's), so its line leads with it and its delivery is marked so.
  */
 export const isReturnNote = (kind: LoopWakeKind, text?: string): boolean => kind === 'note' && !!text && text.replace(/\s+/g, ' ').includes(` ${CAME_BACK}: `)
 
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string, next?: string): string {
   const who =
     kind === 'done' && next ? next : say(kind === 'review' ? W.loopReview : kind === 'step' ? W.loopStep : kind === 'stepNotice' ? W.loopStepNotice : kind === 'reply' ? W.loopReply : kind === 'answer' ? W.loopAnswer : W.loopOwn)
-  // A reviewer's request (#912), a card loop's step (#1382) or Hive's own note (stale, an answer, what came back from the
+  // A reviewer's request (#912), a card loop's step (#1382) or Combwork's own note (stale, an answer, what came back from the
   // merge queue and what to do next: #1354, up to NOTE_MAX): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
   const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' || kind === 'reply' ? REQUEST_MAX : kind === 'answer' ? ANSWER_MAX : NOTE_MAX
   const whose = kind === 'request' ? 'reviewerAsks' : kind === 'reply' ? 'builderReplies' : kind === 'step' || kind === 'stepNotice' ? 'builder' : kind === 'stepAnswer' ? 'reviewer' : 'combwork'
   const tail = say(W.loopTail, { who })
-  // HI-2087: Hive's note that the merge queue returned the card leads the line, as a watch's does: its column and the
+  // HI-2087: Combwork's note that the merge queue returned the card leads the line, as a watch's does: its column and the
   // review's pass first made HB2 take HI-2046 for merged.
   if (isReturnNote(kind, text)) return lineOf({ ...change, about: { owner: null, verdict: null, ...change.about, queueReturn: said.slice(0, max).join('') } }, tail)
   const what = !said.length ? '' : say(W.loopSaid, { whose, text: said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('') })
@@ -732,17 +732,17 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
 
 /**
  * What comes next in a builder's lane, as its Done wake says it (HI-1990; English, agent-facing): its next card, which
- * Hive starts for it once its turn ends (`hiveStarts`, rules on), for it to start (`start`, rules off), already under way
+ * Combwork starts for it once its turn ends (`combworkStarts`, rules on), for it to start (`start`, rules off), already under way
  * (`started`) or not yet startable (`waits`); the lane paused; or none left.
  */
-export function laneNextWords(next: { card: number; title: string; is: 'hiveStarts' | 'start' | 'started' | 'waits' } | 'paused' | 'last'): string {
+export function laneNextWords(next: { card: number; title: string; is: 'combworkStarts' | 'start' | 'started' | 'waits' } | 'paused' | 'last'): string {
   if (next === 'paused') return say(W.lanePaused)
   if (next === 'last') return say(W.laneLast)
   const title = [...next.title.trim()]
   const values = { card: cardRef(next.card), title: title.length > 60 ? `${title.slice(0, 59).join('')}…` : title.join('') }
   switch (next.is) {
-    case 'hiveStarts':
-      return say(W.laneNextHiveStarts, values)
+    case 'combworkStarts':
+      return say(W.laneNextCombworkStarts, values)
     case 'start':
       return say(W.laneNextStart, values)
     case 'started':
@@ -754,7 +754,7 @@ export function laneNextWords(next: { card: number; title: string; is: 'hiveStar
 
 /**
  * What a loop wake is about (#405, #1266): a card arrived in Review (its reviewer's), a verdict, the card moved into Passed
- * or Done, a reviewer's request mid-review (#912), a note of Hive's (a pass gone stale), or the user's answer to a request
+ * or Done, a reviewer's request mid-review (#912), a note of Combwork's (a pass gone stale), or the user's answer to a request
  * (#1269: the agent waiting on it, whether or not the card is in a loop), a card loop's step (#1382: `step`, a design to
  * check, and `stepNotice`, its builder going ahead unchecked, are its reviewer's; `stepAnswer`, the reviewer's answer, its
  * builder's; `reply`, the builder's reply to its reviewer, HI-2302, its reviewer's): the rest are its builder's.
@@ -1036,7 +1036,7 @@ function wherePart(w: ReviewWhere): string {
 }
 
 /**
- * The line Hive types when a watch's overall limit passes with no change. Cards that left the watch meanwhile (#420) are
+ * The line Combwork types when a watch's overall limit passes with no change. Cards that left the watch meanwhile (#420) are
  * told first: drop them. A card in Review (HI-2295, `where`) is said to be there, by whom it is reviewed or that it waits for
  * a reviewer: a review on its way is nothing to tell the user, so only the other cards ask the agent to. Likewise a card
  * waiting on another agent's card in progress, and that card (HI-2381): watched again quietly, the lane showing the wait.

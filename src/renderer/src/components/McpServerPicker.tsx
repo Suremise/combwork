@@ -38,7 +38,7 @@ export function McpSearch({ query, filter, onQuery, onFilter, errors, stacked }:
 }
 
 /**
- * Add server… (HI-2059): the workspace's servers not yet added to a project or the Hive Assistant (`servers`, those
+ * Add server… (HI-2059): the workspace's servers not yet added to a project or the Combwork Assistant (`servers`, those
  * that can be added), found by search and filter; the one chosen shows what it runs and what to know about its
  * definition before Add, which stays greyed out (the dialog's `dialogBlocked`) until one is chosen. `onPick` hears it.
  */

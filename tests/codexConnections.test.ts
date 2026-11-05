@@ -14,7 +14,7 @@ import { acceptable } from '../src/shared/accounts'
 import type { Account } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-codex-connections-')
+const base = tempDir('cw-codex-connections-')
 const home = join(base, 'codex-home')
 const userHome = join(base, 'user-profile')
 process.env.CW_USER_DATA = join(base, 'profile')

@@ -75,7 +75,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TASKBAR_LOG: taskbarLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TASKBAR_LOG: taskbarLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -720,7 +720,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('…Recent included, kept runs too (#352)', (await inv('progress:list')).length === 0 && !!(await until(async () => !fs.existsSync(path.join(userData, 'progress-history')), 5000)))
 
   // --- Agents show long commands (#167): on by default, in Settings under the Progress panel and greyed out while the
-  // panel is off; a session started afterwards gets the matching rule (its hive MCP server's instructions).
+  // panel is off; a session started afterwards gets the matching rule (its combwork MCP server's instructions).
   const instructionsOf = async (dir) => {
     const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.cwd.toLowerCase() === dir.toLowerCase()).at(-1)
     const server = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork

@@ -27,7 +27,7 @@ describe("0.9.3's agent fields, carried through (pure)", () => {
 })
 
 describe("0.9.3's agent fields survive the workspace's saves", async () => {
-  const base = tempDir('hive-legacyfields-')
+  const base = tempDir('cw-legacyfields-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
 

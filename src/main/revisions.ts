@@ -7,7 +7,7 @@ import { metricsHandle, recordSkills } from './metrics'
 
 /**
  * The revisions (contentHash) of skills and modes, and their SKILL.md headers (headerOf), kept so a status poll doesn't read every file again: one
- * inventory per open workspace, and one for what ships with Hive. A kept revision is used only while its path's
+ * inventory per open workspace, and one for what ships with Combwork. A kept revision is used only while its path's
  * treeSignature (sizes, times, file ids; no file contents) is the one it was taken with, so an edit, a new file or a
  * restore is hashed again on the next call and a stale revision is never given. A workspace's inventory goes when it
  * closes, and hashing for it stops there (its lifetime signal); nothing is shared between workspaces.
@@ -22,7 +22,7 @@ interface Kept {
 
 /**
  * How much each inventory keeps. Revisions: the workspace's skills (at most MAX_SKILL_FOLDERS, 1000) and modes,
- * with room to spare. Headers: those, plus the user's, plugin and projects' local skills Hive lists, and a byte budget,
+ * with room to spare. Headers: those, plus the user's, plugin and projects' local skills Combwork lists, and a byte budget,
  * since a description can be long. Within them a repeated scan reads nothing; past them the least recently used entries
  * go one at a time, never all at once.
  */
@@ -80,7 +80,7 @@ function headerWeight(h: { value: unknown }): number {
 
 interface Inventory {
   signal?: AbortSignal
-  /** Whose work it is, for metrics: the workspace; Hive's shipped resources are the current workspace's to count. */
+  /** Whose work it is, for metrics: the workspace; Combwork's shipped resources are the current workspace's to count. */
   owner: WorkspaceService | null
   kept: Retained<Kept>
   /** SKILL.md headers (headerOf), by path. */

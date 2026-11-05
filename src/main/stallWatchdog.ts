@@ -3,8 +3,8 @@ import { parentPort, workerData } from 'worker_threads'
 
 /**
  * The stall watchdog (HI-1692): a thread beside main that only ticks, noting each gap in its own ticks. When main stalls,
- * the watchdog either ticked on (main itself was blocked: Hive's, a warning) or stopped for the same span (the whole
- * process was paused: the PC asleep without powerMonitor saying so, the display off, the process suspended; not Hive's,
+ * the watchdog either ticked on (main itself was blocked: Combwork's, a warning) or stopped for the same span (the whole
+ * process was paused: the PC asleep without powerMonitor saying so, the display off, the process suspended; not Combwork's,
  * not counted). Darren's log had stalls of 7–8 s with no main-thread CPU and nothing under way, at quiet times, that only
  * this can tell apart. Shared with main: [0] the last tick, [1] how many gaps were noted, then the latest GAPS gaps as
  * (start, end) pairs, each in ms since the epoch (performance's timeOrigin + now: the same on both threads).

@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-servers-')
+const base = tempDir('cw-servers-')
 const home = join(base, 'claude-home')
 const userHome = join(base, 'user-profile')
 const profile = join(base, 'profile')

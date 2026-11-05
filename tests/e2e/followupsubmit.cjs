@@ -2,7 +2,7 @@
 // failed round, or by the reviewer moving the card to Doing, which gave it to the reviewer and ended both watches. A fake
 // Claude Code builder (B1) and its lane's reviewer (E1, fake Claude Code), the Assistant off, in the project folder:
 // - B1 builds the card and submits it; E1 starts its review, leased copy-1 at that revision;
-// - B1 commits the change E1 asked for and submits it with cw_submit followUp (the real hive MCP server): the card stays
+// - B1 commits the change E1 asked for and submits it with cw_submit followUp (the real combwork MCP server): the card stays
 //   in Review and B1's, in the same round, its history "Follow-up submitted for review at <commit>", the new revision
 //   pinned, B1 watching it again, and E1 woken (no column move) saying to start its review again;
 // - E1's start review again takes the follow-up: copy-1 is reset to it (the earlier lease returned), and its pass there
@@ -109,7 +109,7 @@ const lines = (file) => {
     check('E1 starts its review, in copy-1 at the submitted revision', r1.status === 200 && !!c1 && gitIn(c1.folder, 'rev-parse', 'HEAD') === first, JSON.stringify({ r1: r1.body, copies: await copies() }))
     const firstLease = c1?.lease?.id
 
-    // --- B1 commits what E1 asked for and submits it as a follow-up, through its hive tool.
+    // --- B1 commits what E1 asked for and submits it as a follow-up, through its Combwork tool.
     fs.writeFileSync(path.join(alpha, 'a.ts'), 'export const a = 3\n')
     gitIn(alpha, 'commit', '-qam', 'asked for', '-m', `Combwork-Card: ${key}`)
     const head = gitIn(alpha, 'rev-parse', 'HEAD')

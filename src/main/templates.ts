@@ -31,7 +31,7 @@ import {
   type TemplateAgent,
   type TemplateScope
 } from '../shared/templates'
-import { CW_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
+import { CW_TEMPLATES, combworkTemplate, type CombworkTemplate } from '../shared/templateDefaults'
 import type { AgentBranchStatus, AgentDef, PageLayout, ProjectConfig, ProviderId, TemplateLoadPlan, TemplateLoadWorkflow } from '../shared/types'
 import { answerFor, badAnswers, loadFallback, optionNamed, optionOf, type ConnectionAnswers, type ConnectionOption, type ConnectionsApplied, type ConnectionsPlan, type PickedAgent } from '../shared/templateConnections'
 import { accountOnIn, connectionsOn } from '../shared/accounts'
@@ -54,7 +54,7 @@ import * as wt from './worktrees'
 import { legacySetupPending, legacyWorktree } from '../shared/agentFolders'
 import { agentText, englishText, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { msg, tr, type Msg } from '../shared/i18n'
-import { errorText, HiveError } from './hiveError'
+import { errorText, CombworkError } from './combworkError'
 import { trash } from './trash'
 import { upgradedTemplate } from './nameUpgradeValues'
 import { withAgentNames, workspaceAgents } from './agentNames'
@@ -66,8 +66,8 @@ import { AGENT_NAME_MAX, agentNameProblem, nameTaken, sameAgentName } from '../s
  * of git). One kept JSON file each (a damaged one is recovered from its copy). Loading one replaces the project's agents
  * — only when it is safe (none running, no uncommitted work in their worktrees, every provider on and installed), and
  * all or nothing; adding one agent from a template leaves the others alone. #127: listing every scope, rename,
- * duplicate, delete (to the Recycle Bin), and export and import as files, read as untrusted. #1436: Hive's own templates
- * (the Hive scope, read-only, `shared/templateDefaults.ts`), and agents created in the project folder with their role
+ * duplicate, delete (to the Recycle Bin), and export and import as files, read as untrusted. #1436: Combwork's own templates
+ * (the Combwork scope, read-only, `shared/templateDefaults.ts`), and agents created in the project folder with their role
  * in the workflow, note and pairing. HI-1910: its workflow, a section per version control (the rules of the project's
  * options, never its own facts: workflow/templateOptions.ts), saved with the agents when asked, shown and laid over a
  * project's options when it is loaded, to save in its Workflow form.
@@ -76,7 +76,7 @@ import { AGENT_NAME_MAX, agentNameProblem, nameTaken, sameAgentName } from '../s
 const log = createLogger('templates')
 
 /** A template that isn't there, or can't be used: the caller says so as it is, in the window's language (#849). */
-export class TemplateError extends HiveError {}
+export class TemplateError extends CombworkError {}
 
 /** A refusal from a message and its values. */
 const refusal = (m: Msg, values?: TextValues, kind?: 'invalid' | 'notFound' | 'conflict'): TemplateError => new TemplateError(values ? withValues(m, values) : m, kind ? { kind } : undefined)
@@ -98,7 +98,7 @@ const M = {
   nothing: msg({ id: 'content.templates.nothing', defaultMessage: '{problem} Nothing was changed.', description: "An error loading a template, nothing changed: {problem} is why, a sentence of its own (how many agents a project can have)." }),
   noKey: msg({ id: 'content.templates.noKey', defaultMessage: "Combwork couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → General.", description: "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents is where the key is changed: use its translation." }),
   noKeySave: msg({ id: 'content.templates.noKeySave', defaultMessage: "Combwork couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.", description: "An error saving a project's agents as a template with \"Use the project key in names\" ticked: the key of the project ({project}, its name) couldn't be read. \"Use the project key in names\" is the tick box's label: use its translation." }),
-  hiveOnly: msg({ id: 'content.templates.combworkOnly', defaultMessage: "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.", description: "An error: saving, renaming, editing, importing into or deleting one of Combwork's own templates (the Combwork scope, read-only). Duplicate is a button: as Combwork names it." })
+  combworkOnly: msg({ id: 'content.templates.combworkOnly', defaultMessage: "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.", description: "An error: saving, renaming, editing, importing into or deleting one of Combwork's own templates (the Combwork scope, read-only). Duplicate is a button: as Combwork names it." })
 }
 
 const checkScope = (scope: unknown): TemplateScope => {
@@ -108,12 +108,12 @@ const checkScope = (scope: unknown): TemplateScope => {
 
 /**
  * Where a scope's templates are kept. A project's: that project's folder (one of the workspace's). The workspace's:
- * the workspace of `project` when one is given (the project a template is used in), else this call's workspace. Hive's
+ * the workspace of `project` when one is given (the project a template is used in), else this call's workspace. Combwork's
  * own have no folder (#1436): whatever would write there is refused.
  */
 function folder(d: TemplateDest): string {
   const scope = checkScope(d.scope)
-  if (scope === 'combwork') throw refusal(M.hiveOnly, undefined, 'invalid')
+  if (scope === 'combwork') throw refusal(M.combworkOnly, undefined, 'invalid')
   if (scope === 'project') return join(workspace.assertProject(String(d.project ?? '')), CW_DIR, 'templates')
   const ws = d.project ? workspaceOf(d.project).path : workspace.path
   if (!ws) throw refusal(msg({ id: 'content.templates.noWorkspace', defaultMessage: 'Open a workspace first.', description: "An error: the workspace's templates need a workspace open." }))
@@ -138,8 +138,8 @@ const isV09 = (raw: unknown): boolean => {
   return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v < TEMPLATE_VERSION
 }
 
-/** One of Hive's own templates as listed (#1436): its name and description in the language Hive shows now. */
-function hiveEntry(h: HiveTemplate): TemplateEntry {
+/** One of Combwork's own templates as listed (#1436): its name and description in the language Combwork shows now. */
+function combworkEntry(h: CombworkTemplate): TemplateEntry {
   const t = h.template
   return { scope: 'combwork', file: h.file, name: tr(h.name), savedAt: null, layout: t.layout, description: tr(h.description), agents: t.agents, ...extras(t) }
 }
@@ -150,9 +150,9 @@ function hiveEntry(h: HiveTemplate): TemplateEntry {
  */
 async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry | null> {
   if (d.scope === 'combwork') {
-    const h = hiveTemplate(file)
+    const h = combworkTemplate(file)
     if (!h) throw refusal(M.gone, undefined, 'notFound')
-    return hiveEntry(h)
+    return combworkEntry(h)
   }
   const where = place(d)
   const raw = await readKeptJson<unknown>(join(folder(d), file), null)
@@ -167,9 +167,9 @@ async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry | n
   return { ...where, file, name: t.name, savedAt: t.savedAt || null, layout: t.layout, ...(t.description ? { description: t.description } : {}), agents: t.agents, ...extras(t) }
 }
 
-/** The templates kept in one place, by file name (Hive's own in their order). */
+/** The templates kept in one place, by file name (Combwork's own in their order). */
 async function listIn(d: TemplateDest): Promise<TemplateEntry[]> {
-  if (d.scope === 'combwork') return CW_TEMPLATES.map(hiveEntry)
+  if (d.scope === 'combwork') return CW_TEMPLATES.map(combworkEntry)
   const files = (await readdir(folder(d)).catch(() => [] as string[])).filter(isTemplateFile).sort()
   const out: TemplateEntry[] = []
   for (const f of files) {
@@ -182,7 +182,7 @@ async function listIn(d: TemplateDest): Promise<TemplateEntry[]> {
 const byName = (a: TemplateEntry, b: TemplateEntry): number => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || (a.scope === 'workspace' ? -1 : 1)
 
 /**
- * The templates a project can use: Hive's own (#1436, in their order), then the workspace's and its own, each by name
+ * The templates a project can use: Combwork's own (#1436, in their order), then the workspace's and its own, each by name
  * (a name in both scopes is listed twice), each with its agents' names in this project (`agentNames`, HI-1948).
  */
 export async function listTemplates(projectPath: string): Promise<TemplateEntry[]> {
@@ -194,7 +194,7 @@ export async function listTemplates(projectPath: string): Promise<TemplateEntry[
   return [...(await listIn({ scope: 'combwork' })), ...out.sort(byName)].map((e) => (e.problem ? e : { ...e, agentNames: templateAgentNames(e.agents, key) }))
 }
 
-/** Every template of the workspace (the Templates view): Hive's own, the workspace's, then each project's, each by name. */
+/** Every template of the workspace (the Templates view): Combwork's own, the workspace's, then each project's, each by name. */
 export async function listAllTemplates(): Promise<TemplateEntry[]> {
   if (!workspace.path) return []
   const out = [...(await listIn({ scope: 'combwork' })), ...(await listIn({ scope: 'workspace' })).sort(byName)]
@@ -202,11 +202,11 @@ export async function listAllTemplates(): Promise<TemplateEntry[]> {
   return out
 }
 
-/** One template's file, after checking it is one Hive could have made (never a path) and is there. */
+/** One template's file, after checking it is one Combwork could have made (never a path) and is there. */
 function fileOf(ref: TemplateRef): string {
   if (!isTemplateFile(ref.file)) throw refusal(M.gone, undefined, 'notFound')
   if (ref.scope === 'combwork') {
-    if (!hiveTemplate(ref.file)) throw refusal(M.gone, undefined, 'notFound')
+    if (!combworkTemplate(ref.file)) throw refusal(M.gone, undefined, 'notFound')
     return ref.file
   }
   const f = join(folder(ref), ref.file)
@@ -378,14 +378,14 @@ export async function duplicateTemplate(ref: TemplateRef, to: TemplateDest): Pro
   const t = await usable(ref)
   return changing(to, async () => {
     const name = uniqueTemplateName(t.name, (await listIn(to)).map((e) => e.name))
-    // One of Hive's own has no time it was saved: the copy's is now.
+    // One of Combwork's own has no time it was saved: the copy's is now.
     const copy = await write(to, await newFile(to, name), { ...t.template, name, savedAt: t.template.savedAt || new Date().toISOString() })
     log.info(`Duplicated template ${userText(t.name)} into ${to.scope} as ${userText(name)}`)
     return copy
   })
 }
 
-/** Deletes a template: its file (and the copy kept beside it) go to the Recycle Bin. Hive's own and 0.9's can't be (#1436). */
+/** Deletes a template: its file (and the copy kept beside it) go to the Recycle Bin. Combwork's own and 0.9's can't be (#1436). */
 export async function deleteTemplate(ref: TemplateRef): Promise<void> {
   await changing(ref, async () => {
     const f = fileOf(ref)
@@ -429,7 +429,7 @@ export async function readImport(path: string): Promise<AgentTemplate> {
   return t
 }
 
-/** What an import would bring in: its name, agents, and the providers among them this Hive doesn't know (flagged). */
+/** What an import would bring in: its name, agents, and the providers among them this Combwork doesn't know (flagged). */
 export async function inspectImport(path: string): Promise<{ path: string; name: string; agents: number; unknown: string[] }> {
   const t = await readImport(path)
   return { path, name: t.name, agents: t.agents.length, unknown: unknownProviders(t.agents) }
@@ -454,7 +454,7 @@ export async function importTemplate(path: string, to: TemplateDest, onClash?: '
   })
 }
 
-/** Whether a CLI can run here: known to this Hive, on and installed. */
+/** Whether a CLI can run here: known to this Combwork, on and installed. */
 const cliUsable = (id: ProviderId): boolean => isKnownProvider(id) && isProviderEnabled(config.settings, id) && !!providerService.info(id).found
 
 /**
@@ -594,7 +594,7 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
 
 /**
  * A template's workflow as it meets a project (HI-1910): the section for its version control laid over its options as
- * they are now, or why none applies (a Git-only template in a None project needs Git first). Hive's own carry their
+ * they are now, or why none applies (a Git-only template in a None project needs Git first). Combwork's own carry their
  * preset's, made here as the project's form offers it (its suggested checks, its identity), with their reviewer mode.
  */
 async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' | 'workflow' | 'workflowDropped' | 'suggestedPreset' | 'reviewerMode' | 'agents'>): Promise<TemplateLoadWorkflow | null> {
@@ -604,7 +604,7 @@ async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' 
   let section = t.workflow?.[form.platform] ?? null
   if (section && t.scope === 'combwork' && t.suggestedPreset) {
     const offered = form.presets.find((p) => p.id === t.suggestedPreset)?.options
-    // Read again as any section is: what Hive makes goes through the same whitelist.
+    // Read again as any section is: what Combwork makes goes through the same whitelist.
     // Their size as their Maximum agents (HI-2001): the team the template is.
     if (offered) section = readTemplateWorkflow(templateWorkflowOf({ ...offered, ...(form.platform === 'git' && t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}), maxAgents: t.agents.length }, t.suggestedPreset), form.platform) ?? section
   }
@@ -620,7 +620,7 @@ async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' 
   }
 }
 
-/** An error's first line as text (git's message can run on), its descriptor when it is Hive's and one line. */
+/** An error's first line as text (git's message can run on), its descriptor when it is Combwork's and one line. */
 function firstLine(e: unknown): TextPart {
   const text = errorText(e)
   return typeof text === 'string' || shownText(text).includes('\n') ? shownText(text).split('\n')[0] : text
@@ -758,9 +758,9 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
       })
     } catch (e) {
       for (const s of staged) await s.discard()
-      // A refusal (Hive's, or the caller's guard's or names' own, HI-1502) goes on as it is, its kind and status kept; a
+      // A refusal (Combwork's, or the caller's guard's or names' own, HI-1502) goes on as it is, its kind and status kept; a
       // failure making the agents is said as one.
-      throw e instanceof HiveError || fromCaller.has(e as object) ? e : refusal(msg({ id: 'content.templates.failed', defaultMessage: 'Nothing was changed: {error}', description: "An error loading a template: making its agents failed, so nothing changed; {error} is why (often git's own words)." }), { error: errorText(e) })
+      throw e instanceof CombworkError || fromCaller.has(e as object) ? e : refusal(msg({ id: 'content.templates.failed', defaultMessage: 'Nothing was changed: {error}', description: "An error loading a template: making its agents failed, so nothing changed; {error} is why (often git's own words)." }), { error: errorText(e) })
     }
     log.info(`Loaded template ${userText(plan.name)} into ${userText(projectPath)}: ${before.agents.length} agents removed, ${staged.length} created${before.maxAgents !== undefined ? `, Maximum agents ${before.maxAgents}` : ''}`)
     if (before.maxAgents !== undefined) workflowChanged(workspaceOf(projectPath), projectPath)
@@ -866,7 +866,7 @@ function connectionsFor(plan: TemplateLoadPlan, answers: ConnectionAnswers | und
 
 /**
  * What a template's agent is made on: its connection (its CLI follows: prepareAgent), never the CLI it suggests; with
- * none usable here, that CLI when this Hive knows it (else the first usable, as Add Agent's), placed once an account is.
+ * none usable here, that CLI when this Combwork knows it (else the first usable, as Add Agent's), placed once an account is.
  */
 const onConnection = (a: TemplateAgent, connection: string | undefined): { connection: string } | { provider?: ProviderId } => (connection ? { connection } : a.provider && isKnownProvider(a.provider) ? { provider: a.provider } : {})
 

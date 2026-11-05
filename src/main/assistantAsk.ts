@@ -14,7 +14,7 @@ import { askAssistantOn, noteOnCard, type TaskActor } from './tasks'
 import { workspaceFor, type WorkspaceService } from './workspace'
 
 /**
- * An agent's request for the Hive Assistant on a card (HI-1866, `cw_ask_assistant`): on 27 Oct HB6 asked the Assistant
+ * An agent's request for the Combwork Assistant on a card (HI-1866, `cw_ask_assistant`): on 27 Oct HB6 asked the Assistant
  * in a comment to park HI-1865 On Hold and move HI-1759 to Done on the user's answer, which only the user or the
  * Assistant can do; a comment reaches no inbox, and the card sat for an hour until the Assistant happened to read it.
  *
@@ -22,7 +22,7 @@ import { workspaceFor, type WorkspaceService } from './workspace'
  * that agent (`assistant-ask`) quoting it whole, which the delivery service offers at once: an idle or watching Assistant
  * (its lane watch) is woken by the doorbell, a busy one told at its next tool call. It moves nothing and grants nothing:
  * the Assistant acts on it only within Settings → Assistant → Control and what the user decided. Refused before anything
- * is written when the Assistant can't be told (its hive tools off, Control not letting it change cards); one that ends
+ * is written when the Assistant can't be told (its Combwork tools off, Control not letting it change cards); one that ends
  * unread (cancelled when Control is turned down, expired) tells the user on the card and in a notice, as an answer
  * relay's does (answerRelay.ts).
  */

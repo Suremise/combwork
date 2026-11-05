@@ -1,4 +1,4 @@
-// What a progress run ran for (#1220, SPEC §16.13): the card, revision and check hive-progress and /v1/progress name,
+// What a progress run ran for (#1220, SPEC §16.13): the card, revision and check cw-progress and /v1/progress name,
 // or their defaults (the agent's card in Doing, the folder's head), checked before the command runs. Real git in
 // throwaway repositories for the head; the board and the project's options are stand-ins.
 import { execFileSync } from 'child_process'
@@ -16,7 +16,7 @@ import { setLanguage, tr } from '../src/shared/i18n'
 import type { ProgressRun, TaskColumn } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-runlink-')
+const base = tempDir('cw-runlink-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 

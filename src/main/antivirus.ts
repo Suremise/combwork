@@ -165,7 +165,7 @@ function testLog(entry: Record<string, unknown>): void {
   try {
     appendFileSync(file, `${JSON.stringify({ at: Date.now(), ...entry })}\n`)
   } catch {
-    // A test log that can't be written mustn't break Hive.
+    // A test log that can't be written mustn't break Combwork.
   }
 }
 
@@ -177,7 +177,7 @@ const resolved = (p: string): Promise<string | null> => realpath(resolve(p)).cat
 const exists = (p: string): Promise<boolean> => stat(p).then((s) => s.isDirectory(), () => false)
 
 /**
- * Of the folders Hive excluded, those that no longer exist (#1389): gone only when they truly aren't there (ENOENT,
+ * Of the folders Combwork excluded, those that no longer exist (#1389): gone only when they truly aren't there (ENOENT,
  * ENOTDIR), never for a folder that can't be looked at.
  */
 async function missingOf(paths: string[]): Promise<string[]> {
@@ -186,13 +186,13 @@ async function missingOf(paths: string[]): Promise<string[]> {
   return out
 }
 
-/** Whether the workspace holds Hive's own repository (someone developing Hive). */
-async function holdsHive(w: WorkspaceService): Promise<boolean> {
+/** Whether the workspace holds Combwork's own repository (someone developing Combwork). */
+async function holdsCombwork(w: WorkspaceService): Promise<boolean> {
   for (const p of await w.listProjectPaths().catch(() => [] as string[])) {
     try {
       const pkg = JSON.parse(await readFile(join(p, 'package.json'), 'utf8')) as { name?: unknown; productName?: unknown }
-      // Its product name before and after the rename to Combwork (HI-2461, HI-2458).
-      if (pkg.name === 'hive' && (pkg.productName === 'Hive Desktop' || pkg.productName === 'Hive' || pkg.productName === 'Combwork')) return true
+      // Its package and product names (HI-2591: the repository's own, from 1.1; an older checkout's isn't asked for).
+      if (pkg.name === 'combwork' && pkg.productName === 'Combwork') return true
     } catch {
       // Not a Node project.
     }
@@ -215,7 +215,7 @@ async function guardedFolders(): Promise<string[]> {
 
 /**
  * The workspace's folders to exclude, as resolved absolute paths: its root, its worktrees folder once it exists, and
- * Hive's test area (%LOCALAPPDATA%\combwork-test) only for people developing Hive and once it exists. Each is resolved
+ * Combwork's test area (%LOCALAPPDATA%\combwork-test) only for people developing Combwork and once it exists. Each is resolved
  * (links followed) and checked after resolving: one that is, or holds, a drive, a share, the home folder, the profile
  * or a system folder is never offered, nor one whose real location can't be established.
  */
@@ -226,7 +226,7 @@ export async function workspaceFolders(w: WorkspaceService): Promise<{ path: str
   const trees = worktreesRoot(root)
   const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
   const tests = join(local, 'combwork-test')
-  const wantTests = testsEligible({ packaged: app.isPackaged, holdsHive: app.isPackaged ? await holdsHive(w) : false }) && (await exists(tests))
+  const wantTests = testsEligible({ packaged: app.isPackaged, holdsCombwork: app.isPackaged ? await holdsCombwork(w) : false }) && (await exists(tests))
   return folderPlan(
     {
       root: rootReal,
@@ -240,7 +240,7 @@ export async function workspaceFolders(w: WorkspaceService): Promise<{ path: str
 
 // ------------------------------------------------------------------------------------------------ status
 
-/** What Hive remembers (config.json, this machine's): what it added, the last administrator check, the offers. */
+/** What Combwork remembers (config.json, this machine's): what it added, the last administrator check, the offers. */
 const remembered = () => config.get().antivirus ?? {}
 
 /** The folder set, as a key: a status for another set (a worktrees folder appeared) is probed again. */
@@ -360,8 +360,8 @@ interface Prepared {
 const prepared = new Map<string, Prepared>()
 
 /**
- * The folders an action would change now: Add the safe ones not known to be excluded, Remove the safe ones Hive added
- * and Hive's exclusions of folders that are gone (#1389).
+ * The folders an action would change now: Add the safe ones not known to be excluded, Remove the safe ones Combwork added
+ * and Combwork's exclusions of folders that are gone (#1389).
  */
 async function planFor(w: WorkspaceService, action: AvAction): Promise<{ status: AntivirusStatus; paths: string[] }> {
   const status = await statusFor(w, true)
@@ -396,7 +396,7 @@ export async function prepareAntivirus(action: AvAction): Promise<{ id: string; 
 /**
  * Runs a prepared change, exactly as confirmed: refused if it isn't the window's workspace's any more, or the folders
  * it would change now differ from those the user saw (they must confirm the new set). One elevated PowerShell, one UAC
- * prompt. What Hive added is remembered from what Defender lists afterwards, never from what was asked.
+ * prompt. What Combwork added is remembered from what Defender lists afterwards, never from what was asked.
  */
 export async function applyAntivirus(id: string): Promise<{ result: AvChangeResult; status: AntivirusStatus | null }> {
   const op = typeof id === 'string' ? prepared.get(id) : undefined
@@ -419,8 +419,8 @@ export async function applyAntivirus(id: string): Promise<{ result: AvChangeResu
 
 /**
  * What an elevated run found, remembered (config.json, the machine's): the list read with administrator rights, what
- * it added and removed. With the list read, Hive also forgets its exclusions of folders that are gone and that Defender
- * no longer lists (#1389: taken away in Windows Security, say): there's nothing of Hive's left to show or remove.
+ * it added and removed. With the list read, Combwork also forgets its exclusions of folders that are gone and that Defender
+ * no longer lists (#1389: taken away in Windows Security, say): there's nothing of Combwork's left to show or remove.
  */
 async function remember(result: AvChangeResult): Promise<void> {
   const missing = result.exclusions ? await missingOf(remembered().added ?? []) : []
@@ -435,7 +435,7 @@ async function remember(result: AvChangeResult): Promise<void> {
   })
 }
 
-/** A moved workspace's old folders, as Hive kept them: where it was, and its worktrees folder beside it then. */
+/** A moved workspace's old folders, as Combwork kept them: where it was, and its worktrees folder beside it then. */
 const oldFolders = (from: string): string[] => [resolve(from), worktreesRoot(resolve(from))]
 
 /**
@@ -453,9 +453,9 @@ export async function moveDefenderPlan(w: WorkspaceService, from: string): Promi
 }
 
 /**
- * Moves Hive's exclusions from the old folders to the new ones (#1302), in one elevated PowerShell (one UAC prompt):
- * the plan worked out again now, so only what is true now is changed (exactly Hive's old entries; only the new folders
- * Hive may offer). Null when there is nothing of Hive's to move. What Hive added is remembered from what Defender lists
+ * Moves Combwork's exclusions from the old folders to the new ones (#1302), in one elevated PowerShell (one UAC prompt):
+ * the plan worked out again now, so only what is true now is changed (exactly Combwork's old entries; only the new folders
+ * Combwork may offer). Null when there is nothing of Combwork's to move. What Combwork added is remembered from what Defender lists
  * afterwards, as for Add and Remove.
  */
 export async function moveExclusions(w: WorkspaceService, from: string): Promise<AvChangeResult | null> {
@@ -473,7 +473,7 @@ export async function moveExclusions(w: WorkspaceService, from: string): Promise
 async function elevated(action: AvAction, paths: string[], drives: string[], remove: string[] = []): Promise<AvChangeResult> {
   const fixture = await readFixture()
   if (fixture) return fixtureChange(fixture, action, paths, remove)
-  if (isTestCopy()) throw new Error('Test copies of Hive never change Defender’s settings.') // i18n-ignore: test copies only
+  if (isTestCopy()) throw new Error('Test copies of Combwork never change Defender’s settings.') // i18n-ignore: test copies only
   if (process.platform !== 'win32') throw new Error(tr(msg({ id: 'main.antivirus.windowsOnly', defaultMessage: 'Only Windows has Defender exclusions.', description: 'An error in Settings → Workspace → Antivirus scanning on another system.' })))
   const dir = join(tmpdir(), `combwork-antivirus-${randomUUID()}`)
   await mkdir(dir, { recursive: true })
@@ -508,7 +508,7 @@ function fixtureChange(f: Fixture, action: AvAction, paths: string[], remove: st
   // list it reports (Defender's "N/A" answer, as if it had slipped through) must count as unknown.
   if (e.redacted) return changeOutcome(action, { started: true }, { ok: action === 'check', ...(action === 'check' ? {} : { error: tr(msg({ id: 'main.antivirus.unreadable', defaultMessage: "Defender's exclusions couldn't be read even with administrator rights, so nothing was changed.", description: 'An error in Settings → Workspace → Antivirus scanning.' })) }), requested: [], listed: true, exclusions: [HIDDEN] })
   if (action === 'move') {
-    // As the elevated script does it: Hive's listed old entries removed, then the new folders the rest doesn't cover added.
+    // As the elevated script does it: Combwork's listed old entries removed, then the new folders the rest doesn't cover added.
     const removing = remove.filter((p) => listed(p, current))
     const left = current.filter((x) => !removing.some((p) => normPath(p) === normPath(x)))
     const adding = paths.filter((p) => !covered(p, left))

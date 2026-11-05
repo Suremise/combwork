@@ -3,7 +3,7 @@ import { msg, tr } from '@shared/i18n'
 
 /**
  * The projects a workspace MCP server is added to, in the MCP view's Add to… dialog (HI-2059): a box per project, ticked
- * where it is added, then one for the Hive Assistant (HI-1472, as a project's), with All and None for the projects (the
+ * where it is added, then one for the Combwork Assistant (HI-1472, as a project's), with All and None for the projects (the
  * Assistant only ever by its own box). `onChange` hears every project's pick (path → added) and the Assistant's.
  * `warnings`: what to know about its definition (a literal secret), shown first, as the dialog's detail would.
  */

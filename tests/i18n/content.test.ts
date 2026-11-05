@@ -1,5 +1,5 @@
 // #849 (E10e): the `content` area, the services behind the workspace's content: MCP servers, skills, shared notes,
-// agent templates, the Assistant's modes. Refusals are HiveErrors: the Agent API and every reader of `.message` get the
+// agent templates, the Assistant's modes. Refusals are CombworkErrors: the Agent API and every reader of `.message` get the
 // English exactly as before, the window (IPC) its language. What a skill's header or an MCP server's definition has
 // wrong is kept English (`problem`, `error`: agents and launches read them) with the window's text beside it
 // (`problemText`, `errorText`). A template's load plan is the window's: its reasons are in its language, and what a
@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-const base = tempDir('hive-i18n-content-')
+const base = tempDir('cw-i18n-content-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')
@@ -25,7 +25,7 @@ const notes = await import('../../src/main/notes')
 const modes = await import('../../src/main/modes')
 const templates = await import('../../src/main/templates')
 const { switchMode } = await import('../../src/main/assistantMode')
-const { shownError, windowError } = await import('../../src/main/hiveError')
+const { shownError, windowError } = await import('../../src/main/combworkError')
 const { apiErrorReply, handOverFailedToast, handoverCreatedToast } = await import('../../src/main/servers')
 
 const ROOT = resolve(__dirname, '../..')
@@ -151,7 +151,7 @@ describe("a skill's header problem: English for agents, the window's text beside
     expect(text).toContain('description: Describe when the agent should use this skill.')
     expect(text).toContain('Write the instructions the agent should follow when this skill applies.')
     writeFileSync(join(made.path, 'SKILL.md'), '---\nname: fresh\nmetadata:\n  audience: assitant\n---\n')
-    const listed = (await run(() => skills.hiveSkills())).find((s) => s.name === 'fresh')!
+    const listed = (await run(() => skills.combworkSkills())).find((s) => s.name === 'fresh')!
     expect(listed.problem).toBe('its audience is "assitant", not agents, assistant or all')
     expect(shownText(listed.problemText!)).toBe('sein Publikum ist „assitant“, nicht agents, assistant oder all')
   })

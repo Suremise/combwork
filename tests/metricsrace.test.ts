@@ -10,7 +10,7 @@ import { tempDir } from './tempDir'
 import { metricsSaved } from './storeDocs'
 
 const HUNG_MS = 20_000
-const base = tempDir('hive-metrics-race-')
+const base = tempDir('cw-metrics-race-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')

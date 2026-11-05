@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { CMD_MAX_CHARS, commandLineLength, promptArg, runsThroughCmd, shimTarget, toSpawnable } from '../src/main/providers/common'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-cmdshim-')
+const base = tempDir('cw-cmdshim-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 const windows = process.platform === 'win32'
 
@@ -92,7 +92,7 @@ describe('a .cmd launcher', () => {
 })
 
 describe.runIf(windows)('starting one', () => {
-  // The Combwork Assistant's Codex launch: hooks, their trust records, its instructions and the hive MCP server.
+  // The Combwork Assistant's Codex launch: hooks, their trust records, its instructions and the combwork MCP server.
   const long = ['--no-daemon', ...Array.from({ length: 12 }, (_, i) => ['-c', `hooks.Event${i}=[{hooks=[{type="command",command="curl.exe -s -m 5 -X POST ${'x'.repeat(260)}"}]}]`]).flat(), '-c', `developer_instructions="${'Combwork guidance. '.repeat(300)}"`]
 
   it('a Node CLI: as node and its script, its arguments as they are, whatever their length', () => {

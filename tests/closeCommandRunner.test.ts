@@ -12,7 +12,7 @@ import { runJob, TailRing, TAIL_BYTES, WRITE_MS, type RunnerDeps } from '../src/
 import { carryRuns, planRun, pruneRuns, runFolderName, runPrefix, runsCloseCommands, startRun, tailLines, READ_TAIL_BYTES, PANEL_LINES, LINE_CHARS } from '../src/main/closeCommand/runs'
 import { fillCloseCommand } from '../src/shared/closeCommand'
 
-const base = tempDir('hive-close-runner-')
+const base = tempDir('cw-close-runner-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 const folder = (): string => {

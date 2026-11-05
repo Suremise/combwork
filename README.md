@@ -122,7 +122,7 @@ npm run release    # build and upload a draft GitHub release (see RELEASING.md)
 |---|---|
 | `src/main` | Electron main process: workspaces, sessions (node-pty), hooks, Agent API, tray |
 | `src/main/providers` | Provider adapters (Claude Code, Codex, GitHub Copilot): launch, hooks, transcripts, usage |
-| `src/main/mcp/hive-mcp.ts` | The built-in `combwork` MCP server |
+| `src/main/mcp/cw-mcp.ts` | The built-in `combwork` MCP server |
 | `src/preload` | Typed bridge between the UI and the main process |
 | `src/renderer` | React UI |
 | `src/shared` | Types, defaults and provider descriptors shared by both sides |

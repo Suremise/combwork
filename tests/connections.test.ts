@@ -19,7 +19,7 @@ import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstRead
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-connections-')
+const base = tempDir('cw-connections-')
 const home = join(base, 'claude-home')
 const userHome = join(base, 'user-profile')
 process.env.CW_USER_DATA = join(base, 'profile')
@@ -330,7 +330,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       c.release()
       await opened
       expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id] } })
-      expect(accounts.hiveAccounts().map((x) => x.id)).toEqual([b.id, a.id])
+      expect(accounts.combworkAccounts().map((x) => x.id)).toEqual([b.id, a.id])
     } finally {
       accounts.accountTestHooks.beforeOrderRead = undefined
       release()

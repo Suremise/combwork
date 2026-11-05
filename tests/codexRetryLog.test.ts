@@ -12,7 +12,7 @@ import { handleRequest, type LogAnswer, type LogRequest } from '../src/main/code
 import { DEADLINE_MS, MAX_PENDING, codexRetryWait, parseRetry, pendingReads, useCodexLogTransport } from '../src/main/providers/codex/retryLog'
 import { tempDir } from './tempDir'
 
-const tmp = tempDir('hive-codex-retry-log-')
+const tmp = tempDir('cw-codex-retry-log-')
 const pattern = (): RegExp => {
   const d = ADVANCED_DEFS.find((x) => x.id === 'codex.retry.pattern')!
   return new RegExp(d.default as string, d.flags ?? '')
@@ -32,7 +32,7 @@ const recorded = readFileSync(join(__dirname, 'fixtures', 'advanced', 'retry-log
 let n = 0
 /** A log database as Codex's (its table and index), with the rows given. */
 function codexLog(rows: { ts: number; nanos?: number; target?: string; thread?: string; body: string }[]): string {
-  const file = join(tempDir(`hive-codex-retry-log-${++n}-`), 'logs_2.sqlite')
+  const file = join(tempDir(`cw-codex-retry-log-${++n}-`), 'logs_2.sqlite')
   const db = new DatabaseSync(file)
   db.exec('PRAGMA journal_mode = WAL')
   db.exec('CREATE TABLE logs (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, ts_nanos INTEGER NOT NULL, level TEXT NOT NULL, target TEXT NOT NULL, feedback_log_body TEXT, module_path TEXT, file TEXT, line INTEGER, thread_id TEXT, process_uuid TEXT, estimated_bytes INTEGER NOT NULL DEFAULT 0)')
@@ -99,10 +99,10 @@ describe("Codex's log's worker (HI-1972)", () => {
   })
 
   it('says why there is no row: no file, no table, a file locked past its busy wait; and never makes a file', () => {
-    const missing = join(tempDir('hive-codex-retry-log-missing-'), 'logs_2.sqlite')
+    const missing = join(tempDir('cw-codex-retry-log-missing-'), 'logs_2.sqlite')
     expect(handleRequest(ask(missing))).toMatchObject({ row: null, why: 'missing' })
     expect(() => readFileSync(missing)).toThrow()
-    const empty = join(tempDir('hive-codex-retry-log-empty-'), 'logs_2.sqlite')
+    const empty = join(tempDir('cw-codex-retry-log-empty-'), 'logs_2.sqlite')
     new DatabaseSync(empty).close()
     expect(handleRequest(ask(empty))).toMatchObject({ row: null, why: 'noTable' })
     // A rollback journal held exclusively: a reader waits its busy timeout, then gives up.

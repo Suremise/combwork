@@ -108,7 +108,7 @@ const rich = (m: Msg, values: Record<string, string> = {}): React.ReactNode[] =>
 export function WelcomeView() {
   const recent = useStore((s) => s.recent)
   const recentMenu = useContextMenu()
-  // Whether each folder is there now (#144): when shown, and when Hive comes back to the front (a folder deleted meanwhile).
+  // Whether each folder is there now (#144): when shown, and when Combwork comes back to the front (a folder deleted meanwhile).
   useEffect(() => {
     void actions.loadRecent()
     const again = (): void => void actions.loadRecent()
@@ -354,7 +354,7 @@ function McpServerView({ selected }: { selected: string | null }) {
 
   const [reload, setReload] = useState(0)
   useEffect(() => {
-    if (!selected || selected === '__hive') return
+    if (!selected || selected === '__cw') return
     // Another server selected before this one loaded: its text must not show (and be saved) under that one.
     let current = true
     void call('mcp:read', selected).then((t) => {
@@ -377,7 +377,7 @@ function McpServerView({ selected }: { selected: string | null }) {
   latest.current = text
   useEffect(() => onEditorDrafts(() => void (selected && dirtyNow.current && !editorDraft(`mcp:${selected}`) && setReload((n) => n + 1))), [selected])
   useEffect(() => {
-    if (!selected || selected === '__hive') return
+    if (!selected || selected === '__cw') return
     let current = true
     void call('mcp:list').then((l) => current && setInfo(l.find((m) => m.name === selected) ?? null))
     return () => {
@@ -393,7 +393,7 @@ function McpServerView({ selected }: { selected: string | null }) {
       </div>
     )
   }
-  if (selected === '__hive') {
+  if (selected === '__cw') {
     return (
       <div className="scroll-page">
         <div className="page-narrow">
@@ -401,7 +401,7 @@ function McpServerView({ selected }: { selected: string | null }) {
             <Icon name="hubot" /> {tr(M.builtIn)}
           </h2>
           <p className="hint">{rich(M.builtInText, { hasUrl: api?.url ? 'yes' : 'no', url: api?.url ?? '' })}</p>
-          <Markdown source={hiveToolsTable()} />
+          <Markdown source={combworkToolsTable()} />
         </div>
       </div>
     )
@@ -517,8 +517,8 @@ function McpServerView({ selected }: { selected: string | null }) {
 // Docs
 // ---------------------------------------------------------------------------
 
-/** The built-in hive server's tools, as a table (the tools' names are theirs; what they do is window text). */
-function hiveToolsTable(): string {
+/** The built-in combwork server's tools, as a table (the tools' names are theirs; what they do is window text). */
+function combworkToolsTable(): string {
   const tools: [string, Msg][] = [
     ['cw_list_projects', M.toolListProjects],
     ['cw_project_status', M.toolProjectStatus],

@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { SessionBulkProgress } from '../src/shared/types'
 
-const base = tempDir('hive-inuse-')
+const base = tempDir('cw-inuse-')
 // The CLIs' homes are the test's (never ~/.claude or ~/.codex).
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
@@ -31,7 +31,7 @@ const { sessions, SessionInUse } = await import('../src/main/sessions')
 const { usageHistory } = await import('../src/main/usageHistory')
 const { setViewing, whileReading } = await import('../src/main/transcriptReads')
 const { encodeProjectPath } = await import('../src/main/providers/claude/usage')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'proj')
@@ -227,7 +227,7 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
     write(cliFile(outside), transcript(outside))
     const ids = [mine[0], outside, ...mine.slice(1), '../not-an-id']
     const seen: SessionBulkProgress[][] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'session-bulk' && e.projectPath === p) seen.push(e.runs)
     })
     let at = 0
@@ -266,7 +266,7 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
     const outside = newId()
     write(cliFile(outside), transcript(outside))
     const seen: SessionBulkProgress[][] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'session-bulk' && e.projectPath === p) seen.push(e.runs)
     })
     // The long one's archives wait until released: it is still running when the short one ends.

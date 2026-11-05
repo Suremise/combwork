@@ -41,7 +41,7 @@ const program = basename(process.execPath)
 const plain = (s: string): string => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\x1b\][^\x07]*\x07/g, '')
 
 describe.runIf(process.platform === 'win32')('a launch held at its gate', () => {
-  const dir = tempDir('hive-gate-')
+  const dir = tempDir('cw-gate-')
   const since = Date.now()
   const children: ChildProcess[] = []
   const env: Record<string, string> = {}

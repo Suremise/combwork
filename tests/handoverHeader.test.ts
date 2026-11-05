@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { handoverHeader, handoverSession } from '../src/shared/hiveGuidance'
+import { handoverHeader, handoverSession } from '../src/shared/combworkGuidance'
 
 const at = new Date('2026-10-01T03:22:42.123Z')
 const pad = (n: number): string => String(n).padStart(2, '0')

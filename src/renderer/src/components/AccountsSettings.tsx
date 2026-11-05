@@ -18,7 +18,7 @@ import { UsageMoveRuleRow } from './UsageMoveRule'
 import { AddConnectionDialog, MaskingBanner, ServerConnectionDetail, setUpConnection, setUpHint, setUpLabel } from './ServerConnections'
 
 /**
- * Settings → Accounts & Connections (HI-980; HI-2107, HI-2105's design). Accounts: Hive's sign-ins, each a CLI login in
+ * Settings → Accounts & Connections (HI-980; HI-2107, HI-2105's design). Accounts: Combwork's sign-ins, each a CLI login in
  * a folder of its own signed in through the CLI's own sign-in (nothing typed into it), servers it reaches, and
  * Copilot's one sign-in for the PC; in one order for every CLI (decision A), each on or off in this window's workspace.
  * Under each, its connections: the setups agents and the Assistant choose, each with who uses it.
@@ -211,7 +211,7 @@ export function AccountsSettings() {
   const affected = (projects ?? []).flatMap((p) => p.agents).filter((a) => a.live?.launchedConnection && !a.live.switchPending && connectionOf(a.connection, a.live.provider, a.live.launchedConnection, view)?.other).length
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
-  // One list in the one order (decision A): Hive's accounts of the CLIs turned on, and Copilot's sign-in while it is on.
+  // One list in the one order (decision A): Combwork's accounts of the CLIs turned on, and Copilot's sign-in while it is on.
   const byId = new Map<string, AccountView | Account>([...view.connections, ...view.homes].map((a) => [a.id, a]))
   const shown = view.order.map((id) => byId.get(id)).filter((a): a is AccountView | Account => !!a && (a.home ? a.id === COPILOT_ACCOUNT && isProviderEnabled(settings, a.provider) : view.providers.includes(a.provider)))
   // Its place in the one order, every account counted (those hidden here too): what a move names.
@@ -392,7 +392,7 @@ export function AccountsSettings() {
     )
   }
 
-  /** GitHub Copilot's one sign-in for the PC (decision C): no folder, sign-in or removal of Hive's; its ⋯ opens Provider Setup. */
+  /** GitHub Copilot's one sign-in for the PC (decision C): no folder, sign-in or removal of Combwork's; its ⋯ opens Provider Setup. */
   const copilotRow = (a: Account) => {
     const who = copilotInfo?.account
     return (

@@ -13,9 +13,9 @@ import { LOG_FILE, logsDir } from './logger'
 import { provider } from './providers'
 import { providerService } from './providerService'
 import { gitTool } from './gitTool'
-import { hiveWindows } from './windows'
+import { combworkWindows } from './windows'
 import { GUIDANCE_REVISION } from './guidance'
-import { hiveSkills } from './skills'
+import { combworkSkills } from './skills'
 import { inWorkspace } from './workspace'
 import { trackingLost, trackingProblem } from './agentProcesses'
 import { diagnosticRecording } from '../shared/consoleFixtures.mts'
@@ -29,10 +29,10 @@ import { workerThreadLines } from './workerThreads'
 import { queryMetrics } from './metrics'
 import { toolListRows, type ToolListRow } from '../shared/metricsView'
 
-/** How much of Hive's log a report carries. */
+/** How much of Combwork's log a report carries. */
 const LOG_LINES = 50
 
-/** The end of Hive's log (64 KB, whole lines). */
+/** The end of Combwork's log (64 KB, whole lines). */
 async function logTail(): Promise<string[]> {
   const file = join(logsDir(), LOG_FILE)
   if (!existsSync(file)) return []
@@ -49,7 +49,7 @@ async function logTail(): Promise<string[]> {
   }
 }
 
-/** Workspaces opened before (Hive's recent list) and their project folders: the log names them too. */
+/** Workspaces opened before (Combwork's recent list) and their project folders: the log names them too. */
 async function earlierWork(): Promise<{ folders: string[]; names: string[] }> {
   const folders = config.get().recentWorkspaces
   const names: string[] = []
@@ -62,8 +62,8 @@ async function earlierWork(): Promise<{ folders: string[]; names: string[] }> {
 }
 
 /**
- * A workspace's hive tool list a start in the last 24 hours (HI-2063), per role and workflow role, as one line: counts
- * only, never a name. A size Hive didn't measure (a bridge from before it did) is said, never shown as zero.
+ * A workspace's Combwork tool list a start in the last 24 hours (HI-2063), per role and workflow role, as one line: counts
+ * only, never a name. A size Combwork didn't measure (a bridge from before it did) is said, never shown as zero.
  */
 export function toolListLine(label: string, rows: ToolListRow[]): string {
   const n = (v: number): string => Math.round(v).toLocaleString('en')
@@ -78,7 +78,7 @@ export function toolListLine(label: string, rows: ToolListRow[]): string {
 }
 
 /** The tool list lines of each open workspace (its metrics' last 24 hours; one that can't be read says so). */
-function toolListLines(windows: ReturnType<typeof hiveWindows>): string[] {
+function toolListLines(windows: ReturnType<typeof combworkWindows>): string[] {
   // Numbered as the skills' lines number them: the windows with a workspace open.
   return windows.filter((w) => !!w.ws.path).map((w, i) => {
     const label = `Workspace ${i + 1}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
@@ -94,14 +94,14 @@ function toolListLines(windows: ReturnType<typeof hiveWindows>): string[] {
 const yesNo = (v: boolean | null | undefined): string => (v === true ? 'yes' : v === false ? 'no' : 'unknown')
 
 /**
- * Help → Copy Diagnostics: versions, each coding agent's state, counts, the settings that change how Hive
+ * Help → Copy Diagnostics: versions, each coding agent's state, counts, the settings that change how Combwork
  * behaves and the end of its log, as Markdown for a bug report. Redacted (shared/redact.ts): no folder,
  * workspace, project or agent names, prompts or secrets. `recording`: the newest developer console recording's newest
  * events too (#638), only a redacted one, redacted again like the log.
  */
 export async function diagnostics(opts: { recording?: boolean } = {}): Promise<string> {
   const s = config.settings
-  const windows = hiveWindows()
+  const windows = combworkWindows()
   const workspaces = windows.map((w) => w.ws.info()).filter((w) => !!w)
   const projects = workspaces.flatMap((w) => w.projects)
   const agents = projects.flatMap((p) => p.agents)
@@ -126,11 +126,11 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
   const g = gitTool()
   providerLines.push(`- **Git**: ${g.state === 'missing' ? "not found on Combwork's PATH" : g.version ? `${g.version}${g.path ? ` at \`${g.path}\`` : ''}${g.state === 'old' ? ' (older than Combwork needs)' : ''}` : `unknown${g.error ? ` (${g.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 
-  // Bundled skills: Hive's own names, so they are shown; the user's own skills only as a count.
+  // Bundled skills: Combwork's own names, so they are shown; the user's own skills only as a count.
   const skillLines: string[] = []
   for (const w of windows) {
     if (!w.ws.path) continue
-    const list = await inWorkspace(w.ws, () => hiveSkills(true)).catch(() => [])
+    const list = await inWorkspace(w.ws, () => combworkSkills(true)).catch(() => [])
     const mark = (x: (typeof list)[number]): string => `${x.name} ${x.bundled}${x.updateAvailable ? ' (update available)' : ''}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     skillLines.push(`- Workspace ${skillLines.length + 1}: ${list.filter((x) => x.bundled).map(mark).join(', ') || 'no bundled skills'}; ${list.filter((x) => !x.bundled).length} of its own`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
   }
@@ -178,7 +178,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     // Overrides of Hive's defaults (#367): how many and which, by Hive's names; never their values.
     ...advanced.diagnostics(windows.map((w) => (w.ws.path ? (w.ws.config.advanced ?? null) : null))),
     '',
-    // Crashes Hive kept a dump of (#985): named, never attached.
+    // Crashes Combwork kept a dump of (#985): named, never attached.
     '### Crash dumps',
     '',
     ...crashDumpLines(crashDumps(), join(crashDumpsDir(), 'reports')),
@@ -190,14 +190,14 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     '',
     ...memoryDiagnostics(app.getPath('userData')),
     '',
-    // How each worker thread runs (HI-1880): an installed Hive ran their work on main's thread, unseen.
+    // How each worker thread runs (HI-1880): an installed Combwork ran their work on main's thread, unseen.
     '### Worker threads',
     '',
     ...workerThreadLines()
   ].join('\n')
 
   // The log goes back further than what is open now: earlier workspaces and their projects are taken out too.
-  // Hive marks the user's own text as it logs it (logger.ts userText()); this catches older lines and the rest.
+  // Combwork marks the user's own text as it logs it (logger.ts userText()); this catches older lines and the rest.
   const earlier = await earlierWork()
   const ctx: RedactContext = {
     home: homedir(),
@@ -212,7 +212,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     ]
   }
   // Names are only taken out of the log: the summary above has none, and a project called "Hive" would take Hive's own name with it.
-  // The whole tail is redacted first: which run of Hive a line is from depends on the start lines before it.
+  // The whole tail is redacted first: which run of Combwork a line is from depends on the start lines before it.
   const log = redactLog((await logTail()).join('\n'), ctx).split('\n').slice(-LOG_LINES).join('\n')
   return `${redact(header, { ...ctx, names: [] })}\n\n### Log (last ${LOG_LINES} lines)\n\n\`\`\`\n${log}\n\`\`\`\n${opts.recording ? await recordingSection(ctx) : ''}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 }

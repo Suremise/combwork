@@ -1,7 +1,7 @@
 // An adopted worktree handed over to its agent's first card under slots (#1441, SPEC §16.10.8): only when its carried
 // lease is kept for nothing (no lane or card in flight from the upgrade), its folder is clean and its head is in the
 // target; then, in one write, the carried lease ends (`handedOff`), the card's lease begins on the same slot and the
-// conversations bound to it go on under the new lease. A failure in that write leaves all of it as it was; two Hives
+// conversations bound to it go on under the new lease. A failure in that write leaves all of it as it was; two Combworks
 // handing over at once, one wins; asked again (a restart), the start finds the card's lease. The workspace, its board, the
 // pool and git are real; the rules are on; no session is started.
 import { mkdirSync, writeFileSync } from 'fs'
@@ -155,7 +155,7 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     expect(resumeHold(facts, folderAgent({ id: 'b4', name: 'B4', workflowRole: 'builder' } as never), s4)).toMatchObject({ is: 'after', card: card4 })
   })
 
-  it('two Hives handing over the same carried lease at once: one wins, the other gets nothing', async () => {
+  it('two Combworks handing over the same carried lease at once: one wins, the other gets nothing', async () => {
     const carried = open('b3')!
     expect(carried.kind).toBe('carried')
     const card3 = (await run(() => tasks.createTask({ title: "B3's", project: 'alpha', agent: 'b3' }, { kind: 'user' }))).number

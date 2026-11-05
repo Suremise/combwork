@@ -1,5 +1,5 @@
 // Runs as checks (#1222, SPEC §16.13): a progress run that names a card (and, on Git, what was checked out) brackets its
-// command: what Hive reads when it starts (before hive-progress runs the command) and when it finishes. Its end writes
+// command: what Combwork reads when it starts (before hive-progress runs the command) and when it finishes. Its end writes
 // `CheckRan` in the card's facts, counted only if every rule holds, else with why not:
 // - it was started as a check (`--check`) and reported the command configured for it when it was resolved, or its
 //   command is exactly a configured one (`notCheck`);
@@ -36,7 +36,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { agentActor, CHANGES_KEPT, foldCard, type Actor, type CheckRanData, type Fact } from '../../shared/workflow/facts'
 import { allOff } from '../../shared/workflow/options'
 
-/** What a run is for, as Hive knows it when the run starts. */
+/** What a run is for, as Combwork knows it when the run starts. */
 export interface CheckRunFor {
   card: number
   /** The folder it runs in (Git), or the project's (None). */
@@ -285,7 +285,7 @@ export type Recorded = CheckRanData & { platform: PlatformId; blocks?: 'review' 
 
 /**
  * Each project's check records still being written, by workspace and project folder (#1651): a submit right after
- * hive-progress exits waits for them (`checksSettled`), since a run's end reads the folder (the watcher settling, git)
+ * cw-progress exits waits for them (`checksSettled`), since a run's end reads the folder (the watcher settling, git)
  * before its `CheckRan` is written, and a passed check counts for its commit as soon as its run has finished.
  */
 const recording = new WeakMap<WorkspaceService, Map<string, Set<Promise<unknown>>>>()

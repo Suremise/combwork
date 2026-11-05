@@ -87,7 +87,7 @@ export function McpCatalogPanel() {
     )
     return () => clearTimeout(t)
   }, [query, filter, version, ws])
-  // A source Hive doesn't check: its note is said once, then remembered.
+  // A source Combwork doesn't check: its note is said once, then remembered.
   useEffect(() => {
     for (const p of pages ?? []) {
       if (!p.noteDue || noted.current.has(p.url)) continue

@@ -1,7 +1,7 @@
 // The Activity tab (#1254, HI-1743): what runs now in a project, a tab per running agent, each its current work as a
 // list: its card in progress (a header) or its session, the turn now (its prompt, the tool call under way, or thinking
 // or writing), the subagents and background tasks, and the processes it started. Nothing past: "the card is the
-// history". From what Hive already has: the board, the session records, the agents' live state, a session's transcript
+// history". From what Combwork already has: the board, the session records, the agents' live state, a session's transcript
 // parse and Stop's tracking's processes.
 import type { AgentProcess } from './agentProcesses'
 import type { BackgroundTaskType, SessionListItem, SessionStatus, TranscriptItem, TranscriptTool } from './types'
@@ -97,7 +97,7 @@ export interface ActivityDetail {
 export interface ActivityNow {
   launches: ActivityLaunch[]
   tasks: ActivityTask[]
-  /** Lock blocks standing now (HI-982): an agent's edit Hive's file lock blocked, while that decision stands. */
+  /** Lock blocks standing now (HI-982): an agent's edit Combwork's file lock blocked, while that decision stands. */
   blocks?: ActivityHookBlock[]
 }
 
@@ -293,9 +293,9 @@ export interface ActivityPart {
   doing: ActivityDoing
   subagents: ActivityNode[]
   processes: ActivityNode[]
-  /** Its edit Hive's file lock blocks now (HI-982), while that decision stands: none, or its latest. */
+  /** Its edit Combwork's file lock blocks now (HI-982), while that decision stands: none, or its latest. */
   blocks: ActivityHookBlock[]
-  /** Its own processes left out (the CLI, its terminal, hive-mcp.js): shown with `showOwn`. */
+  /** Its own processes left out (the CLI, its terminal, cw-mcp.js): shown with `showOwn`. */
   ownHidden: number
 }
 

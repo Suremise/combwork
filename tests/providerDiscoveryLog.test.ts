@@ -16,7 +16,7 @@ describe('Provider discovery log', () => {
   for (const p of PROVIDERS) {
     it(`${p.id}: leaves a candidate’s path and what it printed out of Copy Diagnostics (userText)`, async () => {
       // A custom path in a private folder (a space in its name) whose CLI prints a private name instead of its version.
-      const dir = tempDir('hive-discovery-')
+      const dir = tempDir('cw-discovery-')
       const exe = join(dir, 'Private Client', p.exe)
       mkdirSync(dirname(exe), { recursive: true })
       writeFileSync(exe, '')

@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-skill-restart-')
+const base = tempDir('cw-skill-restart-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

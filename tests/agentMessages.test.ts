@@ -16,7 +16,7 @@ import { admitted } from './admitted'
 const HUNG_MS = 10000
 
 describe('messages left for agents (#530, #647)', async () => {
-  const base = tempDir('hive-messages-')
+  const base = tempDir('cw-messages-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   // The hosts' workspace (each host a folder in it), as a window holding it would admit it (#1395).
   const dismiss = admitted(base)

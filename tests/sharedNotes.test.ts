@@ -9,7 +9,7 @@ import { NoteConflict, noteRevision, readNote, writeNote } from '../src/main/not
 import { noteText, noteWrittenText } from '../src/shared/toolReplies'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-notes-')
+const base = tempDir('cw-notes-')
 let n = 0
 const note = (text: string | null): string => {
   const p = join(base, `note-${++n}.md`)

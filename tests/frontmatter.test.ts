@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { skillListText } from '../src/shared/toolReplies'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-frontmatter-')
+const base = tempDir('cw-frontmatter-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
@@ -87,7 +87,7 @@ describe('who gets which skill', () => {
     mkdirSync(join(proj, '.combwork'), { recursive: true })
     writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
-    const { hiveSkills } = await import('../src/main/skills')
+    const { combworkSkills } = await import('../src/main/skills')
     const { sessions } = await import('../src/main/sessions')
     const w = createWorkspaceService()
     await w.open(ws)
@@ -104,10 +104,10 @@ describe('who gets which skill', () => {
     skill('twice', 'metadata:\n  audience: assistant\n  audience: agents')
     skill('empty', 'metadata:\n  audience: ~')
     try {
-      const names = async (role?: 'agent' | 'assistant') => (await inWorkspace(w, () => hiveSkills(false, role))).map((s) => s.name).sort()
+      const names = async (role?: 'agent' | 'assistant') => (await inWorkspace(w, () => combworkSkills(false, role))).map((s) => s.name).sort()
       expect(await names('agent')).toEqual(['flow-all', 'plain'])
       expect(await names('assistant')).toEqual(['commented-assistant', 'flow-all', 'inline-assistant'])
-      const all = await inWorkspace(w, () => hiveSkills())
+      const all = await inWorkspace(w, () => combworkSkills())
       const of = (n: string) => all.find((s) => s.name === n)!
       expect([of('misspelt').audience, of('misspelt').problem]).toEqual([undefined, 'its audience is "assitant", not agents, assistant or all'])
       expect(of('broken').problem).toMatch(/^its header isn't valid YAML/)

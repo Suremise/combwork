@@ -13,7 +13,7 @@ import { boardLockKey, editCard, readCard, removeCard, writeCard, writeCardOutsi
 import { boardTestHooks } from '../src/main/boardStore'
 import { follow } from './followDoorbell'
 
-const base = tempDir('hive-tasks-')
+const base = tempDir('cw-tasks-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, for tests: gone.
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = (p) => rm(p, { recursive: true, force: true })

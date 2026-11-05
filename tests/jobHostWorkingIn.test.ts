@@ -15,7 +15,7 @@ import { tempDir } from './tempDir'
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 60_000
-const dir = tempDir('hive-jobhost-workingin-')
+const dir = tempDir('cw-jobhost-workingin-')
 const SLOT = join(dir, 'slot-a')
 const ELSEWHERE = join(dir, 'elsewhere')
 for (const d of [SLOT, ELSEWHERE]) mkdirSync(d, { recursive: true })

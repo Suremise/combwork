@@ -4,7 +4,7 @@
 // nothing else; a test Combwork's main process (whose environment its agents' shells get), a child that is part of Combwork,
 // and the cw-progress wrapper (#202: it reports, not taking itself for nested) see none of them; a test Combwork's git
 // reads the suite's global config, with the test identity (#1466); and a test Combwork
-// started with any environment but lib.hiveEnv's is refused.
+// started with any environment but lib.combworkEnv's is refused.
 const lib = require('./lib.cjs')
 const ctx = require('./runContext.cjs')
 const { _electron } = require('playwright-core')
@@ -94,13 +94,13 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
       await other.close().catch(() => undefined)
       return false
     } catch (e) {
-      return /lib\.hiveEnv/.test(e.message)
+      return /lib\.combworkEnv/.test(e.message)
     }
   }
   check("a test Combwork started with the suite's own environment is refused", await refused(null))
-  check('…or with a copy of a run-context environment', await refused({ ...lib.hiveEnv({ CW_USER_DATA: userData }) }))
+  check('…or with a copy of a run-context environment', await refused({ ...lib.combworkEnv({ CW_USER_DATA: userData }) }))
 
-  // A child that is part of Combwork (the hive MCP server, a bridge): the allowlist and what it is given.
+  // A child that is part of Combwork (the combwork MCP server, a bridge): the allowlist and what it is given.
   const child = await new Promise((resolve) => {
     const p = spawn(process.execPath, ['-e', 'process.stdout.write(JSON.stringify(process.env))'], { env: lib.childEnv({ CW_API_URL: 'http://127.0.0.1:1' }) })
     let out = ''

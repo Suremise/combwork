@@ -23,7 +23,7 @@ import { tempDir } from './tempDir'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30_000
 
-const tmp = tempDir('hive-none-point-')
+const tmp = tempDir('cw-none-point-')
 const bundle = join(tmp, 'none-baseline-worker.cjs')
 let t: BaselineThread
 
@@ -43,7 +43,7 @@ async function until(ok: () => boolean): Promise<void> {
 
 let n = 0
 function project(): string {
-  const p = tempDir(`hive-none-point-${++n}-`)
+  const p = tempDir(`cw-none-point-${++n}-`)
   writeFileSync(join(p, 'doc.md'), 'the doc\n')
   writeFileSync(join(p, 'other.md'), 'another\n')
   mkdirSync(join(p, 'src', 'deep'), { recursive: true })
@@ -173,7 +173,7 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
   })
 
   it("benchmark (recorded, not a gate): main's longest gap during a check's start for a card declaring the project (5,000 files)", async () => {
-    const p = tempDir('hive-none-point-bench-')
+    const p = tempDir('cw-none-point-bench-')
     for (let i = 0; i < 5000; i++) {
       const d = join(p, 'assets', String(i % 20))
       mkdirSync(d, { recursive: true })

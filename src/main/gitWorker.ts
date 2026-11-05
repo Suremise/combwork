@@ -5,9 +5,9 @@ import { parentPort } from 'worker_threads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 
 /**
- * Git's worker (HI-1783): a thread of its own that starts Hive's git processes, so their starts (CreateProcess blocks the
+ * Git's worker (HI-1783): a thread of its own that starts Combwork's git processes, so their starts (CreateProcess blocks the
  * thread that calls it, about 4 ms a process on Windows, and a check's resolve starts 9 to 21 of them) never hold up
- * Hive's main process and the keystrokes typed into a pane. Each command is run as git.ts always ran it (execFile, its
+ * Combwork's main process and the keystrokes typed into a pane. Each command is run as git.ts always ran it (execFile, its
  * output as bytes, its bound and environment, its input); what it gives back is execFile's own outcome, which git.ts
  * reads as it always did. Its environment is main's, shared (SHARE_ENV), so a change main makes to it applies here too.
  * It also reads a repository's refs and working folders for the observer (HI-1814: a reset's read walked every ref file
@@ -30,7 +30,7 @@ export interface GitRequest {
 }
 
 /**
- * HI-2137: what Git for Windows' launcher (`<root>\cmd\git.exe`) gives the real git it starts, which Hive gives it when
+ * HI-2137: what Git for Windows' launcher (`<root>\cmd\git.exe`) gives the real git it starts, which Combwork gives it when
  * it starts that git itself (withLauncherEnv): its MSYSTEM (`msystem`: MINGW64, CLANGARM64 or MINGW32, as its folder),
  * and its folders before PATH (`pathFirst`: `<root>\<mingw>\bin` and `<root>\usr\bin`). The real git, given MSYSTEM,
  * leaves PATH as it is; without it, it would put `~\bin` first itself.
@@ -52,7 +52,7 @@ export interface GitOutcome {
 }
 
 /**
- * After git exits, how long its output may go quiet before Hive stops waiting for it to close (HI-1854). Git's output is
+ * After git exits, how long its output may go quiet before Combwork stops waiting for it to close (HI-1854). Git's output is
  * all in its pipes once it has exited, read at once; one still open then is held by another process that inherited it.
  */
 export const EXITED_QUIET_MS = 2000

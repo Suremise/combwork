@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CW_FOLDER_GUIDE, hiveVcsKey, hiveVcsText } from '@shared/hiveVcsText'
+import { CW_FOLDER_GUIDE, combworkVcsKey, combworkVcsText } from '@shared/combworkVcsText'
 import { msg, tr } from '@shared/i18n'
 import type { ProjectInfo } from '@shared/types'
 import { call, errorMessage } from '../api'
@@ -36,17 +36,17 @@ const M = {
  * Says when a project's .combwork isn't kept out of version control or is in a sync service's folder (#345). In the
  * Overview it can be dismissed for the situation it describes; Project Settings always shows it.
  */
-export function HiveVcsNotice({ project, dismissible = false }: { project: ProjectInfo; dismissible?: boolean }) {
+export function CombworkVcsNotice({ project, dismissible = false }: { project: ProjectInfo; dismissible?: boolean }) {
   const key = project.path.toLowerCase()
-  const dismissed = useStore((s) => s.hiveVcsNotice[key])
+  const dismissed = useStore((s) => s.combworkVcsNotice[key])
   const [busy, setBusy] = useState(false)
-  const v = project.hiveVcs
-  const text = hiveVcsText(v)
-  if (!v || !text || (dismissible && dismissed === hiveVcsKey(v))) return null
+  const v = project.combworkVcs
+  const text = combworkVcsText(v)
+  if (!v || !text || (dismissible && dismissed === combworkVcsKey(v))) return null
   const exclude = async (): Promise<void> => {
     setBusy(true)
     try {
-      set({ workspace: await call('project:excludeHive', project.path) })
+      set({ workspace: await call('project:excludeCombwork', project.path) })
       notify('success', tr(M.excluded, { project: project.name }))
     } catch (e) {
       notify('error', tr(M.excludeFailed), errorMessage(e))
@@ -58,7 +58,7 @@ export function HiveVcsNotice({ project, dismissible = false }: { project: Proje
   const untrack = async (): Promise<void> => {
     setBusy(true)
     try {
-      const files = await call('project:hiveTracked', project.path)
+      const files = await call('project:combworkTracked', project.path)
       if (!files.length) {
         set({ workspace: await call('workspace:refresh') })
         return
@@ -69,7 +69,7 @@ export function HiveVcsNotice({ project, dismissible = false }: { project: Proje
         list: files.length > 50 ? [...files.slice(0, 50), tr(M.more, { count: files.length - 50 })] : files,
         confirmLabel: tr(M.untrack),
         busyLabel: tr(M.untracking),
-        run: async () => set({ workspace: await call('project:untrackHive', project.path, files) })
+        run: async () => set({ workspace: await call('project:untrackCombwork', project.path, files) })
       })
       if (ok) notify('success', tr(M.untracked, { project: project.name }), tr(M.untrackedDetail))
     } catch (e) {
@@ -79,9 +79,9 @@ export function HiveVcsNotice({ project, dismissible = false }: { project: Proje
     }
   }
   return (
-    <div className="banner warn hive-vcs-notice">
+    <div className="banner warn cw-vcs-notice">
       <Icon name="warning" />
-      <span className="hive-vcs-text">
+      <span className="cw-vcs-text">
         {sentences(<strong>{tr(M.titleSentence, { title: text.title })}</strong>, text.detail)}
       </span>
       {text.canUntrack && (
@@ -97,7 +97,7 @@ export function HiveVcsNotice({ project, dismissible = false }: { project: Proje
       <button className="btn small subtle" onClick={() => openGuideAt(CW_FOLDER_GUIDE)}>
         {tr(M.learnMore)}
       </button>
-      {dismissible && <IconButton icon="close" title={tr(M.dismiss)} onClick={() => rememberProjectPref('hiveVcsNotice', key, hiveVcsKey(v))} />}
+      {dismissible && <IconButton icon="close" title={tr(M.dismiss)} onClick={() => rememberProjectPref('combworkVcsNotice', key, combworkVcsKey(v))} />}
     </div>
   )
 }

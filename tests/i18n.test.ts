@@ -281,7 +281,7 @@ describe("main's language", () => {
 })
 
 describe('agent-facing scripts never load the translations', () => {
-  // hive-mcp.js and hive-progress.js run outside the asar with Node built-ins and Combwork's own chunks only (AGENTS.md):
+  // cw-mcp.js and cw-progress.js run outside the asar with Node built-ins and Combwork's own chunks only (AGENTS.md):
   // a shared module they import that imports a package the build leaves in node_modules would break them, and
   // agent-facing text stays English. The one package they reach is agent text's formatter, intl-messageformat, which the
   // build bundles into the chunks (electron.vite.config.ts, HI-2433); never the window's translations. msg.ts and
@@ -310,7 +310,7 @@ describe('agent-facing scripts never load the translations', () => {
     }
     return { files: [...seen].map((f) => f.slice(ROOT.length + 1).replace(/\\/g, '/')), packages: [...packages] }
   }
-  it.each(['src/main/mcp/hive-mcp.ts', 'src/main/progressReporters/hive-progress.ts'])('%s', (entry) => {
+  it.each(['src/main/mcp/cw-mcp.ts', 'src/main/progressReporters/cw-progress.ts'])('%s', (entry) => {
     const { files, packages } = reach(join(ROOT, entry))
     expect(files.length).toBeGreaterThan(1)
     expect(files.filter((f) => f.startsWith('src/shared/i18n/') && !/\/(msg|languages|languageText|locale)\.ts$/.test(f))).toEqual([])
@@ -347,8 +347,8 @@ describe('the e2e build follows the translations', () => {
 
 describe('tests run in English', () => {
   it('a test Combwork is pinned to English unless a suite says otherwise', () => {
-    const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { hiveEnv: (vars?: Record<string, string>, parent?: Record<string, string>) => Record<string, string> }
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, { CW_LANG: 'pl' }).CW_LANG).toBe('en')
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p', CW_LANG: 'en-XA' }, {}).CW_LANG).toBe('en-XA')
+    const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { combworkEnv: (vars?: Record<string, string>, parent?: Record<string, string>) => Record<string, string> }
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, { CW_LANG: 'pl' }).CW_LANG).toBe('en')
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p', CW_LANG: 'en-XA' }, {}).CW_LANG).toBe('en-XA')
   })
 })

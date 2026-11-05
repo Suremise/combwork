@@ -163,7 +163,7 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const laneRuleset = p.why === 'start' ? laneRulesetOf(ws, p) : null
   if (laneRuleset) r.ruleset = laneRuleset
   else if (p.why === 'start') {
-    // Resolved over the workspace's and Hive's (#1278: a project may set only some), as the runtime has them.
+    // Resolved over the workspace's and Combwork's (#1278: a project may set only some), as the runtime has them.
     const resolved = cfg.workflow ? resolvedOf(ws, projectPath, cfg.workflow.platform, cfg) : null
     try {
       const c = resolved && !resolved.invalid ? compile(resolved.options) : null
@@ -428,7 +428,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
 export const rulesEnforced = (): boolean => advanced.get<boolean>('cw.workflow.enforce')
 
 /**
- * A failed review recorded at the card's round limit (§16.11.4, #1269): Hive asks the user (For you, Decide) as the
+ * A failed review recorded at the card's round limit (§16.11.4, #1269): Combwork asks the user (For you, Decide) as the
  * runtime does (`askAtLimit`), so a loop's verdicts given on the board (before #1268 moves them to the runtime) pause it
  * too. Only for a card in a running lane, while the rules are enforced.
  */
@@ -479,7 +479,7 @@ function loopWakes(tx: Tx, n: number, by: Actor, after: TaskCard, f: { submitted
   }
 }
 
-/** A move's cause (§16.4.2): the user's from the window, an agent's or the Assistant's by its tools or the API, Hive's derived. */
+/** A move's cause (§16.4.2): the user's from the window, an agent's or the Assistant's by its tools or the API, Combwork's derived. */
 function causeOf(a: ChangeActor | undefined): 'intent' | 'user' | 'derived' {
   if (!a) return 'derived'
   if (a.kind === 'user') return 'user'

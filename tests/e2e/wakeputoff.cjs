@@ -58,7 +58,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.writeFileSync(path.join(claudeHome, 'fake-follow-notices.txt'), '')
   fs.writeFileSync(path.join(codexHome, 'fake-follow-notices.txt'), '')
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', CW_TEST_HOLD_TYPED: hold })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', CW_TEST_HOLD_TYPED: hold })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -75,11 +75,11 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     /** The doorbells the agent was sent, each line as its CLI took it. */
     const wakes = (a) => lines(path.join(homeOf(a), 'fake-wakes.jsonl')).filter((w) => w.agent === a.name && w.doorbell).map((w) => w.doorbell)
     const setSwitch = (which, value) => inv('advanced:set', `cw.inbox.${which}`, value)
-    const hiveLog = () => {
+    const combworkLog = () => {
       const f = path.join(userData, 'logs', 'combwork.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
     }
-    const logCount = (re) => hiveLog().split('\n').filter((l) => re.test(l)).length
+    const logCount = (re) => combworkLog().split('\n').filter((l) => re.test(l)).length
     /** What the agent's terminal shows: its output (pty:buffer, which keeps what was erased too) drawn at its size. */
     const screen = async (a) => {
       const key = lib.ptyKey(alpha, a.id)

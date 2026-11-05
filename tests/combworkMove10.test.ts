@@ -14,7 +14,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-move10-')
+const base = tempDir('cw-move10-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -62,6 +62,7 @@ const code = (s: string): string =>
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
     .replace(/\.combwork/g, '.hive')
+    .replace(/\bCombwork\b/g, 'Hive') // HI-2591: the app's name in its messages and notes, as 1.0 had it
     .replace(/\s+/g, ' ')
 /** Every schema module the tag had (all of src/main/schema), and the database layer that runs them. */
 function schemaFiles(): string[] {

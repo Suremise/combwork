@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.notifications = { ...cfg.settings.notifications, notifyOnFinished: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47899), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47899), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -121,7 +121,7 @@ const check = (name, ok, extra = '') => {
   const bar = page.locator('.agent-pane-body .session-ended')
   await until(async () => (await bar.count()) === 1, 10000)
   await lib.sleep(300)
-  check('the tip still shows (no notification closed it)', (await card.count()) === 1, JSON.stringify(await page.evaluate(() => window.__hiveBell?.())))
+  check('the tip still shows (no notification closed it)', (await card.count()) === 1, JSON.stringify(await page.evaluate(() => window.__cwBell?.())))
   const b2 = await box(bar)
   const c2 = await box(card)
   check('with the Assistant hidden, the card is in the window corner', c2 && c2.x + c2.width > 1400, JSON.stringify(c2))

@@ -8,7 +8,7 @@ import { tempDir } from './tempDir'
 import { CARD_TITLE_NUDGE } from '../src/shared/advanced'
 import { changedText, createdText, type TaskChange } from '../src/shared/toolReplies'
 
-const base = tempDir('hive-title-nudge-')
+const base = tempDir('cw-title-nudge-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 

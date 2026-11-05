@@ -26,7 +26,7 @@ describe("a worktree setup command's command line", () => {
 })
 
 describe.runIf(process.platform === 'win32')('a worktree setup command with a quoted path run in a terminal', () => {
-  const dir = tempDir('hive-shell-command-')
+  const dir = tempDir('cw-shell-command-')
   // A folder with a space (and an & cmd would read as a command separator unquoted), as the path the user quotes.
   const spaced = join(dir, 'with space & ampersand')
   mkdirSync(spaced, { recursive: true })

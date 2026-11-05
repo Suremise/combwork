@@ -47,7 +47,7 @@ const prose = (seed, n) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, allowSessionInput: true, devConsole: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -464,7 +464,7 @@ const prose = (seed, n) => {
   const consoleOne = measure('cw_console (an event in full)', tool('cw_console', { agent: 'Coder', seq: [promptSeq] }), 3000)
   check('…one in full: the raw hook and what Combwork made of it, its prompt still hidden', consoleOne.includes('"raw"') && consoleOne.includes('"made"') && /"prompt":"<text: \d+ chars>"/.test(consoleOne), consoleOne)
   const consoleList = measure('cw_console (sources, as the Assistant)', tool('cw_console', { action: 'sources' }, 'assistant'), 1200)
-  check('the sources: a line each, with how to name it', /^alpha · Coder \(claude-code\): captured, \d+ events \[agent="a-[\w-]+" project="alpha"\]$/m.test(consoleList) && /^Combwork: not captured \[source="hive"\]$/m.test(consoleList), consoleList)
+  check('the sources: a line each, with how to name it', /^alpha · Coder \(claude-code\): captured, \d+ events \[agent="a-[\w-]+" project="alpha"\]$/m.test(consoleList) && /^Combwork: not captured \[source="combwork"\]$/m.test(consoleList), consoleList)
   // On a connection of its own (agent: false): after the slow tool calls above, fetch's kept-alive socket can be the one
   // Combwork's server is closing for idleness, which reset this request once under load.
   const sourcePage = await new Promise((resolve, reject) => {
@@ -621,7 +621,7 @@ const prose = (seed, n) => {
   measure('cw_update_task (as Assistant)', tool('cw_update_task', { number: todo[30], comment: 'Noted.' }, 'assistant'), 400)
   // A long title (HI-1872): kept, never refused, the reply's last line suggesting a shorter one; none for a title within
   // the limit, a change without a title, the user's own title (the window's), or with the setting at 0.
-  const LONG = 'Tray: the restart notice stays after Hive restarts, because the update check runs before the window opens'
+  const LONG = 'Tray: the restart notice stays after Combwork restarts, because the update check runs before the window opens'
   const NUDGE = 'Titles over 80 characters are cut in git and on the board: consider a shorter one (the detail belongs in the description).'
   const nudged = (text) => text.split('\n').at(-1) === NUDGE
   const longMade = measure('cw_create_task (a long title)', tool('cw_create_task', { title: LONG, description: prose(700, 600) }), 500)
@@ -661,7 +661,7 @@ const prose = (seed, n) => {
   // Templates (HI-1502): a line per template; a plan and a load (Team 3×3 into gamma, which has no agents, one named) in
   // a few lines each; project agents aren't given the tool.
   const templateList = measure('cw_template (list)', tool('cw_template', { action: 'list', project: 'gamma' }, 'assistant'), 1200)
-  check('templates: a line each, with the scope and file to name it by', templateList.split('\n').some((l) => l.startsWith('Team 3×3 (scope hive, file team-3x3.json): 6 agents')), templateList)
+  check('templates: a line each, with the scope and file to name it by', templateList.split('\n').some((l) => l.startsWith('Team 3×3 (scope combwork, file team-3x3.json): 6 agents')), templateList)
   const templatePlan = measure('cw_template (plan)', tool('cw_template', { action: 'plan', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
   check('…a plan: who comes, the name given beside its own', /^"Team 3×3" into gamma: removes no agents; creates Gamma lead \([A-Z]+-B1\) builder with [A-Z]+-R1/.test(templatePlan), templatePlan)
   const templateLoaded = measure('cw_template (load)', tool('cw_template', { action: 'load', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
@@ -803,7 +803,7 @@ const prose = (seed, n) => {
   const ga = (after.workspace?.guidance ?? []).find((x) => x.role === 'assistant')
   // Its custom part is the journal's rule (#1032: on by default, work only).
   const journalBytes = Buffer.byteLength(`
-${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/shared/journal.ts').DEFAULT_SCOPE)}`)
+${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src/shared/journal.ts').DEFAULT_SCOPE)}`)
   check("metrics: the Assistant's launch is the workspace's own, its core, role and mode each measured, and the journal's rule as its custom part", ga?.launches >= 1 && ga.guidanceBytes > 0 && ga.roleBytes > 0 && ga.modeBytes > 0 && ga.customBytes === journalBytes, `${JSON.stringify(ga)}; the journal's rule: ${journalBytes}`)
 
   // --- cw_inbox's three forms (#1531), by each caller: the Assistant (its tool), a script with an agent's own token

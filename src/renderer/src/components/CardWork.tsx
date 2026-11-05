@@ -18,7 +18,7 @@ import { CardRoundCostTable } from './CardCost'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
-// card's facts say, in the glossary's words (revision, verdict, check, stale, outside Hive, before 1.0). Revisions are
+// card's facts say, in the glossary's words (revision, verdict, check, stale, outside Combwork, before 1.0). Revisions are
 // shown through the card's project's platform (revisionShort), never by switching on its id.
 
 const M = {
@@ -48,7 +48,7 @@ const M = {
   verdict: msg({ id: 'board.work.verdict', defaultMessage: '{reviewer}: {pass, select, yes {passed} other {failed}}{current, select, no { (no longer counts)} other {}}', description: "A verdict under a revision in the card dialog's Work section: who reviewed it ({reviewer}, an agent's name, then a colon) and whether it passed or failed; (no longer counts) when a newer revision or decision came since. Keep the select keys. Glossary: verdict, pass/fail." }),
   check: msg({ id: 'board.work.check', defaultMessage: '{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}', description: "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check." }),
   integrated: msg({ id: 'board.work.integrated', defaultMessage: '{method, select, merge {Merged into {target} as {result}} squash {Squashed into {target} as {result}} fastForward {{target} moved forward to {result}} sameTree {Already in {target} at {result}} other {Committed in {target} as {result}}}', description: "The card dialog's Work section: how the card's work went into its target ({target}, a branch such as main) and the target's revision with it ({result}, a short commit id). Keep the select keys." }),
-  outsideHive: msg({ id: 'board.work.outsideCombwork', defaultMessage: 'Merged outside Combwork.', description: "The card dialog's Work section, under how the card was merged: the merge was made outside Combwork (in a terminal or another tool). Glossary: outside Combwork." }),
+  outsideCombwork: msg({ id: 'board.work.outsideCombwork', defaultMessage: 'Merged outside Combwork.', description: "The card dialog's Work section, under how the card was merged: the merge was made outside Combwork (in a terminal or another tool). Glossary: outside Combwork." }),
   accepted: msg({ id: 'board.work.accepted', defaultMessage: 'Accepted {when}.', description: "The card dialog's Work section: the card's work was accepted (a project without version control, or a no-code card) at {when}, a date and time." }),
   staleChange: msg({ id: 'board.work.staleChange', defaultMessage: 'Stale: the pass was for {approved}; the card is now at {current}.', description: "A mark in the card dialog's Work section: the card's pass is for an older revision ({approved}, a short commit id) that isn't the same change as its revision now ({current}). Glossary: stale, pass." }),
   staleDecision: msg({ id: 'board.work.staleDecision', defaultMessage: 'Stale: a decision was recorded since the pass.', description: "A mark in the card dialog's Work section: the card's pass no longer counts because the user recorded a decision on the card after it. Glossary: stale, pass." }),
@@ -192,7 +192,7 @@ function WorkDetails({ card, view: v, project, short, agentName, reveal }: { car
       {v.integration && (
         <div className="card-work-merged">
           <Icon name="git-merge" /> {tr(M.integrated, { method: v.integration.method, target: v.integration.target, result: short(v.integration.result) })}
-          {v.integration.by === 'outside' && <> {tr(M.outsideHive)}</>}
+          {v.integration.by === 'outside' && <> {tr(M.outsideCombwork)}</>}
         </div>
       )}
       {v.accepted && (
@@ -307,7 +307,7 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
   )
 }
 
-/** How the window names the rules a move skipped (a rule this Hive has no name for: its id). */
+/** How the window names the rules a move skipped (a rule this Combwork has no name for: its id). */
 export const OVERRIDE_NAMES: OverrideNames = {
   list: (items, type) => fmt.list(items, type),
   ruleName: (r) => (RULE_NAMES[r] ? tr(RULE_NAMES[r]) : r),

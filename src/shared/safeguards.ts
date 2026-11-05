@@ -6,13 +6,13 @@ import { HISTORY } from './taskHistory'
 /**
  * A CLI's safety classifier stopping an agent's response, or the model it runs on changing after one (#606): Opus 5.5's
  * safeguards stopped one of HB3's responses and asked whether to switch to Opus 4.8, and with the fallback set to switch
- * by itself an agent carries on with another model unsaid. Hive shows when, on which model, and the names of the agent's
+ * by itself an agent carries on with another model unsaid. Combwork shows when, on which model, and the names of the agent's
  * last few tool calls before it (to tell a false positive from an agent drifting into risky work), never the stopped
  * content (the CLI withholds it anyway) nor the calls' input.
  */
 
 /**
- * What Hive spots safeguards by, as named defaults in one place (data, not code). The note and the question are
+ * What Combwork spots safeguards by, as named defaults in one place (data, not code). The note and the question are
  * Settings → Advanced's (#685: claude-code.safeguard.note, .prompt in ADVANCED_DEFS), which the detection reads through
  * `advanced`, so an override changes them; the lists join them once a real session of one is recorded (#697). Patterns
  * are a case-insensitive regular expression's source; lists are the CLI's own codes.
@@ -56,7 +56,7 @@ export function newStop(memo: { ids?: string[] }, id: string | undefined): boole
   return true
 }
 
-/** The names of the last tool calls a detector's memo holds (each keeps them as `tools`), for a stop Hive sees elsewhere. */
+/** The names of the last tool calls a detector's memo holds (each keeps them as `tools`), for a stop Combwork sees elsewhere. */
 export function memoTools(memo: Record<string, unknown> | undefined): string[] {
   const t = memo?.tools
   return Array.isArray(t) ? t.filter((x): x is string => typeof x === 'string').slice(-SAFEGUARD_TOOLS) : []
@@ -78,9 +78,9 @@ export function memoTurn(memo: Record<string, unknown> | undefined): string | un
  * model the agent runs on changing after a stop (`flagged`: the CLI says the change is the safeguard's own, as Codex's
  * reroute does). `at`: when the CLI wrote it (ms). A stop's `id` is what the CLI identifies the stopped request by,
  * when it does: each detector counts a stop once by it, however close two stops are. `asked`: the CLI's record of a
- * stop it may have asked the user about first (Claude Code's `model_refusal_fallback`), so a stop Hive saw on screen
+ * stop it may have asked the user about first (Claude Code's `model_refusal_fallback`), so a stop Combwork saw on screen
  * (the prompt) and this record of it count once: matched by `turn`, the turn both came in (the CLI's id for the user's
- * prompt that started it), read from the transcript's own order, so neither when Hive reads them nor a restart matters.
+ * prompt that started it), read from the transcript's own order, so neither when Combwork reads them nor a restart matters.
  */
 export type SafeguardEvent = { kind: 'stop'; at: number; model?: string; tools: string[]; id?: string; asked?: boolean; turn?: string } | { kind: 'switch'; at: number; from: string; to: string; flagged?: boolean }
 
@@ -141,7 +141,7 @@ export function safeguardTime(iso: string): string {
 }
 
 /**
- * The comment Hive writes on an agent's cards after its model changed with a safeguard stop (#606), as stored text
+ * The comment Combwork writes on an agent's cards after its model changed with a safeguard stop (#606), as stored text
  * (#866): its English is the agent's name, safeguardText's sentences and the CLI's `help`, word for word as before; the
  * window shows it in its language. `label`: the CLI's model names.
  */
@@ -218,7 +218,7 @@ export function countSafeguards(by: Record<string, number>, events: readonly Saf
 }
 
 /**
- * A stop Hive saw on the CLI's screen (its prompt about one), kept on the session's record so Performance counts it
+ * A stop Combwork saw on the CLI's screen (its prompt about one), kept on the session's record so Performance counts it
  * (SessionRecord.screenStops): HB3's left no transcript entry. `turn`: the turn it came in (SafeguardEvent.turn), when
  * the transcript said, so the CLI's record of it, if it writes one, is told from another stop (withScreenStops).
  */

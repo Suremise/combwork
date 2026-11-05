@@ -26,13 +26,13 @@ import { cardsWait } from './watchLine'
 
 /**
  * The Session tab's Tiles view (#976; #975's toggle switches to it): a tile per agent, 12 to a page, in the order Settings
- * → Sessions → Tile order chooses, so a whole team fits on one screen. A tile shows what Hive already has (the state, the
+ * → Sessions → Tile order chooses, so a whole team fits on one screen. A tile shows what Combwork already has (the state, the
  * status, the card, a progress run, the start of the latest reply, badges for background tasks and warnings): no CLI is
  * asked anything, and no terminal is drawn for it. Clicking one (or Enter) opens its focus view: the agent's live pane
  * large, the other agents in a strip beside it; Esc (outside the terminal), Back to Tiles or the Tiles toggle go back.
  * ProjectView places the pane (the agents' area beside the strip); the toolbar above shows the pages (TilePager).
  * In the panes' order, a tile is dragged like a pane header (#993): onto another tile the two swap, onto a page button it
- * goes to that page's end; its menu and Move Agent Left/Right move it from the keyboard. By urgency, the order is Hive's.
+ * goes to that page's end; its menu and Move Agent Left/Right move it from the keyboard. By urgency, the order is Combwork's.
  */
 export function AgentTiles({ project }: { project: ProjectInfo }) {
   useLanguage()

@@ -272,7 +272,7 @@ if (lane) console.log(`Lane ${lane.lane}: ports ${lane.first}–${lane.last}\n  
 /**
  * A suite's environment (runContext.suiteEnv): the allowlist and the test settings passed on by name, nothing else of
  * the runner's (an agent session's CW_ variables, CW_PROGRESS_*, NO_COLOR…); its lane's folder, and side by side
- * its own Agent API port (suites read it with lib.port(); the test copies they start get it through lib.hiveEnv). The
+ * its own Agent API port (suites read it with lib.port(); the test copies they start get it through lib.combworkEnv). The
  * same said without the CW_ prefix (E2E_RUN_*), which Combwork keeps in its sessions: a runner started in an agent's
  * shell inside the suite's Combwork (progressreport does) knows it is inside a suite, and which port to keep clear of.
  */

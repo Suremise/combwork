@@ -2,12 +2,12 @@ import { appendFileSync } from 'original-fs'
 import { app, screen, type BrowserWindow } from 'electron'
 
 /**
- * Test copies of Hive don't interrupt the person at the desk: their windows open off screen and never take focus, and
+ * Test copies of Combwork don't interrupt the person at the desk: their windows open off screen and never take focus, and
  * Windows notifications, taskbar flashes and the chime don't happen. What would have happened is appended to
  * CW_TEST_NOTIFY_LOG (one JSON line each), so suites can check it. A test copy is an unpackaged build with a test
  * profile (CW_USER_DATA, which every suite, scenario and verification script sets, however it is started), or one
  * started with CW_TEST_QUIET=1; CW_TEST_QUIET=0 turns it off, for a test that needs a real window. A packaged build
- * is quiet only with CW_TEST_QUIET=1 (#1253: the packaged suites start dist\win-unpacked with it, hiveEnv); its test
+ * is quiet only with CW_TEST_QUIET=1 (#1253: the packaged suites start dist\win-unpacked with it, combworkEnv); its test
  * profile alone doesn't make it so. Never on in normal use: `npm run dev` has no CW_USER_DATA, and the installed app
  * is started without CW_TEST_QUIET.
  */
@@ -64,7 +64,7 @@ export function testNotifyLog(entry: { kind: 'notification' | 'flash' | 'chime' 
   try {
     appendFileSync(file, `${JSON.stringify({ at: Date.now(), ...entry })}\n`)
   } catch {
-    // A test log that can't be written mustn't break Hive.
+    // A test log that can't be written mustn't break Combwork.
   }
 }
 

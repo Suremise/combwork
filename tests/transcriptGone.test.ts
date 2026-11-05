@@ -33,7 +33,7 @@ vi.mock('fs/promises', async (importOriginal) => {
   }
 })
 
-const base = tempDir('hive-transcript-gone-')
+const base = tempDir('cw-transcript-gone-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { sessions } = await import('../src/main/sessions')

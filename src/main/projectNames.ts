@@ -4,7 +4,7 @@ import { CW_DIR } from '../shared/defaults'
 import { isProjectId } from '../shared/projectIds'
 import { readKeptJson, retryWhileSaving, withFileLock, writeKeptJson } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import type { ProjectSeen, WorkspaceService } from './workspace'
 
@@ -182,12 +182,12 @@ export async function noteFormerName(ws: WorkspaceService, id: string, folder: s
   const life = ws.lifetime
   const gone = (): boolean => life.aborted || ws.lifetime !== life || ws.path !== path
   await retryWhileSaving(() => withFileLock(fileOf(path), async () => {
-    if (gone()) throw hiveError(CLOSED, undefined, { kind: 'conflict' })
+    if (gone()) throw combworkError(CLOSED, undefined, { kind: 'conflict' })
     const j = readJournal(await readKeptJson<unknown>(fileOf(path), null, { unsettled: 'throw' }))
-    if (gone()) throw hiveError(CLOSED, undefined, { kind: 'conflict' })
+    if (gone()) throw combworkError(CLOSED, undefined, { kind: 'conflict' })
     const now = ws.projectIdsNow().byId.get(id)
     const p = j.projects[id] ?? (now ? (j.projects[id] = { name: basename(now), former: [] }) : null)
-    if (!p) throw hiveError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }), undefined, { kind: 'notFound' })
+    if (!p) throw combworkError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }), undefined, { kind: 'notFound' })
     if (same(p.name, folder) || p.former.some((n) => same(n, folder))) return remember(ws, life, j)
     // The oldest of its names: it had it before any Hive saw it renamed from.
     p.former = [...p.former.slice(0, MAX_FORMER - 1), folder]

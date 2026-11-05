@@ -13,7 +13,7 @@ import { LATENCY_BOUNDS_MS, percentile, utf8Bytes, type MetricsPart } from '../s
 import { tempDir } from './tempDir'
 import { metricsSaved, putMetrics } from './storeDocs'
 
-const base = tempDir('hive-metrics-')
+const base = tempDir('cw-metrics-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -711,7 +711,7 @@ describe('cost', () => {
 describe('approved labels', () => {
   it("the tool names metrics take are exactly the Combwork MCP server's tools", async () => {
     const { CW_TOOLS } = await import('../src/shared/assistantTools')
-    const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+    const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
     // A tool's name, or an intent tool's (#1267: intent('cw_submit', …)).
     const offered = [...source.matchAll(/(?:^ {4}name: |\bintent\(\s*)'(cw_[a-z_]+)'/gm)].map((m) => m[1])
     expect([...offered].sort()).toEqual([...CW_TOOLS].sort())
@@ -1251,27 +1251,27 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
 
   it("a launch's guidance in parts: core, the project's additions, the Assistant's role and mode", async () => {
     const { launchParts } = await import('../src/main/guidance')
-    const { hiveInstructions, withLatestHandover } = await import('../src/shared/hiveGuidance')
-    const core = hiveInstructions('alpha')
+    const { combworkInstructions, withLatestHandover } = await import('../src/shared/combworkGuidance')
+    const core = combworkInstructions('alpha')
     const withHandover = withLatestHandover(core, 'handovers/alpha/one.md')
     const agent = launchParts(withHandover, 'agent', 'alpha', null)
     expect([agent.guidanceBytes, agent.customBytes, agent.roleBytes, agent.modeBytes]).toEqual([utf8Bytes(core), utf8Bytes(withHandover) - utf8Bytes(core), 0, 0])
     expect(agent.customChars).toBeGreaterThan(0)
     const mode = '# Your mode: Bee\n\nBuzz. Ünïcödé.'
     const text = `You are the Combwork Assistant…\n\n${mode}`
-    const assistant = launchParts(hiveInstructions('', 'assistant'), 'assistant', 'assistant', { text, modeText: mode })
+    const assistant = launchParts(combworkInstructions('', 'assistant'), 'assistant', 'assistant', { text, modeText: mode })
     expect([assistant.customBytes, assistant.roleBytes, assistant.modeBytes]).toEqual([0, utf8Bytes(text) - utf8Bytes(mode), utf8Bytes(mode)])
     // The Assistant's journal (HI-2112): off, the contract is all core; on, its skills line changes inside the contract
     // (HI-2048), which is still core, and its rule after it is custom.
-    const { journalRule } = await import('../src/shared/hiveGuidance')
-    const assistantCore = hiveInstructions('', 'assistant')
-    expect(launchParts(hiveInstructions('', 'assistant', true, undefined, null), 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(assistantCore), customBytes: 0 })
-    const journalOn = hiveInstructions('', 'assistant', true, undefined, ['decision', 'plan'])
+    const { journalRule } = await import('../src/shared/combworkGuidance')
+    const assistantCore = combworkInstructions('', 'assistant')
+    expect(launchParts(combworkInstructions('', 'assistant', true, undefined, null), 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(assistantCore), customBytes: 0 })
+    const journalOn = combworkInstructions('', 'assistant', true, undefined, ['decision', 'plan'])
     expect(journalOn.startsWith(assistantCore)).toBe(false)
     const rule = `\n${journalRule(['decision', 'plan'])}`
     expect(launchParts(journalOn, 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(journalOn) - utf8Bytes(rule), customBytes: utf8Bytes(rule) })
     // Without long commands wrapped too (Settings → General).
-    const unwrapped = hiveInstructions('', 'assistant', false, undefined, ['decision'])
+    const unwrapped = combworkInstructions('', 'assistant', false, undefined, ['decision'])
     expect(launchParts(unwrapped, 'assistant', 'assistant', null).customBytes).toBe(utf8Bytes(`\n${journalRule(['decision'])}`))
     // Text that isn't as expected is counted whole, never split by guesswork.
     expect(launchParts('something else', 'agent', 'alpha', null)).toMatchObject({ guidanceBytes: 14, customBytes: 0 })

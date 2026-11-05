@@ -5,13 +5,13 @@ import type { DatabaseSync, SQLInputValue, StatementSync } from 'node:sqlite'
  * contract. `composeCard(decomposeCard(n, doc))` stringifies to exactly `JSON.stringify(doc)` for any document a card's
  * row holds today, so every reader (the Agent API, Export Board, a 0.9.3 Hive reading an export) sees the same card.
  *
- * - Each field the board knows goes to its typed column or child table when it has the form Hive writes; anything else
- *   (a field Hive doesn't know, or a known one of another type: an older Hive's, a hand-edited export's) is kept as JSON
+ * - Each field the board knows goes to its typed column or child table when it has the form Combwork writes; anything else
+ *   (a field Combwork doesn't know, or a known one of another type: an older Hive's, a hand-edited export's) is kept as JSON
  *   in the card's `extra`, and read from there.
- * - The keys' order is Hive's canonical order (CARD_KEYS) with optional fields present when they have a value; a card
+ * - The keys' order is Combwork's canonical order (CARD_KEYS) with optional fields present when they have a value; a card
  *   saved in another order or with a field missing keeps its exact key list in `layout` (null for the canonical one).
  *   Cards written by 1.0 are canonical, so `layout` empties as cards are saved.
- * - A list entry (a comment, a history line, a decision, a hold) not of Hive's form keeps its exact JSON in its row's
+ * - A list entry (a comment, a history line, a decision, a hold) not of Combwork's form keeps its exact JSON in its row's
  *   `raw`, its typed columns filled where they can be (for queries only).
  * - A string with a lone surrogate (valid in JSON, not in SQLite's UTF-8 text) is never put in a text column: its field
  *   goes to `extra` (a card's) or the entry to `raw`, as JSON, which escapes it.
@@ -50,7 +50,7 @@ export interface CardRow {
   layout: string | null
 }
 
-/** A list entry's row: its typed columns (by column name) and its exact JSON when it isn't of Hive's form. */
+/** A list entry's row: its typed columns (by column name) and its exact JSON when it isn't of Combwork's form. */
 export interface EntryRow {
   cols: Record<string, string | null>
   raw: string | null
@@ -68,7 +68,7 @@ export interface CardRows {
   holds: EntryRow[]
 }
 
-/** A list entry's form: its fields in Hive's order, each a text column (`json`: any JSON value, kept as its text). */
+/** A list entry's form: its fields in Combwork's order, each a text column (`json`: any JSON value, kept as its text). */
 interface EntrySpec {
   table: string
   fields: { key: string; col: string; optional?: boolean; json?: boolean }[]
@@ -118,7 +118,7 @@ const HOLD: EntrySpec = {
 export const ENTRY_SPECS = { comments: COMMENT, history: HISTORY, decisions: DECISION, held: HOLD } as const
 
 /**
- * A card's keys in Hive's order, `optional` ones only when they have a value: tasks.ts `clean`'s, with `projectId` beside
+ * A card's keys in Combwork's order, `optional` ones only when they have a value: tasks.ts `clean`'s, with `projectId` beside
  * `project` (saveCard) and `archivedFor`/`archivedBatch` last, where archiving a card adds them (most saved cards' order).
  */
 export const CARD_KEYS: { key: string; optional?: boolean }[] = [
@@ -175,7 +175,7 @@ function entryOf(spec: EntrySpec, r: EntryRow): unknown {
   for (const f of spec.fields) {
     const v = r.cols[f.col]
     if (v === null || v === undefined) {
-      if (!f.optional) throw new Error(`${spec.table}: ${f.col} missing in a row of Hive's form`) // i18n-ignore: a broken row, an internal error
+      if (!f.optional) throw new Error(`${spec.table}: ${f.col} missing in a row of Combwork's form`) // i18n-ignore: a broken row, an internal error
       continue
     }
     out[f.key] = f.json ? JSON.parse(v) : v
@@ -248,7 +248,7 @@ export function decomposeCard(n: number, doc: Record<string, unknown>): CardRows
   const createdBy = take('createdBy', text)
   const updatedAt = take('updatedAt', text)
 
-  // A review not of Hive's form (kept in extra) still names its reviewer for queries (cardDocs' reviewers), as clean reads it.
+  // A review not of Combwork's form (kept in extra) still names its reviewer for queries (cardDocs' reviewers), as clean reads it.
   const reviewer = review?.agent ?? (isObject(doc.review) && isText(doc.review.agent) && doc.review.agent ? doc.review.agent : null)
   const card: CardRow = {
     number: n,
@@ -294,7 +294,7 @@ export function decomposeCard(n: number, doc: Record<string, unknown>): CardRows
   return rows
 }
 
-/** The keys a card of Hive's form has: every required one, and each optional one with a value. */
+/** The keys a card of Combwork's form has: every required one, and each optional one with a value. */
 function canonicalKeys(r: CardRows): string[] {
   const c = r.card
   const has: Record<string, boolean> = {

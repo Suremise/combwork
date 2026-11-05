@@ -5,9 +5,9 @@ import type { PermissionMode } from './types'
 
 /**
  * "The CLI's own setting" (#1284, #966 row 1, Darren's decision on #1120 point 3): a permission choice every provider
- * offers beside its own modes. Hive passes no mode flag, so the CLI starts in whatever its own config (or its default)
- * says. Hive doesn't know which mode that is, so it shows this choice, never a guessed mode, and switches no mode live in
- * such a session (a switch restarts it in the mode chosen). The Hive Assistant isn't offered it: Control relies on its
+ * offers beside its own modes. Combwork passes no mode flag, so the CLI starts in whatever its own config (or its default)
+ * says. Combwork doesn't know which mode that is, so it shows this choice, never a guessed mode, and switches no mode live in
+ * such a session (a switch restarts it in the mode chosen). The Combwork Assistant isn't offered it: Control relies on its
  * known mode.
  */
 export const CLI_OWN_MODE: PermissionMode = 'cli-own'
@@ -18,7 +18,7 @@ export const isCliOwnMode = (mode: PermissionMode | '' | null | undefined): bool
 /**
  * The mode a session's CLI is in, for what depends on it (Codex's reviewer answering its permission requests, the
  * warning for a no-guardrails mode): its mode, or on the CLI's own setting the one the CLI last showed (absent until it
- * has shown one). What Hive shows and switches stays the CLI's own setting.
+ * has shown one). What Combwork shows and switches stays the CLI's own setting.
  */
 export const modeInEffect = (s: { permissionMode?: PermissionMode; modeObserved?: PermissionMode } | null | undefined): PermissionMode | undefined =>
   isCliOwnMode(s?.permissionMode) ? s?.modeObserved : s?.permissionMode

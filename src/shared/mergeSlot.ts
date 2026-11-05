@@ -1,9 +1,9 @@
 import type { MergeSlotInfo } from './types'
 import { cardRef } from './projectKeys'
 
-/** How the merge slot (#350) is put in words, the same in the window, the agents' status and the hive tools' replies. */
+/** How the merge slot (#350) is put in words, the same in the window, the agents' status and the Combwork tools' replies. */
 
-/** How long a claim waits in one call (seconds): by default, and at most (the service and the hive tool both use these). */
+/** How long a claim waits in one call (seconds): by default, and at most (the service and the Combwork tool both use these). */
 export const CLAIM_WAIT_SECONDS = 240
 export const CLAIM_WAIT_MAX_SECONDS = 290
 

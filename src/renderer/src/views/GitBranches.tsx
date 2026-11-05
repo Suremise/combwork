@@ -408,10 +408,10 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
           const lane = l?.lane ? (lanes.find((x) => x.id === l.lane)?.name ?? l.lane) : ''
           return tr(M.slotLease, { kind: l ? (l.kind === 'carried' ? 'carried' : l.card !== null ? 'card' : 'lane') : 'none', slot: v.name, agent, card, lane })
         }
-        // The worktrees as the user's (agents', slots', unused ones) and Hive's own (HI-1710).
-        const theirs = info.worktrees.filter((w) => !w.hive)
-        const hiveCopies = info.worktrees.filter((w) => w.hive === 'copy')
-        const hiveQueue = info.worktrees.filter((w) => w.hive === 'queue')
+        // The worktrees as the user's (agents', slots', unused ones) and Combwork's own (HI-1710).
+        const theirs = info.worktrees.filter((w) => !w.combwork)
+        const combworkCopies = info.worktrees.filter((w) => w.combwork === 'copy')
+        const combworkQueue = info.worktrees.filter((w) => w.combwork === 'queue')
         const copyText = (path: string): string => {
           const c = copies.find((x) => samePath(x.folder, path))
           const l = c?.lease && !c.lease.returned ? c.lease : null
@@ -700,16 +700,16 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 </div>
               </>
             )}
-            {/* Hive's own worktrees (HI-1710): its review copies and the merge queue's folder, each its group, nothing to remove. */}
-            {hiveCopies.length > 0 && (
+            {/* Combwork's own worktrees (HI-1710): its review copies and the merge queue's folder, each its group, nothing to remove. */}
+            {combworkCopies.length > 0 && (
               <>
                 <h2 className="section" data-worktrees="copies">
-                  {tr(M.copiesHeading)} <span className="badge">{hiveCopies.length}</span>
+                  {tr(M.copiesHeading)} <span className="badge">{combworkCopies.length}</span>
                 </h2>
                 <p className="hint">{tr(M.copiesHint)}</p>
                 <div className="git-rows">
-                  {hiveCopies.map((w) => (
-                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-hive="copy">
+                  {combworkCopies.map((w) => (
+                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-cw="copy">
                       <Icon name="shield" />
                       <span className="git-name">{copyText(w.path)}</span>
                       <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
@@ -719,15 +719,15 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 </div>
               </>
             )}
-            {hiveQueue.length > 0 && (
+            {combworkQueue.length > 0 && (
               <>
                 <h2 className="section" data-worktrees="queue">
-                  {tr(M.queueHeading)} <span className="badge">{hiveQueue.length}</span>
+                  {tr(M.queueHeading)} <span className="badge">{combworkQueue.length}</span>
                 </h2>
                 <p className="hint">{tr(M.queueHint)}</p>
                 <div className="git-rows">
-                  {hiveQueue.map((w) => (
-                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-hive="queue">
+                  {combworkQueue.map((w) => (
+                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-cw="queue">
                       <Icon name="git-merge" />
                       <span className="git-name">{tr(M.queueRow)}</span>
                       <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>

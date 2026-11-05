@@ -1,5 +1,5 @@
 // Each card's focused tests (G20, HI-1367; SPEC §16.9.1, §16.13): the tests a card's change needs, chosen when it is
-// submitted and run by the merge queue at the merged result. Hive knows none of a project's tests: its picker
+// submitted and run by the merge queue at the merged result. Combwork knows none of a project's tests: its picker
 // (`focused.pick`) names them and its runner (`focused.run`) runs them. What is shared by the submission, the queue and
 // the window is here, pure: the ids, the picker's output, a change's identity path by path, and the runner's results.
 //
@@ -21,7 +21,7 @@ export interface FocusedTest {
   needs: FocusedNeed[]
 }
 
-/** The pick's outcome: a list (possibly empty: nothing needed), or none Hive can use. */
+/** The pick's outcome: a list (possibly empty: nothing needed), or none Combwork can use. */
 export type FocusedPickState = 'chosen' | 'unknown' | 'tooBroad'
 
 /** Why a pick is `unknown`, as a code (the window and the agents' reply say it in words). */
@@ -158,7 +158,7 @@ export const choiceStands = (c: FocusedChoice | undefined | null): boolean => !!
 /** A test the queue never runs: proved by its review instead (realProof = review). */
 export const reviewProved = (t: FocusedTest): boolean => t.needs.includes('real') || t.needs.includes('packaged')
 
-/** The check name a review's run of one focused test is recorded under (`hive-progress --check "focused:<id>"`). */
+/** The check name a review's run of one focused test is recorded under (`cw-progress --check "focused:<id>"`). */
 export const focusedCheckName = (id: string): string => `focused:${id}`
 
 /** The queue's run of a card's focused tests, as its `CheckRan` names it. */

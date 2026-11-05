@@ -40,7 +40,7 @@ const until = async (fn, ms = 10000) => {
 
   const notifyLog = path.join(lib.WORK, 'bursts-notify.log')
   fs.rmSync(notifyLog, { force: true })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47902), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47902), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -56,7 +56,7 @@ const until = async (fn, ms = 10000) => {
   let notesFrom = 0
   const notes = async () => logged().slice(notesFrom)
   const clearNotes = () => (notesFrom = logged().length)
-  const chimes = () => page.evaluate(() => window.__hiveChimes?.() ?? -1)
+  const chimes = () => page.evaluate(() => window.__cwChimes?.() ?? -1)
 
   const one = await lib.addAgent(inv, alpha, { name: 'One' })
   const two = await lib.addAgent(inv, alpha, { name: 'Two' })

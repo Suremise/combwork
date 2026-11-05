@@ -48,14 +48,14 @@ function marks() {
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    check('the test hook is there', await page.evaluate(() => typeof window.__hiveStateMarks === 'function'))
+    check('the test hook is there', await page.evaluate(() => typeof window.__cwStateMarks === 'function'))
 
     for (const theme of ['light', 'dark']) {
       await inv('settings:update', { appearance: { theme } })
       check(`${theme}: the theme is applied`, !!(await lib.until(() => page.evaluate((t) => document.documentElement.dataset.theme === t, theme), HUNG_MS)))
       await page.emulateMedia({ reducedMotion: 'no-preference' })
       await page.evaluate(() => {
-        window.__stateMarksDone = window.__hiveStateMarks()
+        window.__stateMarksDone = window.__cwStateMarks()
       })
       await lib.until(async () => (await page.locator('.state-mark-gallery .state-mark').count()) === 4, HUNG_MS)
       const m = Object.fromEntries((await page.evaluate(marks)).map((x) => [x.state, x]))

@@ -258,7 +258,7 @@ async function retryTemplates(ctx) {
 }
 
 /** The Templates view, one of Combwork's own selected (#1436): Team 3×3, its roles and pairs, read-only. */
-async function hiveTemplates(ctx) {
+async function combworkTemplates(ctx) {
   await showView(ctx, 'view.templates', '.sidebar .template-row')
   await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="hive"]'), "Combwork's templates")).nth(3).click()
   await shown(ctx, ctx.page.locator('.template-detail[data-scope="hive"] .template-agents'), "one of Combwork's templates")
@@ -336,7 +336,7 @@ module.exports = {
     { name: 'project-menu', open: projectMenu, close: closeMenu },
     { name: 'projects-rail', open: projectsRail, close: expandRail },
     { name: 'templates-failed', open: templatesFailed, close: retryTemplates },
-    { name: 'templates-hive', open: hiveTemplates },
+    { name: 'templates-hive', open: combworkTemplates },
     { name: 'templates', open: templates },
     { name: 'template-editor', open: templateEditor, close: closeEditor },
     { name: 'template-load', open: templateLoad, close: cancelDialog },

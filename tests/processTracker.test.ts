@@ -26,7 +26,7 @@ vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
   return { ...stub, app: { ...stub.app, getPath: () => profile.dir } }
 })
-profile.dir = tempDir('hive-tracker-profile-')
+profile.dir = tempDir('cw-tracker-profile-')
 
 const alive = (pid: number): boolean => {
   try {
@@ -43,7 +43,7 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
 }
 
 describe.runIf(process.platform === 'win32')("when the process tracker fails", () => {
-  const dir = tempDir('hive-tracker-')
+  const dir = tempDir('cw-tracker-')
   const since = Date.now()
   const children: ChildProcess[] = []
   let mod: typeof import('../src/main/agentProcesses') | null = null

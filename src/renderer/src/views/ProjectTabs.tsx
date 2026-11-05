@@ -45,7 +45,7 @@ import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWork
 import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
-import { HiveVcsNotice } from '../components/HiveVcsNotice'
+import { CombworkVcsNotice } from '../components/CombworkVcsNotice'
 import { InitRepoButton } from '../components/InitRepo'
 import { MergeSlotList, projectSlots, useMergeSlots } from '../components/MergeSlots'
 import { cx, formatDuration, formatNumber, formatTokens, resetsIn, timeAgo } from '../util'
@@ -234,9 +234,9 @@ const C = {
   applyNew: msg({ id: 'project.apply.new', defaultMessage: '{live, select, yes {Changes apply to new sessions — restart the running session to apply them.} other {Changes apply to new sessions.}}', description: 'Under the Skills and MCP tabs.' }),
   skillsHeading: msg({ id: 'project.skills.heading', defaultMessage: 'Skills available to agents', description: "Heading of the project's Skills tab list." }),
   skillsTarget: msg({ id: 'project.skills.target', defaultMessage: 'the skills', description: 'What could not be read in the Skills tab: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
-  hiveGroup: msg({ id: 'project.skills.cw', defaultMessage: 'Combwork', description: "The group of Combwork's own skills (the workspace's). Usually kept as Combwork." }),
+  combworkGroup: msg({ id: 'project.skills.cw', defaultMessage: 'Combwork', description: "The group of Combwork's own skills (the workspace's). Usually kept as Combwork." }),
   deliveredNote: msg({ id: 'project.skills.deliveredNote', defaultMessage: "Each switch says whether this project's agents get the skill (Delivered to agents), from their next session. A skill switched off in the Skills view is off in every project.", description: "Under the Combwork skills in a project's Skills tab: what the switch beside each skill does. Delivered to agents is the switch's name; the Skills view is the workspace's list of skills." }),
-  noHiveSkills: msg({ id: 'project.skills.noCombwork', defaultMessage: 'No Combwork skills in this workspace.', description: 'Under the Combwork group when it is empty.' }),
+  noCombworkSkills: msg({ id: 'project.skills.noCombwork', defaultMessage: 'No Combwork skills in this workspace.', description: 'Under the Combwork group when it is empty.' }),
   editInWorkspace: msg({ id: 'project.skills.editInWorkspace', defaultMessage: "Edit in the workspace's Skills view (Combwork skills are shared by every project)", description: 'Tooltip on the button beside a Combwork skill.' }),
   assistantOnly: msg({ id: 'project.skills.assistantOnly', defaultMessage: "{count, plural, one {# Combwork skill is for the Assistant only, so it isn't listed: this project's agents don't get it.} other {# Combwork skills are for the Assistant only, so they aren't listed: this project's agents don't get them.}}", description: 'Under the Combwork skills, when some are for the Combwork Assistant alone.' }),
   seeThem: msg({ id: 'project.skills.seeThem', defaultMessage: 'See them in the Skills view', description: 'Link after the note about skills for the Combwork Assistant.' }),
@@ -267,7 +267,7 @@ const C = {
   definedByProject: msg({ id: 'project.mcp.definedByProject', defaultMessage: 'Defined by the project (disabled)', description: "Heading in a project's MCP tab: servers in the project's own agent config." }),
   copyToWorkspace: msg({ id: 'project.mcp.copy', defaultMessage: 'Copy to workspace', description: "Button: copies the project's own MCP server to the workspace." }),
   builtIn: msg({ id: 'project.mcp.builtIn', defaultMessage: 'Built-in', description: "Heading in a project's MCP tab: Combwork's own server." }),
-  hiveDesc: msg({ id: 'project.mcp.combworkDesc', defaultMessage: 'Lets agents see other projects, read and write shared notes, create handovers and notify you.', description: "What Combwork's own MCP server (combwork) does." }),
+  combworkDesc: msg({ id: 'project.mcp.combworkDesc', defaultMessage: 'Lets agents see other projects, read and write shared notes, create handovers and notify you.', description: "What Combwork's own MCP server (combwork) does." }),
   onAll: msg({ id: 'project.mcp.onAll', defaultMessage: 'On for all sessions', description: "Badge on Combwork's own MCP server when it is on." }),
   off: msg({ id: 'project.mcp.off', defaultMessage: 'Off', description: "Badge on Combwork's own MCP server when it is off." })
 }
@@ -303,7 +303,7 @@ const S = {
   compactAbove: msg({ id: 'project.settings.compactAbove', defaultMessage: 'Suggest compacting above', description: 'Accessible name of the number box of tokens above which compacting is suggested.' }),
   neverChoice: msg({ id: 'project.settings.neverChoice', defaultMessage: 'Never', description: 'A choice: the warning or suggestion is off.' }),
   warnOver: msg({ id: 'project.settings.warnOver', defaultMessage: 'Warn when a transcript is over', description: 'Accessible name of the number box of megabytes above which a transcript is flagged.' }),
-  openHive: msg({ id: 'project.settings.openCombwork', defaultMessage: 'Open .combwork folder', description: "Button: opens the project's .combwork folder. Keep .combwork." }),
+  openCombwork: msg({ id: 'project.settings.openCombwork', defaultMessage: 'Open .combwork folder', description: "Button: opens the project's .combwork folder. Keep .combwork." }),
   resetTitle: msg({ id: 'project.settings.resetTitle', defaultMessage: 'Reset project settings?', description: 'Title of the confirmation before resetting the project settings.' }),
   resetMessage: msg({ id: 'project.settings.resetMessage', defaultMessage: "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the fresh-start suggestion, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.", description: 'The confirmation before resetting the project settings.' }),
   reset: msg({ id: 'project.settings.reset', defaultMessage: 'Reset', description: "The reset confirmation's button." }),
@@ -313,7 +313,7 @@ const S = {
   noMatch: msg({ id: 'project.settings.noMatch', defaultMessage: 'No settings match.', description: "Project Settings when the search finds nothing." })
 }
 
-/** A plan limit's window as the messages select on: the 5-hour and weekly windows Hive knows, else its own label. */
+/** A plan limit's window as the messages select on: the 5-hour and weekly windows Combwork knows, else its own label. */
 export const limitWindow = (l: PlanLimit): string => (l.windowMinutes === 300 ? 'fiveHour' : l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other')
 
 // ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ const LIST_LIMIT_MS = 60_000
  * only on reload(). Only while a view using it is shown.
  */
 const NO_SESSIONS: SessionListItem[] = []
-/** A listing as shown: `othersLoading` while it is Hive's own sessions alone, the others still being read (HI-1681). */
+/** A listing as shown: `othersLoading` while it is Combwork's own sessions alone, the others still being read (HI-1681). */
 type SessionsData = { list: SessionListItem[]; kept: SessionListItem[]; othersLoading?: boolean }
 
 export function useSessions(project: ProjectInfo) {
@@ -368,7 +368,7 @@ export function useSessions(project: ProjectInfo) {
           loadScoped(path, () => bounded)
           return bounded
         }
-        // Nothing shown yet (HI-1681): Hive's own sessions first, from its records, while the sessions its CLIs keep for
+        // Nothing shown yet (HI-1681): Combwork's own sessions first, from its records, while the sessions its CLIs keep for
         // the project's folders are read (seconds on a busy disk with hundreds of them); the whole list follows. Shown
         // only while the whole list's load runs, which alone says how it ended (its time limit too); without deleted
         // sessions' usage meanwhile, which only adds to totals.
@@ -498,7 +498,7 @@ export function OverviewTab({ project }: { project: ProjectInfo }) {
     <div className="scroll-page overview-page">
       <div className="page-narrow">
         <TaskStrip project={project} />
-        <HiveVcsNotice project={project} dismissible />
+        <CombworkVcsNotice project={project} dismissible />
         {slots.length > 0 && (
           <>
             <h2 className="section">{tr(M.mergeSlot)}</h2>
@@ -705,7 +705,7 @@ function LastTurn({ c }: { c: CompactionEvent }) {
 
 /**
  * A session's compactions as a data table (newest first, filters, pages). A row opens that compaction in the Sessions
- * tab's transcript, at its divider, when the transcript (or Hive's backup of it) is there to read.
+ * tab's transcript, at its divider, when the transcript (or Combwork's backup of it) is there to read.
  */
 function CompactionHistory({ project, session, compactions }: { project: ProjectInfo; session: SessionListItem; compactions: CompactionEvent[] }) {
   // Its When filter matches the dates as shown, in the current format.
@@ -1102,7 +1102,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   if (shownId === LEFTOVERS_ROOT) return <LeftoversPage project={owner} read={infoRead} selector={selector} listWidth={listWidth} onCompare={(b, h) => choose(compareRoot(b, h))} />
   if (compared) return <ComparePage project={owner} base={compared.base} head={compared.head} lines={compare.lines} selector={selector} listWidth={listWidth} onPick={(b, h) => choose(compareRoot(b, h))} />
 
-  // Not "not a git repository": git can't run, so Hive can't tell (#346). Whichever page is shown.
+  // Not "not a git repository": git can't run, so Combwork can't tell (#346). Whichever page is shown.
   const gitMissing = (problem: string, retry: () => void): React.ReactNode => (
     <div className="empty-state changes-git-missing" style={{ paddingTop: '15vh' }}>
       <Icon name="warning" />
@@ -1128,7 +1128,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   )
 
   // All the unused worktrees, in the main pane (#400): the list and its actions, as the Overview had them. Listing them
-  // reads git for each, which takes a while: the last list shows meanwhile, else a spinner says what Hive is doing.
+  // reads git for each, which takes a while: the last list shows meanwhile, else a spinner says what Combwork is doing.
   if (listingUnused && unusedData?.gitProblem) return gitMissing(unusedData.gitProblem, reloadUnused)
   if (listingUnused) {
     return (
@@ -1454,16 +1454,16 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
   const fallback = connectionCli(connections, firstReadyConnection(connections, settings, cliReadyOf(cliFound)).id)
   const shown = providers.find((p) => p.id === remembered) ?? providers.find((p) => p.id === fallback) ?? providers[0]
   const showProvider = (id: ProviderId): void => rememberProjectPref('skillsProvider', key, id)
-  // Hive skills (the workspace's, the same in every project) start open at the top; the provider's skills folded under
+  // Combwork skills (the workspace's, the same in every project) start open at the top; the provider's skills folded under
   // the dropdown. Opening or folding either is remembered for the project (Darren, 5 Oct).
   const fold = useStore((s) => s.skillsFold[key])
-  const hiveOpen = fold?.hive ?? true
+  const combworkOpen = fold?.combwork ?? true
   const providerOpen = fold?.provider ?? false
-  const setFold = (patch: { hive?: boolean; provider?: boolean }): void => rememberProjectPref('skillsFold', key, { hive: hiveOpen, provider: providerOpen, ...patch })
-  const setHiveOpen = (open: boolean): void => setFold({ hive: open })
+  const setFold = (patch: { combwork?: boolean; provider?: boolean }): void => rememberProjectPref('skillsFold', key, { combwork: combworkOpen, provider: providerOpen, ...patch })
+  const setCombworkOpen = (open: boolean): void => setFold({ combwork: open })
   const all = skills ?? []
-  // This project's agents get the Hive skills for them; those for the Assistant alone are left out, and counted.
-  const hive = all.filter((s) => s.level === 'combwork' && s.audience !== 'assistant')
+  // This project's agents get the Combwork skills for them; those for the Assistant alone are left out, and counted.
+  const combwork = all.filter((s) => s.level === 'combwork' && s.audience !== 'assistant')
   const assistantOnly = all.filter((s) => s.level === 'combwork' && s.audience === 'assistant').length
   const current = selected ? all.find((s) => s.path === selected) : undefined
 
@@ -1501,21 +1501,21 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
             </div>
           )}
           {skills && (
-            <div className="skill-group skill-group-toggle" role="button" tabIndex={0} aria-expanded={hiveOpen} onClick={() => setHiveOpen(!hiveOpen)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setHiveOpen(!hiveOpen))}>
-              <Icon name={hiveOpen ? 'chevron-down' : 'chevron-right'} /> {tr(C.hiveGroup)} <span className="count">{hive.length}</span> <InfoTip text={SKILL_LEVEL_TIP.combwork} />
+            <div className="skill-group skill-group-toggle" role="button" tabIndex={0} aria-expanded={combworkOpen} onClick={() => setCombworkOpen(!combworkOpen)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setCombworkOpen(!combworkOpen))}>
+              <Icon name={combworkOpen ? 'chevron-down' : 'chevron-right'} /> {tr(C.combworkGroup)} <span className="count">{combwork.length}</span> <InfoTip text={SKILL_LEVEL_TIP.combwork} />
             </div>
           )}
-          {skills && hiveOpen && hive.length === 0 && <div className="pane-empty">{tr(C.noHiveSkills)}</div>}
-          {hiveOpen &&
-            hive.map((sk) =>
+          {skills && combworkOpen && combwork.length === 0 && <div className="pane-empty">{tr(C.noCombworkSkills)}</div>}
+          {combworkOpen &&
+            combwork.map((sk) =>
               row(
                 sk,
                 <IconButton icon="go-to-file" title={tr(C.editInWorkspace)} onClick={() => editInWorkspace(sk)} />,
                 !sk.problem && sk.bundled !== 'missing' ? <DeliveredSwitch skill={sk} projectPath={project.path} /> : undefined
               )
             )}
-          {skills && hiveOpen && hive.length > 0 && <div className="pane-empty skills-delivered-note">{tr(C.deliveredNote)}</div>}
-          {skills && hiveOpen && assistantOnly > 0 && (
+          {skills && combworkOpen && combwork.length > 0 && <div className="pane-empty skills-delivered-note">{tr(C.deliveredNote)}</div>}
+          {skills && combworkOpen && assistantOnly > 0 && (
             <div className="pane-empty assistant-only-note">
               {sentences(tr(C.assistantOnly, { count: assistantOnly }), <a onClick={() => showView('skills')}>{tr(C.seeThem)}</a>)}
             </div>
@@ -1593,7 +1593,7 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
   const { load: loadScoped } = loaded
   const load = useCallback(() => loadScoped(wsPath, () => call('mcp:list')), [wsPath, loadScoped])
   useEffect(load, [load, version])
-  const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideCombworkMcp && api?.running)
+  const combworkOn = !!(settings?.agentApi.enabled && settings.agentApi.provideCombworkMcp && api?.running)
   // Only the servers added here (HI-2059): a broken definition still named in its list stays, to be removed.
   const added = (servers ?? []).filter((m) => serverAddedIn({ ...m, def: m.def ?? {} }, project.path))
   // Which agents get a server, once any agent has a choice of its own (#537, Agent Settings → MCP servers).
@@ -1679,9 +1679,9 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
             <Icon name="hubot" />
             <div className="ti-text">
               <div className="ti-name">{TOOLS_SERVER /* i18n-ignore: the server's name */}</div>
-              <div className="ti-desc">{tr(C.hiveDesc)}</div>
+              <div className="ti-desc">{tr(C.combworkDesc)}</div>
             </div>
-            <span className={cx('badge', hiveOn ? 'success' : '')}>{tr(hiveOn ? C.onAll : C.off)}</span>
+            <span className={cx('badge', combworkOn ? 'success' : '')}>{tr(combworkOn ? C.onAll : C.off)}</span>
           </div>
         </div>
       </div>
@@ -2013,7 +2013,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       ...rowText('project.metadata'),
       render: () => (
         <button className="btn subtle" onClick={() => void call('app:openPath', `${project.path}\\.combwork`)}>
-          <Icon name="folder-opened" /> {tr(S.openHive)}
+          <Icon name="folder-opened" /> {tr(S.openCombwork)}
         </button>
       )
     },
@@ -2055,7 +2055,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
           {tr(S.global)}
         </a>
       </div>
-      <HiveVcsNotice project={project} />
+      <CombworkVcsNotice project={project} />
       <div className="settings-body">
         <SectionNav
           items={sections.map((s) => ({ id: s.id, icon: s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />, label: shownText(s.text.label), sub: !!s.provider }))}

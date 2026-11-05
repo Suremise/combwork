@@ -1,13 +1,13 @@
 // A project's review and check copies (#1435, SPEC §16.10.5, §16.13): a small warm pool of detached worktrees in one
 // fixed folder per project (`<Workspace>.worktrees/<Project>/copies/copy-N`, so a reviewer's launch grant never
-// changes), each leased to one reviewer for one submission (#1439) or to one isolated check run (`hive-progress --check
+// changes), each leased to one reviewer for one submission (#1439) or to one isolated check run (`cw-progress --check
 // <name> --isolated`), reset to the exact revision first. Rows of combwork.db (schema/v1_0.ts, COPIES_STEP): at most one
 // lease per copy that isn't freed (a partial unique index).
 //
 // - Leasing (`leaseCopy`) reserves a free copy (the most recently used), or a new one while the pool is under its size
 //   (the larger of 2 and the agents that review plus one, OP-32, or the project's own), with its lease and an operation
 //   in one write. The operation then makes it if new (a detached worktree, the project's copied files, its setup as one
-//   of Hive's runs, credited to the lease's agent: HI-1710), recreates it if gone, resets it to the revision (`git checkout --detach
+//   of Combwork's runs, credited to the lease's agent: HI-1710), recreates it if gone, resets it to the revision (`git checkout --detach
 //   --force`, then `git clean` of what isn't ignored) and installs again when its lock files changed; then the copy is
 //   `leased`. With none free it refuses `noCopy` (the callers' "waiting for a check copy"), or `stillInUse` once a
 //   returning copy has been held back past Settings → Advanced's bound.
@@ -17,8 +17,8 @@
 //   review's holder agent isn't in a turn and has no background tasks (or has stopped; a check's isn't waited for, its
 //   processes all in its job: HI-1764); and a rename of its folder aside and back proves no process has it open. Until
 //   then it stays returning, tried again within seconds of its return (`soon`), then on every lease and refresh.
-// - Restart and crash: a lease whose holder Hive is gone, or (this Hive's) whose run is over, is returned and goes
-//   through the same barrier: a copy is never taken for quiet because Hive restarted. Operations (leasing, removal) own a
+// - Restart and crash: a lease whose holder Combwork is gone, or (this Combwork's) whose run is over, is returned and goes
+//   through the same barrier: a copy is never taken for quiet because Combwork restarted. Operations (leasing, removal) own a
 //   copy as slots' do (slots.ts): token-fenced writes, taken over only once their holder process is gone.
 // - Clean-up (`remove`): never with a lease not freed, an operation or a job, a run or a process in it; copies hold no
 //   work of anyone's (detached, at a revision), so git removes them forced. Copies beyond the size unused for a day go
@@ -64,9 +64,9 @@ export const COPY_TEXT = {
   setupExit: agentMsg({ id: 'copy.error.setupExit', text: 'its setup exited with code {code}', note: "A copy's setup error: its setup command failed. {code} is its exit code." }),
   heldJob: agentMsg({ id: 'copy.held.job', text: "its run's processes ({job})", note: 'What holds a returned copy back from being freed: processes of the run that had it. {job} is their job\'s id. The end of copy.refusal.stillInUse and of "held back by …".' }),
   heldProcess: agentMsg({ id: 'copy.held.process', text: 'a process with a file or folder open in it', note: 'What holds a copy back from being freed or removed: a process has something open in its folder.' }),
-  notLeased: agentMsg({ id: 'copy.isolated.notLeased', text: 'no check copy could be leased: {error}', note: "hive-progress --isolated's refusal: leasing its check copy failed. {error} is why." }),
-  waitCopy: agentMsg({ id: 'copy.isolated.waitCopy', text: 'a check copy', note: 'What hive-progress --isolated waits for ("waiting for a check copy"): none is free yet.' }),
-  waitSetup: agentMsg({ id: 'copy.isolated.waitSetup', text: 'a check copy to be set up', note: 'What hive-progress --isolated waits for: its check copy is being set up.' })
+  notLeased: agentMsg({ id: 'copy.isolated.notLeased', text: 'no check copy could be leased: {error}', note: "cw-progress --isolated's refusal: leasing its check copy failed. {error} is why." }),
+  waitCopy: agentMsg({ id: 'copy.isolated.waitCopy', text: 'a check copy', note: 'What cw-progress --isolated waits for ("waiting for a check copy"): none is free yet.' }),
+  waitSetup: agentMsg({ id: 'copy.isolated.waitSetup', text: 'a check copy to be set up', note: 'What cw-progress --isolated waits for: its check copy is being set up.' })
 }
 const T = COPY_TEXT
 /** The waits before a copy held back as it was returned is tried again (CopyPool.soon): about 16 s in all. */
@@ -103,7 +103,7 @@ export interface CopyLease {
   ref: string | null
   /** The agent holding it (a reviewer, the agent running the check). */
   agent: string | null
-  /** The Hive that leased it: its profile, pid and start. */
+  /** The Combwork that leased it: its profile, pid and start. */
   profile: string
   pid: number
   started: number
@@ -410,13 +410,13 @@ export interface CopyPoolDeps {
   runner: SlotRunner
   settle: (job: string) => Promise<boolean>
   holder: OpHolder
-  /** This Hive's profile, recorded on its leases. */
+  /** This Combwork's profile, recorded on its leases. */
   profile: string
   /** A Progress run running with its folder in the copy: its title (for "still in use by"), or null. */
   runIn: (folder: string) => string | null
   /** The holder agent in a turn or with background tasks running: its name, or null (idle, stopped, gone). */
   holderBusy: (agent: string) => string | null
-  /** Whether a lease's review or run is over (a check's run ended, its link never started), as this Hive knows; null: can't tell. */
+  /** Whether a lease's review or run is over (a check's run ended, its link never started), as this Combwork knows; null: can't tell. */
   leaseOver: (lease: CopyLease) => boolean | null | Promise<boolean | null>
   /** Settings → Advanced, Reviewers review in review copies. */
   reviewOn: () => boolean
@@ -722,7 +722,7 @@ export class CopyPool {
 
   /**
    * Brings the rows in step: an operation whose holder is gone taken over (a lease's reset failed: never ready; a
-   * removal looked at again), a copy-level job settled, a lease whose Hive is gone or (this Hive's) whose review or run
+   * removal looked at again), a copy-level job settled, a lease whose Combwork is gone or (this Combwork's) whose review or run
    * is over returned, returning copies tried through the barrier, a free copy whose folder is gone marked gone.
    */
   async refresh(): Promise<void> {
@@ -740,7 +740,7 @@ export class CopyPool {
       if (l.returned) continue
       const mine = l.pid === me.pid && l.started === me.started
       const over = mine ? await this.deps.leaseOver(l) : (await this.deps.holder.alive(l.pid, l.started)) === false
-      if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'hiveGone')
+      if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'combworkGone')
     }
     for (const c of this.store.copies()) {
       if (c.state === 'returning') await this.tryFree(c.name)

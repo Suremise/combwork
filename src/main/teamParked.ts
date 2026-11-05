@@ -8,7 +8,7 @@ import type { LiveSessionState } from '../shared/types'
 import { heldSlots } from './agentFolders'
 import { endTreesExactly, leftoversOf } from './agentProcesses'
 import { startNow } from './agentStarts'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { orphansOf } from './orphanProcesses'
 import { progress } from './progressService'
 import { sessions } from './sessions'
@@ -20,15 +20,15 @@ import { openWorkspaces, type WorkspaceService } from './workspace'
 /**
  * Whether a paused team is parked (HI-2081; HR1's design checks s10 and s12, its round 1 and 2 findings, and the
  * Assistant's call after round 2, the card's own scope): a fresh scan each time it is asked, never a kept list, of every
- * open workspace's agents and its Assistant, from what Hive itself records. An agent is parked when it is stopped, or
- * idle (ready, finished or watching) or at a question for the user, with nothing of Hive's records left: busy, and named,
+ * open workspace's agents and its Assistant, from what Combwork itself records. An agent is parked when it is stopped, or
+ * idle (ready, finished or watching) or at a question for the user, with nothing of Combwork's records left: busy, and named,
  * when it works or starts, when its CLI reports background tasks, when a Progress run of it is open (a test run, a check
  * in a copy, a merge), when it holds a slot writer, or when its launches, an earlier one's included, left processes
  * running (HI-2055's leftovers), or when its running launch's commands left a process running, its parent gone (HI-2111:
  * orphanProcesses.ts); and can't be checked, and named, when its state is unknown, the workspace's projects or
  * slots can't be read, its pause isn't saved, or the workspace closed during the scan. Only "parked" is parked.
  *
- * Hive doesn't classify the CLI's own processes to guess what else it runs (its MCP servers, a command under way): those
+ * Combwork doesn't classify the CLI's own processes to guess what else it runs (its MCP servers, a command under way): those
  * have a live parent, and are the user's to end, as the user guide's Updates section says. The asking Assistant's
  * own turn isn't counted (no self-wait); any other Assistant's is, and what it left running always is.
  */
@@ -94,7 +94,7 @@ async function agentItems(project: string, projectPath: string, agentId: string,
   return out
 }
 
-/** A start of the agent under way before its session exists (sessions.start's reservation, or Hive's start preparing it). */
+/** A start of the agent under way before its session exists (sessions.start's reservation, or Combwork's start preparing it). */
 const startingNow = (projectPath: string, agentId: string): boolean => !!sessions.pendingStart(projectPath, agentId) || startNow(projectPath, agentId).starting
 
 /** Who asks for a scan: the Assistant of `self` asking of its own workspace (its own turn isn't counted then). */
@@ -166,14 +166,14 @@ function orphanProcess(projectPath: string, agentId: string, pid: number, create
  * workspaces open. Counted as each happens; a scan whose count moved meanwhile isn't the state now.
  */
 let changes = 0
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type === 'session-status' || e.type === 'session-exit' || e.type === 'agent-start' || e.type === 'progress-changed' || e.type === 'team-pause-changed' || e.type === 'workspace-changed') changes++
 })
 
 /** The most scans Install Now makes while things keep changing under it, before it says it isn't parked. */
 const INSTALL_SCANS = 5
 
-/** No agent of an open workspace is working or starting now, as Hive knows it at this moment (no wait between this and the install). */
+/** No agent of an open workspace is working or starting now, as Combwork knows it at this moment (no wait between this and the install). */
 function quietNow(): boolean {
   for (const ws of openWorkspaces()) {
     if (!ws.path) continue

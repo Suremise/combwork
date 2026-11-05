@@ -10,7 +10,7 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
 describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", async () => {
-  const base = tempDir('hive-settings-ws-')
+  const base = tempDir('cw-settings-ws-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const { createWorkspaceService: createService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
   const workspaces = new Set<ReturnType<typeof createService>>()

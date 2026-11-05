@@ -1,4 +1,4 @@
-// The platform watcher (SPEC §16.3.2 Observe, §16.3.3, §16.13): tells Hive when a project's content changes outside an
+// The platform watcher (SPEC §16.3.2 Observe, §16.3.3, §16.13): tells Combwork when a project's content changes outside an
 // intent, and keeps the per-folder write log checks read to prove nothing changed while they ran.
 //
 // - Git: per repository (its common git dir), a watch on `HEAD`, `packed-refs`, `refs/heads`, `logs` and each
@@ -627,7 +627,7 @@ export class Observer {
     } catch {
       return null
     }
-    // Only a plain repository (plainRepo, the one rule of Hive's git caches): a reftable's refs, say, aren't in the files
+    // Only a plain repository (plainRepo, the one rule of Combwork's git caches): a reftable's refs, say, aren't in the files
     // these reads walk, so nothing of them can be seen to move (HR3's HI-2115 rounds 1 and 2).
     if (!head || !plainRepo(r.common, gitDir!)) return null
     r.read()

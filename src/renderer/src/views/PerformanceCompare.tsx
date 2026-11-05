@@ -460,7 +460,7 @@ function scenarioColumns(open: string | null): DataColumn<ScenarioComparison>[] 
       num: true,
       descFirst: true,
       cell: (s) => {
-        const calls = measureOf(s, 'hiveCalls')
+        const calls = measureOf(s, 'combworkCalls')
         const rep = measureOf(s, 'repeatedCalls')
         return (
           <>
@@ -468,7 +468,7 @@ function scenarioColumns(open: string | null): DataColumn<ScenarioComparison>[] 
           </>
         )
       },
-      sortValue: (s) => measureOf(s, 'hiveCalls')?.run?.mean ?? null
+      sortValue: (s) => measureOf(s, 'combworkCalls')?.run?.mean ?? null
     }
   ]
 }

@@ -1,8 +1,8 @@
 /**
- * One Agent API call from the hive MCP server (#371), with Node's own http/https rather than the global fetch: fetch
+ * One Agent API call from the combwork MCP server (#371), with Node's own http/https rather than the global fetch: fetch
  * (undici) gives up on a reply whose headers take over 300 s, and the Agent API sends its headers only when a wait
  * ends, so a wait of up to 840 s failed after 300. Here the only limit is the call's own deadline, which a wait sets
- * past its longest. Node built-ins only: hive-mcp.js runs outside the asar (AGENTS.md).
+ * past its longest. Node built-ins only: cw-mcp.js runs outside the asar (AGENTS.md).
  */
 import { request as httpRequest } from 'http'
 import { request as httpsRequest } from 'https'

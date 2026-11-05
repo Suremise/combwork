@@ -30,33 +30,33 @@ import { byArea, extractMessages, messageProblems, ROOT, VALUES_DIR } from './i1
 import { valuesDts } from './i18nValues.mjs'
 
 /** In the copy, the values of a message known only as `Msg` (its id `string`): no number, and a marker that names them in tsc's errors. */
-const DYNAMIC = 'HiveDynamicMessage'
-const DYNAMIC_DTS = `// The audit's (scripts/i18nNumbers.mjs): the values of a message whose id isn't known where it is used.\ninterface ${DYNAMIC} { readonly __hiveDynamicMessage: true }\n`
+const DYNAMIC = 'CombworkDynamicMessage'
+const DYNAMIC_DTS = `// The audit's (scripts/i18nNumbers.mjs): the values of a message whose id isn't known where it is used.\ninterface ${DYNAMIC} { readonly __cwDynamicMessage: true }\n`
 
 /** A message's values typed by its id, for the helpers below: a plain placeholder takes text, a number or plural a number. */
-const AUDIT_V = `type AuditV<Id extends string> = string extends Id ? Record<string, string | Text | ${DYNAMIC}> : Id extends keyof HiveMessageValues ? (HiveMessageValues[Id] extends undefined ? TextValues : { [K in keyof NonNullable<HiveMessageValues[Id]>]: NonNullable<HiveMessageValues[Id]>[K] extends string ? string | Text : TextPart }) : TextValues; export type { AuditV }; `
+const AUDIT_V = `type AuditV<Id extends string> = string extends Id ? Record<string, string | Text | ${DYNAMIC}> : Id extends keyof CombworkMessageValues ? (CombworkMessageValues[Id] extends undefined ? TextValues : { [K in keyof NonNullable<CombworkMessageValues[Id]>]: NonNullable<CombworkMessageValues[Id]>[K] extends string ? string | Text : TextPart }) : TextValues; export type { AuditV }; `
 // NoInfer, here and below: the id comes from the message alone. Inferred from the values too, a value typed `string`
 // made it `string` in the copy, so a message known where it is used read as one that isn't.
 const V = "NoInfer<import('../shared/advanced').AuditV<Id>>"
 /** tRich's values in the copy: a plain placeholder takes text or an element (any React node but a number), never a number; a tag, a function. */
 const RICH_TAG = '((chunks: any[]) => unknown)'
 const RICH_NODE = 'string | object | boolean | null | undefined'
-const RICH_V = `string extends Id ? Record<string, ${RICH_NODE} | ${DYNAMIC} | ${RICH_TAG}> : Id extends keyof HiveMessageValues ? { [K in keyof NonNullable<HiveMessageValues[Id]>]: NonNullable<HiveMessageValues[Id]>[K] extends string ? ${RICH_NODE} : NonNullable<HiveMessageValues[Id]>[K] | object } & Record<string, ${RICH_NODE} | number | ${RICH_TAG}> : Record<string, unknown>`
+const RICH_V = `string extends Id ? Record<string, ${RICH_NODE} | ${DYNAMIC} | ${RICH_TAG}> : Id extends keyof CombworkMessageValues ? { [K in keyof NonNullable<CombworkMessageValues[Id]>]: NonNullable<CombworkMessageValues[Id]>[K] extends string ? ${RICH_NODE} : NonNullable<CombworkMessageValues[Id]>[K] | object } & Record<string, ${RICH_NODE} | number | ${RICH_TAG}> : Record<string, unknown>`
 
 /** The helpers that take a message with loose values, typed by the message in the copy: [file, text as it is, as patched]. One line each, so the copy's line numbers are the source's. */
 export const PATCHES = [
   ['src/shared/i18n/msg.ts', 'export type MessageArgs<Id extends string> = string extends Id ? [values?: Values] :', `export type MessageArgs<Id extends string> = string extends Id ? [values?: Record<string, string | boolean | Date | null | undefined | ${DYNAMIC}>] :`],
   ['src/shared/i18n/index.ts', 'export function tr<Id extends string>(m: Msg<Id>, ...values: MessageArgs<Id>): string {', 'export function tr<Id extends string>(m: Msg<Id>, ...values: NoInfer<MessageArgs<Id>>): string {'],
   ['src/shared/advanced.ts', 'export const withValues = (m: Msg, values: TextValues): Text => ({ m, values })', `${AUDIT_V}export const withValues = <Id extends string>(m: Msg<Id>, values: NoInfer<AuditV<Id>>): Text => ({ m, values: values as TextValues })`],
-  // hiveError() is typed by the message already: in the copy a plain placeholder there takes text (a Text too), not a number.
-  ['src/main/hiveError.ts', 'type ErrorArgs<Id extends string> = string extends Id', `type ErrorArgs<Id extends string> = string extends Id ? [values?: Record<string, string | Text | ${DYNAMIC}>, options?: { kind?: HiveErrorKind; cause?: unknown }] : string extends Id`],
-  ['src/main/hiveError.ts', '(m: Msg<Id>, ...[values, options]: ErrorArgs<Id>): HiveError {', '(m: Msg<Id>, ...[values, options]: NoInfer<ErrorArgs<Id>>): HiveError {'],
-  ['src/main/hiveError.ts', 'HiveMessageValues[Id][K] extends string ? string : TextPart }', 'HiveMessageValues[Id][K] extends string ? string | Text : TextPart }'],
-  ['src/main/hiveError.ts', 'withValues(m, values as TextValues)', 'withValues(m as Msg, values as never)'],
-  ['src/main/gitRepo.ts', 'const refusal = (m: Msg, values?: TextValues): HiveError =>', `const refusal = <Id extends string>(m: Msg<Id>, values?: ${V}): HiveError =>`],
+  // combworkError() is typed by the message already: in the copy a plain placeholder there takes text (a Text too), not a number.
+  ['src/main/combworkError.ts', 'type ErrorArgs<Id extends string> = string extends Id', `type ErrorArgs<Id extends string> = string extends Id ? [values?: Record<string, string | Text | ${DYNAMIC}>, options?: { kind?: CombworkErrorKind; cause?: unknown }] : string extends Id`],
+  ['src/main/combworkError.ts', '(m: Msg<Id>, ...[values, options]: ErrorArgs<Id>): CombworkError {', '(m: Msg<Id>, ...[values, options]: NoInfer<ErrorArgs<Id>>): CombworkError {'],
+  ['src/main/combworkError.ts', 'CombworkMessageValues[Id][K] extends string ? string : TextPart }', 'CombworkMessageValues[Id][K] extends string ? string | Text : TextPart }'],
+  ['src/main/combworkError.ts', 'withValues(m, values as TextValues)', 'withValues(m as Msg, values as never)'],
+  ['src/main/gitRepo.ts', 'const refusal = (m: Msg, values?: TextValues): CombworkError =>', `const refusal = <Id extends string>(m: Msg<Id>, values?: ${V}): CombworkError =>`],
   // failed() adds `why` itself.
   ['src/main/gitRepo.ts', 'function failed(m: Msg, values: TextValues, r: GitResult): Error {', `function failed<Id extends string>(m: Msg<Id>, values: Omit<${V}, 'why'>, r: GitResult): Error {`],
-  ['src/main/gitRepo.ts', '  return refusal(m, { ...values, why:', '  return (refusal as (m: Msg, v: TextValues) => HiveError)(m, { ...(values as TextValues), why:'],
+  ['src/main/gitRepo.ts', '  return refusal(m, { ...values, why:', '  return (refusal as (m: Msg, v: TextValues) => CombworkError)(m, { ...(values as TextValues), why:'],
   ['src/main/skills.ts', 'function problemOf(m: Msg, values?: TextValues): {', `function problemOf<Id extends string>(m: Msg<Id>, values?: ${V}): {`],
   ['src/main/templates.ts', 'const refusal = (m: Msg, values?: TextValues, kind?:', `const refusal = <Id extends string>(m: Msg<Id>, values?: ${V}, kind?:`],
   ['src/shared/i18n/index.ts', 'export function tRich<T>(m: Msg, values: Record<string, T | string | number | Date | ((chunks: (string | T)[]) => T)>): (string | T)[] {', `export function tRich<Id extends string, T = any>(m: Msg<Id>, values: NoInfer<${RICH_V}>): (string | T)[] {`],
@@ -68,7 +68,7 @@ export const PATCHES = [
   [
     'src/renderer/src/components/MoveRepair.tsx',
     'const rich = (m: Msg, values: Record<string, string | number>): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, { ...values, ...TAGS }))',
-    'const rich = <Id extends string>(m: Msg<Id>, values: Id extends keyof HiveMessageValues ? { [K in keyof NonNullable<HiveMessageValues[Id]>]: NonNullable<HiveMessageValues[Id]>[K] extends string ? string : number } : Record<string, string | number>): React.ReactNode[] => Children.toArray(tRich(m as Msg, { ...values, ...TAGS } as never))'
+    'const rich = <Id extends string>(m: Msg<Id>, values: Id extends keyof CombworkMessageValues ? { [K in keyof NonNullable<CombworkMessageValues[Id]>]: NonNullable<CombworkMessageValues[Id]>[K] extends string ? string : number } : Record<string, string | number>): React.ReactNode[] => Children.toArray(tRich(m as Msg, { ...values, ...TAGS } as never))'
   ]
 ]
 

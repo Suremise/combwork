@@ -1,7 +1,7 @@
 import { basename } from 'path'
 import { workStartedAt } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { liveDecisionCards } from './tasks'
 import type { WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
@@ -18,7 +18,7 @@ const T = {
 export const cardDecisions = (n: number, count: number): string => say(T.card, { card: cardRef(n), count: String(count), n: count })
 
 /**
- * The "new decision" flag (#357): a hive tool's reply to an agent working on a card (in Doing, its agent), asking the
+ * The "new decision" flag (#357): a Combwork tool's reply to an agent working on a card (in Doing, its agent), asking the
  * user about one (blocked, its agent) or reviewing one says when a decision was recorded or changed on it since the agent last read the card in full, or since its work
  * (or review) began. Only a flag: the skills say when to act on it (at the next checkpoint). Reads are kept in memory;
  * after a restart the start of the work is the baseline.
@@ -51,7 +51,7 @@ let listening = false
 function board(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
   if (!listening) {
     listening = true
-    onHiveEvent((e) => {
+    onCombworkEvent((e) => {
       if (e.type !== 'tasks-changed') return
       changes++
       boards.delete(e.workspacePath.toLowerCase())

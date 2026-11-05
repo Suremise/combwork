@@ -29,7 +29,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 
 ;(async () => {
   q.prepare(fx)
-  let h = await q.startHive(fx, { port: PORT })
+  let h = await q.startCombwork(fx, { port: PORT })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const reviewer = await q.agent(fx, h, 'R1')
@@ -176,7 +176,7 @@ ${JSON.stringify(await h.kinds(five.n))}`)
     // --- S33c: Combwork ends right after the target moved, before Integrated; the next start records it, once.
     let crashed = null
     try {
-      h = await q.startHive(fx, { port: PORT, env: { CW_TEST_QUEUE_CRASH: 'afterAdvance' }, keepOptions: true })
+      h = await q.startCombwork(fx, { port: PORT, env: { CW_TEST_QUEUE_CRASH: 'afterAdvance' }, keepOptions: true })
       // Its process's end, seen as it happens (the page goes with it).
       const proc = h.app.process()
       let ended = false
@@ -197,7 +197,7 @@ ${JSON.stringify(await h.kinds(five.n))}`)
       const queueRefs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/queue/']).split(/\r?\n/).filter(Boolean)
       const refsAtCrash = queueRefs()
       try {
-        h = await q.startHive(fx, { port: PORT, keepOptions: true })
+        h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
         const restartedDone = await until(async () => (await h.card(crashed.n))?.column === 'done', HUNG_MS)
         const integ = (await h.facts(crashed.n)).filter((f) => f.kind === 'Integrated')
         check('…restarted: Done, Integrated (observed) once, its result the target as the crash left it', !!restartedDone && integ.length === 1 && integ[0].data.result === afterCrash && q.head(fx) === afterCrash, JSON.stringify(integ))

@@ -1,20 +1,20 @@
-// Fresh starts at natural breaks (#1437, SPEC §16.10.4; #1086, #1088): Start Fresh (Idle Agents), and Hive's own nudge
+// Fresh starts at natural breaks (#1437, SPEC §16.10.4; #1086, #1088): Start Fresh (Idle Agents), and Combwork's own nudge
 // when a project's work has finished. The rules are shared/freshStarts.ts's.
 //
 // - **Start Fresh (Idle Agents)** gives each idle running agent of a project a new conversation (the old one stays in
 //   the Sessions tab): `freshPlan` says who will and who won't, with why; `startFreshIfIdle` checks one again just
-//   before it stops it, with no wait between the check and the stop (its session, Hive typing into it, and its slot's
+//   before it stops it, with no wait between the check and the stop (its session, Combwork typing into it, and its slot's
 //   lease as the board has it then), so an agent that started work or took a lease meanwhile is left as it is. Stopped
 //   agents stay stopped.
 // - **The nudge**, "A good moment to start fresh", once per quiet spell, with the Assistant on or off: when a project's
 //   last running lane ends verified (`lane-ended`), or, with no lane running, a card of it reaches Done, and its work has
 //   finished (no agent busy, waiting, watching or with background tasks; no card in Review or Passed). A notice, as the
 //   user's notification settings say, with Start Fresh (Idle Agents).
-//   - Once per spell, across windows and Hives: the board keeps the spell's mark (`fresh_nudge:<project name>`, each one
+//   - Once per spell, across windows and Combworks: the board keeps the spell's mark (`fresh_nudge:<project name>`, each one
 //     unique), claimed in one write that also checks again that the work has finished. One of the project's agents
 //     getting busy ends the spell whose mark is on the board at that moment, and only it: the mark is read then, at the
 //     event, and that exact mark (by its value) is removed by the next write that gets to it, the reset's or the next
-//     claim's. A mark made later, here or by another Hive, is never removed for it; the duty to remove it is kept until
+//     claim's. A mark made later, here or by another Combwork, is never removed for it; the duty to remove it is kept until
 //     a write doing so commits (`ending`).
 //   - A completion is kept, one per project, from before it is checked: one seen while the work hasn't finished yet
 //     (the agent marks its last card Done from inside its turn) is considered again as the project's agents go quiet,
@@ -29,8 +29,8 @@ import { folderFacts, slotsIn } from './agentFolders'
 import { boardRead, boardWrite, boardWriteOp } from './boardStore'
 import { coalesced } from './coalesce'
 import { config } from './config'
-import { onHiveEvent } from './events'
-import { hiveError } from './hiveError'
+import { onCombworkEvent } from './events'
+import { combworkError } from './combworkError'
 import { listLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -83,14 +83,14 @@ function whyNotNow(ws: WorkspaceService, projectPath: string, project: string, a
  */
 export async function startFreshIfIdle(projectPath: string, agentId: string): Promise<FreshWhy | null> {
   const row = (await freshPlan(projectPath)).find((r) => r.agentId === agentId)
-  if (!row) throw hiveError(M.notFound, { agent: agentId }, { kind: 'notFound' })
+  if (!row) throw combworkError(M.notFound, { agent: agentId }, { kind: 'notFound' })
   if (row.why) return row.why
   const ws = workspaceOf(projectPath)
   const project = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
   return sessions.startFresh(projectPath, agentId, () => whyNotNow(ws, projectPath, project, agentId))
 }
 
-/** Whether a project lets Hive suggest a fresh start: its own choice, else Settings → Notifications. */
+/** Whether a project lets Combwork suggest a fresh start: its own choice, else Settings → Notifications. */
 async function suggestOn(projectPath: string): Promise<boolean> {
   const own = (await workspace.projectConfig(projectPath).catch(() => null))?.suggestFreshStart
   return own === 'on' ? true : own === 'off' ? false : config.settings.notifications.suggestFreshStart !== false
@@ -188,7 +188,7 @@ export async function considerNudge(ws: WorkspaceService, projectPath: string, t
   const cfg = await ws.projectConfig(projectPath)
   const agents = projectAgents(cfg).map((a) => a.id)
   // Claimed in one write, which checks the work again as it is then (its agents, and its cards in Review or Passed): two
-  // triggers at once, or two windows or Hives, tell it once; a record already there is this spell's.
+  // triggers at once, or two windows or Combworks, tell it once; a record already there is this spell's.
   let handled: Duty | undefined
   const told = await boardWrite(ws, async () =>
     boardWriteOp(ws, (db): Told => {
@@ -240,7 +240,7 @@ let started = false
 export function startFreshNudges(): void {
   if (started) return
   started = true
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'session-status') {
       const key = e.state.projectPath.toLowerCase()
       // Each run reads the latest (a run asked for meanwhile runs once more, after it).
@@ -262,7 +262,7 @@ export function startFreshNudges(): void {
   })
 }
 
-/** For tests: forgets what this Hive was told and saw (the board keeps its records). */
+/** For tests: forgets what this Combwork was told and saw (the board keeps its records). */
 export function resetFreshNudgesForTests(): void {
   pending.clear()
   ending.clear()

@@ -26,7 +26,7 @@ afterEach(() => {
 
 /** A tree with one source file, its allowlist made by --init from `base`. */
 function tree(base: string, file = FILE) {
-  const root = tempDir('hive-i18n-guard-')
+  const root = tempDir('cw-i18n-guard-')
   roots.push(root)
   const allowDir = join(root, ALLOW_DIR)
   const write = (src: string, rel = file) => {
@@ -326,7 +326,7 @@ describe("Combwork's own source", () => {
 
   it('a new hard-coded string in a real file fails, against its real allowlist', () => {
     const rel = 'src/renderer/src/components/Board.tsx'
-    const root = tempDir('hive-i18n-guard-real-')
+    const root = tempDir('cw-i18n-guard-real-')
     roots.push(root)
     mkdirSync(dirname(join(root, rel)), { recursive: true })
     mkdirSync(join(root, ALLOW_DIR), { recursive: true })

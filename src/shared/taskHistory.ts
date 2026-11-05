@@ -2,9 +2,9 @@ import { msg, type MessageArgs, type Msg } from './i18n/msg'
 import type { StoredText } from './types'
 
 /**
- * What Hive writes in a card's history (#846, E10b of #677), as messages: main stores each entry's English in `what`
- * (agents read it, Hive's own code matches it, scenarios too) and its message's id and values in `whatText`, and the
- * card dialog shows that in the window's language. Imports only msg.ts: hive-mcp reaches shared/tasks, and this stays
+ * What Combwork writes in a card's history (#846, E10b of #677), as messages: main stores each entry's English in `what`
+ * (agents read it, Combwork's own code matches it, scenarios too) and its message's id and values in `whatText`, and the
+ * card dialog shows that in the window's language. Imports only msg.ts: cw-mcp reaches shared/tasks, and this stays
  * out of its way. A column (`{column}`) or a reason (`{why}`) is stored as its key and the message chooses its words;
  * other values are names, numbers and the user's own words, the same in every language.
  */
@@ -65,7 +65,7 @@ export const HISTORY = {
   archivedDone: msg({ id: 'tasks.history.archivedDone', defaultMessage: 'Archived after {days, plural, one {# day} other {# days}} in Done', description: "A line in a card's history: Combwork archived the card on its own, because it had been in the Done column for {days} days (Settings → Board)." }),
   archivedHidden: msg({ id: 'tasks.history.archivedHidden', defaultMessage: 'Archived: {project} was hidden', description: "A line in a card's history: the card was archived because the user hid its project {project} (its folder name) from Combwork." }),
   archivedRemoved: msg({ id: 'tasks.history.archivedRemoved', defaultMessage: 'Archived: {project} was removed from Combwork', description: "A line in a card's history: the card was archived because the user removed its project {project} (its folder name) from Combwork." }),
-  // HI-1842: Hive's comment on an archived card whose attachments its project's clean-up removed (Project Settings → Storage).
+  // HI-1842: Combwork's comment on an archived card whose attachments its project's clean-up removed (Project Settings → Storage).
   attachmentsCleaned: msg({
     id: 'tasks.history.attachmentsCleaned',
     defaultMessage: "{n, plural, one {Removed # attachment} other {Removed # attachments}} ({names}): this project removes archived cards' attachments {days, plural, one {# day} other {# days}} after archiving (Project Settings → Storage). {n, plural, one {It is} other {They are}} in the Recycle Bin.",
@@ -76,7 +76,7 @@ export const HISTORY = {
   repaired: msg({ id: 'tasks.history.repaired', defaultMessage: 'Project: {from} → {to} (renamed or moved)', description: "A line in a card's history, by Repair: the card was given to the project {to}, the new name of its project {from} (folder names), which was renamed or moved." }),
   stageRepaired: msg({ id: 'tasks.history.stageRepaired', defaultMessage: 'Recorded as Done, as the board had it: its workflow still had it in {stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} other {{stage}}}', description: "A line in a card's history, by Combwork (HI-1674): the card was in the Done column, but a move had not reached its workflow, which still had it at an earlier stage ({stage}, select: a board stage; translate each); Combwork recorded it as Done and closed its open questions." }),
   fromOlder: msg({ id: 'tasks.history.fromOlder', defaultMessage: 'Added from an older Combwork, where it was made as #{was}', description: "A line in a card's history, by Repair: the card was made in an older version of Combwork (which saved it after the board moved to its database), set aside, and the user added it to the board from Review…; {was} is the number it had there (it keeps it when no card here has it)." }),
-  // Lines and a comment Hive writes from outside the board service (#866): the same English as before, word for word.
+  // Lines and a comment Combwork writes from outside the board service (#866): the same English as before, word for word.
   loopWake: msg({ id: 'tasks.history.loopWake', defaultMessage: 'Woke {agent} {kind, select, review {to review it} step {with a card loop step} other {with its verdict}} (a loop wake)', description: "A line in a card's history: in a card loop, Combwork woke the agent {agent} (its name), as the card arrived in Review for it to review (review), with a step of the loop for it (step: its builder's design to check, or its reviewer's answer, #1382), or with its review's verdict (other). \"Card loop\" and \"loop wake\" are Combwork's terms." }),
   answerUntold: msg({ id: 'tasks.history.answerUntold', defaultMessage: "The Assistant couldn't be told of your answer to {agent}'s question: only {agent} has it", description: "A line in a card's history (and a notification): the user answered a question the agent {agent} (its name) asked on the card; Combwork gives such answers to the Combwork Assistant too, in case they grant something the agent can't do itself, but the Assistant couldn't be told (its tools are off, or Settings → Assistant → Control doesn't let it change cards)." }),
   answerUntoldNeed: msg({ id: 'tasks.history.answerUntoldNeed', defaultMessage: "{agent} can't {action, select, done {move this card to Done} noCode {make this card no code} skipReview {skip this card's review} other {unblock this card}} by itself, and the Assistant couldn't be told of your answer: do it yourself if you agreed to it", description: "A line in a card's history (and a notification): the user answered a question the agent {agent} (its name) asked on the card; the card needs something only the user or the Combwork Assistant may do (select: translate each; keep the keys), the agent can't, and the Assistant couldn't be told (its tools are off, or Settings → Assistant → Control doesn't let it change cards)." }),
@@ -97,8 +97,8 @@ export const HISTORY = {
 }
 
 /**
- * Who wrote a history line or a comment as Hive stores it (in English: agents read it), in the window's language: the
- * user, the Assistant, Repair; Hive and an agent's name stay as they are.
+ * Who wrote a history line or a comment as Combwork stores it (in English: agents read it), in the window's language: the
+ * user, the Assistant, Repair; Combwork and an agent's name stay as they are.
  */
 export const BY_TEXT: Record<string, Msg> = {
   You: msg({ id: 'tasks.by.you', defaultMessage: 'You', description: "Who made a change or wrote a comment on a card (beside a history line or a comment): the user. Short." }),
@@ -118,7 +118,7 @@ export const BUSY = {
 
 const BY_ID = new Map<string, Msg>(Object.values(HISTORY).map((m) => [m.id, m]))
 
-/** The message a stored line names, by its id: null for an id this Hive doesn't know (a record from a newer one). */
+/** The message a stored line names, by its id: null for an id this Combwork doesn't know (a record from a newer one). */
 export const storedMessage = (s: StoredText | undefined): Msg | null => (s ? (BY_ID.get(s.id) ?? null) : null)
 
 /**
@@ -127,13 +127,13 @@ export const storedMessage = (s: StoredText | undefined): Msg | null => (s ? (BY
  */
 const CARD_VALUES: Record<string, string> = { 'tasks.history.movedBefore': 'before', 'tasks.history.movedBeforeIn': 'before' }
 
-/** How deep messages within a stored line's values go: Hive nests one (a CLI's sentence); more is a damaged file. */
+/** How deep messages within a stored line's values go: Combwork nests one (a CLI's sentence); more is a damaged file. */
 const MAX_NESTED = 3
 
 /**
  * A stored line's text, by `format` (the window's language, or English): its message with its values, a value that is a
  * message of its own formatted first, found by `more` when it isn't the history's (a CLI's sentence: providerMessage).
- * Null when this Hive doesn't know a message it names (a record from a newer one), or the record isn't one (a card file
+ * Null when this Combwork doesn't know a message it names (a record from a newer one), or the record isn't one (a card file
  * edited by hand: an id that isn't text, values that aren't an object of text, numbers and messages): the window then
  * shows the stored English.
  */
@@ -185,7 +185,7 @@ export function setStoredForAgents(fn: ((english: string, stored: unknown) => st
 }
 
 /**
- * A history line or Hive's comment as an agent reads it (dialects, HI-2440; design section 2): said again from its
+ * A history line or Combwork's comment as an agent reads it (dialects, HI-2440; design section 2): said again from its
  * message and values in the reader's chain where that chain overrides a message it names, else its English as stored.
  * A record from before #845, with no message (decision 5), is shown as stored. Where none is registered (hive-mcp.js,
  * which renders no history), the stored English.

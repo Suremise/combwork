@@ -38,7 +38,7 @@ const B = {
     text: 'Checks that pass before review: {checks}. Run each as `cw-progress --check <name> --card "<key>"` before submitting.',
     note: 'The checks the project runs before review, by name, joined ("typecheck and lint").'
   }),
-  finishHive: agentMsg({ id: 'brief.rule.finish.combworkMerges', text: 'Combwork merges each approved card.', note: 'Finish: Combwork merges.' }),
+  finishCombwork: agentMsg({ id: 'brief.rule.finish.combworkMerges', text: 'Combwork merges each approved card.', note: 'Finish: Combwork merges.' }),
   finishAgent: agentMsg({ id: 'brief.rule.finish.agentMerges', text: 'The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.', note: 'Finish: the builder merges.' }),
   finishCommitted: agentMsg({ id: 'brief.rule.finish.committed', text: 'A card is done once its work is committed.', note: 'Finish: committed is done.' }),
   finishNotChecked: agentMsg({ id: 'brief.rule.finish.notChecked', text: 'Combwork does not check merges: report each one with cw_report_merge.', note: "Finish: merges aren't checked." }),
@@ -78,7 +78,7 @@ export function laneRules(o: LaneBriefInput['options']): string[] {
   const out: string[] = []
   out.push(say({ none: B.reviewNone, agent: B.reviewAgent, agentThenYou: B.reviewAgentThenYou, you: B.reviewYou }[o.review]))
   if (o.preChecks.length) out.push(say(B.preChecks, { checks: agentList(o.preChecks) }))
-  out.push(say({ combworkMerges: B.finishHive, agentMerges: B.finishAgent, committed: B.finishCommitted, notChecked: B.finishNotChecked, accept: B.finishAccept }[o.finish]))
+  out.push(say({ combworkMerges: B.finishCombwork, agentMerges: B.finishAgent, committed: B.finishCommitted, notChecked: B.finishNotChecked, accept: B.finishAccept }[o.finish]))
   if (o.okBefore.mode === 'every') out.push(say(B.okEvery))
   if (o.okBefore.mode === 'labels' && o.okBefore.labels.length) out.push(say(B.okLabels, { labels: agentList(o.okBefore.labels) }))
   return out

@@ -6,10 +6,10 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { dropIndex, moveAgentTo, pageAgents, pageEndIndex, projectAgents, swapAgentsIn } from '../src/shared/defaults'
-import type { HiveEvent, ProjectConfig } from '../src/shared/types'
+import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-order-')
+const base = tempDir('cw-order-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const ids = (list: { id: string }[]): string => list.map((a) => a.id).join('')
@@ -45,7 +45,7 @@ describe('agent order', () => {
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { moveAgent, swapAgents } = await import('../src/main/projectAgents')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
@@ -119,7 +119,7 @@ describe('saving the order', () => {
     // what Combwork knew), never further back than one before it; once all have saved, only the last order.
     const reported: { order: string; settled: boolean }[] = []
     let settled = false
-    const off = onHiveEvent((e: HiveEvent) => {
+    const off = onCombworkEvent((e: CombworkEvent) => {
       const p = e.type === 'workspace-changed' ? e.workspace?.projects.find((x) => x.path === alpha) : undefined
       if (p) reported.push({ order: p.agents.map((a) => a.id).join(','), settled })
     })

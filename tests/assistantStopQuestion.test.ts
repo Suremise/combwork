@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 import { setLanguage } from '../src/shared/i18n'
 import { shownText } from '../src/shared/advanced'
 
-const base = tempDir('hive-stop-question-')
+const base = tempDir('cw-stop-question-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

@@ -112,7 +112,7 @@ function prepare() {
   fs.writeFileSync(path.join(fx.claudeHome, 'fake-trusted.json'), JSON.stringify([fx.ws, alpha, beta, gamma, ...slotFolders(alpha), ...slotFolders(beta)].map((f) => f.toLowerCase())))
 }
 
-async function startHive(env = {}) {
+async function startCombwork(env = {}) {
   const { app, page, inv } = await lib.launch({ userData: fx.userData, viewport: { width: 1500, height: 950 }, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: fx.claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', ...env } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.waitForProvider(inv)
@@ -257,13 +257,13 @@ function helpers(h) {
     }, HUNG_MS)
     await listed.click()
   }
-  const command = (id) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
+  const command = (id) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args: [] })
   return { live, idle, tokenOf, intent, startReview, shell, card, facts, kinds, fact, done, lane, slots, slotOfLane, create, runs, shoot, showBoard, startLane, panel, showTab, laneTop, text, toProject, command }
 }
 
 ;(async () => {
   prepare()
-  let h = await startHive()
+  let h = await startCombwork()
   // What the restart needs of the first start: the agents, the lanes, the cards.
   const kept = {}
   try {
@@ -406,11 +406,11 @@ function helpers(h) {
     const agentChoices = () => x.panel.locator('select[aria-label="Agent"] option').allInnerTexts().catch(() => [])
     // HI-1710: the copy's set-up run is its reviewer's (no "Combwork (copy …)" entry), and no entry is listed twice.
     const hives = ['Combwork (slot slot-a)', 'Combwork (slot slot-b)']
-    const hivesNamed = async () => {
+    const combworkNamed = async () => {
       const now = await agentChoices()
       return hives.every((c) => now.includes(c)) && !now.some((c) => c.startsWith('Combwork (copy')) && new Set(now).size === now.length
     }
-    check("the Runs tab's Agent filter names the slots' runs as Combwork's, and the copy's as its reviewer's", !!(await until(hivesNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
+    check("the Runs tab's Agent filter names the slots' runs as Combwork's, and the copy's as its reviewer's", !!(await until(combworkNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
     await x.shoot('runs', x.panel)
 
     // --- Passed: the queue merges it into main, checked out in the project folder, while the reviewer is idle there (S42).
@@ -486,7 +486,7 @@ function helpers(h) {
   }
 
   // --- The second start: the restart's Resume All (S35), then the pool (beta) and everyone in the project folder (gamma).
-  h = await startHive()
+  h = await startCombwork()
   try {
     if (kept.ok) {
       const { page, inv } = h
@@ -699,7 +699,7 @@ async function gallery(h, kept) {
   const base = (await inv('app:info')).language
   const dir = path.join(lib.ROOT, 'locales', 'de')
   const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   const english = async () => (await page.getByRole('button', { name: 'Task Board', exact: true }).count()) > 0
   /** `loc` (or what `open(lang)` opens in each language) shot in both themes, English then German; `close` after. */
   const shoot = async (name, { loc = page, open, close } = {}) => {

@@ -19,7 +19,7 @@ const write = (dir: string, path: string, f: DialectFile): void => {
   writeFileSync(p, JSON.stringify(f))
 }
 
-const base = tempDir('hive-dialects-sessions-')
+const base = tempDir('cw-dialects-sessions-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 const folder = (): string => join(base, `d-${++n}`)

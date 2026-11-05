@@ -1,4 +1,4 @@
-// The hive tools' short replies (shared/toolReplies.ts): a change confirms what changed and where the card is now,
+// The Combwork tools' short replies (shared/toolReplies.ts): a change confirms what changed and where the card is now,
 // a listing is one line per item, and nothing echoes a card's description, comments or history.
 import { describe, expect, it } from 'vitest'
 import { addRetryWaited, retryWaitEnd } from '../src/shared/runtime'

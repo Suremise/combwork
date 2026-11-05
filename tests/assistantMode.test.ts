@@ -20,7 +20,7 @@ const st = vi.hoisted(() => ({
 
 vi.mock('../src/main/logger', () => ({ createLogger: () => ({ info: () => undefined, warn: () => undefined, debug: () => undefined }), userText: (s: string) => s }))
 vi.mock('../src/main/config', () => ({ config: { settings: {} } }))
-vi.mock('../src/main/events', () => ({ onHiveEvent: (fn: (e: unknown) => void) => (st.onStatus = fn) }))
+vi.mock('../src/main/events', () => ({ onCombworkEvent: (fn: (e: unknown) => void) => (st.onStatus = fn) }))
 vi.mock('../src/main/modes', () => ({
   readMode: async (id: string) => {
     if (st.holdRead?.id === id) await st.holdRead.until
@@ -83,7 +83,7 @@ vi.mock('../src/main/sessions', () => ({
 // dropped), typed only while it holds, received once typed, and tried again when the Assistant is next idle.
 vi.mock('../src/main/deliveries', async () => {
   const { sessions } = await import('../src/main/sessions')
-  const { onHiveEvent } = await import('../src/main/events')
+  const { onCombworkEvent } = await import('../src/main/events')
   type R = { id: string; source?: string; ref?: string; body: string; forRun?: string; meta?: Record<string, unknown> }
   type Source = { refresh?: (r: R, host: string) => Promise<{ cancel: string } | { body: string } | null>; holds?: (r: R, host: string) => boolean; received?: (r: R, host: string) => void }
   const sources = new Map<string, Source>()
@@ -115,7 +115,7 @@ vi.mock('../src/main/deliveries', async () => {
     src?.received?.(r, host)
     return true
   }
-  onHiveEvent((e: unknown) => {
+  onCombworkEvent((e: unknown) => {
     const ev = e as { type: string; state: { projectPath: string; agentId: string; status: string } }
     if (ev.type === 'session-status' && ['ready', 'finished', 'watching'].includes(ev.state.status)) setTimeout(() => void offerNow(ev.state.projectPath, ev.state.agentId), 500)
   })

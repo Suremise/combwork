@@ -12,7 +12,7 @@ import { COPIES_EXCLUDE_COMMENT, excludeCopies } from '../src/main/providers/com
 import { LAUNCH_README } from '../src/main/providers/claude/adapter'
 import { upgradedGitignore, upgradedMcpDefinition, upgradedReadme } from '../src/main/nameUpgradeFiles'
 import { upgradedExclude } from '../src/main/nameUpgradeProjects'
-import { EXCLUDE_COMMENT } from '../src/shared/hiveFolderMove'
+import { EXCLUDE_COMMENT } from '../src/shared/combworkFolderMove'
 
 /** Hive's .combwork/.gitignore before #1106 added the usage history's lines. */
 const OLD_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
@@ -79,7 +79,7 @@ describe("stored MCP definitions", () => {
 
 describe('the comments in info/exclude', () => {
   const repo = (): { dir: string; exclude: string } => {
-    const dir = tempDir('hive-copies-exclude-')
+    const dir = tempDir('cw-copies-exclude-')
     execFileSync('git', ['init', '-q', dir])
     const exclude = join(dir, '.git', 'info', 'exclude')
     mkdirSync(join(exclude, '..'), { recursive: true })

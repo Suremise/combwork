@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import type { TaskChanges, TaskCursor } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-card-revs-')
+const base = tempDir('cw-card-revs-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

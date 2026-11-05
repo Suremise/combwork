@@ -33,8 +33,8 @@ const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
   process.env.CW_TEST_FAIL_IPC = c
 }, calls)
 
-/** Sends the window an event as main does (hive:event). */
-const sendEvent = (ctx, ev) => ctx.app.evaluate(({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', e), ev)
+/** Sends the window an event as main does (cw:event). */
+const sendEvent = (ctx, ev) => ctx.app.evaluate(({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', e), ev)
 
 /** An icon button by its icon (its name is translated), within `scope`. */
 const iconButton = (ctx, scope, icon) => ctx.page.locator(`${scope} .icon-btn`, { has: ctx.page.locator(`.codicon-${icon}`) }).first()
@@ -189,7 +189,7 @@ async function docs(ctx) {
   return windowShot()
 }
 
-/** The built-in hive MCP server's page: what it is and its tools. */
+/** The built-in combwork MCP server's page: what it is and its tools. */
 async function mcpBuiltIn(ctx) {
   await ctx.command('view.mcp')
   await (await shown(ctx, ctx.page.locator('.sidebar .row.tall', { has: ctx.page.locator('.codicon-hubot') }), 'the built-in server')).first().click()

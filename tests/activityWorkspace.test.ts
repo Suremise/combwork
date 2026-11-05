@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 
 vi.mock('../src/main/agentProcesses', async (orig) => ({ ...(await orig<object>()), projectLaunches: async (p: string) => [{ agentId: 'b1', runId: `run:${p.toLowerCase()}`, cli: [], processes: [], more: 0 }] }))
 
-const base = tempDir('hive-activity-workspace-')
+const base = tempDir('cw-activity-workspace-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')

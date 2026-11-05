@@ -9,15 +9,15 @@ import { join } from 'path'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { closedNotice } from '../src/main/notices'
-import type { HiveEvent, Notice } from '../src/shared/types'
+import type { CombworkEvent, Notice } from '../src/shared/types'
 
 const AGENT = { workspace: 'C:\\ws', projectPath: 'C:\\ws\\webapp', agentId: 'a-1' }
-const noticeEvent = (n: Partial<Notice>): HiveEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Combwork a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as HiveEvent
+const noticeEvent = (n: Partial<Notice>): CombworkEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Combwork a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as CombworkEvent
 
 describe("the events stream's lines, as broadcast says them", async () => {
   // The real resolver (sessions.ts registers it: a session's pinned chain, else the bound workspace's API chain) and two
   // workspaces with API files of their own.
-  const base = tempDir('hive-agenttext-events-')
+  const base = tempDir('cw-agenttext-events-')
   mkdirSync(join(base, 'profile'), { recursive: true })
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))

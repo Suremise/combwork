@@ -212,7 +212,7 @@ const check = (name, ok, extra = '') => {
   saved.window = narrowBounds
   saved.windows = (saved.windows ?? []).map((w) => ({ workspace: w.workspace, ...narrowBounds }))
   fs.writeFileSync(cfgFile, JSON.stringify(saved, null, 2))
-  const again = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }) })
+  const again = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }) })
   try {
     const p = await again.firstWindow()
     p.on('pageerror', (e) => check('no page errors (narrow start)', false, e.message))

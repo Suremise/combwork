@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.notifications = { onlyWhenUnfocused: false, chimeEnabled: false, desktopNotifications: true, notifyOnFinished: true, notifyOnWaiting: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
     }, on)
   const osNotes = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
   const banners = () => page.locator('.popups .popup:not(.kind-tip)')
-  const bellTitles = () => page.evaluate(() => window.__hiveBell?.().map((t) => `${t.quiet ? 'quiet:' : ''}${t.title}`) ?? null)
+  const bellTitles = () => page.evaluate(() => window.__cwBell?.().map((t) => `${t.quiet ? 'quiet:' : ''}${t.title}`) ?? null)
   const bannerTitles = () => banners().allInnerTexts()
   const showProject = async (name) => {
     await page.locator('.project-row', { hasText: name }).first().click()
@@ -167,13 +167,13 @@ const check = (name, ok, extra = '') => {
   check('…that stays while it waits', (await page.locator('.popups .popup.kind-needsYou').count()) === 1)
   await turnEnds(alpha, one)
   check('…and closes once it is no longer waiting', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 0, 8000)))
-  check('…its bell row says Answered', !!(await lib.until(() => page.evaluate(() => window.__hiveBell?.().some((t) => t.kind === 'needsYou' && t.resolved === 'Answered')), 5000)))
+  check('…its bell row says Answered', !!(await lib.until(() => page.evaluate(() => window.__cwBell?.().some((t) => t.kind === 'needsYou' && t.resolved === 'Answered')), 5000)))
   check('no Windows notification for any of them', osNotes().length === 0, JSON.stringify(osNotes()))
   await lib.until(async () => (await banners().count()) === 0, 6000)
 
   // --- More than fit: five waiting for you are all kept ("+1 more" shows the fifth), and finished ones never push
   // a waiting one out. Sent to the window as main sends them.
-  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
+  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), e)
   const entry = (id, kind, title, message) => ({ type: 'toast', toast: { id, kind, level: kind === 'finished' ? 'success' : 'info', title, message, target: { kind: 'project', projectPath: alpha, project: 'alpha' }, timestamp: new Date().toISOString() } })
   const waitingNotice = (i) => entry(`w${i}`, 'needsYou', `Waiting ${i}`, 'Allow Bash?')
   const resolved = (ids) => sendEvent({ type: 'toast-resolved', ids, outcome: 'Answered' })

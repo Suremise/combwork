@@ -8,7 +8,7 @@ import { withFileLock, writeTextAtomic, writeTextUnlessChanged } from '../src/ma
 import { createWorkspaceService, disposeWorkspaceService, type WorkspaceService } from '../src/main/workspace'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-bounds-')
+const base = tempDir('cw-bounds-')
 const dir = (...p: string[]): string => {
   const d = join(base, ...p)
   mkdirSync(d, { recursive: true })

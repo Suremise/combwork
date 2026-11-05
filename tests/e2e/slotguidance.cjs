@@ -1,8 +1,8 @@
 // What agents are told about slots (#1444, SPEC §16.10): the guidance P7 changed, as each CLI is given it, with the
 // Assistant off. alpha builds cards in slots (Where cards are built: each card in its own folder):
-// 1. Claude Code (fake): B1, in the project folder, starts its card through its own hive server (tools/call, as its
+// 1. Claude Code (fake): B1, in the project folder, starts its card through its own combwork server (tools/call, as its
 //    CLI would): the reply names the slot and says it continues there; Combwork starts it again in the slot, where its launch's
-//    skills have the slot lines (work-on-card: work and run checks in the slot; --isolated) and its hive server's
+//    skills have the slot lines (work-on-card: work and run checks in the slot; --isolated) and its combwork server's
 //    instructions the contract's slot line.
 // 2. R1, a reviewer in the project folder: its skills have the review-copy line (review-agent-work), and its start review
 //    reply names the review copy's folder (B1's submission, made in the slot).

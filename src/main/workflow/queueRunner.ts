@@ -1,11 +1,11 @@
-// The merge queue's runner (#1360, SPEC §16.9.3): exactly one per project and target across every Hive on the workspace
-// (the dev and the installed one share its combwork.db). A runner holds the target's lease (queue_runners); another Hive
+// The merge queue's runner (#1360, SPEC §16.9.3): exactly one per project and target across every Combwork on the workspace
+// (the dev and the installed one share its combwork.db). A runner holds the target's lease (queue_runners); another Combwork
 // takes it over only once the holder *process* is gone (its pid gone, or given to a process that started at another
-// time), never because its renewals stopped: a stalled but living Hive keeps its queue (the panel says "run by
+// time), never because its renewals stopped: a stalled but living Combwork keeps its queue (the panel says "run by
 // <profile>"), so a living runner is never fenced out of a checkout it may still be writing.
 //
-// Process ownership: each lease has a Windows job object on Hive's process supervisor (processSupervisor.ts, shared
-// with agents; queueJobs.ts), which dies with its Hive, and closing the job ends everything in it. Every command starts
+// Process ownership: each lease has a Windows job object on Combwork's process supervisor (processSupervisor.ts, shared
+// with agents; queueJobs.ts), which dies with its Combwork, and closing the job ends everything in it. Every command starts
 // through a launcher that is put in the job and recorded before the command exists: so no process of the runner's,
 // however started (a shell's detached server), outlives the job, and none runs unrecorded. What escapes a job anyway (a
 // packaged app's children) the supervisor follows, writing each to the lease's journal before it follows it, and ends
@@ -49,7 +49,7 @@ const END_WAIT_MS = 15_000
 /** A recorded launcher's start may be this far outside the clock readings around it (clock resolution). */
 const START_SLACK_MS = 50
 
-/** The runner no longer holds its target's lease (another Hive took it over): it stops, writing nothing. */
+/** The runner no longer holds its target's lease (another Combwork took it over): it stops, writing nothing. */
 export class LeaseLost extends Error {
   constructor(readonly target: string) {
     super(`the merge queue for ${target} is run by another Combwork now`) // i18n-ignore: an internal error, caught by the queue's host and logged
@@ -58,14 +58,14 @@ export class LeaseLost extends Error {
 
 export interface RunnerConfig {
   store: FactStore
-  /** Hive's process supervisor (the app passes agents', processSupervisor()); left out, the queue's own (queueHost). */
+  /** Combwork's process supervisor (the app passes agents', processSupervisor()); left out, the queue's own (queueHost). */
   host?: JobHost
   /** The workspace folder: its runners are released as it closes. */
   workspace?: string
   /** The project folder (its repository). */
   project: string
   target: string
-  /** Where the project's Hive worktrees go (`<workspace>.worktrees/<project>`): the runner's folder is made there. */
+  /** Where the project's Combwork worktrees go (`<workspace>.worktrees/<project>`): the runner's folder is made there. */
   root: string
   /** This Hive's profile, as the panel names a runner ("run by Hive-Dev"). */
   profile: string
@@ -76,8 +76,8 @@ export interface RunnerConfig {
   needed?: () => Promise<boolean>
   renewMs?: number
   /**
-   * Test seams. `renew`: false skips a renewal (a Hive stalled for as long as a test wants). `lingeringJob`: the
-   * supervisor outlives this process (a Hive whose helper survived it). `beforeSettle`: runs as a takeover begins on a
+   * Test seams. `renew`: false skips a renewal (a Combwork stalled for as long as a test wants). `lingeringJob`: the
+   * supervisor outlives this process (a Combwork whose helper survived it). `beforeSettle`: runs as a takeover begins on a
    * dead runner's duties. `endJob`: false makes ending a job fail (a job that won't empty). `journalDir`: where the
    * jobs' journals go (a folder that can't be written, for a journal that fails). `afterSeal`, `beforeClear`: run as a
    * takeover has sealed the earlier runners' journals, and just before it drops their duties (a late write, then).
@@ -118,7 +118,7 @@ export interface RunResult {
    * HI-2042: the command (or its launcher) was ended by a signal, as Node saw it: its name. Code -1 then, never 1 (which
    * git's reads take for "no"). Not set for a command that exited with a code of its own, nor one ended at its bound.
    * On Windows a process ended from outside (TerminateProcess) exits with the code it was given: that is no signal.
-   * HI-2054: Hive's own ending of a runner's job comes after `stop()` (release): a queue command run through the runner
+   * HI-2054: Combwork's own ending of a runner's job comes after `stop()` (release): a queue command run through the runner
    * can't start the next one then (LeaseLost), and the queue's later store writes are refused (its write fence), so its
    * exit 1 can't become a recorded answer. One another program ends (Task Manager, an antivirus) can't be told apart.
    */
@@ -207,7 +207,7 @@ export class QueueRunner {
       const token = randomBytes(16).toString('hex')
       const at = new Date().toISOString()
       const taken = await locked(cfg, () => store.takeQueueLease({ target: cfg.target, lease, token, profile: cfg.profile, pid: me.pid, started: me.started, takenAt: at, renewedAt: at }, now?.token ?? null))
-      // Another Hive took or freed it meanwhile: looked at again.
+      // Another Combwork took or freed it meanwhile: looked at again.
       if (!taken) continue
       if (now) log.info(`Took over the merge queue for ${userText(cfg.target)} from ${userText(now.profile)} (process ${now.pid} has ended)`)
       const runner = new QueueRunner(cfg, lease, token, join(cfg.root, queueFolderName(cfg.project, cfg.target, lease)))
@@ -226,7 +226,7 @@ export class QueueRunner {
         return { ok: true, runner, ...(paused !== null ? { paused } : {}) }
       } catch (e) {
         // A failed set-up (a write that failed, the lease lost) gives its lease up, by its own token (a successor's is
-        // never touched), once its job is closed: a retry, in this Hive or another, can take it at once. Its job's duty
+        // never touched), once its job is closed: a retry, in this Combwork or another, can take it at once. Its job's duty
         // goes with it once closing it has ended what was in it (kill on close) and its journal holds nothing; else it
         // stays, for the next runner's settle.
         runner.stop()
@@ -279,7 +279,7 @@ export class QueueRunner {
 
   /**
    * Records the lease's job as a duty of the target (`what = 'job'`, before it exists: whichever runner settles the
-   * target ends it by name, never the supervisor holding it, which may be another Hive's, serving its other targets and
+   * target ends it by name, never the supervisor holding it, which may be another Combwork's, serving its other targets and
    * agents: HR4's round 3 finding 2), then makes it on the supervisor, kill on close, with its journal: each process it
    * follows is written there, durably, before it is followed (HR4's round 3 finding 1), and one it can't write is ended
    * at once and pauses the queue. A problem when it can't be made.
@@ -468,10 +468,10 @@ export class QueueRunner {
   }
 
   /**
-   * git in a folder of the runner's (its own worktree, or the project for a ref), as Hive runs git (GIT_PREFIX); `opts`
+   * git in a folder of the runner's (its own worktree, or the project for a ref), as Combwork runs git (GIT_PREFIX); `opts`
    * its environment and bound (the queue's merge commits, #1350; a push). HI-2079: one with no bound runs in the lease's
    * git host (no Node start of its own); a bounded one through `run`'s launcher, whose bound ends its tree. HI-2137: the
-   * git Hive starts (gitExe), once more with PATH's when that one couldn't start.
+   * git Combwork starts (gitExe), once more with PATH's when that one couldn't start.
    */
   git(cwd: string, args: string[], what: Launched = 'testMerge', opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<RunResult> {
     return this.gitAs(gitExe(), cwd, args, what, opts)
@@ -580,13 +580,13 @@ export class QueueRunner {
   }
 
   /**
-   * Gives the lease up (a workspace closing, Hive quitting, its project removed): its job ended and seen empty first
+   * Gives the lease up (a workspace closing, Combwork quitting, its project removed): its job ended and seen empty first
    * (with the processes it follows), so no process of its runs; then its folder kept for the next runner if the queue
    * still needs it (else removed), its records dropped, and its lease row deleted by its own token (nothing of a
    * successor's). If the job can't be seen empty (or a process its journal names still runs), its job is let go all
    * the same (closing it ends what is in it), and its records, journal and folder stay as duties for the next runner
    * (a followed process isn't in the job), which ends what is left before it runs; only the lease goes. Once: every
-   * caller (a failure, the queue's run ending) waits for the same release. A lease lost to another Hive is the
+   * caller (a failure, the queue's run ending) waits for the same release. A lease lost to another Combwork is the
    * successor's to settle: nothing then.
    */
   release(): Promise<void> {
@@ -609,7 +609,7 @@ export class QueueRunner {
     const ended = emptied && (await this.journalGone(this.lease))
     if (!ended) log.warn(`The merge queue for ${userText(this.target)} couldn't see its processes end: the next runner ends them before it runs`)
     const keep = ended && this.cfg.needed ? await this.cfg.needed().catch(() => true) : !ended
-    // Its own, by token: a lease taken over meanwhile (its pid looked gone to another Hive) keeps its successor's row and
+    // Its own, by token: a lease taken over meanwhile (its pid looked gone to another Combwork) keeps its successor's row and
     // folders, and the successor settles what was recorded.
     if (!store.holdsQueueLease(this.lease, this.token)) return
     // A folder it couldn't remove keeps its record (its lease's): the next runner's settle tries again, else pauses naming it.
@@ -677,7 +677,7 @@ export class QueueRunner {
    * Settles every earlier runner's duties for the target (any lease but this one's, however many runners crashed since
    * they were recorded), in this order, each step only once the one before has succeeded:
    * 1. their jobs ended by name (never the supervisor holding them) and seen empty, or gone;
-   * 2. their journals sealed: closed to writers for good, so nothing a supervisor that outlived its Hive writes down can
+   * 2. their journals sealed: closed to writers for good, so nothing a supervisor that outlived its Combwork writes down can
    *    arrive after the read (it ends what it can't write down instead);
    * 3. one read of them (unreadable or damaged: unknown, never empty), then every process they and the launcher
    *    records name that still runs ended as a tree, and waited for;
@@ -888,7 +888,7 @@ async function gone(probe: ProcessProbe, targets: Listed[]): Promise<Listed[] | 
 /**
  * Whether a target's queue still needs its worktree (#1360 item 5): an open queue entry for it, an unfinished journal
  * (`IntegrationStarted` with no outcome), an in-flight card whose *ruleset* (never the project's options now: §16.6.5)
- * says Hive merges into it, or a run in the folder (`busy`).
+ * says Combwork merges into it, or a run in the folder (`busy`).
  */
 export function queueFolderNeeded(wf: Workflow, target: string, busy?: () => boolean): boolean {
   if (busy?.()) return true
@@ -924,12 +924,12 @@ export async function forgetProjectQueues(cfg: Pick<RunnerConfig, 'store' | 'pro
   await git(cfg.project, ['worktree', 'prune'])
 }
 
-/** Every runner this Hive holds (the panel's "run by", a workspace closing). */
+/** Every runner this Combwork holds (the panel's "run by", a workspace closing). */
 export function queueRunners(): QueueRunner[] {
   return [...live]
 }
 
-/** Releases this Hive's runners (all, or those `which` picks): a workspace closing, Hive quitting, a project removed. */
+/** Releases this Combwork's runners (all, or those `which` picks): a workspace closing, Combwork quitting, a project removed. */
 export async function releaseQueueRunners(which: (r: QueueRunner) => boolean = () => true): Promise<void> {
   await Promise.all(queueRunners().filter(which).map((r) => r.release().catch((e) => log.warn(`releasing the merge queue for ${userText(r.target)}`, e))))
 }

@@ -1,5 +1,5 @@
 // Reading a Markdown document to outline it or read one section (#817): a project's file (in the folder the caller works
-// in) or a shared note (`shared:<path>`). Only Markdown, only inside its folder (through junctions too), never Hive's
+// in) or a shared note (`shared:<path>`). Only Markdown, only inside its folder (through junctions too), never Combwork's
 // own `.combwork` or git's `.git` folder, and up to DOC_MAX: a reply never carries more than the section asked for.
 import { readFile, stat } from 'original-fs/promises'
 import { isAbsolute, relative, resolve } from 'path'
@@ -20,7 +20,7 @@ export type DocRead = { ok: true; text: string } | { ok: false; code: 'outside' 
 
 const MARKDOWN = /\.(md|markdown|mdx)$/i
 
-/** Whether a path inside the folder goes into Hive's own `.combwork` or git's `.git`. */
+/** Whether a path inside the folder goes into Combwork's own `.combwork` or git's `.git`. */
 const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === CW_DIR || part.toLowerCase() === '.git')
 
 /**

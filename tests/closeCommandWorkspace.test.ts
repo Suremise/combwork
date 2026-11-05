@@ -22,7 +22,7 @@ vi.mock('../src/main/closeCommand/runs', async (orig) => {
   }
 })
 
-const base = tempDir('hive-close-ws-')
+const base = tempDir('cw-close-ws-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 

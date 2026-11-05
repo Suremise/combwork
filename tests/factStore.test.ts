@@ -1,6 +1,6 @@
 // The fact store in the workspace's combwork.db (#1215, SPEC §16.4): facts, actions and the stage cache written in the board's
 // transaction (a change undone leaves none of them), the actions worker (each action's effect once, also when run
-// again after a crash or at the same time: claimed before it runs, or found delivered, #1266), two Hives observing one transition writing it once, and the runtime's
+// again after a crash or at the same time: claimed before it runs, or found delivered, #1266), two Combworks observing one transition writing it once, and the runtime's
 // columns of a card kept by the board's own saves while the card's JSON stays as it was.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
 
-const base = tempDir('hive-fact-store-')
+const base = tempDir('cw-fact-store-')
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -156,7 +156,7 @@ describe('the fact store in combwork.db (#1215)', () => {
     expect(actionsOf(ws)).toMatchObject([{ id: first, state: 'done' }, { id: second, state: 'done' }])
   })
 
-  it('two runs at once, as two Hives would: each claimed action runs once', async () => {
+  it('two runs at once, as two Combworks would: each claimed action runs once', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Twice', project: 'p' }, user))).number
     const other = FactStore.open(store.boardFile(ws), scope)
@@ -253,7 +253,7 @@ describe('the fact store in combwork.db (#1215)', () => {
     expect(factsOf(facts, card)).toEqual(['HeadMoved'])
   })
 
-  it('two Hives (two connections) observing one transition write it once; the loser reads what is there', async () => {
+  it('two Combworks (two connections) observing one transition write it once; the loser reads what is there', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Observed', project: 'p' }, user))).number
     const a = FactStore.open(store.boardFile(ws), scope)

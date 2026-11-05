@@ -87,7 +87,7 @@ export const CARDS_STEP: SchemaStep = {
       ref  TEXT    NOT NULL,
       PRIMARY KEY (card, ord)
     ) STRICT, WITHOUT ROWID`,
-    // Entries: typed columns, and `raw` (the entry's exact JSON) for one not of Hive's form (cardRows.ts).
+    // Entries: typed columns, and `raw` (the entry's exact JSON) for one not of Combwork's form (cardRows.ts).
     `CREATE TABLE card_comments (
       card      INTEGER NOT NULL REFERENCES cards (number) ON DELETE CASCADE,
       ord       INTEGER NOT NULL,
@@ -275,7 +275,7 @@ const LANES_WATCHES_METRICS: SchemaStep = {
     'CREATE INDEX lanes_builder ON lanes (project_id, builder_id, state)',
     'CREATE INDEX lanes_reviewer ON lanes (project_id, reviewer_id, state) WHERE reviewer_id IS NOT NULL',
     'CREATE INDEX lanes_state ON lanes (state, ended_at)',
-    // A lane's cards in order (Hive owns the list, SPEC §16.11.1), and the snapshot an ended lane keeps (`frozen`).
+    // A lane's cards in order (Combwork owns the list, SPEC §16.11.1), and the snapshot an ended lane keeps (`frozen`).
     `CREATE TABLE lane_cards (
       lane TEXT    NOT NULL REFERENCES lanes (id) ON DELETE CASCADE,
       ord  INTEGER NOT NULL,
@@ -422,7 +422,7 @@ export const FACTS_STEP: SchemaStep = {
     'ALTER TABLE cards ADD COLUMN lane TEXT',
     'ALTER TABLE cards ADD COLUMN lane_reviewer TEXT',
     'ALTER TABLE cards ADD COLUMN paths_declared INTEGER NOT NULL DEFAULT 0 CHECK (paths_declared IN (0, 1))',
-    // None's paths of a card (§16.3.3): those it declared, and the pre-fill Hive saw it edit; the watcher and None's
+    // None's paths of a card (§16.3.3): those it declared, and the pre-fill Combwork saw it edit; the watcher and None's
     // checks ask which cards hold a path.
     `CREATE TABLE card_paths (
       card INTEGER NOT NULL REFERENCES cards (number) ON DELETE CASCADE,
@@ -541,17 +541,17 @@ const LANE_RECORD: SchemaStep = {
 /**
  * #1266 (P4): an action's delivery is recorded by the delivery itself, its row in `deliveries` with the action's id
  * (unique), so the transitional `card_actions.delivered` (#1215) goes; a notice, which makes no delivery, is leased by
- * one Hive and counts its uncertain dispatches instead (`lease_owner`, `lease_until`, `attempts`: actionWorker.ts).
- * And what Hive has told the user of each running lane (its lane notices, workflowNotices.ts, §16.11.4): each lane as
- * last told and its cards, so a restart tells what it hadn't yet, and two Hives on one workspace tell each event once.
+ * one Combwork and counts its uncertain dispatches instead (`lease_owner`, `lease_until`, `attempts`: actionWorker.ts).
+ * And what Combwork has told the user of each running lane (its lane notices, workflowNotices.ts, §16.11.4): each lane as
+ * last told and its cards, so a restart tells what it hadn't yet, and two Combworks on one workspace tell each event once.
  */
 export const ACTIONS_DELIVERED_STEP: SchemaStep = {
   name: 'actions delivered by deliveries, lane notices',
   ddl: [
     'DROP INDEX card_actions_delivered',
     'ALTER TABLE card_actions DROP COLUMN delivered',
-    // A repeatable action's lease (actionWorker.ts): the process running it (its id, per Hive) and until when; one
-    // writer at a time takes it by a conditional update, and one whose Hive ended runs again once it has passed.
+    // A repeatable action's lease (actionWorker.ts): the process running it (its id, per Combwork) and until when; one
+    // writer at a time takes it by a conditional update, and one whose Combwork ended runs again once it has passed.
     'ALTER TABLE card_actions ADD COLUMN lease_owner TEXT',
     'ALTER TABLE card_actions ADD COLUMN lease_until TEXT',
     // A lane as its notices last told it (laneWatch.ts' LaneMark): its state, whether its merge was due, and stalled.
@@ -615,7 +615,7 @@ export const CARD_SEARCH_STEP: SchemaStep = {
 
 /**
  * Undo for the Assistant's changes (#1282, SPEC §16.14): each change it made (a card's, a lane's, an agent's settings, a
- * Hive setting, an agent it started), grouped by the user's message it came from, with what it replaced and what it
+ * Combwork setting, an agent it started), grouped by the user's message it came from, with what it replaced and what it
  * wrote, field by field, kept 7 days (assistantUndo.ts). `kind` says how it is undone; `final` ones can't be (a message, a
  * prompt) and say why; `act` is the Assistant's action it came from (assistantActivity.ts' kinds), for the window's words. A value is rows, not JSON: a scalar one row at path '' (`type` null, bool, num or text), a list or
  * object a row of its own (`arr`, `obj`) and one per member, its path the member's keys joined by U+001F.
@@ -672,7 +672,7 @@ export const UNDO_OUTCOMES_STEP: SchemaStep = {
 }
 
 /**
- * The merge queue's runner (#1360, SPEC §16.9.3): one per project and target across every Hive on the workspace, its
+ * The merge queue's runner (#1360, SPEC §16.9.3): one per project and target across every Combwork on the workspace, its
  * processes and its own worktree (workflow/queueRunner.ts).
  */
 export const QUEUE_RUNNERS_STEP: SchemaStep = {
@@ -694,7 +694,7 @@ export const QUEUE_RUNNERS_STEP: SchemaStep = {
       PRIMARY KEY (project, target)
     ) STRICT, WITHOUT ROWID`,
     // What a runner owns: its lease's job (`what = 'job'`, pid 0: settled by the job's name, never by the supervisor
-    // holding it, which may serve a living Hive's other targets and agents) and each command's launcher (git in its
+    // holding it, which may serve a living Combwork's other targets and agents) and each command's launcher (git in its
     // folder, an install, a check), recorded before the command exists. What the job follows outside it is in the
     // lease's journal (a file the supervisor writes, queueJobs.ts). A row is a duty, kept until its process and its
     // lease's job are seen gone: by its runner's release, or by whichever runner of the target next takes the lease (a
@@ -721,7 +721,7 @@ export const QUEUE_RUNNERS_STEP: SchemaStep = {
       lease   TEXT
     ) STRICT, WITHOUT ROWID`,
     'CREATE INDEX queue_worktrees_target ON queue_worktrees (project, target)',
-    // A pause naming a process Hive couldn't end (a dead runner's, at a takeover).
+    // A pause naming a process Combwork couldn't end (a dead runner's, at a takeover).
     'ALTER TABLE workflow_queue_pauses ADD COLUMN pid INTEGER'
   ]
 }
@@ -734,7 +734,7 @@ export const QUEUE_PAUSE_MESSAGE_STEP: SchemaStep = {
 
 /**
  * Who paused a merge queue, and when (#1353, SPEC §16.9.3 User controls): `paused_by` the user or the Assistant (null:
- * Hive's own pause, with its reason), `paused_at` an ISO time (null: a pause from before this step).
+ * Combwork's own pause, with its reason), `paused_at` an ISO time (null: a pause from before this step).
  */
 export const QUEUE_PAUSE_BY_STEP: SchemaStep = {
   name: 'queue pause by',
@@ -743,7 +743,7 @@ export const QUEUE_PAUSE_BY_STEP: SchemaStep = {
 
 /**
  * The state an advance into a checked-out target was left in, for its terminal "needs you" pause (#1351, SPEC §16.9.2):
- * the folder, the branch its HEAD named and where the target's ref was when Hive looked, the advance's expected revision
+ * the folder, the branch its HEAD named and where the target's ref was when Combwork looked, the advance's expected revision
  * and result, the journal's last phase (`done`: the ref moved, but the folder was on another branch by then), the side
  * each listed file is at (its index and working copy at the expected revision, at the result, or neither), and the
  * commands that finish or undo it, generated from the journal, each run in the project folder or the checked-out one.
@@ -783,7 +783,7 @@ export const QUEUE_PAUSE_STATE_STEP: SchemaStep = {
 /**
  * When the user saw a merge queue's returned card (#1356, the Progress panel's Merges tab): a return shows on its queue's
  * card until seen, like a failed run, and keeps the queue's card shown (an old ruleset's queue included) until then. One
- * row per returned entry (its id, `<key>/e<n>`, unique in its project), shared by every window and Hive on the workspace.
+ * row per returned entry (its id, `<key>/e<n>`, unique in its project), shared by every window and Combwork on the workspace.
  */
 export const QUEUE_SEEN_STEP: SchemaStep = {
   name: 'queue seen',
@@ -798,10 +798,10 @@ export const QUEUE_SEEN_STEP: SchemaStep = {
 }
 
 /**
- * A project's slots and their leases (#1429, SPEC §16.10.1–16.10.2; slots.ts): the worktrees Hive lends to a card or a
+ * A project's slots and their leases (#1429, SPEC §16.10.1–16.10.2; slots.ts): the worktrees Combwork lends to a card or a
  * lane, and each loan of one. At most one open lease per slot, one open dispatch lease (`card`, `lane`: where the agent
  * builds now) and one open carried lease (#1441's migrated worktree) per agent: partial unique indexes, so a second one
- * fails in SQLite whichever Hive or process writes it, not only in code.
+ * fails in SQLite whichever Combwork or process writes it, not only in code.
  */
 export const SLOTS_STEP: SchemaStep = {
   name: 'slots',
@@ -924,9 +924,9 @@ export const COPIES_STEP: SchemaStep = {
 }
 
 /**
- * Hive's skill copies in folders' .agents/skills (#1431, SPEC §16.15 C row 15; Codex and Copilot): which copy Hive made in
+ * Combwork's skill copies in folders' .agents/skills (#1431, SPEC §16.15 C row 15; Codex and Copilot): which copy Combwork made in
  * which folder, at which revision (the copy's contentHash, its marker left out). A clean-up removes a copy only when this
- * record and the copy's marker both say Hive made it and its content is still that revision (skillCopies.ts). `project`
+ * record and the copy's marker both say Combwork made it and its content is still that revision (skillCopies.ts). `project`
  * is the project folder the copy's session was in: Slots only compares the folder with it.
  */
 export const SKILL_COPIES_STEP: SchemaStep = {
@@ -948,7 +948,7 @@ export const SKILL_COPIES_STEP: SchemaStep = {
  * a slot; null in the project folder or a home; changed only by `rebindSession`, agentFolders.ts, in the lease change's
  * own write); `slot_leases.end_rev`, the slot's head once its ended lease's writer has drained (a free slot still there
  * is where its conversations may resume by hand); and a slot's writer, the session run that writes in it (its lease,
- * agent and Hive), reserved in the write that lets it start and cleared once it has exited: while it is set the slot
+ * agent and Combwork), reserved in the write that lets it start and cleared once it has exited: while it is set the slot
  * isn't lent, adopted, taken by hand or removed. `lease` isn't in the sessions' codec: a record's save leaves it as it is.
  */
 export const SESSION_LEASES_STEP: SchemaStep = {
@@ -999,7 +999,7 @@ const REV_TABLES = ['card_labels', 'card_links', 'card_context', 'card_comments'
 
 /**
  * A card's revision (HI-1715): `cards.rev`, raised by triggers on every write to the card's row or to a child table the
- * window's card is made of, by whatever wrote it (another Hive's connection too), and `board_rev.g`, the board's mark,
+ * window's card is made of, by whatever wrote it (another Combwork's connection too), and `board_rev.g`, the board's mark,
  * the highest revision given. The window keeps the mark it last read and asks for the cards at it or above (`>=`): a card
  * already at the mark keeps it when it changes again (one raise for a card's many rows in a write, not one per row), and
  * is sent again however often; a card below it is raised above every mark a window holds. A rolled-back write undoes its

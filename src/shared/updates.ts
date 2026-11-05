@@ -1,6 +1,6 @@
 /**
- * Which update Hive takes, and when it installs one (#1647). On 23 Oct a published 0.9.3, downloaded by a running 0.9.2,
- * was installed when that Hive quit, and the user's local build of 0.9.3 (with fixes the release didn't have) didn't
+ * Which update Combwork takes, and when it installs one (#1647). On 23 Oct a published 0.9.3, downloaded by a running 0.9.2,
+ * was installed when that Combwork quit, and the user's local build of 0.9.3 (with fixes the release didn't have) didn't
  * end up installed. A build says what it is (`BuildIdentity`: `npm run dist` marks it local, the release workflow not),
  * versions are compared by semver with prereleases (1.0.0-rc.2 < 1.0.0), a local build is never replaced by a release of
  * its own version (that release is offered, never installed by itself), and a downloaded update is installed only when it
@@ -15,7 +15,7 @@ export interface BuildIdentity {
 }
 
 /**
- * The copy of Hive installed on disk, as read when an update would be installed: `known` (`legacy`: from before builds
+ * The copy of Combwork installed on disk, as read when an update would be installed: `known` (`legacy`: from before builds
  * said what they are, so a release), or `unreadable` (missing, malformed or inconsistent: changing under the read, say).
  */
 export type InstalledCopy = { kind: 'known'; identity: BuildIdentity; legacy?: true } | { kind: 'unreadable'; why: string }

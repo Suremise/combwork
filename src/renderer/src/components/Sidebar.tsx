@@ -13,7 +13,7 @@ import { commandKeybinding, runCommand } from '../commands'
 import { get, leaveSettingsForSidePanel, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, InfoTip, LoadFailed, OneLineDesc, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
-import { addSkill, deleteSkill, DeliveredSwitch, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
+import { addSkill, deleteSkill, DeliveredSwitch, CombworkSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
 import { DialectsPanel } from './Dialects'
 import { TemplatesPanel } from './Templates'
 import { hasEditorDraftsUnder } from '../editorDrafts'
@@ -111,7 +111,7 @@ const M = {
   skillFromFile: msg({ id: 'assistant.sidebar.skillFromFile', defaultMessage: 'Add Skill from File (.md or .zip)…', description: 'The Skills sidebar: a button. Keep .md and .zip as they are.' }),
   openSkillsFolder: msg({ id: 'assistant.sidebar.openSkillsFolder', defaultMessage: 'Open Combwork Skills Folder', description: 'The Skills sidebar: a button that opens .combwork/skills in Explorer.' }),
   filterSkills: msg({ id: 'assistant.sidebar.filterSkills', defaultMessage: 'Filter skills', description: "The Skills sidebar's filter box, empty." }),
-  hiveGroup: msg({ id: 'assistant.sidebar.combworkGroup', defaultMessage: 'Combwork', description: "The Skills sidebar: the section of the workspace's Combwork skills. Usually kept as Combwork." }),
+  combworkGroup: msg({ id: 'assistant.sidebar.combworkGroup', defaultMessage: 'Combwork', description: "The Skills sidebar: the section of the workspace's Combwork skills. Usually kept as Combwork." }),
   noWorkspaceSkills: msg({ id: 'assistant.sidebar.noWorkspaceSkills', defaultMessage: 'Open a workspace to manage Combwork skills.', description: 'The Skills sidebar with no workspace open.' }),
   skillsLoadTarget: msg({ id: 'assistant.sidebar.skillsLoadTarget', defaultMessage: 'the skills', description: 'What could not be loaded when the Combwork skills were first read: shown in "Could not load {what}: {error}", with Retry.' }),
   skillsRefreshTarget: msg({ id: 'assistant.sidebar.skillsRefreshTarget', defaultMessage: 'the skills', description: 'What could not be refreshed while the skills shown stay on screen: shown in "Could not refresh {what}; last updated …", with Retry.' }),
@@ -136,8 +136,8 @@ const M = {
   noServers: msg({ id: 'assistant.sidebar.noServers', defaultMessage: 'No MCP servers yet. Create one with +, or add one from a .json definition or a .zip of a server folder.', description: 'The MCP sidebar with no servers. + is the add button.' }),
   deleteServer: msg({ id: 'assistant.sidebar.deleteServer', defaultMessage: 'Delete server', description: "A trash button beside an MCP server of the workspace: deletes it." }),
   builtIn: msg({ id: 'assistant.sidebar.builtIn', defaultMessage: 'Built-in', description: "The MCP sidebar: the section of Combwork's own server." }),
-  hiveServerDesc: msg({ id: 'assistant.sidebar.combworkServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in combwork server: what it gives agents." }),
-  hiveServerTip: msg({ id: 'assistant.sidebar.combworkServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
+  combworkServerDesc: msg({ id: 'assistant.sidebar.combworkServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in combwork server: what it gives agents." }),
+  combworkServerTip: msg({ id: 'assistant.sidebar.combworkServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
   on: msg({ id: 'assistant.sidebar.on', defaultMessage: 'On', description: 'A badge: the built-in combwork server is on.' }),
   off: msg({ id: 'assistant.sidebar.off', defaultMessage: 'Off', description: 'A badge: the built-in combwork server is off.' })
 }
@@ -736,12 +736,12 @@ function SkillsPanel() {
           <IconButton icon="folder-opened" title={tr(M.openSkillsFolder)} onClick={() => void call('skills:openFolder')} disabled={!workspace} />
         </div>
       </div>
-      {workspace && <HiveSkillsWarning />}
+      {workspace && <CombworkSkillsWarning />}
       <div style={{ padding: '0 8px 6px 12px' }}>
         <SearchInput style={{ height: 24 }} placeholder={tr(M.filterSkills)} value={filter} onChange={setFilter} />
       </div>
       <div className="pane-body">
-        <Section title={tr(M.hiveGroup)} count={skills.length - missing} tip={SKILL_LEVEL_TIP.combwork}>
+        <Section title={tr(M.combworkGroup)} count={skills.length - missing} tip={SKILL_LEVEL_TIP.combwork}>
           {!workspace && <div className="pane-empty">{tr(M.noWorkspaceSkills)}</div>}
           {workspace && error && loaded.data && <StaleNote what={tr(M.skillsRefreshTarget)} error={error} at={loaded.at} onRetry={reload} />}
           {workspace && error && !loaded.data && <LoadFailed inline what={tr(M.skillsLoadTarget)} error={error} onRetry={reload} />}
@@ -830,7 +830,7 @@ function McpPanel() {
     load()
   }
 
-  const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideCombworkMcp && api?.running)
+  const combworkOn = !!(settings?.agentApi.enabled && settings.agentApi.provideCombworkMcp && api?.running)
   const shown = servers.filter((m) => mcpServerShown(m, query, filter))
 
   return (
@@ -887,14 +887,14 @@ function McpPanel() {
           ))}
         </Section>
         <Section title={tr(M.builtIn)} count={1}>
-          <div className={cx(/* i18n-ignore: class names */ 'row tall', selected === '__hive' && 'selected')} onClick={() => set({ selectedMcp: '__hive' })}>
+          <div className={cx(/* i18n-ignore: class names */ 'row tall', selected === '__cw' && 'selected')} onClick={() => set({ selectedMcp: '__cw' })}>
             <Icon name="hubot" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="label">{TOOLS_SERVER /* i18n-ignore: the server's name */}</div>
-              <div className="desc">{tr(M.hiveServerDesc)}</div>
+              <div className="desc">{tr(M.combworkServerDesc)}</div>
             </div>
-            <Tooltip content={tr(M.hiveServerTip)}>
-              <span className={cx('badge', hiveOn ? 'success' : '')}>{tr(hiveOn ? M.on : M.off)}</span>
+            <Tooltip content={tr(M.combworkServerTip)}>
+              <span className={cx('badge', combworkOn ? 'success' : '')}>{tr(combworkOn ? M.on : M.off)}</span>
             </Tooltip>
           </div>
         </Section>

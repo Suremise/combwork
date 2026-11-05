@@ -1,5 +1,5 @@
 /**
- * The Assistant's state view (#1032): what Hive gives the Assistant at each session start and after each compaction
+ * The Assistant's state view (#1032): what Combwork gives the Assistant at each session start and after each compaction
  * (Claude Code sends SessionStart then too), while its journal is on. The board, lanes and agents in brief, what waits
  * on the user, and the few journal entries relevant now, within a hard budget, so its context stays small (#989's
  * decision). Pure: main gathers the input (main/startView.ts). Agent-facing, so English.

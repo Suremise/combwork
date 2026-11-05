@@ -10,7 +10,7 @@ import { recordTestToken } from './testQuiet'
 /**
  * Each agent launch's own Agent API token. The API knows from it which agent, project and workspace a call comes
  * from, so a project agent's board calls are confined to its project however it fills in the request. Agents get
- * this token instead of the workspace's (`agent-api.json`), in their environment and their hive tools; a new launch
+ * this token instead of the workspace's (`agent-api.json`), in their environment and their Combwork tools; a new launch
  * replaces it and the agent's exit ends it. (An agent runs as the user and could still read the workspace token
  * from disk: this keeps agents in their lane, it doesn't contain a hostile one.)
  */
@@ -24,7 +24,7 @@ const log = createLogger('agent-tokens')
 const tokens = new Map<string, AgentIdentity & { token: string; runId: string }>()
 const key = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
 
-/** Where an agent's hive tools find its token: one file per agent, so its launch settings stay the same. */
+/** Where an agent's Combwork tools find its token: one file per agent, so its launch settings stay the same. */
 export function agentTokenFile(projectPath: string, agentId: string): string {
   return join(app.getPath('userData'), 'agent-api', `${hashText(key(projectPath, agentId))}.json`)
 }

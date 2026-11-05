@@ -66,7 +66,7 @@ module.exports = async function run(provider) {
     cliEnv = copilotTestEnv(api, cliDir, { above: lib.WORK })
   }
   fs.rmSync(hold, { force: true })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_HOLD_TYPED: hold, CLAUDE_CONFIG_DIR: claudeHome, ...cliEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_HOLD_TYPED: hold, CLAUDE_CONFIG_DIR: claudeHome, ...cliEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -95,12 +95,12 @@ module.exports = async function run(provider) {
     const id = def.id
     const live = async () => (await inv('session:live')).find((s) => s.agentId === id)
     const idle = async () => ['ready', 'finished'].includes((await live())?.status)
-    const hiveLog = () => {
+    const combworkLog = () => {
       const f = path.join(userData, 'logs', 'combwork.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
     }
     /** Combwork's log lines about lines typed into the agent (its wakes' and doorbells' outcomes). */
-    const wakeLines = () => hiveLog().split('\n').filter((l) => l.includes(id) && /\[watches\] (Woke|The wake typed into)/.test(l))
+    const wakeLines = () => combworkLog().split('\n').filter((l) => l.includes(id) && /\[watches\] (Woke|The wake typed into)/.test(l))
     /** The CLI's processes in this Combwork's tree (by their command lines), each { pid, started }: what a busy round suspends. */
     const cliProcesses = () => {
       const list = processes()
@@ -111,8 +111,8 @@ module.exports = async function run(provider) {
       return [...ids.values()]
     }
     /** What the agent's pane shows now (its terminal's lines, as drawn). */
-    const screen = async (key) => ((await page.evaluate((k) => window.__hiveTerminalLines(k), key)) ?? []).join('\n')
-    const paneCols = async (key) => (await page.evaluate((k) => window.__hiveTerminalState(k), key))?.cols
+    const screen = async (key) => ((await page.evaluate((k) => window.__cwTerminalLines(k), key)) ?? []).join('\n')
+    const paneCols = async (key) => (await page.evaluate((k) => window.__cwTerminalState(k), key))?.cols
     /**
      * The doorbells on its screen, each by its id, however its rows were wrapped: by its "(m4). Call cw_inbox" with
      * whitespace dropped, and up to a few non-letters between "Call" and "cw_inbox", as the CLI can draw in a doorbell's
@@ -122,7 +122,7 @@ module.exports = async function run(provider) {
     /** How many doorbells its screen shows for a message (`delivery`: one of them). */
     const copies = async (key, delivery) => (await doorbellIds(key)).filter((x) => x === delivery).length
     /** Combwork has written the whole line into the agent: its Enter too (Woke), or, for Codex, waiting for it to be drawn. */
-    const written = (from) => hiveLog().split('\n').slice(from).some((l) => (l.includes(id) && /\[watches\] Woke /.test(l)) || /the line Combwork typed is in; Enter once it shows/.test(l))
+    const written = (from) => combworkLog().split('\n').slice(from).some((l) => (l.includes(id) && /\[watches\] Woke /.test(l)) || /the line Combwork typed is in; Enter once it shows/.test(l))
 
     await inv('session:start', proj, { agentId: id })
     await lib.cliStep(`${provider} starts`, { session: lib.ptyKey(proj, id) }, async () => {
@@ -130,7 +130,7 @@ module.exports = async function run(provider) {
       if (provider === 'copilot' && (await lib.until(async () => /Do you trust the files in this folder/.test(lib.plainText(await inv('pty:buffer', lib.ptyKey(proj, id)).catch(() => ''))), HUNG_MS, 300))) await inv('pty:write', lib.ptyKey(proj, id), '\r')
       check(`${provider} starts and is ready`, !!(await lib.until(idle, HUNG_MS, 300)), JSON.stringify(await live()))
       // Combwork types nothing into it until its CLI has connected Combwork's tools (#865: a second or two after it is ready).
-      check(`${provider} connects Combwork's tools`, !!(await lib.until(() => lib.hiveToolsConnected(userData, id), HUNG_MS, 300)))
+      check(`${provider} connects Combwork's tools`, !!(await lib.until(() => lib.combworkToolsConnected(userData, id), HUNG_MS, 300)))
     })
 
     for (const [i, pause] of PAUSES.entries()) {
@@ -138,7 +138,7 @@ module.exports = async function run(provider) {
       await lib.cliStep(`a doorbell, ${what}`, { session: lib.ptyKey(proj, id) }, async () => {
         check(`${what}: the agent is idle first`, !!(await lib.until(idle, HUNG_MS, 300)), JSON.stringify(await live()))
         const lines = wakeLines().length
-        const logLines = hiveLog().split('\n').length - 1
+        const logLines = combworkLog().split('\n').length - 1
         if (pause) {
           const procs = cliProcesses()
           check(`${what}: its CLI's processes are found`, procs.length > 0)
@@ -180,11 +180,11 @@ module.exports = async function run(provider) {
       // A narrow window, so the doorbell wraps in its pane, and the CLI is as wide as the pane that shows it.
       await page.getByText('alpha', { exact: true }).first().click()
       await lib.fitWindow(app, page, { width: 640, height: 900 })
-      check('put off: its pane is narrow, and the CLI as wide', !!(await lib.until(async () => (await page.evaluate(() => window.__hiveTerminalsFitted())) && (await paneCols(key)) <= 60 && (await inv('pty:size', key))?.cols === (await paneCols(key)), HUNG_MS, 300)), JSON.stringify({ pane: await paneCols(key), pty: await inv('pty:size', key) }))
+      check('put off: its pane is narrow, and the CLI as wide', !!(await lib.until(async () => (await page.evaluate(() => window.__cwTerminalsFitted())) && (await paneCols(key)) <= 60 && (await inv('pty:size', key))?.cols === (await paneCols(key)), HUNG_MS, 300)), JSON.stringify({ pane: await paneCols(key), pty: await inv('pty:size', key) }))
       const earlier = new Set(await doorbellIds(key))
       const lines = wakeLines().length
-      const logLines = hiveLog().split('\n').length - 1
-      const since = (re) => hiveLog().split('\n').slice(logLines).some((l) => re.test(l))
+      const logLines = combworkLog().split('\n').length - 1
+      const since = (re) => combworkLog().split('\n').slice(logLines).some((l) => re.test(l))
       fs.writeFileSync(hold, '')
       const left = callApi('POST', `/v1/projects/alpha/agents/Tester/message`, { text: 'Last round: nothing to do. Read this, ack it, and reply with just: ok' })
       check('put off: its doorbell is typed, and held before its Enter', !!(await lib.until(() => since(/the line Combwork typed is held before its Enter/), HUNG_MS, 100)))

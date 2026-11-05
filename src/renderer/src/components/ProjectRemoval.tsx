@@ -257,7 +257,7 @@ export function RemoveProjectDialog() {
   )
 }
 
-/** Settings → Workspace: projects hidden or removed from Hive, to restore (or forget, once the folder is gone). */
+/** Settings → Workspace: projects hidden or removed from Combwork, to restore (or forget, once the folder is gone). */
 export function HiddenProjectsList() {
   const workspace = useStore((s) => s.workspace)
   // This workspace's hidden projects: another workspace's never show (or restore) here.
@@ -331,7 +331,7 @@ export function HiddenProjectsList() {
   )
 }
 
-/** On a project whose folder holds what Remove from Hive packed: bring it in, or discard it. */
+/** On a project whose folder holds what Remove from Combwork packed: bring it in, or discard it. */
 export function RemovedDataBanner({ project }: { project: ProjectInfo }) {
   const d = project.removedData
   const [busy, setBusy] = useState(false)

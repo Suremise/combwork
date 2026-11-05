@@ -12,7 +12,7 @@ import * as electron from 'electron'
 import { MCP_ADDED_MODEL, mcpAdded, mcpOnInProject, mcpServerShown, migratedProjectMcp, migratedWorkspaceMcp, serverOnIn } from '../src/shared/agentMcp'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-mcp-projects-')
+const base = tempDir('cw-mcp-projects-')
 const profile = join(base, 'profile')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
 process.env.CW_USER_DATA = profile
@@ -124,7 +124,7 @@ describe('MCP servers per project (HI-2059)', () => {
 
   /** A server's file to add, in a folder of its own. */
   const file = (name: string, data: unknown): string => {
-    const dir = tempDir('hive-mcp-projects-file-')
+    const dir = tempDir('cw-mcp-projects-file-')
     writeFileSync(join(dir, name), JSON.stringify(data))
     return join(dir, name)
   }
@@ -145,7 +145,7 @@ describe('MCP servers per project (HI-2059)', () => {
     else process.env.CW_TEST_TRASH_DIR = was
   })
   beforeEach(() => {
-    wsPath = tempDir('hive-mcp-projects-ws-')
+    wsPath = tempDir('cw-mcp-projects-ws-')
     ambrosia = join(wsPath, 'ambrosia')
     apiary = join(wsPath, 'apiary')
     mkdirSync(mcpDir(), { recursive: true })

@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(proj)
   const claude = lib.fakeClaude(userData, path.join(scratch, 'stoppedpane-claude-home'), [proj])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
     await page.mouse.down()
     await page.mouse.move(box.x + box.width * 0.6, box.y + 60, { steps: 8 })
     await page.mouse.up()
-    const selection = () => page.evaluate((k) => window.__hiveTerminalSelection?.(k) ?? '', key)
+    const selection = () => page.evaluate((k) => window.__cwTerminalSelection?.(k) ?? '', key)
     check('…its scrollback still selected', !!(await lib.until(async () => (await selection()).trim().length > 0, HUNG_MS)), JSON.stringify(await selection()))
     // Right-click copies a selection in every pane (and clears it): the text selected, as it was.
     const selected = await selection()

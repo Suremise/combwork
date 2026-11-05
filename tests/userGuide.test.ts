@@ -10,7 +10,7 @@ import { SETTINGS_CATALOG } from '../src/shared/settingsCatalog'
 import { BOARD_UPGRADE_GUIDE } from '../src/shared/userGuide'
 import { GIT_VIEW_GUIDE } from '../src/shared/gitRepo'
 import { GIT_GUIDE } from '../src/shared/gitTool'
-import { CW_FOLDER_GUIDE } from '../src/shared/hiveVcsText'
+import { CW_FOLDER_GUIDE } from '../src/shared/combworkVcsText'
 import { UNUSED_WORKTREES_GUIDE } from '../src/shared/unusedWorktrees'
 
 const root = join(__dirname, '..')

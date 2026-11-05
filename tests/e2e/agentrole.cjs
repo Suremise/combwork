@@ -3,7 +3,7 @@
 // with nothing written; Add Agent offers Role in the workflow (Builder · Reviewer · Either, guessed from the name until
 // chosen) and an agent added as a reviewer is offered as a lane's reviewer only; Agent Settings shows the guess, the
 // free-text role as Note, and saving stores the role; an agent changed to Either is in both lists; the project hover's
-// table shows each role; the Assistant's hive tools set a role (and add an agent with one) and refuse one that isn't a
+// table shows each role; the Assistant's Combwork tools set a role (and add an agent with one) and refuse one that isn't a
 // role; project agents have neither tool (only the Assistant changes agents).
 // Screenshots of Add Agent, Agent Settings and the hover in both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
@@ -43,7 +43,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -169,7 +169,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
 
-    // --- The hive tools: the Assistant (Control: projects) sets a role and adds an agent with one; a value that isn't a
+    // --- The Combwork tools: the Assistant (Control: projects) sets a role and adds an agent with one; a value that isn't a
     // role is refused; project agents have neither tool (assistantChange: only the Assistant changes agents).
     const home = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', home, { agentId: 'assistant' })

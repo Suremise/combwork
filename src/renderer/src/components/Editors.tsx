@@ -13,7 +13,7 @@ function useEditorTheme(): string {
   const theme = useStore((s) => s.settings?.appearance.theme)
   const [dark, setDark] = useState(document.documentElement.dataset.theme !== 'light')
   useEffect(() => setDark(document.documentElement.dataset.theme !== 'light'), [theme])
-  return dark ? 'hive-dark' : 'hive-light'
+  return dark ? 'cw-dark' : 'cw-light'
 }
 
 const baseOptions: Monaco.editor.IStandaloneEditorConstructionOptions = {

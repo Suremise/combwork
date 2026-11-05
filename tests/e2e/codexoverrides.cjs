@@ -10,7 +10,7 @@
 // 3. Claude Code's pane (the fake Claude Code, which like Claude Code 2.1.305 tracks no mouse): Pass right-click to
 //    Claude Code turns Combwork's copy/paste off and back at once; passed, a right-click sends nothing and Combwork does nothing.
 // The clipboard is stubbed in the page, and no CLI ever gets a mouse button: while right-click is passed, the pane's
-// mouse reports are held back (__hiveHoldMouseReports, test builds), never the machine's clipboard. gpt-6-luna at low effort.
+// mouse reports are held back (__cwHoldMouseReports, test builds), never the machine's clipboard. gpt-6-luna at low effort.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -64,7 +64,7 @@ function codexCommandLine(runId) {
   prepare()
   // The fake Claude Code for part 3 (its folder trusted, so it asks nothing).
   const claudeEnv = lib.fakeClaude(userData, path.join(scratch, 'cxover-claude-home'), [proj])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47839), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases(), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47839), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases(), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   let page
   let inv
@@ -103,10 +103,10 @@ function codexCommandLine(runId) {
     await page.getByText('demo', { exact: true }).first().click()
     const key = lib.ptyKey(proj, def.id)
     // What the terminal shows now (the pty's history keeps text since rubbed out).
-    const onScreen = async () => ((await page.evaluate((k) => window.__hiveTerminalLines(k), key)) ?? []).join('\n')
-    const textAt = (text) => page.evaluate(([k, t]) => window.__hiveTerminalTextAt(k, t), [key, text])
-    const hiveSelection = () => page.evaluate((k) => window.__hiveTerminalSelection(k), key)
-    const mouse = () => page.evaluate((k) => window.__hiveTerminalState(k)?.mouse, key)
+    const onScreen = async () => ((await page.evaluate((k) => window.__cwTerminalLines(k), key)) ?? []).join('\n')
+    const textAt = (text) => page.evaluate(([k, t]) => window.__cwTerminalTextAt(k, t), [key, text])
+    const combworkSelection = () => page.evaluate((k) => window.__cwTerminalSelection(k), key)
+    const mouse = () => page.evaluate((k) => window.__cwTerminalState(k)?.mouse, key)
     const rightClickGoesTo = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-right-click'), key)
     const lineWith = async (text) => (await onScreen()).split('\n').find((l) => l.includes(text)) ?? null
     const startReady = async (label) => {
@@ -144,17 +144,17 @@ function codexCommandLine(runId) {
       const n = (await copied()).length
       const r0 = await reads()
       await drag(true)
-      const selected = await lib.until(async () => ((await hiveSelection())?.includes(TEXT) ? await hiveSelection() : null), HUNG_MS, 100)
-      check("Shift+drag makes Combwork's selection", !!selected, JSON.stringify(await hiveSelection()))
+      const selected = await lib.until(async () => ((await combworkSelection())?.includes(TEXT) ? await combworkSelection() : null), HUNG_MS, 100)
+      check("Shift+drag makes Combwork's selection", !!selected, JSON.stringify(await combworkSelection()))
       // Moving to right-click keeps it (Combwork doesn't report moves over a mouse-tracking program while there is one).
       await page.mouse.move(at.s.x + at.w, at.s.y + at.w)
       await page.mouse.move(at.s.x + at.w, at.s.y)
-      check('…and moving the mouse keeps it', (await hiveSelection())?.includes(TEXT), JSON.stringify(await hiveSelection()))
+      check('…and moving the mouse keeps it', (await combworkSelection())?.includes(TEXT), JSON.stringify(await combworkSelection()))
       await page.screenshot({ path: path.join(scratch, 'codexoverrides-1-selected.png') })
       await rightClick()
       const got = await lib.until(async () => ((await copied()).length > n ? await copied() : null), HUNG_MS, 100)
       check('right-click copies the selection (the stubbed clipboard gets it)', !!got && got[n].includes(TEXT), JSON.stringify(got))
-      check('…clears it, and pastes nothing (no clipboard read)', (await hiveSelection()) === '' && (await reads()) === r0, `${JSON.stringify(await hiveSelection())}, ${(await reads()) - r0} read(s)`)
+      check('…clears it, and pastes nothing (no clipboard read)', (await combworkSelection()) === '' && (await reads()) === r0, `${JSON.stringify(await combworkSelection())}, ${(await reads()) - r0} read(s)`)
       check('…and the input is as it was (nothing pasted into Codex)', (await lineWith(TEXT))?.split('SELECTME').length === 2 && !(await onScreen()).includes(`${TEXT}${TEXT}`), JSON.stringify(await lineWith(TEXT)))
       const after1 = await live()
       check('…without interrupting Codex (still ready, the same process)', after1?.status === 'ready' && after1.pid === pid && after1.runId === runId, JSON.stringify(after1 && { status: after1.status, pid: after1.pid }))
@@ -177,9 +177,9 @@ function codexCommandLine(runId) {
       await setClip('')
 
       // Pass right-click to Codex, with the agent running: at once, no restart. The pane's mouse reports are held back
-      // meanwhile (__hiveHoldMouseReports) and never reach Codex, whose own paste would read the machine's clipboard: the
+      // meanwhile (__cwHoldMouseReports) and never reach Codex, whose own paste would read the machine's clipboard: the
       // test sees the button's reports Combwork would have sent, and that Combwork itself neither copies nor pastes.
-      const hold = (on) => page.evaluate(([k, h]) => window.__hiveHoldMouseReports(k, h), [key, on])
+      const hold = (on) => page.evaluate(([k, h]) => window.__cwHoldMouseReports(k, h), [key, on])
       const holding = Array.isArray(await hold(true))
       check('the pane holds its mouse reports back (a test build)', holding)
       if (holding) {
@@ -198,7 +198,7 @@ function codexCommandLine(runId) {
           check('…a right-click then goes to Codex: its press and release, as mouse reports', !!reports, JSON.stringify(await hold(true)))
           check("…and Combwork neither copies nor pastes (no clipboard write or read by Combwork)", (await copied()).length === n3 && (await reads()) === r3, `${(await copied()).length - n3} write(s), ${(await reads()) - r3} read(s)`)
           check('…and Codex keeps running (the same process)', !!(await live()) && (await live()).pid === pid, JSON.stringify(await live().then((l) => l && { status: l.status, pid: l.pid })))
-          record.rightClick.passedToCodex = { hiveWrites: (await copied()).length - n3, hiveReads: (await reads()) - r3, rightButtonReports: (reports ?? []).filter((r) => /\x1b\[<2;/.test(r)).length }
+          record.rightClick.passedToCodex = { combworkWrites: (await copied()).length - n3, combworkReads: (await reads()) - r3, rightButtonReports: (reports ?? []).filter((r) => /\x1b\[<2;/.test(r)).length }
         } finally {
           await hold(false)
         }
@@ -307,10 +307,10 @@ function codexCommandLine(runId) {
     if (cready) {
       await lib.showAgent(page, 'Claude')
       const cGoesTo = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-right-click'), ckey)
-      const cmouse = () => page.evaluate((k) => window.__hiveTerminalState(k)?.mouse, ckey)
+      const cmouse = () => page.evaluate((k) => window.__cwTerminalState(k)?.mouse, ckey)
       check('Claude Code tracks no mouse', (await cmouse()) === 'none', await cmouse())
       check("right-click is Combwork's by default", (await cGoesTo()) === 'combwork', await cGoesTo())
-      const pt = await lib.until(() => page.evaluate(([k, t]) => window.__hiveTerminalTextAt(k, t), [ckey, '? for shortcuts']), HUNG_MS, 200)
+      const pt = await lib.until(() => page.evaluate(([k, t]) => window.__cwTerminalTextAt(k, t), [ckey, '? for shortcuts']), HUNG_MS, 200)
       check('its prompt is on screen', !!pt)
       const cRightClick = () => page.mouse.click(pt.x, pt.y, { button: 'right' })
       // Combwork's: with nothing selected, a right-click pastes (one read of the stubbed clipboard).
@@ -320,7 +320,7 @@ function codexCommandLine(runId) {
       check("…a right-click pastes (Combwork's: one read)", !!(await lib.until(async () => (await reads()) === c0 + 1, HUNG_MS, 100)), `${(await reads()) - c0} read(s)`)
       await inv('pty:write', ckey, '\x15')
       // Passed to Claude Code: Combwork neither copies nor pastes, and nothing goes to it (it asked for no mouse reports).
-      const chold = (on) => page.evaluate(([k, h]) => window.__hiveHoldMouseReports(k, h), [ckey, on])
+      const chold = (on) => page.evaluate(([k, h]) => window.__cwHoldMouseReports(k, h), [ckey, on])
       if (Array.isArray(await chold(true))) {
         try {
           await inv('advanced:set', CLAUDE_RIGHT_ID, true)

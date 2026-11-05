@@ -8,7 +8,7 @@ import { getAccount } from './accounts'
 import { advanced } from './advanced'
 import { noteForAssistant } from './assistantNotes'
 import { deliverNow } from './deliveries'
-import { onHiveEvent, toast } from './events'
+import { onCombworkEvent, toast } from './events'
 import { createLogger } from './logger'
 import { clock, connectionDropped, OutageResume, reachable, type OutageAgent, type OutageHost } from './outageCore'
 import { progress, progressGate } from './progressService'
@@ -17,7 +17,7 @@ import { workspaceOf } from './workspace'
 import { pausedFor } from './teamPause'
 
 /**
- * Resuming agents after a connection drops (HI-1612, SPEC §6.3). Off by default (Settings → Advanced, Hive's "Resume
+ * Resuming agents after a connection drops (HI-1612, SPEC §6.3). Off by default (Settings → Advanced, Combwork's "Resume
  * agents after a connection drops"). An agent whose turn ended on a connection error (its CLI's words, as the failed
  * turn keeps them, found by the CLI's pattern and not by the one for a usage limit, a sign-in or "overloaded") waits
  * for its CLI's API host to answer, checked with a request that never holds main's thread, backing off; once it
@@ -108,7 +108,7 @@ function finishRun(a: OutageAgent, body: Record<string, unknown>): void {
   }
 }
 
-const hiveHost: OutageHost = {
+const combworkHost: OutageHost = {
   on: () => advanced.get<boolean>(OUTAGE_RESUME) === true,
   dropped: (provider, words) => connectionDropped(provider, words, (id) => advanced.pattern(id)),
   reachable: (a) => reachable(a.baseUrl ?? advanced.get<string>(outageCheckUrlId(a.provider))),
@@ -147,7 +147,7 @@ const hiveHost: OutageHost = {
   },
   async resume(a, note) {
     // Not while its team is paused (HI-2081): a turn carried on is work, which waits for the team to resume.
-    const still = (): boolean => hiveHost.stillStopped(a) && !pausedFor(a.projectPath)
+    const still = (): boolean => combworkHost.stillStopped(a) && !pausedFor(a.projectPath)
     if (!still()) return false
     return !!(await deliverNow(a.projectPath, { agentId: a.agentId, kind: 'control', from: HIVE, body: note, source: 'connection-back', ref: `${a.runId}@${a.turn}`, forRun: a.runId }, still).catch(() => null))
   },
@@ -169,12 +169,12 @@ let outage: OutageResume | null = null
  * Starts following agents' failed turns (once): a session's status with a new failed turn may start a wait, one
  * without it (a new turn) or a launch's exit ends one, and the switch turned off ends them all.
  */
-export function startOutageResume(host: OutageHost = hiveHost): OutageResume {
+export function startOutageResume(host: OutageHost = combworkHost): OutageResume {
   if (outage) return outage
   const o = new OutageResume(host)
   outage = o
   const seen = new Map<string, string>()
-  onHiveEvent((ev) => {
+  onCombworkEvent((ev) => {
     if (ev.type === 'session-status') {
       const st = ev.state
       if (!st.projectPath) return

@@ -98,8 +98,8 @@ type LegacySettings = Pick<AppSettings, 'providers' | 'defaultProvider'> & Parti
 
 /**
  * Automatic's pick at 16e8d6129 (its autoProvider over orderedProviders): the first provider turned on and installed in
- * the user's order (`providerOrder`'s first, then Hive's), else the first turned on, else Claude Code. Its own, not
- * today's autoProvider (Hive's order since HI-2139), so a 0.9 launch is read as it ran.
+ * the user's order (`providerOrder`'s first, then Combwork's), else the first turned on, else Claude Code. Its own, not
+ * today's autoProvider (Combwork's order since HI-2139), so a 0.9 launch is read as it ran.
  */
 function legacyAutoProvider(settings: LegacySettings): ProviderId {
   const order = Array.isArray(settings.providerOrder) ? settings.providerOrder : []
@@ -210,7 +210,7 @@ export function legacyEffective(agent: AgentDef, pc: ProjectConfig, assistant: b
 // The migration: accounts, connections made by the rule, deduplicated.
 // ---------------------------------------------------------------------------
 
-/** Copilot's one PC-wide sign-in as an account (decision C): made by Hive, never removed, on the CLI's own home. */
+/** Copilot's one PC-wide sign-in as an account (decision C): made by Combwork, never removed, on the CLI's own home. */
 export const COPILOT_ACCOUNT = 'copilot'
 
 /** A test copy's CLI test home as an account (the seam, connectionSeam.ts): its id. */

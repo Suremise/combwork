@@ -33,7 +33,7 @@ const M = {
   none: msg({ id: 'board.restore09.none', defaultMessage: 'There is no 0.9 board backup to restore', description: 'A notification from Help → Restore the 0.9 Board Backup… when the workspace has no copy of its board from before an upgrade to 1.0.' })
 }
 
-/** Asks to upgrade the board (the dialog runs it, and a refusal, such as another Hive having it open, stays in it). */
+/** Asks to upgrade the board (the dialog runs it, and a refusal, such as another Combwork having it open, stays in it). */
 export async function askBoardUpgrade(): Promise<void> {
   const ok = await confirm({
     title: tr(M.askTitle),
@@ -79,7 +79,7 @@ export function readOnlyReason(readOnly: BoardState['readOnly'] | undefined): st
 }
 
 /**
- * Why no agent can start here (#1230): the workspace's upgrade to 1.0 waits, and Hive refuses a start then
+ * Why no agent can start here (#1230): the workspace's upgrade to 1.0 waits, and Combwork refuses a start then
  * (`board.error.upgradeFirstStart`), so New Session and Resume are disabled with this as their tooltip. Else null.
  */
 export function startBlockedReason(readOnly: BoardState['readOnly'] | undefined): string | null {
@@ -91,7 +91,7 @@ export function useStartBlocked(): string | null {
   return startBlockedReason(useStore((s) => s.boardState?.readOnly))
 }
 
-/** The workspaces this window has asked about already: Not Now holds until Hive starts again (the banner stays). */
+/** The workspaces this window has asked about already: Not Now holds until Combwork starts again (the banner stays). */
 const asked = new Set<string>()
 
 /** Asks once per workspace, as soon as its board says it waits for the upgrade. */

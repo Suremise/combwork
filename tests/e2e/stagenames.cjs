@@ -59,7 +59,7 @@ function projectJson(dir, platform, workflow) {
   cfg.settings.assistant = { ...cfg.settings.assistant, changeSettings: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -98,7 +98,7 @@ function projectJson(dir, platform, workflow) {
     const headers = (await page.locator('.board-column-label').allTextContents()).join(' | ')
     check('no column says Doing or Passed', !/\bDoing\b|\bPassed\b/.test(headers), headers)
 
-    // The Assistant's own token, as its hive tools use it (it starts as the fake Claude Code).
+    // The Assistant's own token, as its Combwork tools use it (it starts as the fake Claude Code).
     const home = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', home, { agentId: 'assistant' })
     const assistantLive = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
@@ -166,7 +166,7 @@ function projectJson(dir, platform, workflow) {
     await header('doing').waitFor({ timeout: HUNG_MS })
     await boardShot('en')
     const base = (await inv('app:info')).language
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const words = { de: ['In Arbeit', 'Genehmigt'], pl: ['Aktywne', 'Zatwierdzone'], 'zh-CN': ['进行中', '已批准'] }
     for (const [code, [active, approved]] of Object.entries(words)) {
       const dir = path.join(lib.ROOT, 'locales', code)

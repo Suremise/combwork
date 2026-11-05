@@ -25,7 +25,7 @@ const TARGET = 'integration'
 
 ;(async () => {
   q.prepare(fx)
-  let h = await q.startHive(fx, { port: PORT })
+  let h = await q.startCombwork(fx, { port: PORT })
   let removed = null
   let removedAt = null
   let headAtClose = null
@@ -186,7 +186,7 @@ const TARGET = 'integration'
   // --- S33a: after a restart, the removed card is never merged.
   if (removed !== null) {
     try {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
       const rest = await until(async () => {
         const v = (await h.inv('queue:list', fx.alpha, TARGET))[0]
         return v && !v.runHere && !v.testing && !v.queued.length ? v : null

@@ -1,6 +1,6 @@
 /**
- * Carrying on (#1432, #966 row 16, SPEC §16.15 row C (16)): how Hive gets an agent to read its inbox, as three switches
- * with one owner each, apart from whether it can read one at all (its hive tools: Settings → Agent API → Provide Hive
+ * Carrying on (#1432, #966 row 16, SPEC §16.15 row C (16)): how Combwork gets an agent to read its inbox, as three switches
+ * with one owner each, apart from whether it can read one at all (its Combwork tools: Settings → Agent API → Provide Combwork
  * tools to sessions, `agentReadsInbox`).
  *
  * - **checkpoints** (`cw.inbox.checkpoints`): a working agent is told of new items at the end of a tool of its own.

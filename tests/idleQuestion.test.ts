@@ -342,7 +342,7 @@ describe('a held line the screen took (HI-1959, the 12:47 comment)', () => {
   })
 })
 describe("a Claude Code launch's settings: the offer turned off (HI-1959)", () => {
-  const base = tempDir('hive-envsetup-')
+  const base = tempDir('cw-envsetup-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const launch = async (name: string, extraArgs: string[] = []) => {
     const cwd = join(base, `${name}-project`)

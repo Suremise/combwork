@@ -12,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { as09, removeCard, writeCard, writeCardOutside } from './boardDb'
 
-const base = tempDir('hive-cards-step-')
+const base = tempDir('cw-cards-step-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

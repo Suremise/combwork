@@ -12,7 +12,7 @@
 import { readFileSync, renameSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
 import { fmt, msg, tr } from '../shared/i18n'
-import { checkAccount, hiveAccounts, isServer } from './accounts'
+import { checkAccount, combworkAccounts, isServer } from './accounts'
 import { toast } from './events'
 import { createLogger, userText } from './logger'
 import { MOVE_RECORD, profileChoices } from './profileFolders'
@@ -79,7 +79,7 @@ export async function checkSignInsAfterMove(folder: string, check: (id: string) 
   const named = new Set(Array.isArray(r.signInNamed) ? r.signInNamed.filter((x): x is string => typeof x === 'string') : [])
   const out: { id: string; name: string }[] = []
   let unfinished = false
-  for (const a of hiveAccounts().filter((x) => !isServer(x))) {
+  for (const a of combworkAccounts().filter((x) => !isServer(x))) {
     const seen = await check(a.id).catch(() => null)
     if (!seen || seen.loggedIn === null) unfinished = true
     else if (seen.loggedIn === false && !named.has(a.id)) out.push({ id: a.id, name: a.name })

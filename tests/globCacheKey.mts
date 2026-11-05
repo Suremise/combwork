@@ -14,7 +14,7 @@ export const globCacheKey = ({ sourceCode }: { sourceCode: string }): false | un
 /** A Vitest plugin that keeps import.meta.glob users out of the disk module cache. */
 export const globsUncached = (): Plugin =>
   ({
-    name: 'hive:globs-uncached',
+    name: 'cw:globs-uncached',
     configureVitest(ctx: { defineCacheKeyGenerator: (fn: typeof globCacheKey) => void }) {
       ctx.defineCacheKeyGenerator(globCacheKey)
     }

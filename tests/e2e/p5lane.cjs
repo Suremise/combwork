@@ -1,6 +1,6 @@
 // S55, P5's RC scenario end to end (#1358, SPEC §16.18, §16.19.1-2), as 1.0 builds it (#1573: §16.10's slots, no
 // worktree agents): "Pair (Combwork merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
-// hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
+// Combwork tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
 // (#1355's form: Pair, with G8 strict on); lanes are started from the board, each lent a slot that B1 then works in.
 // The quick check is the project's `typecheck` script, steered from outside the repository (queueFixture.cjs's check),
 // run by the builder through cw-progress --check before each submit (counted) and by the queue on the merged result.
@@ -56,7 +56,7 @@ const ancestor = (x, y) => {
   fs.writeFileSync(path.join(alpha, 'package.json'), JSON.stringify({ name: 'alpha', scripts: { typecheck: `node "${slash(path.join(fx.tools, 'check.js'))}"` } }, null, 2) + '\n')
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'])
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'scripts'])
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -358,8 +358,8 @@ const ancestor = (x, y) => {
     const main1 = head()
     // HI-1990: nobody starts Two. Once One is Done and B1's turn is over, Combwork starts it on B1 as the lane's next card, and
     // B1 is given it in its slot; B1's own start then is that start (it raced Combwork's), with the same folder and line.
-    const byHive = await waitHung(async () => (await factsOf(c2, 'Started')).find((f) => f.actor === 'combwork') ?? null)
-    check('Combwork starts Two on B1 itself once One is Done, with no prompt from the user or the Assistant', !!byHive && byHive.data?.builder === b1.id && (await card(c2))?.agent === b1.id, JSON.stringify({ byHive, card: await card(c2) }))
+    const byCombwork = await waitHung(async () => (await factsOf(c2, 'Started')).find((f) => f.actor === 'combwork') ?? null)
+    check('Combwork starts Two on B1 itself once One is Done, with no prompt from the user or the Assistant', !!byCombwork && byCombwork.data?.builder === b1.id && (await card(c2))?.agent === b1.id, JSON.stringify({ byCombwork, card: await card(c2) }))
     check('…and gives it to B1 in its slot (placed there)', !!(await waitHung(async () => (await kinds(c2)).includes('BuilderPlaced'))), JSON.stringify(await kinds(c2)))
     const s2 = await start(c2)
     check("only then does Two start, in the lane's slot still, its line from main's head (One merged in)", s2.s.status === 200 && path.basename(wt ?? '') === lentA && s2.base === main1 && ancestor(one.rev, s2.base) && git(wt, 'rev-parse', 'HEAD') === s2.base, JSON.stringify(s2))

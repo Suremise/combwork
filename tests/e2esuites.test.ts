@@ -88,13 +88,13 @@ describe('the e2e suite list', () => {
     expect(unsaid).toEqual([])
   })
 
-  it("names every CW_TEST_ seam Hive reads: one a packaged build ignores or honours (#1591, #1599)", () => {
+  it("names every CW_TEST_ seam Combwork reads: one a packaged build ignores or honours (#1591, #1599)", () => {
     const src = execFileSync('git', ['ls-files', 'src'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter((f) => /\.(ts|tsx|mts|cjs|mjs|js)$/.test(f))
     const read = new Set(src.flatMap((f) => readFileSync(join(root, f), 'utf8').match(/CW_TEST_[A-Z0-9_]*[A-Z0-9]/g) ?? []))
     const listed = [...DEV_SEAMS, ...PACKAGED_SEAMS]
     expect(new Set(listed).size, 'a seam is in two lists').toBe(listed.length)
     expect([...read].filter((s) => !listed.includes(s)).sort(), 'add each to DEV_SEAMS (runner.mjs) unless a packaged build honours it').toEqual([])
-    expect(listed.filter((s) => !read.has(s)), 'no longer read by Hive: take it off its list').toEqual([])
+    expect(listed.filter((s) => !read.has(s)), 'no longer read by Combwork: take it off its list').toEqual([])
   })
 
   it('says why a suite would test the dev build on a packaged one (devBuildOnly, #1591)', () => {
@@ -520,7 +520,7 @@ describe('the real tier and environment failures (card #191)', () => {
 })
 
 describe('the code fingerprint in a run record (record.mjs)', () => {
-  const repo = tempDir('hive-fp-')
+  const repo = tempDir('cw-fp-')
   afterAll(() => rmSync(repo, { recursive: true, force: true }))
   const git = (...a: string[]): string => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'core.autocrlf=false', ...a], { cwd: repo, encoding: 'utf8' })
 
@@ -594,7 +594,7 @@ describe('the runner command line and run records (runner.mjs)', () => {
 })
 
 describe('whether the dev build is from this source (build.mjs)', () => {
-  const buildDir = tempDir('hive-build-')
+  const buildDir = tempDir('cw-build-')
   afterAll(() => rmSync(buildDir, { recursive: true, force: true }))
   mkdirSync(join(buildDir, 'src'), { recursive: true })
   writeFileSync(join(buildDir, 'src', 'a.ts'), 'a\n')
@@ -810,7 +810,7 @@ describe("progressreport's estimate check (lib.hadEstimate)", () => {
 })
 
 describe("each run's own log folder (logs.mjs)", () => {
-  const logsDir = tempDir('hive-logs-')
+  const logsDir = tempDir('cw-logs-')
   afterAll(() => rmSync(logsDir, { recursive: true, force: true }))
   const second = new Date(2026, 9, 4, 15, 0, 2)
 
@@ -844,7 +844,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it('a repeat of more than ten runs in one second keeps every one of its folders until its record is saved, then the next run trims to ten', () => {
-    const runsDir = tempDir('hive-repeat-')
+    const runsDir = tempDir('cw-repeat-')
     try {
       // Older runs from before.
       finishRunDirs(Array.from({ length: 4 }, (_, i) => newRunDir(runsDir, new Date(2026, 9, 4, 14, 0, i))))
@@ -884,7 +884,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it("a runner never prunes another runner's run still going: a slow run overlapping a fast repeat of more than ten", () => {
-    const shared = tempDir('hive-overlap-')
+    const shared = tempDir('cw-overlap-')
     try {
       const A = 111
       const B = 222
@@ -920,7 +920,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it("keeps a folder's files before its folders, and a --lang run's every language (#899)", () => {
-    const runsDir = tempDir('hive-keeplang-')
+    const runsDir = tempDir('cw-keeplang-')
     try {
       // The i18nshots route's shots: a folder per language, its reports beside them.
       const shots = join(runsDir, 'lane', 'i18nshots', 'i18nshots-shots')
@@ -951,7 +951,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it('a failed run survives ten newer passing runs for a day, with its failed suites’ screenshots, then goes (#223)', () => {
-    const runsDir = tempDir('hive-failed-')
+    const runsDir = tempDir('cw-failed-')
     try {
       // A failed suite's folder in its lane: screenshots and a report at the top, a profile below.
       const suite = join(runsDir, 'lane', 'board')
@@ -984,7 +984,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it('…at most the newest FAILED_MAX failed runs are kept beyond KEEP_RUNS', () => {
-    const runsDir = tempDir('hive-failed-')
+    const runsDir = tempDir('cw-failed-')
     try {
       const dirs = Array.from({ length: FAILED_MAX + 2 }, (_, i) => newRunDir(runsDir, new Date(2026, 9, 4, 15, 1, i)))
       for (const d of dirs) markRunFailed(d, 'x')
@@ -997,7 +997,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it('a passing run of the last day survives twenty newer runs; an older one goes (#1595)', () => {
-    const runsDir = tempDir('hive-window-')
+    const runsDir = tempDir('cw-window-')
     try {
       const now = Date.now()
       const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000)
@@ -1025,7 +1025,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it('past the size cap, the oldest passing runs of the window go first, then failed ones, never the newest ten (#1595)', () => {
-    const runsDir = tempDir('hive-cap-')
+    const runsDir = tempDir('cw-cap-')
     try {
       const now = Date.now()
       const run = (minutesAgo: number) => {
@@ -1075,7 +1075,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it("a run folder counts as still going only while its runner's process is alive (a crashed runner's is pruned)", () => {
-    const crashed = tempDir('hive-crash-')
+    const crashed = tempDir('cw-crash-')
     try {
       const runDir = newRunDir(crashed, new Date(2026, 9, 4, 15, 0, 2), 333)
       expect(runDirActive(runDir, () => true)).toBe(true)
@@ -1090,7 +1090,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it.runIf(process.platform === 'win32')("a run folder something still holds is kept and named, never a failure; a later prune removes it (#1616)", async () => {
-    const logs = tempDir('hive-held-')
+    const logs = tempDir('cw-held-')
     let holder: ReturnType<typeof spawn> | null = null
     try {
       const held = newRunDir(logs, new Date(2026, 9, 4, 15, 0, 0))
@@ -1131,7 +1131,7 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it('a name pruned away is never given to a newer run in the same second (it would sort as the oldest)', () => {
-    const runsDir = tempDir('hive-reuse-')
+    const runsDir = tempDir('cw-reuse-')
     try {
       const when = new Date(2026, 9, 4, 15, 0, 2)
       const first = newRunDir(runsDir, when)
@@ -1221,7 +1221,7 @@ describe("each runner's own lane: ports and suite folders (lanes.mjs)", () => {
   const alive = (pid: number) => pid === 100 || pid === 200
   const now = Date.parse('2026-10-04T12:00:00Z')
 
-  it("lanes' ports are their own, clear of Hive's, of the suites' defaults and of Windows' dynamic range", () => {
+  it("lanes' ports are their own, clear of Combwork's, of the suites' defaults and of Windows' dynamic range", () => {
     const ranges = Array.from({ length: LANES }, (_, k) => lanePorts(k))
     for (const [k, r] of ranges.entries()) {
       expect(r.last - r.first + 1).toBe(LANE_PORTS)
@@ -1248,7 +1248,7 @@ describe("each runner's own lane: ports and suite folders (lanes.mjs)", () => {
     const own = Array.from({ length: LANES }, (_, k) => lanePorts(k, lanesFirst(true)))
     expect(own[0].first).toBeGreaterThan(machineTop)
     expect(own.at(-1)!.last).toBeLessThan(49152)
-    const lanesDir = tempDir('hive-own-lanes-')
+    const lanesDir = tempDir('cw-own-lanes-')
     try {
       const got = await claimLane(lanesDir, { owner: 300, alive: () => true, free: async () => true, portsFrom: lanesFirst(true) })
       expect(got).toMatchObject({ lane: 0, ...own[0] })
@@ -1259,8 +1259,8 @@ describe("each runner's own lane: ports and suite folders (lanes.mjs)", () => {
   })
 
   it('only one pool of its own at a time on the machine: a second checker waits for the first, whose pools would have the same ports (#1127)', async () => {
-    const machine = tempDir('hive-machine-lanes-')
-    const pools = [tempDir('hive-own-lanes-a-'), tempDir('hive-own-lanes-b-')]
+    const machine = tempDir('cw-machine-lanes-')
+    const pools = [tempDir('cw-own-lanes-a-'), tempDir('cw-own-lanes-b-')]
     try {
       const running = (pid: number) => pid === 300 || pid === 301
       // Two pools of their own hand out the same ports: the reason for the hold.
@@ -1327,7 +1327,7 @@ describe("each runner's own lane: ports and suite folders (lanes.mjs)", () => {
   })
 
   it('runners claiming at the same time each get a lane of their own; a released lane is taken again', async () => {
-    const lanesDir = tempDir('hive-lanes-')
+    const lanesDir = tempDir('cw-lanes-')
     try {
       const free = async () => true
       type Claim = { lane: number; base: number; release: () => void }
@@ -1348,7 +1348,7 @@ describe("each runner's own lane: ports and suite folders (lanes.mjs)", () => {
   })
 
   it('runners beyond the lanes wait for one instead of failing; --no-wait refuses at once, saying who holds them (#707)', async () => {
-    const lanesDir = tempDir('hive-lanes-')
+    const lanesDir = tempDir('cw-lanes-')
     try {
       const free = async () => true
       // Every runner is alive until it lets its lane go (a claim written is held at once, by its owner).
@@ -1389,7 +1389,7 @@ describe("each runner's own lane: ports and suite folders (lanes.mjs)", () => {
   })
 
   it("skips a lane whose ports are busy, takes over a crashed runner's, and breaks a lock left by a crash", async () => {
-    const lanesDir = tempDir('hive-lanes-')
+    const lanesDir = tempDir('cw-lanes-')
     try {
       // Lane 0 claimed by a process that is gone: taken over.
       writeFileSync(join(lanesDir, 'lane-0.json'), JSON.stringify({ pid: 999, at: Date.now() }))
@@ -1471,7 +1471,7 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
     expect(stuck.writes.includes('\r')).toBe(false)
   })
 
-  it("in a trusted folder it returns at once: Claude Code 2.1.289's mode footer, the old one, or Hive's ready status", async () => {
+  it("in a trusted folder it returns at once: Claude Code 2.1.289's mode footer, the old one, or Combwork's ready status", async () => {
     for (const screen of ['> \x1b[2m⏵⏵ auto mode on (shift+tab to cycle)\x1b[0m', '>  ⏸ manual mode on', '> ? for shortcuts']) {
       const s = session(screen)
       const { r, ms } = await s.run()
@@ -1525,11 +1525,11 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
   })
 })
 
-describe('the Hives a suite starts (lib.cjs testExecutable, keepPackagedQuiet, #1253)', () => {
+describe('the Combworks a suite starts (lib.cjs testExecutable, keepPackagedQuiet, #1253)', () => {
   type Lib = { ROOT: string; ELECTRON: string; PACKAGED_EXE: string; PACKAGED_ARGS: string[]; testExecutable: (exe: string) => string; keepPackagedQuiet: (m: object) => string[] }
   const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
 
-  it("this checkout's Electron is the dev build; its dist and the test folders' are packaged; the installed Hive and any other are refused", () => {
+  it("this checkout's Electron is the dev build; its dist and the test folders' are packaged; the installed Combwork and any other are refused", () => {
     expect(lib.testExecutable(lib.ELECTRON)).toBe('dev')
     expect(lib.testExecutable(lib.PACKAGED_EXE)).toBe('packaged')
     expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
@@ -1631,7 +1631,7 @@ describe('the Hives a suite starts (lib.cjs testExecutable, keepPackagedQuiet, #
   })
 })
 
-describe('packaged test Hives never check GitHub for updates (lib.cjs, #1332)', () => {
+describe('packaged test Combworks never check GitHub for updates (lib.cjs, #1332)', () => {
   type Lib = { NO_UPDATE_CHECK: Record<string, string>; noUpdateChecks: (profile: string) => void; updateChecksLogged: (l: { profile: string; since: string }) => string[] }
   const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
 
@@ -1640,7 +1640,7 @@ describe('packaged test Hives never check GitHub for updates (lib.cjs, #1332)', 
   })
 
   it("a saved profile gets automatic checks off, its other settings kept; a new one is left alone", () => {
-    const profile = tempDir('hive-noupdates-')
+    const profile = tempDir('cw-noupdates-')
     lib.noUpdateChecks(profile)
     expect(existsSync(join(profile, 'config.json'))).toBe(false)
     writeFileSync(join(profile, 'config.json'), JSON.stringify({ version: 9, settings: { updates: { install: 'manual' }, general: { showTips: true } } }))
@@ -1649,7 +1649,7 @@ describe('packaged test Hives never check GitHub for updates (lib.cjs, #1332)', 
   })
 
   it('the guard finds a check logged since the launch, in combwork.log or its older copy, and only those', () => {
-    const profile = tempDir('hive-noupdates-')
+    const profile = tempDir('cw-noupdates-')
     mkdirSync(join(profile, 'logs'))
     const check = '2026-10-21T10:00:05.000Z [INFO] [updates] Checking for update'
     writeFileSync(join(profile, 'logs', 'combwork.1.log'), `2026-10-21T09:00:00.000Z [INFO] [updates] Checking for update\n${check}\n`)
@@ -1833,7 +1833,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
   const entries = (home: string) => [...readFileSync(join(home, 'config.toml'), 'utf8').matchAll(/^\[projects\.'([^']+)'\]$/gm)].map((m) => m[1]).sort()
 
   it("waits while another runner changes it, and keeps that runner's change", async () => {
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     try {
       writeFileSync(join(home, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
       // This runner holds the lock (mid-change: it has read the file and not yet written it back).
@@ -1855,7 +1855,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
   }, 30_000)
 
   it('several runners at once: every folder trusted once', async () => {
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     try {
       const folders = Array.from({ length: 6 }, (_, k) => `C:/lanes/${k}/codex-ws/demo`)
       expect(await Promise.all(folders.map((f) => trustIn(home, f))), failures.join('\n\n')).toEqual(folders.map(() => 0))
@@ -1870,7 +1870,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
   }, 30_000)
 
   it('breaks a lock left by a runner that crashed while holding it', () => {
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     try {
       const lock = join(home, 'config.toml.lock')
       mkdirSync(lock)
@@ -1889,7 +1889,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
     const req = createRequire(import.meta.url)
     const { withFileLock } = req('./e2e/lib.cjs') as { withFileLock: Lock }
     const nodeFs = req('fs') as typeof import('fs')
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     const file = join(home, 'config.toml')
     const lock = `${file}.lock`
     const fail = (code: string) => Object.assign(new Error(`${code}: operation not permitted`), { code })
@@ -1960,8 +1960,8 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     CARRIED: string[]
     baseEnv: (parent?: Env) => Env
     childEnv: (vars?: Env, parent?: Env) => Env
-    hiveEnv: (vars?: Env, parent?: Env) => Env
-    isHiveEnv: (env: unknown) => boolean
+    combworkEnv: (vars?: Env, parent?: Env) => Env
+    isCombworkEnv: (env: unknown) => boolean
     suiteEnv: (o: { name: string; port?: number | null; work?: string | null; runDir: string; cliLog?: string | null }, parent?: Env) => Env
     TEST_GIT_IDENTITY: { name: string; email: string }
     gitConfig: (parent?: Env) => string
@@ -1970,7 +1970,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     isUserGitConfig: (file: string, parent?: Env) => boolean
   }
   const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as Ctx
-  /** An agent's shell in Combwork, inside an outer hive-progress, in a suite of a runner, with a person's settings. */
+  /** An agent's shell in Combwork, inside an outer cw-progress, in a suite of a runner, with a person's settings. */
   const parent: Env = {
     Path: 'C:\\Windows;C:\\node',
     SystemRoot: 'C:\\Windows',
@@ -2000,7 +2000,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
   }
   const has = (env: Env, k: string) => Object.keys(env).some((x) => x.toUpperCase() === k.toUpperCase())
 
-  it('no suite, runner or harness builds a child environment from process.env: they use lib.hiveEnv, lib.childEnv or runContext', () => {
+  it('no suite, runner or harness builds a child environment from process.env: they use lib.combworkEnv, lib.childEnv or runContext', () => {
     // The fake CLIs are left out: they stand for Claude Code and Codex, which start their MCP servers from their own
     // environment (a test Combwork's session's, already the run context's).
     const exempt = ['runContext.cjs', 'fake-bridge.cjs']
@@ -2033,30 +2033,30 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     for (const k of ['CW_E2E_PORT', 'CW_API_PORT', 'E2E_RUN_PORT', 'CW_E2E_DIR']) expect(has(nested, k), k).toBe(false)
   })
 
-  it("every test copy of Hive deletes into its suite's trash folder, never the user's Recycle Bin (#414)", () => {
+  it("every test copy of Combwork deletes into its suite's trash folder, never the user's Recycle Bin (#414)", () => {
     const suite = ctx.suiteEnv({ name: 'board', port: 47961, work: 'C:\\lanes\\1\\board', runDir: 'C:\\lanes\\1\\board' }, parent)
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, suite).CW_TEST_TRASH_DIR).toBe('C:\\lanes\\1\\board\\trash')
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, suite).CW_TEST_TRASH_DIR).toBe('C:\\lanes\\1\\board\\trash')
     // A suite run on its own: the work folder's.
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, parent).CW_TEST_TRASH_DIR).toBe(join(ctx.WORK, 'trash'))
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, parent).CW_TEST_TRASH_DIR).toBe(join(ctx.WORK, 'trash'))
     // Not a child that isn't Combwork, and not from the shell the run was started from.
     expect(has(ctx.childEnv({}, suite), 'CW_TEST_TRASH_DIR')).toBe(false)
-    expect(ctx.hiveEnv({}, { ...suite, CW_TEST_TRASH_DIR: 'C:\\elsewhere' }).CW_TEST_TRASH_DIR).toBe('C:\\lanes\\1\\board\\trash')
+    expect(ctx.combworkEnv({}, { ...suite, CW_TEST_TRASH_DIR: 'C:\\elsewhere' }).CW_TEST_TRASH_DIR).toBe('C:\\lanes\\1\\board\\trash')
     // The runner counts the Recycle Bin, read only, before and after.
     const runner = readFileSync(join(root, 'tests', 'e2e', 'run.mjs'), 'utf8')
     expect(runner).toMatch(/recycleBinCount\(\)[\s\S]*recycleBinLine\(binBefore, recycleBinCount\(\)\)/)
     expect(readFileSync(join(root, 'tests', 'e2e', 'recycleBin.mjs'), 'utf8')).not.toMatch(/Empty|InvokeVerb|Delete|Remove-/)
   })
 
-  it("every test copy of Hive gets the CLI homes, test folders, never the user's ~/.claude, ~/.codex, ~/.copilot or gh login (#382, #452)", () => {
+  it("every test copy of Combwork gets the CLI homes, test folders, never the user's ~/.claude, ~/.codex, ~/.copilot or gh login (#382, #452)", () => {
     const suite = ctx.suiteEnv({ name: 'board', port: 47961, work: 'C:\\lanes\\1\\board', runDir: 'C:\\lanes\\1\\board' }, parent)
     // By default, empty folders of the suite's own; whatever the shell the run was started from had.
     const shell = { ...suite, CLAUDE_CONFIG_DIR: 'C:\\Users\\t\\.claude', CODEX_HOME: 'C:\\Users\\t\\.codex' }
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, shell)).toMatchObject({ CLAUDE_CONFIG_DIR: 'C:\\lanes\\1\\board\\cli-homes\\claude', CODEX_HOME: 'C:\\lanes\\1\\board\\cli-homes\\codex' })
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, parent)).toMatchObject({ CLAUDE_CONFIG_DIR: join(ctx.WORK, 'cli-homes', 'claude'), CODEX_HOME: join(ctx.WORK, 'cli-homes', 'codex') })
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, shell)).toMatchObject({ CLAUDE_CONFIG_DIR: 'C:\\lanes\\1\\board\\cli-homes\\claude', CODEX_HOME: 'C:\\lanes\\1\\board\\cli-homes\\codex' })
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, parent)).toMatchObject({ CLAUDE_CONFIG_DIR: join(ctx.WORK, 'cli-homes', 'claude'), CODEX_HOME: join(ctx.WORK, 'cli-homes', 'codex') })
     // Copilot's home and the GitHub CLI's config (Copilot falls back to gh's login): empty folders too, whatever the shell had.
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, { ...shell, COPILOT_HOME: 'C:\\Users\\t\\.copilot', GH_CONFIG_DIR: 'C:\\Users\\t\\AppData\\Roaming\\GitHub CLI' })).toMatchObject({ COPILOT_HOME: 'C:\\lanes\\1\\board\\cli-homes\\copilot', GH_CONFIG_DIR: 'C:\\lanes\\1\\board\\cli-homes\\gh' })
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, { ...shell, COPILOT_HOME: 'C:\\Users\\t\\.copilot', GH_CONFIG_DIR: 'C:\\Users\\t\\AppData\\Roaming\\GitHub CLI' })).toMatchObject({ COPILOT_HOME: 'C:\\lanes\\1\\board\\cli-homes\\copilot', GH_CONFIG_DIR: 'C:\\lanes\\1\\board\\cli-homes\\gh' })
     // A suite gives a test home instead (the fake Claude Code's, its own, the Codex test home).
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p', CLAUDE_CONFIG_DIR: 'C:\\fake-home', CODEX_HOME: 'C:\\codex-test' }, suite)).toMatchObject({ CLAUDE_CONFIG_DIR: 'C:\\fake-home', CODEX_HOME: 'C:\\codex-test' })
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p', CLAUDE_CONFIG_DIR: 'C:\\fake-home', CODEX_HOME: 'C:\\codex-test' }, suite)).toMatchObject({ CLAUDE_CONFIG_DIR: 'C:\\fake-home', CODEX_HOME: 'C:\\codex-test' })
     // Not for a child that isn't Combwork.
     for (const k of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR']) expect(has(ctx.childEnv({}, suite), k), k).toBe(false)
     // The user's homes, however spelled; not a folder beside or inside them.
@@ -2068,13 +2068,13 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     expect(lib).toMatch(/for \(const k of \['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR'\]\) \{\s*if \(!env\[k\]\) throw[\s\S]*?if \(isUserCliHome\(env\[k\]\)\) throw/)
   })
 
-  it("every test copy of Hive's git, and its suite's on the fixtures, has the suite's config alone: a test identity, explicit line endings, no user or system config (#1466)", () => {
+  it("every test copy of Combwork's git, and its suite's on the fixtures, has the suite's config alone: a test identity, explicit line endings, no user or system config (#1466)", () => {
     const suite = ctx.suiteEnv({ name: 'gitview', port: 47961, work: 'C:\\lanes\\1\\gitview', runDir: 'C:\\lanes\\1\\gitview' }, parent)
     // The suite's, whatever the shell had, and no system config; a suite may give its own global one.
-    const fromShell = ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '0' })
+    const fromShell = ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '0' })
     expect(fromShell).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, parent).GIT_CONFIG_GLOBAL).toBe(join(ctx.WORK, 'gitconfig'))
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p', GIT_CONFIG_GLOBAL: 'C:\\w\\empty.gitconfig' }, suite).GIT_CONFIG_GLOBAL).toBe('C:\\w\\empty.gitconfig')
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, parent).GIT_CONFIG_GLOBAL).toBe(join(ctx.WORK, 'gitconfig'))
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p', GIT_CONFIG_GLOBAL: 'C:\\w\\empty.gitconfig' }, suite).GIT_CONFIG_GLOBAL).toBe('C:\\w\\empty.gitconfig')
     // The suite's own git on its fixtures gets the same; a child that isn't git, and the runners' git on the checkout
     // under test (baseEnv, checked out with the machine's settings), get neither.
     expect(ctx.gitEnv({}, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig' })).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
@@ -2083,11 +2083,11 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     // The user's own, however spelled.
     for (const f of ['C:\\Users\\t\\.gitconfig', 'c:/users/T/.gitconfig', 'C:\\Users\\t\\.config\\git\\config']) expect(ctx.isUserGitConfig(f, parent), f).toBe(true)
     expect(ctx.isUserGitConfig('C:\\lanes\\1\\gitview\\gitconfig', parent)).toBe(false)
-    // What git reads with them (run with hiveEnv's and gitEnv's environments, outside any repository): the test identity,
+    // What git reads with them (run with combworkEnv's and gitEnv's environments, outside any repository): the test identity,
     // autocrlf false, from the suite's file alone.
-    const work = tempDir('hive-gitconfig-')
+    const work = tempDir('cw-gitconfig-')
     const shell = { ...process.env, CW_E2E_DIR: work }
-    for (const env of [ctx.hiveEnv({ CW_USER_DATA: join(work, 'profile') }, shell), ctx.gitEnv({}, shell)]) {
+    for (const env of [ctx.combworkEnv({ CW_USER_DATA: join(work, 'profile') }, shell), ctx.gitEnv({}, shell)]) {
       ctx.writeGitConfig(env.GIT_CONFIG_GLOBAL!)
       const read = (...a: string[]) => execFileSync('git', ['config', ...a], { cwd: work, env: env as NodeJS.ProcessEnv, encoding: 'utf8' }).trim()
       expect([read('--global', 'user.name'), read('--global', 'user.email'), read('core.autocrlf')]).toEqual([ctx.TEST_GIT_IDENTITY.name, ctx.TEST_GIT_IDENTITY.email, 'false'])
@@ -2099,7 +2099,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     const lib = readFileSync(join(root, 'tests', 'e2e', 'lib.cjs'), 'utf8')
     expect(lib).toMatch(/if \(!env\.GIT_CONFIG_GLOBAL\) throw[\s\S]*?if \(isUserGitConfig\(env\.GIT_CONFIG_GLOBAL\)\) throw[\s\S]*?writeGitConfig\(env\.GIT_CONFIG_GLOBAL\)/)
     // Every git a suite starts on its fixtures has gitEnv (lib.git does): not the shell's, the allowlist's or none. The
-    // exceptions: evidence's on the checkout under test, and isolation's inside its test Combwork (which has hiveEnv's).
+    // exceptions: evidence's on the checkout under test, and isolation's inside its test Combwork (which has combworkEnv's).
     const suiteFiles = [...readdirSync(dir).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, f)), ...readdirSync(join(dir, 'i18nshots')).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, 'i18nshots', f))]
     const plain: string[] = []
     for (const f of suiteFiles)
@@ -2112,11 +2112,11 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     expect(lib).toMatch(/execFileSync\('git', cmd, \{ env: gitEnv\(\), \.\.\.o \}\) : execSync\(`git \$\{cmd\}`, \{ env: gitEnv\(\), \.\.\.o \}\)/)
   })
 
-  it("the CLIs a suite's Hive selects go to a log of the suite's own; the runner starts no CLI of its own (#365)", () => {
+  it("the CLIs a suite's Combwork selects go to a log of the suite's own; the runner starts no CLI of its own (#365)", () => {
     // The runner gives each suite a log in its folder, and the suite's test copies of Combwork inherit it (CARRIED).
-    const suite = ctx.suiteEnv({ name: 'codex', port: 47961, work: 'C:\\lanes\\1\\codex', runDir: 'C:\\lanes\\1\\codex', cliLog: 'C:\\lanes\\1\\codex\\hive-clis.jsonl' }, parent)
-    expect(suite.CW_TEST_CLI_LOG).toBe('C:\\lanes\\1\\codex\\hive-clis.jsonl')
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, suite).CW_TEST_CLI_LOG).toBe('C:\\lanes\\1\\codex\\hive-clis.jsonl')
+    const suite = ctx.suiteEnv({ name: 'codex', port: 47961, work: 'C:\\lanes\\1\\codex', runDir: 'C:\\lanes\\1\\codex', cliLog: 'C:\\lanes\\1\\codex\\cw-clis.jsonl' }, parent)
+    expect(suite.CW_TEST_CLI_LOG).toBe('C:\\lanes\\1\\codex\\cw-clis.jsonl')
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, suite).CW_TEST_CLI_LOG).toBe('C:\\lanes\\1\\codex\\cw-clis.jsonl')
     expect(has(ctx.childEnv({}, suite), 'CW_TEST_CLI_LOG')).toBe(false)
     expect(has(ctx.suiteEnv({ name: 'x', runDir: 'C:\\w' }, { ...parent, CW_TEST_CLI_LOG: 'C:\\elsewhere' }), 'CW_TEST_CLI_LOG')).toBe(false)
     // The record's versions are what the suites' Combwork selected, in the CLI homes the suites gave it: the runner never
@@ -2127,7 +2127,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
 
   // Combwork looks for both CLIs when it starts, and their sign-in checks read the home they are given, else the user's.
   // Suites added since (#333, #362, #365) give every Combwork they start both homes; #382 brings the older ones in.
-  it('newer suites give each test Hive their own Claude Code and Codex homes (#362)', () => {
+  it('newer suites give each test Combwork their own Claude Code and Codex homes (#362)', () => {
     for (const name of ['claudesettings', 'contrast', 'testedclis']) {
       const src = readFileSync(join(root, 'tests', 'e2e', `${name}.cjs`), 'utf8')
       const launches = [...src.matchAll(/lib\.launch\(\{[^\n]*\}\)/g)].map((m) => m[0])
@@ -2149,9 +2149,9 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     for (const s of claudeSuites) {
       expect(['own', 'test'], s.name).toContain(s.claudeHome)
       const src = readFileSync(join(root, 'tests', 'e2e', `${s.name}.cjs`), 'utf8')
-      // Its Combwork (every hiveEnv or lib.launch call) gets the home: lib's helper for it, CLAUDE_CONFIG_DIR given directly,
+      // Its Combwork (every combworkEnv or lib.launch call) gets the home: lib's helper for it, CLAUDE_CONFIG_DIR given directly,
       // or the suite's `homes`.
-      const launches = [...src.matchAll(/(?:hiveEnv|lib\.launch)\(\{[^\n]*\}\)/g)].map((m) => m[0])
+      const launches = [...src.matchAll(/(?:combworkEnv|lib\.launch)\(\{[^\n]*\}\)/g)].map((m) => m[0])
       expect(launches.length, s.name).toBeGreaterThan(0)
       for (const l of launches) expect(/CLAUDE_CONFIG_DIR|ownClaudeHome|claudeHome\.env|env: homes/.test(l), `${s.name}: ${l}`).toBe(true)
       if (s.claudeHome === 'test') expect(src, s.name).toMatch(/CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME/)
@@ -2174,35 +2174,35 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     expect(sessionVars).toEqual(expect.arrayContaining(['CW_PROGRESS_WRAPPED', 'CW_PROGRESS_RUN_AS_NODE', 'CW_PROGRESS_DATA', 'CW_HOOK_TOKEN', 'CW_PROJECT']))
     const everywhere = Object.fromEntries(sessionVars.map((n) => [n, 'set']))
     const suite = ctx.suiteEnv({ name: 'x', runDir: 'C:\\w' }, everywhere)
-    const hive = ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, everywhere)
+    const hive = ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, everywhere)
     const child = ctx.childEnv({}, everywhere)
     const contextSets = ['CW_USER_DATA', 'CW_TEST_QUIET', 'CW_TEST_TIPS', 'CW_API_PORT', 'CW_E2E_DIR', 'CW_E2E_PORT']
     for (const n of sessionVars.filter((x) => !contextSets.includes(x))) {
       expect(has(suite, n), `suite: ${n}`).toBe(false)
-      expect(has(hive, n), `test Hive: ${n}`).toBe(false)
+      expect(has(hive, n), `test Combwork: ${n}`).toBe(false)
       expect(has(child, n), `child: ${n}`).toBe(false)
     }
     // And no Combwork session variable is ever allowlisted or passed on.
     for (const n of [...ctx.ALLOW, ...Object.keys(ctx.PASS_ENV)]) expect(/^(CW_(API|PROJECT|AGENT|WORKSPACE|SLOT|HOOK|PROVIDER|SESSION|RUN_ID|DIALECT|ROLE)|CW_PROGRESS(_(WRAPPED|RUN_AS_NODE|DATA))?$|ELECTRON|CLAUDE|ANTHROPIC|NO_COLOR|FORCE_COLOR)/.test(n), n).toBe(false)
   })
 
-  it("a test Hive's environment: quiet, tips off, the suite's port and the carried run variables, then the suite's own", () => {
-    const env = ctx.hiveEnv({ CW_USER_DATA: 'C:\\profile', CLAUDE_CONFIG_DIR: 'C:\\test-claude', CW_TEST_SLOW_IPC: undefined }, parent)
+  it("a test Combwork's environment: quiet, tips off, the suite's port and the carried run variables, then the suite's own", () => {
+    const env = ctx.combworkEnv({ CW_USER_DATA: 'C:\\profile', CLAUDE_CONFIG_DIR: 'C:\\test-claude', CW_TEST_SLOW_IPC: undefined }, parent)
     expect(env).toMatchObject({ CW_USER_DATA: 'C:\\profile', CW_TEST_QUIET: '1', CW_TEST_TIPS: 'off', CW_API_PORT: '47950', E2E_RUN_SUITE: 'progressreport', E2E_RUN_DIR: 'C:\\lanes\\0', E2E_RUN_PORT: '47950', CLAUDE_CONFIG_DIR: 'C:\\test-claude', Path: parent.Path })
     for (const k of ['NO_COLOR', 'ELECTRON_RUN_AS_NODE', 'CW_API_TOKEN', 'CW_PROGRESS_WRAPPED', 'CW_TEST_SLOW_IPC', 'CW_E2E_NATIVE', 'CW_TEST_CODEX_HOME', 'ANTHROPIC_API_KEY']) expect(has(env, k), k).toBe(false)
     // CW_TEST_QUIET=0 for the run shows the copies; a suite's own setting wins.
-    expect(ctx.hiveEnv({}, { ...parent, CW_TEST_QUIET: '0' }).CW_TEST_QUIET).toBe('0')
-    expect(ctx.hiveEnv({ CW_TEST_QUIET: '0' }, parent).CW_TEST_QUIET).toBe('0')
+    expect(ctx.combworkEnv({}, { ...parent, CW_TEST_QUIET: '0' }).CW_TEST_QUIET).toBe('0')
+    expect(ctx.combworkEnv({ CW_TEST_QUIET: '0' }, parent).CW_TEST_QUIET).toBe('0')
     // A suite's variable replaces the allowlisted one in another case, rather than adding a second.
-    const path = ctx.hiveEnv({ PATH: 'C:\\only' }, parent)
+    const path = ctx.combworkEnv({ PATH: 'C:\\only' }, parent)
     expect(Object.keys(path).filter((k) => k.toUpperCase() === 'PATH')).toEqual(['PATH'])
-    // Only what hiveEnv built starts a test Combwork (lib.cjs's _electron.launch): not a copy, not process.env.
-    expect(ctx.isHiveEnv(env)).toBe(true)
-    expect(ctx.isHiveEnv({ ...env })).toBe(false)
-    expect(ctx.isHiveEnv(process.env)).toBe(false)
+    // Only what combworkEnv built starts a test Combwork (lib.cjs's _electron.launch): not a copy, not process.env.
+    expect(ctx.isCombworkEnv(env)).toBe(true)
+    expect(ctx.isCombworkEnv({ ...env })).toBe(false)
+    expect(ctx.isCombworkEnv(process.env)).toBe(false)
   })
 
-  it("a child that is part of Hive gets the allowlist and what it is given; nothing is passed that wasn't allowed", () => {
+  it("a child that is part of Combwork gets the allowlist and what it is given; nothing is passed that wasn't allowed", () => {
     const env = ctx.childEnv({ CW_API_URL: 'http://127.0.0.1:1', ELECTRON_RUN_AS_NODE: '1' }, parent)
     expect(Object.keys(env).sort()).toEqual(['CW_API_URL', 'ELECTRON_RUN_AS_NODE', 'LOCALAPPDATA', 'Path', 'SystemRoot', 'USERPROFILE', 'https_proxy'])
     expect(Object.keys(ctx.baseEnv(parent)).every((k) => ctx.ALLOW.includes(k.toUpperCase()))).toBe(true)
@@ -2210,7 +2210,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
 
   it("no child gets the user's Hives' hive-progress shims on its PATH: they run the installed Hive.exe (#1253)", () => {
     const shell = { APPDATA: 'C:\\Users\\x\\AppData\\Roaming', Path: 'C:\\Windows;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin;C:\\tools;c:\\users\\x\\appdata\\roaming\\hive-dev\\bin\\;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin-other' }
-    for (const env of [ctx.baseEnv(shell), ctx.childEnv({}, shell), ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, shell)]) {
+    for (const env of [ctx.baseEnv(shell), ctx.childEnv({}, shell), ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, shell)]) {
       expect(env.Path).toBe('C:\\Windows;C:\\tools;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin-other')
     }
   })
@@ -2244,7 +2244,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
   })
 
   it("a shell's GIT_DIR, GIT_WORK_TREE and NODE_OPTIONS reach neither the runners' git nor the build (#208)", () => {
-    const tmp = tempDir('hive-shellenv-')
+    const tmp = tempDir('cw-shellenv-')
     const repo = (name: string, file: string) => {
       const d = join(tmp, name)
       mkdirSync(d)
@@ -2292,7 +2292,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
 })
 
 describe("the concurrency checker's temporary worktrees: each invocation's own (tempWorktrees.mjs, #207)", () => {
-  const tmp = tempDir('hive-tempwt-')
+  const tmp = tempDir('cw-tempwt-')
   afterAll(() => {
     // Junctions first (rmdir removes only the link), as the module does.
     for (const base of readdirSync(tmp).filter((n) => n.startsWith('concurrency')))
@@ -2421,7 +2421,7 @@ describe('e2e:concurrency checks a worktree was built once, whoever built it (bu
     expect(builtOnce({ builds: 0, stamp: 'old', inputs: 'h', at: '2026-10-06T10:00:05Z', since }).ok).toBe(false)
   })
   it('the stamp says when it was made', () => {
-    const w = tempDir('hive-stampat-')
+    const w = tempDir('cw-stampat-')
     try {
       expect(buildStampedAt(w)).toBeNull()
       mkdirSync(join(w, 'out'), { recursive: true })
@@ -2434,7 +2434,7 @@ describe('e2e:concurrency checks a worktree was built once, whoever built it (bu
 })
 
 describe('the build lock: runners started together in one worktree build it once (build.mjs, #200)', () => {
-  const tmp = tempDir('hive-buildlock-')
+  const tmp = tempDir('cw-buildlock-')
   afterAll(() => rmSync(tmp, { recursive: true, force: true }))
   const locks = join(tmp, 'locks')
   const buildMjs = pathToFileURL(join(dir, 'build.mjs')).href
@@ -2525,7 +2525,7 @@ describe('the build lock: runners started together in one worktree build it once
 })
 
 describe('heavy runs: at most a few at once on the machine, the rest queue in order (slots.mjs, #204)', () => {
-  const tmp = tempDir('hive-slots-')
+  const tmp = tempDir('cw-slots-')
   afterAll(() => rmSync(tmp, { recursive: true, force: true }))
   let n = 0
   const newPool = () => join(tmp, `pool-${++n}`)
@@ -2538,7 +2538,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
   const ask = (dir2: string, owner: number, more: object = {}) => trySlot(dir2, { slots: 2, owner, alive, now, what: `run ${owner}`, root: `C:/wt${owner}`, ...offline, ...more })
 
   it("how many at once (#589): the machine's config.json, CW_TEST_HEAVY_SLOTS over it, else 2, saying why in one line", () => {
-    const folder = tempDir('hive-slots-config-')
+    const folder = tempDir('cw-slots-config-')
     const file = join(folder, 'config.json')
     const lines: string[] = []
     const count = (env: Record<string, string> = {}) => heavySlots(env, file, (l: string) => lines.push(l))
@@ -2778,8 +2778,8 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     }
   })
 
-  it("the merge slot holder's run: asked of Hive with the session's own variables; anything else is an ordinary run", async () => {
-    // The token from its file, as hive-progress reads it (HI-2262: never CW_API_TOKEN).
+  it("the merge slot holder's run: asked of Combwork with the session's own variables; anything else is an ordinary run", async () => {
+    // The token from its file, as cw-progress reads it (HI-2262: never CW_API_TOKEN).
     const sessionToken = join(tmp, 'session-token.json')
     writeFileSync(sessionToken, JSON.stringify({ token: 'tok' }))
     const session = { CW_API_URL: 'http://127.0.0.1:1/', CW_API_TOKEN_FILE: sessionToken, CW_PROJECT: 'hive', CW_AGENT: 'HB4', CW_WORKSPACE: 'D:/ws' }
@@ -2812,7 +2812,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     expect(calls.at(-1)!.init.headers).toMatchObject({ Authorization: 'Bearer tok' })
   })
 
-  it('--pre-merge goes first without asking; otherwise Hive is asked again at most every 30 s while the run waits', async () => {
+  it('--pre-merge goes first without asking; otherwise Combwork is asked again at most every 30 s while the run waits', async () => {
     expect(parseArgs(['--all', '--pre-merge'], names)).toMatchObject({ preMerge: true })
     expect(parseArgs(['--all'], names)).toMatchObject({ preMerge: false })
     let asks = 0
@@ -2850,7 +2850,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
   })
 
   it("the side slot, model trials and the small-run bound (HI-2070): beside heavySlots in config.json, the environment over the first two, else their defaults, saying why", () => {
-    const folder = tempDir('hive-slots-side-')
+    const folder = tempDir('cw-slots-side-')
     const file = join(folder, 'config.json')
     const lines: string[] = []
     const read = (env: Record<string, string> = {}) => slotSettings(env, file, (l: string) => lines.push(l))
@@ -2944,7 +2944,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     expect([pool(heavyE2e, both), pool(trial, both)]).toEqual([null, null])
     // An empty credit (a light top-level run's): nothing is covered, even with the suite's marker carried.
     expect([pool(heavyE2e, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: '' }), pool(trial, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: '' })]).toEqual(['heavy', 'model'])
-    // The runners pass it on: the e2e runner to each suite, the scenario runner into its test Hives (CARRIED).
+    // The runners pass it on: the e2e runner to each suite, the scenario runner into its test Combworks (CARRIED).
     const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { CARRIED: string[]; suiteEnv: (o: object, parent: object) => Record<string, string> }
     expect(runContext.CARRIED).toContain('E2E_RUN_SLOTS')
     expect(runContext.suiteEnv({ name: 's', runDir: 'C:/x', slots: 'cpu,model' }, {}).E2E_RUN_SLOTS).toBe('cpu,model')
@@ -3074,10 +3074,10 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
   })
 })
 
-describe("a suite's git waits out the Hive under test's own (lib.git, #199)", () => {
+describe("a suite's git waits out the Combwork under test's own (lib.git, #199)", () => {
   type Git = (cwd: string, cmd: string | string[], opts?: { timeoutMs?: number }) => string
   const { git, GIT_LOCKED, baseEnv } = createRequire(import.meta.url)('./e2e/lib.cjs') as { git: Git; GIT_LOCKED: RegExp; baseEnv: () => NodeJS.ProcessEnv }
-  const repo = tempDir('hive-gitlock-')
+  const repo = tempDir('cw-gitlock-')
   afterAll(() => rmSync(repo, { recursive: true, force: true }))
   git(repo, 'init -q -b main')
   git(repo, ['config', 'user.email', 't@t'])
@@ -3159,7 +3159,7 @@ describe("a suite's git waits out the Hive under test's own (lib.git, #199)", ()
     expect(Date.now() - t0).toBeLessThan(5000)
   })
 
-  it('the suites that write to a repository while their Hive runs use it', () => {
+  it('the suites that write to a repository while their Combwork runs use it', () => {
     for (const s of ['agents', 'agents-ui', 'resume', 'inbox', 'unmerged', 'paneheader']) expect(readFileSync(join(dir, `${s}.cjs`), 'utf8'), s).toMatch(/= \([^)]*\) => lib\.git\(/)
   })
 })

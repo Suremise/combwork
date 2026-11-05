@@ -10,7 +10,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { freshWhy, workFinished, type FreshNow } from '../src/shared/freshStarts'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 
 /** A bound for a hung run (the waits are for conditions). */
 const HUNG_MS = 15_000
@@ -45,7 +45,7 @@ describe('who starts fresh (freshWhy)', () => {
 })
 
 describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
-  const base = tempDir('hive-freshstarts-')
+  const base = tempDir('cw-freshstarts-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -135,7 +135,7 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
   })
 
   // The races of the nudge's lifecycle (#1437 round 3's design): one gated test each.
-  const status = (alpha: string, agentId: string, st: string): void => tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId, status: st } } as unknown as HiveEvent)
+  const status = (alpha: string, agentId: string, st: string): void => tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId, status: st } } as unknown as CombworkEvent)
   const markOf = (w: Awaited<ReturnType<typeof open>>['w'], project: string) => boardRead(w, (db) => db.prepare('SELECT value FROM board_meta WHERE key = ?').get(`fresh_nudge:${project}`) as { value: string } | undefined)
   /** Waits for the reset of a project's spell (coalesced) to have run, however it ended. */
   const resetRun = (alpha: string) => vi.waitFor(() => expect(coalescing(`freshSpell:${alpha.toLowerCase()}`)).toBe(false), { timeout: HUNG_MS })

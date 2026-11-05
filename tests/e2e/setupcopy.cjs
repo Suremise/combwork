@@ -53,7 +53,7 @@ const codex = (lang) => ({
 const claude = { provider: 'claude-code', found: false, checking: false, path: null, version: null, source: null, latestVersion: null, updateAvailable: false, loggedIn: null, authMethod: null, account: null, rejected: [], readiness: [] }
 
 async function openSetup(app, page, lang = 'en') {
-  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
+  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), e)
   // Combwork has finished looking for the CLIs (launch waits for it): nothing it finds replaces the stand-ins.
   await sendEvent({ type: 'provider-install', provider: 'codex', info: codex(lang) })
   await sendEvent({ type: 'provider-install', provider: 'claude-code', info: claude })
@@ -62,7 +62,7 @@ async function openSetup(app, page, lang = 'en') {
     window.__copied = []
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => '', writeText: async (t) => void window.__copied.push(t) } })
   })
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'help.agentSetup', args: [] }))
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'help.agentSetup', args: [] }))
   const setup = page.locator('.dialog', { has: page.locator('.setup-tab') })
   await lib.until(async () => (await setup.count()) === 1, HUNG_MS)
   return setup

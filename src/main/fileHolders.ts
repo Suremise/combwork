@@ -15,7 +15,7 @@ $src = @"
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-public static class HiveFileHolders {
+public static class CombworkFileHolders {
   [StructLayout(LayoutKind.Sequential)] struct RM_UNIQUE_PROCESS { public int dwProcessId; public System.Runtime.InteropServices.ComTypes.FILETIME ProcessStartTime; }
   [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] struct RM_PROCESS_INFO {
     public RM_UNIQUE_PROCESS Process;
@@ -45,7 +45,7 @@ public static class HiveFileHolders {
 }
 "@
 Add-Type -TypeDefinition $src
-[HiveFileHolders]::Of($env:CW_HOLDER_PATH)
+[CombworkFileHolders]::Of($env:CW_HOLDER_PATH)
 `
 
 export function fileHolders(path: string): Promise<string[]> {

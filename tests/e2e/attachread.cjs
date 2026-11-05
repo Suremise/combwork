@@ -80,14 +80,14 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     for (const [p, a] of [[alpha, b1], [alpha, r1], [alpha, e1], [beta, x]]) await inv('session:start', p, { agentId: a.id })
     check('the agents start', !!(await ready(alpha, b1.id)) && !!(await ready(alpha, r1.id)) && !!(await ready(alpha, e1.id)) && !!(await ready(beta, x.id)))
 
-    // The hive API as B1 (its token, from its launch's hive server), to build and attach as a builder does.
+    // The hive API as B1 (its token, from its launch's combwork server), to build and attach as a builder does.
     const lines = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : [])
     const b1Launch = await until(async () => {
       const sid = (await live(alpha, b1.id))?.sessionId
       return lines(path.join(claudeHome, 'fake-launches.jsonl')).findLast((l) => l.sessionId === sid && l.opts['--mcp-config'])
     }, HUNG_MS)
-    const hiveEnv = JSON.parse(fs.readFileSync(b1Launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
-    const tb1 = JSON.parse(fs.readFileSync(hiveEnv.CW_API_TOKEN_FILE, 'utf8')).token
+    const combworkEnv = JSON.parse(fs.readFileSync(b1Launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const tb1 = JSON.parse(fs.readFileSync(combworkEnv.CW_API_TOKEN_FILE, 'utf8')).token
     const call = async (method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${tb1}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
@@ -110,7 +110,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       check(`B1 attaches its evidence to ${keys[n]} and submits it`, s.status === 200 && attached.status === 200 && sub.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, attached: attached.body, sub: sub.body }))
     }
 
-    // What an agent's hive tool call got back, from its transcript (both fake CLIs write the call and its reply there).
+    // What an agent's Combwork tool call got back, from its transcript (both fake CLIs write the call and its reply there).
     const replies = async (p, id) => {
       const s = await live(p, id)
       const items = s?.sessionId ? ((await inv('transcript:read', p, s.sessionId).catch(() => null))?.items ?? []) : []

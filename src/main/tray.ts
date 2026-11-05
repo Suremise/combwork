@@ -6,7 +6,7 @@ import type { LiveSessionState, ProjectInfo, SessionStatus } from '../shared/typ
 import { appName } from '../shared/appName'
 import { msg, onLanguageChange, tr, type Msg } from '../shared/i18n'
 import { knownStatus } from './branchWatch'
-import { emitTo, onHiveEvent } from './events'
+import { emitTo, onCombworkEvent } from './events'
 import { resourcesDir } from './paths'
 import { presentWindow } from './testQuiet'
 import { sessions } from './sessions'
@@ -165,7 +165,7 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
   })
   // A working agent's status changes many times a minute (its cost with every status line): rebuild at most every 500 ms.
   let pending: NodeJS.Timeout | null = null
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type !== 'session-status' && e.type !== 'session-exit' && e.type !== 'workspace-changed' && e.type !== 'update-state' && e.type !== 'branch-status') return
     pending ??= setTimeout(() => {
       pending = null

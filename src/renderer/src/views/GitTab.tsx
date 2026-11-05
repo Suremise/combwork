@@ -3,7 +3,7 @@ import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { GIT_VIEW_GUIDE, HISTORY_COMMITS, folderBusy, gitStatusText, gitStatusTip, headText, type GitFolderAction, type GitHistory, type GitRepoSummary } from '@shared/gitRepo'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
-import type { HiveRequests } from '@shared/api'
+import type { CombworkRequests } from '@shared/api'
 import { call, errorMessage } from '../api'
 import { gitReader, type GitReadState } from '../gitReads'
 import { attempt } from '../actions'
@@ -77,8 +77,8 @@ export const at = (ms: number | null): string | null => (ms ? timeAgo(new Date(m
  * Reads a Git channel for the project: again when the project's git changes here, its agents work, the window gets
  * focus, or on `reload`; the last answer stays while it does.
  */
-export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history' | 'git:compareLines' | 'git:compare' | 'git:leftovers'>(channel: C, project: ProjectInfo, args: readonly (string | number | null)[] = NO_ARGS): { data: Awaited<ReturnType<HiveRequests[C]>> | null; error: string | null; loading: boolean; at: number; reload: () => void } {
-  type T = Awaited<ReturnType<HiveRequests[C]>>
+export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history' | 'git:compareLines' | 'git:compare' | 'git:leftovers'>(channel: C, project: ProjectInfo, args: readonly (string | number | null)[] = NO_ARGS): { data: Awaited<ReturnType<CombworkRequests[C]>> | null; error: string | null; loading: boolean; at: number; reload: () => void } {
+  type T = Awaited<ReturnType<CombworkRequests[C]>>
   const version = useStore((s) => s.gitVersion[project.path] ?? 0)
   const usage = useStore((s) => s.usageVersion[project.path] ?? 0)
   // A read is the project's with its arguments (History's branch and page, #1643): another's answer never shows for it.

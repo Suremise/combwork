@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-assistantmcp-')
+const base = tempDir('cw-assistantmcp-')
 const profile = join(base, 'profile')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
 process.env.CW_USER_DATA = profile
@@ -40,7 +40,7 @@ function legacySwitch(on: boolean | undefined): void {
  * demo has sandbox on. `mcp` is workspace.json's mcp as written (its `assistant` absent unless given).
  */
 function oldWorkspace(mcpCfg: Record<string, unknown> = { enabled: ['notes', 'sandbox'], model: 2 }): { ws: string; proj: string } {
-  const ws = tempDir('hive-assistantmcp-ws-')
+  const ws = tempDir('cw-assistantmcp-ws-')
   const proj = join(ws, 'demo')
   mkdirSync(join(ws, '.combwork', 'mcp'), { recursive: true })
   mkdirSync(join(proj, '.combwork'), { recursive: true })
@@ -74,7 +74,7 @@ afterAll(() => {
 describe("the Assistant's MCP servers move from the old Advanced switch (HI-1472)", () => {
   it('a new workspace gets none, even with the old switch on', async () => {
     legacySwitch(true)
-    const ws = join(tempDir('hive-assistantmcp-new-'), 'fresh')
+    const ws = join(tempDir('cw-assistantmcp-new-'), 'fresh')
     mkdirSync(ws)
     const w = await opened(ws)
     try {

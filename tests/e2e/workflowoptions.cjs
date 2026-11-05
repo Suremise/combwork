@@ -112,7 +112,7 @@ async function theForm(page, app, inv) {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -146,7 +146,7 @@ async function theForm(page, app, inv) {
       globalThis.__presetsCalls = 0
       handlers.set('workflow:presetsNotice', (...x) => (globalThis.__presetsCalls++, h(...x)))
     })
-    const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
+    const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
     const running = page.locator('.project-row', { hasText: 'web' }).locator('.agent-count')
     for (const s of ['ready', 'working', 'waiting', 'working']) for (const a of ['b1', 'r1']) await status(a, s)
     // Main knows nothing of these made-up runs, so a workspace refresh meanwhile (a project.json write's) drops them: they
@@ -335,7 +335,7 @@ async function theForm(page, app, inv) {
     check('…G6 offers Merge commit, Squash and Rebase and fast-forward', JSON.stringify(styles) === JSON.stringify(['Merge commit', 'Squash', 'Rebase and fast-forward']), JSON.stringify(styles))
     await row('style').locator('select').selectOption('rebase')
     await themes('rebase', row('style'))
-    await themes('hivemerges', row('mergeChecks'))
+    await themes('cwmerges', row('mergeChecks'))
     // File locks (HI-1766) stays with each card in a slot: agents can still share the project folder outside one.
     check('File locks is shown with slots too, saying where it applies', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('fileLocks').locator('[data-note="file-locks"]').count()) === 1)
     await themes('filelocks-slots', row('fileLocks'))
@@ -472,7 +472,7 @@ async function theForm(page, app, inv) {
     await themes('none', section.locator('.workflow-group[data-group="review"]'))
     check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
     await themes('none-loops', section.locator('.workflow-group[data-group="loops"]'))
-    const noneBase = { hiveWorkflow: 1, platform: 'none', preset: null, options: {} }
+    const noneBase = { combworkWorkflow: 1, platform: 'none', preset: null, options: {} }
     const merging = await pasteIn({ ...noneBase, options: { finish: 'combworkMerges' } })
     check('None: a merge pasted is refused, merging needs Git', !!(await lib.until(async () => (await merging.innerText()).includes('Merging needs Git'), HUNG_MS)), await merging.innerText())
     await merging.locator('textarea').fill(JSON.stringify({ ...noneBase, options: { folder: 'slots' } }))
@@ -500,7 +500,7 @@ async function theForm(page, app, inv) {
     check('N6: dependencies done switched on None’s form alone, saved', n6.ok, n6.said)
     // notes as it was (Solo, nothing of its own), which the late reads below start from; the form reads it again.
     await inv('workflow:setOptions', notes, { preset: 'solo', options: {} })
-    await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: notes })
+    await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: notes })
     check('notes back to Solo, the form with it', !!(await lib.until(async () => projectJson(notes).workflow?.preset === 'solo' && (await row('review').locator('select').inputValue()) === 'none' && (await row('excluded').locator('input').inputValue()) === 'node_modules, .venv', HUNG_MS)), JSON.stringify(projectJson(notes).workflow))
 
     // --- Reads answering late (HR5's round 1): a reload never replaces an edit made while it waited, an older read never
@@ -530,7 +530,7 @@ async function theForm(page, app, inv) {
         s.held = s.held.filter((y) => y.p !== x)
       }, p)
     const heldFor = (p) => app.evaluate((_, x) => globalThis.__wf.held.filter((y) => y.p === x).length, p)
-    const changedElsewhere = (p) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: p })
+    const changedElsewhere = (p) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: p })
     // After a release, a read of the window's own answered after it: the held answer has been taken (or dropped) by then.
     const fence = (p) => inv('workflow:form', p)
     // An edit made while a reload waits stays.
@@ -594,7 +594,7 @@ async function theForm(page, app, inv) {
     const speak = async (code) => {
       const dir = path.join(lib.ROOT, 'locales', code)
       messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
     }
     /**
      * The save's dialog opened in the window's language (#1489): its title, message, what changes (Merge style, its
@@ -649,7 +649,7 @@ async function theForm(page, app, inv) {
   q.prepare(fx)
   let h = null
   try {
-    h = await q.startHive(fx, { port: lib.port(47857), keepOptions: true })
+    h = await q.startCombwork(fx, { port: lib.port(47857), keepOptions: true })
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges', mergeChecks: [] }) })
     await h.page.getByText('alpha', { exact: true }).first().click()
     await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).click()

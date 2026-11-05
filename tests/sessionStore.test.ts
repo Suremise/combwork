@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 import { moveFolder } from './moveFolder'
 import type { SessionRecord } from '../src/shared/types'
 
-const base = tempDir('hive-session-store-')
+const base = tempDir('cw-session-store-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

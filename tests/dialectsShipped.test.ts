@@ -98,7 +98,7 @@ describe('the dialect files Combwork ships', () => {
 })
 
 describe('the shipped dialect files in a workspace', () => {
-  const base = tempDir('hive-dialects-shipped-')
+  const base = tempDir('cw-dialects-shipped-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   let mod: typeof import('../src/main/bundled')
   let wsMod: typeof import('../src/main/workspace')

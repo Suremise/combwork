@@ -39,7 +39,7 @@ function holdWrite(file: string): { reached: Promise<void>; release: () => void 
 }
 
 describe('project-config write stamps (#1498)', async () => {
-  const base = tempDir('hive-configwrites-')
+  const base = tempDir('cw-configwrites-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
   let n = 0

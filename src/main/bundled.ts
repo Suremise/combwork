@@ -15,15 +15,15 @@ import { atMost } from '../shared/atMost'
 import { dialectsDir } from './dialects/store'
 
 /**
- * Keeps a workspace's copies of Hive's bundled skills, the Assistant's modes and the dialect files (HI-2439) up to date,
+ * Keeps a workspace's copies of Combwork's bundled skills, the Assistant's modes and the dialect files (HI-2439) up to date,
  * without overriding the user:
- * - a bundled item the workspace was never given is added (a new workspace, or one Hive added since);
- * - a copy the user never changed (a version Hive shipped, older than this one) is updated in place;
+ * - a bundled item the workspace was never given is added (a new workspace, or one Combwork added since);
+ * - a copy the user never changed (a version Combwork shipped, older than this one) is updated in place;
  * - a copy the user changed is kept as it is (the Skills, Modes and Dialects views offer Revert, and say when the copy
  *   came from an older version);
  * - an item the user deleted stays deleted (the views offer Restore).
  * `.combwork/bundled.json` records which items the workspace has been given and the version each copy came from.
- * bundledHistory.json lists every version Hive has shipped of each (scripts/bundled-history.mjs), oldest first.
+ * bundledHistory.json lists every version Combwork has shipped of each (scripts/bundled-history.mjs), oldest first.
  */
 
 const log = createLogger('bundled')
@@ -35,19 +35,19 @@ const SLOW_SYNC_MS = 1000
 const SLOW_ITEM_MS = 500
 
 /**
- * What Hive bundles: skills (a folder each), modes (a file each) and dialect files (`dialects`, HI-2439: a file each,
+ * What Combwork bundles: skills (a folder each), modes (a file each) and dialect files (`dialects`, HI-2439: a file each,
  * in a CLI's folder, its id `<folder>/<label>`, such as "claude-code/Opus 5.5").
  */
 export type BundledKind = 'skills' | 'modes' | 'dialects'
 
-/** What `.combwork/bundled.json` holds: per item, the shipped version its copy was made from (null: not Hive's copy). */
+/** What `.combwork/bundled.json` holds: per item, the shipped version its copy was made from (null: not Combwork's copy). */
 interface Manifest {
   skills: Record<string, { from: string | null }>
   modes: Record<string, { from: string | null }>
   dialects: Record<string, { from: string | null }>
 }
 
-/** Items that shipped before Hive kept a manifest: missing from a workspace without one, they were deleted by the user. */
+/** Items that shipped before Combwork kept a manifest: missing from a workspace without one, they were deleted by the user. */
 const BEFORE_MANIFEST: Record<BundledKind, string[]> = {
   skills: ['handover', 'merge-ready', 'pick-up', 'review-agent-work', 'split-work', 'workspace-note'],
   modes: ['orchestrator', 'overseer', 'planner', 'reviewer'],
@@ -63,7 +63,7 @@ export function bundledDir(kind: BundledKind): string {
 /** A bundled item's path: a skill's folder, a mode's file, a dialect file (its id is `<folder>/<label>`). */
 const itemPath = (dir: string, kind: BundledKind, id: string): string => join(dir, kind === 'skills' ? id : kind === 'modes' ? `${id}.md` : `${id}.json`)
 
-/** A dialect file's folders, as Hive ships them: a provider's id, or `api`. */
+/** A dialect file's folders, as Combwork ships them: a provider's id, or `api`. */
 const DIALECT_FOLDER = /^[a-z0-9][a-z0-9-]*$/
 
 /** The dialect files a folder of them holds, as ids (`<folder>/<label>`). */
@@ -75,7 +75,7 @@ async function dialectIds(dir: string): Promise<string[]> {
   return ids.sort()
 }
 
-/** The items this version of Hive ships. */
+/** The items this version of Combwork ships. */
 export async function bundledIds(kind: BundledKind): Promise<string[]> {
   if (kind === 'dialects') return dialectIds(bundledDir(kind))
   try {
@@ -117,19 +117,19 @@ export function bundledAction(i: BundledInput): BundledAction {
     return 'add'
   }
   if (i.copy === i.shipped) return 'keep'
-  // Untouched: a version Hive shipped before this one (a copy of a newer one, from another Hive, is left alone).
+  // Untouched: a version Combwork shipped before this one (a copy of a newer one, from another Combwork, is left alone).
   const was = i.versions.lastIndexOf(i.copy)
   return was >= 0 && was < i.versions.lastIndexOf(i.shipped) ? 'update' : 'keep'
 }
 
-/** How a workspace copy compares with what this Hive ships, for the Skills and Modes views. */
+/** How a workspace copy compares with what this Combwork ships, for the Skills and Modes views. */
 export interface BundledStatus {
   bundled: 'same' | 'changed'
   /** A changed copy made from an older version than this one: Revert also brings in the newer version. */
   updateAvailable?: true
 }
 
-const manifestPath = (): string => join(workspace.hiveDir, 'bundled.json')
+const manifestPath = (): string => join(workspace.combworkDir, 'bundled.json')
 
 async function readManifest(): Promise<Manifest | null> {
   return manifestOf(await readJson<unknown>(manifestPath(), null))
@@ -154,13 +154,13 @@ function changeManifest(fn: (m: Manifest) => void): Promise<void> {
   })
 }
 
-const folderOf = (kind: BundledKind): string => (kind === 'skills' ? workspace.skillsDir : kind === 'modes' ? workspace.modesDir : dialectsDir(workspace.hiveDir))
+const folderOf = (kind: BundledKind): string => (kind === 'skills' ? workspace.skillsDir : kind === 'modes' ? workspace.modesDir : dialectsDir(workspace.combworkDir))
 
 /** What an item is called in the log. */
 const itemWord = (kind: BundledKind): string => (kind === 'skills' ? 'skill' : kind === 'modes' ? 'mode' : 'dialect file') // i18n-ignore: the log's words for a bundled item
 
 /**
- * Puts this Hive's version of an item in the workspace (swapIn: a skill's folder or a mode's file, all at once). An
+ * Puts this Combwork's version of an item in the workspace (swapIn: a skill's folder or a mode's file, all at once). An
  * automatic update or add passes what the copy was when it was decided (its contentHash, or null: none): if the user
  * changed, deleted or replaced it since, SwapAbandoned, and theirs stays. Restore and Revert, which the user asked for,
  * pass nothing.
@@ -170,7 +170,7 @@ async function install(kind: BundledKind, id: string, expected?: string | null):
 }
 
 /**
- * A swap's leftover old copy is disposable when it is a version Hive shipped of that item (nothing of the user's).
+ * A swap's leftover old copy is disposable when it is a version Combwork shipped of that item (nothing of the user's).
  * `folder`: a dialect file's folder, the first part of its id.
  */
 function shippedVersion(kind: BundledKind, folder?: string): (old: string, name: string) => Promise<boolean> {
@@ -185,7 +185,7 @@ async function cleanKind(kind: BundledKind, folder: string): Promise<void> {
 }
 
 /**
- * Brings the workspace's bundled skills, modes and dialect files up to date (each time it opens; `fresh` for a workspace Hive has
+ * Brings the workspace's bundled skills, modes and dialect files up to date (each time it opens; `fresh` for a workspace Combwork has
  * just set up). One item that can't be updated (a file in it open) is left as it is until the next time; the others go
  * ahead.
  */
@@ -201,7 +201,7 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
     const ids = { skills: await bundledIds('skills'), modes: await bundledIds('modes'), dialects: await bundledIds('dialects') }
     for (const kind of ['skills', 'modes', 'dialects'] as const) {
       const folder = folderOf(kind)
-      // A workspace Hive has just set up has empty folders: nothing in it was deleted.
+      // A workspace Combwork has just set up has empty folders: nothing in it was deleted.
       const hadFolder = !opts.fresh && existsSync(folder)
       // What a crash in a swap left: an old copy that isn't a shipped version (the user's) is kept, renamed beside it.
       await cleanKind(kind, folder)
@@ -224,7 +224,7 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
             log.info(`${action === 'add' ? 'Added' : 'Updated'} the bundled ${itemWord(kind)} ${userText(id)}${ms > SLOW_ITEM_MS ? ` (${Math.round(ms)} ms)` : ''}`)
           } else if (action === 'deleted') m[kind][id] ??= { from: null }
           else if (copy === shipped) m[kind][id] = { from: shipped }
-          // A changed copy keeps the version it came from; one Hive never gave (a same-name folder of the user's) has none.
+          // A changed copy keeps the version it came from; one Combwork never gave (a same-name folder of the user's) has none.
           else m[kind][id] ??= { from: (history[kind][id] ?? []).includes(copy!) ? copy : null }
         } catch (e) {
           // The user changed it meanwhile: it is theirs now, as the next scan will see; the manifest isn't changed.
@@ -254,8 +254,8 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
  * the next time; one an older Hive made again beside .combwork/modes is left alone.
  */
 async function moveLegacyModes(): Promise<void> {
-  const from = join(workspace.hiveDir, LEGACY_MODES_DIR)
-  const to = join(workspace.hiveDir, MODES_DIR)
+  const from = join(workspace.combworkDir, LEGACY_MODES_DIR)
+  const to = join(workspace.combworkDir, MODES_DIR)
   if (existsSync(to) || !existsSync(from)) return
   try {
     // A moment's lock (an indexer, a virus scan) is waited out; a file held open fails it.
@@ -292,7 +292,7 @@ async function retireSkills(m: Manifest): Promise<void> {
 }
 
 /**
- * Personas Hive no longer ships (working modes replaced them, #259): a workspace copy that is a version Hive shipped,
+ * Personas Combwork no longer ships (working modes replaced them, #259): a workspace copy that is a version Combwork shipped,
  * never changed, goes (nothing of the user's is lost); one the user changed is theirs and stays. A workspace whose
  * Assistant used one that went moves to its mode, and is told once (this happens once: afterwards there is no copy).
  */
@@ -350,7 +350,7 @@ async function chooseModeFor(id: string, mode: string): Promise<boolean> {
   return moved
 }
 
-/** Puts back an item as this Hive ships it (Restore, Revert), and records that the copy is Hive's again. */
+/** Puts back an item as this Combwork ships it (Restore, Revert), and records that the copy is Combwork's again. */
 export async function restoreBundled(kind: BundledKind, id: string): Promise<void> {
   await install(kind, id)
   const shipped = await contentHash(itemPath(bundledDir(kind), kind, id))
@@ -359,7 +359,7 @@ export async function restoreBundled(kind: BundledKind, id: string): Promise<voi
   })
 }
 
-/** How the workspace's copy of a bundled item compares with this Hive's. */
+/** How the workspace's copy of a bundled item compares with this Combwork's. */
 export async function bundledStatus(kind: BundledKind, id: string, copyPath: string): Promise<BundledStatus> {
   const [copy, shipped] = await Promise.all([revisionOf(copyPath).catch(() => ''), revisionOf(itemPath(bundledDir(kind), kind, id))])
   if (copy === shipped) return { bundled: 'same' }
@@ -369,7 +369,7 @@ export async function bundledStatus(kind: BundledKind, id: string, copyPath: str
   return from && olderThan(kind, id, from, shipped) ? { bundled: 'changed', updateAvailable: true } : { bundled: 'changed' }
 }
 
-/** Whether `version` is a version Hive shipped before `shipped` (bundledHistory.json's order). */
+/** Whether `version` is a version Combwork shipped before `shipped` (bundledHistory.json's order). */
 export function olderThan(kind: BundledKind, id: string, version: string, shipped: string): boolean {
   const versions = history[kind][id] ?? []
   const at = versions.lastIndexOf(version)

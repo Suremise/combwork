@@ -53,7 +53,7 @@ describe('line endings (#149)', () => {
   })
 
   it('finds a mixed file or a lone CR, and passes all-CRLF, all-LF and binary files', () => {
-    const repo = tempDir('hive-eol-')
+    const repo = tempDir('cw-eol-')
     try {
       const git = (...args: string[]) => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'core.safecrlf=false', ...args], { cwd: repo, env: baseEnv(), encoding: 'utf8' })
       git('init', '-q')

@@ -1,5 +1,5 @@
 // A Git project's slot options as they inherit (HI-1765): the project's own (project.json `slots`, or before 1.0 its
-// `worktreeCopy`), then its workspace's, then Hive's, then the built-in default. A value left out inherits; an empty
+// `worktreeCopy`), then its workspace's, then Combwork's, then the built-in default. A value left out inherits; an empty
 // string is "none" and is kept, at the level that set it. One resolver for slots, review copies and the old worktree
 // paths, and for the window's "where it comes from".
 import { SLOT_COPY_DEFAULT } from './defaults'
@@ -9,7 +9,7 @@ import { msg } from './i18n/msg'
 /** Where a slot option's value comes from. */
 export type SlotOptionOrigin = 'project' | 'workspace' | 'global' | 'default'
 
-/** The levels above a project: Hive's (settings `slotDefaults`) and its workspace's (workspace.json `slotDefaults`). */
+/** The levels above a project: Combwork's (settings `slotDefaults`) and its workspace's (workspace.json `slotDefaults`). */
 export interface SlotLevels {
   global?: SlotDefaults | null
   workspace?: SlotDefaults | null
@@ -17,7 +17,7 @@ export interface SlotLevels {
 
 /**
  * The git-ignored files copied into the project's new slots and review copies, and the level that set them. `cfg`
- * null: a level's own form (the workspace's inherits Hive's, Hive's the default), with `levels` above it.
+ * null: a level's own form (the workspace's inherits Combwork's, Combwork's the default), with `levels` above it.
  */
 export function slotCopyOf(cfg: Pick<ProjectConfig, 'slots' | 'worktreeCopy'> | null, levels: SlotLevels): { value: string; origin: SlotOptionOrigin } {
   const own = cfg?.slots?.copy ?? cfg?.worktreeCopy

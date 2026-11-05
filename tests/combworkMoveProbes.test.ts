@@ -52,7 +52,7 @@ const base = tempDir('hi2462-probes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { MARK_FILE, MOVED_FILE, deriveMoves, finishMove, mapHash, moveFolders, movedFolders, movedPath, moveStats, moveTestHooks } = await import('../src/main/combworkMove')
 const { NAMES_VERSION } = await import('../src/main/nameUpgrade')
-const { cardsTestHooks, rewriteCards } = await import('../src/main/hiveMoveWorker')
+const { cardsTestHooks, rewriteCards } = await import('../src/main/combworkMoveWorker')
 
 const json = (p: string, v: unknown): void => {
   mkdirSync(join(p, '..'), { recursive: true })

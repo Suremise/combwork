@@ -6,10 +6,10 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { HOOK_FIRED_MAX, HOOK_ROWS_MAX, HOOK_TEXT_MAX, clip, groupFired, withoutHiveAuth, type HookFired } from '../src/shared/hooks'
+import { HOOK_FIRED_MAX, HOOK_ROWS_MAX, HOOK_TEXT_MAX, clip, groupFired, withoutCombworkAuth, type HookFired } from '../src/shared/hooks'
 import { claudeScopeHooks, codexListedHooks, rowsOfHooksTable } from '../src/main/hookListing'
 
-const base = tempDir('hive-hooksview-')
+const base = tempDir('cw-hooksview-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -28,9 +28,9 @@ describe('the shared helpers', () => {
   it('cuts text short, saying so, and leaves Combwork\'s authentication out', () => {
     expect(clip('abcdef', 4)).toEqual({ text: 'abc…', truncated: true })
     expect(clip('abc', 4)).toEqual({ text: 'abc', truncated: false })
-    const shown = withoutHiveAuth('curl -H @C:\\data\\auth-1.txt "http://127.0.0.1:5/hook?run=abc123&statusline" -H "Authorization: Bearer s3cret"', ['C:\\data\\auth-1.txt'])
+    const shown = withoutCombworkAuth('curl -H @C:\\data\\auth-1.txt "http://127.0.0.1:5/hook?run=abc123&statusline" -H "Authorization: Bearer s3cret"', ['C:\\data\\auth-1.txt'])
     expect(shown).not.toMatch(/auth-1|abc123|s3cret/)
-    expect(withoutHiveAuth('Bearer $CW_HOOK_TOKEN')).toBe('Bearer $CW_HOOK_TOKEN')
+    expect(withoutCombworkAuth('Bearer $CW_HOOK_TOKEN')).toBe('Bearer $CW_HOOK_TOKEN')
   })
 })
 
@@ -93,7 +93,7 @@ describe('what a launch has', () => {
       ],
       hive
     )
-    expect([...got.hiveTrust]).toEqual([['PreToolUse', 'trusted'], ['Stop', 'modified']])
+    expect([...got.combworkTrust]).toEqual([['PreToolUse', 'trusted'], ['Stop', 'modified']])
     expect(got.rows.map((r) => [r.event, r.source, r.status, r.file ?? null, r.observed])).toEqual([
       ['Stop', 'cli', 'untrusted', null, false],
       ['PostToolUse', 'user', 'trusted', 'C:\\home\\config.toml', false]

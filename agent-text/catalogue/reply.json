@@ -224,7 +224,7 @@
     "note": "A journal entry that digests others."
   },
   "reply.journal.head": {
-    "text": "#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byHive, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}",
+    "text": "#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byCombwork, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}",
     "note": "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed."
   },
   "reply.journal.links": {
@@ -492,7 +492,7 @@
     "note": "cw_release_slot list: a slot kept for an agent (kind is what release takes)."
   },
   "reply.release.held": {
-    "text": "{slot}: held by {agent}'s ended run {run}, its Combwork {hive} (kind writer, confirm '{'\"slot\":\"{slot}\",\"run\":\"{run}\"'}').",
+    "text": "{slot}: held by {agent}'s ended run {run}, its Combwork {combwork} (kind writer, confirm '{'\"slot\":\"{slot}\",\"run\":\"{run}\"'}').",
     "note": "cw_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is)."
   },
   "reply.release.none": {

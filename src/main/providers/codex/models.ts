@@ -3,7 +3,7 @@ import type { CatalogRead } from '../types'
 
 /**
  * Codex's models from `codex debug models` (#125): its catalog for this version and account, in its order. Read
- * defensively: unknown fields are ignored, a model's missing or odd field is left out (Hive falls back for it), and
+ * defensively: unknown fields are ignored, a model's missing or odd field is left out (Combwork falls back for it), and
  * hidden models (visibility "hide": internal ones such as its auto-reviewer) aren't offered. Checked with 0.160.
  */
 export function parseCodexModels(stdout: string): CatalogRead | null {
@@ -26,7 +26,7 @@ export function parseCodexModels(stdout: string): CatalogRead | null {
       const description = str(m.description)
       if (description) out.description = description
       // Each level is { effort, description } (or, defensively, the level's name). An empty list says the model has no
-      // levels; a list with none valid, or no list, is unknown, and Hive falls back (#125, round 2).
+      // levels; a list with none valid, or no list, is unknown, and Combwork falls back (#125, round 2).
       const raw = m.supported_reasoning_levels
       if (Array.isArray(raw)) {
         const valid = [...new Set(raw.map((l: unknown) => str((l as { effort?: unknown })?.effort) ?? str(l)).filter((x: string | undefined): x is string => !!x))] as string[]

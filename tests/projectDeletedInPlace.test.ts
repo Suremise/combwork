@@ -11,14 +11,14 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-// Git as the tests run it (#369, as hiveVcs.test.ts): the run context's environment, the shell's GIT_* kept out of main's.
+// Git as the tests run it (#369, as combworkVcs.test.ts): the run context's environment, the shell's GIT_* kept out of main's.
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 const gitEnv = baseEnv()
 const shellGit = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^GIT_/i.test(k) || /^NODE_(OPTIONS|PATH)$/i.test(k)))
 for (const k of Object.keys(shellGit)) delete process.env[k]
 afterAll(() => void Object.assign(process.env, shellGit))
 
-const base = tempDir('hive-deleted-in-place-')
+const base = tempDir('cw-deleted-in-place-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')

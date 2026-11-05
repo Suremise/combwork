@@ -15,7 +15,7 @@ export interface InboxItem {
   projectName: string
   agentId: string
   agentName: string
-  /** The Hive Assistant's agent: it opens the Assistant's panel. */
+  /** The Combwork Assistant's agent: it opens the Assistant's panel. */
   assistant: boolean
   /** safeguard: its model changed after its CLI's safety classifier stopped a response, not looked at since (#606). */
   kind: 'waiting' | 'signin' | 'question' | 'error' | 'safeguard' | 'finished' | 'failed' | 'review'
@@ -59,7 +59,7 @@ const idle = (live: LiveSessionState | null): boolean => !live || live.status ==
 /** Oldest first; unknown times last. */
 const byAge = (a: InboxItem, b: InboxItem): number => (a.since || '￿').localeCompare(b.since || '￿')
 
-/** The Hive Assistant's name where an inbox row names its project. */
+/** The Combwork Assistant's name where an inbox row names its project. */
 const ASSISTANT_NAME = msg({ id: 'board.inbox.assistant', defaultMessage: 'Assistant', description: "The Combwork Assistant, named in the attention inbox (status bar popover, tray menu) where a project name goes. Combwork is the app's name: keep it." })
 
 /**
@@ -108,7 +108,7 @@ export function inbox(
       // Stopped by an error (#1632: its turn ended on an API connection error, say): it does nothing until someone
       // looks, and leaves once its next turn starts.
       else if (live?.failedTurn) {
-        // The CLI's words, or none (Hive's own status message isn't them: the row then says only that it stopped).
+        // The CLI's words, or none (Combwork's own status message isn't them: the row then says only that it stopped).
         const { message: _status, ...plain } = item('error')
         needYou.push({ ...plain, since: live.failedTurn.since, ...(live.failedTurn.message ? { message: live.failedTurn.message } : {}) })
       }
@@ -129,7 +129,7 @@ export function firstAcross<O>(parts: readonly { owner: O; items: readonly Inbox
   return { shown: all.slice(0, limit), total: all.length }
 }
 
-/** "3 files, +120 −40 · 2 commits, 1 uncommitted file", in the language Hive shows. */
+/** "3 files, +120 −40 · 2 commits, 1 uncommitted file", in the language Combwork shows. */
 export function branchSummary(b: AgentBranchStatus): string {
   const parts: string[] = []
   if (b.diff && b.diff.files) parts.push(tr(msg({ id: 'board.inbox.diff', defaultMessage: '{files, plural, one {# file} other {# files}}, +{insertions} −{deletions}', description: "A worktree agent's unmerged changes, in the attention inbox: how many files differ from its base branch, and the lines added (+) and removed (−)." }), { files: b.diff.files, insertions: fmt.number(b.diff.insertions), deletions: fmt.number(b.diff.deletions) }))

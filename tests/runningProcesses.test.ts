@@ -30,7 +30,7 @@ vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
   return { ...stub, app: { ...stub.app, getPath: () => profile.dir } }
 })
-profile.dir = tempDir('hive-running-profile-')
+profile.dir = tempDir('cw-running-profile-')
 
 const alive = (pid: number): boolean => {
   try {
@@ -47,7 +47,7 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
 }
 
 describe.runIf(process.platform === 'win32')('what running agents had started, after an unexpected close (#987)', () => {
-  const dir = tempDir('hive-running-')
+  const dir = tempDir('cw-running-')
   const since = Date.now()
   const children: ChildProcess[] = []
   afterAll(() => {

@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 
-const base = tempDir('hive-close-drain-')
+const base = tempDir('cw-close-drain-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 

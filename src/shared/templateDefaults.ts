@@ -1,5 +1,5 @@
-// Hive's own agent templates (#1436, OP-19; Darren's 19 Oct decision on #1123: templates from 0.9 are wiped and Hive
-// ships these instead). Read-only, listed under the Hive scope; Duplicate… copies one into the workspace or a project to
+// Combwork's own agent templates (#1436, OP-19; Darren's 19 Oct decision on #1123: templates from 0.9 are wiped and Combwork
+// ships these instead). Read-only, listed under the Combwork scope; Duplicate… copies one into the workspace or a project to
 // change it. They suggest a CLI per role and never a connection or model (HI-2109, decision G): the user picks
 // connections when one is loaded. Names are patterns of the project's key
 // (`{key}-B{n}`, #1123 names, #1440), made where the template is loaded (HI-B1…); the layout fits the count.
@@ -11,8 +11,8 @@ import type { ReviewerMode } from './workflow/roles'
 import { preset } from './workflow/options'
 import { templateWorkflowOf, type TemplateWorkflows } from './workflow/templateOptions'
 
-/** One of Hive's templates: its file name in the Hive scope (how calls name it), its name and description as messages. */
-export interface HiveTemplate {
+/** One of Combwork's templates: its file name in the Combwork scope (how calls name it), its name and description as messages. */
+export interface CombworkTemplate {
   file: string
   name: Msg
   description: Msg
@@ -24,16 +24,16 @@ const reviewers = (n: number, provider = 'codex'): TemplateAgent[] => Array.from
 /** Builder n with reviewer n, for each n both have (by their numbered names, `pairNames`). */
 const paired = (n: number): TemplatePair[] => Array.from({ length: n }, (_, i) => ({ builder: `{key}-B${i + 1}`, reviewer: `{key}-R${i + 1}` }))
 
-function hive(file: string, name: Msg, description: Msg, layout: PageLayout, agents: TemplateAgent[], suggestedPreset: SuggestedPreset, extra: { pairs?: TemplatePair[]; reviewerMode?: ReviewerMode } = {}): HiveTemplate {
+function combwork(file: string, name: Msg, description: Msg, layout: PageLayout, agents: TemplateAgent[], suggestedPreset: SuggestedPreset, extra: { pairs?: TemplatePair[]; reviewerMode?: ReviewerMode } = {}): CombworkTemplate {
   // Its name in English: what a copy is called before the window's language names it (main names copies in its own).
   return { file, name, description, template: { version: TEMPLATE_VERSION, name: name.defaultMessage, savedAt: '', layout, description: description.defaultMessage, agents, suggestedPreset, ...extra, workflow: presetWorkflow(suggestedPreset, extra.reviewerMode, agents.length) } }
 }
 
 /**
- * A preset as a template's sections (HI-1910: Hive's own carry their preset's), for None and Git, with its reviewer
+ * A preset as a template's sections (HI-1910: Combwork's own carry their preset's), for None and Git, with its reviewer
  * mode on Git (Team 6 + pool's pool) and its size as Maximum agents (HI-2001: the team the template is). Its checks are
  * the preset's for no project (none): loading it into a project makes them that project's (the plan reads the preset as
- * the project's form offers it, `hiveSections`).
+ * the project's form offers it, `combworkSections`).
  */
 export function presetWorkflow(id: SuggestedPreset, reviewerMode?: ReviewerMode, size?: number): TemplateWorkflows {
   const team = size ? { maxAgents: size } : {}
@@ -43,9 +43,9 @@ export function presetWorkflow(id: SuggestedPreset, reviewerMode?: ReviewerMode,
   }
 }
 
-/** Hive's templates, in the order they are listed. */
-export const CW_TEMPLATES: readonly HiveTemplate[] = [
-  hive(
+/** Combwork's templates, in the order they are listed. */
+export const CW_TEMPLATES: readonly CombworkTemplate[] = [
+  combwork(
     'solo.json',
     msg({ id: 'assistant.combworkTemplates.solo', defaultMessage: 'Solo', description: "Name of one of Combwork's own agent templates: one builder (glossary: builder). Like the preset Solo." }),
     msg({ id: 'assistant.combworkTemplates.soloText', defaultMessage: 'One builder (Claude Code), working alone.', description: "Description of Combwork's template Solo (glossary: builder)." }),
@@ -53,7 +53,7 @@ export const CW_TEMPLATES: readonly HiveTemplate[] = [
     builders(1),
     'solo'
   ),
-  hive(
+  combwork(
     'pair.json',
     msg({ id: 'assistant.combworkTemplates.pair', defaultMessage: 'Pair', description: "Name of one of Combwork's own agent templates: a builder and a reviewer. Like the preset Pair." }),
     msg({ id: 'assistant.combworkTemplates.pairText', defaultMessage: 'A builder (Claude Code) and a reviewer (Codex) that reviews its cards.', description: "Description of Combwork's template Pair (glossary: builder, reviewer)." }),
@@ -62,7 +62,7 @@ export const CW_TEMPLATES: readonly HiveTemplate[] = [
     'pair',
     { pairs: paired(1) }
   ),
-  hive(
+  combwork(
     'pair-one-provider.json',
     msg({ id: 'assistant.combworkTemplates.pairOne', defaultMessage: 'Pair: one provider', description: "Name of one of Combwork's own agent templates: a builder and a reviewer on the same coding agent (provider: Claude Code, Codex…)." }),
     msg({ id: 'assistant.combworkTemplates.pairOneText', defaultMessage: 'A builder and a reviewer, both Claude Code: for when only one coding agent is installed.', description: "Description of Combwork's template Pair: one provider (glossary: builder, reviewer)." }),
@@ -71,7 +71,7 @@ export const CW_TEMPLATES: readonly HiveTemplate[] = [
     'pair',
     { pairs: paired(1) }
   ),
-  hive(
+  combwork(
     'team-3x3.json',
     msg({ id: 'assistant.combworkTemplates.team3', defaultMessage: 'Team 3×3', description: "Name of one of Combwork's own agent templates: three builders and three reviewers. Keep 3×3." }),
     msg({ id: 'assistant.combworkTemplates.team3Text', defaultMessage: 'Three builders (Claude Code), each with its own reviewer (Codex).', description: "Description of Combwork's template Team 3×3 (glossary: builder, reviewer)." }),
@@ -80,7 +80,7 @@ export const CW_TEMPLATES: readonly HiveTemplate[] = [
     'team',
     { pairs: paired(3) }
   ),
-  hive(
+  combwork(
     'team-6x6.json',
     msg({ id: 'assistant.combworkTemplates.team6', defaultMessage: 'Team 6×6', description: "Name of one of Combwork's own agent templates: six builders and six reviewers. Keep 6×6." }),
     msg({ id: 'assistant.combworkTemplates.team6Text', defaultMessage: 'Six builders (Claude Code), each with its own reviewer (Codex), on two pages.', description: "Description of Combwork's template Team 6×6 (glossary: builder, reviewer)." }),
@@ -89,7 +89,7 @@ export const CW_TEMPLATES: readonly HiveTemplate[] = [
     'team',
     { pairs: paired(6) }
   ),
-  hive(
+  combwork(
     'team-6-pool.json',
     msg({ id: 'assistant.combworkTemplates.team6Pool', defaultMessage: 'Team 6 + pool', description: "Name of one of Combwork's own agent templates: six builders and a shared pool of reviewers." }),
     msg({ id: 'assistant.combworkTemplates.team6PoolText', defaultMessage: 'Six builders (Claude Code) and two reviewers (Codex) shared by all of them.', description: "Description of Combwork's template Team 6 + pool (glossary: builder, reviewer)." }),
@@ -100,18 +100,18 @@ export const CW_TEMPLATES: readonly HiveTemplate[] = [
   )
 ]
 
-/** One of Hive's templates by its file name, or undefined. */
-export const hiveTemplate = (file: string): HiveTemplate | undefined => CW_TEMPLATES.find((t) => t.file === file)
+/** One of Combwork's templates by its file name, or undefined. */
+export const combworkTemplate = (file: string): CombworkTemplate | undefined => CW_TEMPLATES.find((t) => t.file === file)
 
 /**
- * A listed template's name and description as the window shows them: Hive's own in the window's language now (main
+ * A listed template's name and description as the window shows them: Combwork's own in the window's language now (main
  * listed them in its own, which a change of language leaves behind), any other as saved.
  */
 export function templateTitle(t: { scope: string; file: string; name: string }): string {
-  const h = t.scope === 'combwork' ? hiveTemplate(t.file) : undefined
+  const h = t.scope === 'combwork' ? combworkTemplate(t.file) : undefined
   return h ? tr(h.name) : t.name
 }
 export function templateDescription(t: { scope: string; file: string; description?: string }): string | undefined {
-  const h = t.scope === 'combwork' ? hiveTemplate(t.file) : undefined
+  const h = t.scope === 'combwork' ? combworkTemplate(t.file) : undefined
   return h ? tr(h.description) : t.description
 }

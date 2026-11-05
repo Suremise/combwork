@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 
 const diagnostics = createRequire(import.meta.url)('./e2e/codexDiagnostics.cjs')
-const tmp = tempDir('hive-codex-diagnostics-')
+const tmp = tempDir('cw-codex-diagnostics-')
 afterAll(() => rmSync(tmp, { recursive: true, force: true }))
 const from = new Date(2026, 9, 9, 11, 47, 0).getTime()
 const to = from + 60_000

@@ -26,7 +26,7 @@ vi.mock('../src/main/agentMessages', () => ({ leaveMessage: async (_p: string, a
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
-const base = tempDir('hive-review-copies-')
+const base = tempDir('cw-review-copies-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 

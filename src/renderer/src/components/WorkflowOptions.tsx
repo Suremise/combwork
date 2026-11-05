@@ -140,7 +140,7 @@ export const problemText = (p: WorkflowProblem): string => problemLines(p).join(
 
 /**
  * Where the editor's options come from and go to (#1422): a project's (the Version Control tab's Workflow section) or a
- * level's defaults (Hive's in Settings → Workflow defaults, the workspace's in Settings → Workspace). `key` scopes what
+ * level's defaults (Combwork's in Settings → Workflow defaults, the workspace's in Settings → Workspace). `key` scopes what
  * is shown: another source's read never shows.
  */
 export interface FormSource {
@@ -153,7 +153,7 @@ export interface FormSource {
 
 /** The JSON Copy as JSON gives: the version control, the preset and every option in force. */
 interface CopiedOptions {
-  hiveWorkflow: 1
+  combworkWorkflow: 1
   platform: WorkflowOptions['platform']
   preset: PresetId | null
   options: Partial<WorkflowOptions>
@@ -198,9 +198,9 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
 }
 
 /**
- * A level's workflow defaults (#1422): Hive's (Settings → Workflow defaults) or the workspace's (Settings → Workspace),
+ * A level's workflow defaults (#1422): Combwork's (Settings → Workflow defaults) or the workspace's (Settings → Workspace),
  * for None or for Git, in the project form's editor: the same groups and checks, each option inheriting from the level
- * below (the workspace's from Hive's, Hive's from every rule off).
+ * below (the workspace's from Combwork's, Combwork's from every rule off).
  */
 export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; onDirty?: (dirty: boolean) => void }) {
   const [platform, setPlatform] = useState<PlatformId>('git')
@@ -404,7 +404,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   }
   const copy = (): void => {
     const { platform: p, ...options } = effective
-    const out: CopiedOptions = { hiveWorkflow: 1, platform: p, preset: draft.preset, options }
+    const out: CopiedOptions = { combworkWorkflow: 1, platform: p, preset: draft.preset, options }
     void navigator.clipboard.writeText(JSON.stringify(out, null, 2)).then(() => notify('success', tr(T.copied)))
   }
   const paste = async (): Promise<void> => {
@@ -422,7 +422,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         } catch {
           v = null
         }
-        if (!v || v.hiveWorkflow !== 1 || !v.options || typeof v.options !== 'object') throw new Error(tr(T.pasteBad))
+        if (!v || v.combworkWorkflow !== 1 || !v.options || typeof v.options !== 'object') throw new Error(tr(T.pasteBad))
         if (v.platform !== platform) throw new Error(tr(T.pastePlatform))
         const change: WorkflowChange = { preset: v.preset ?? null, options: v.options }
         // Checked as a save would check it (OP-5): refused with its reasons, else it fills the form, to save.
@@ -530,7 +530,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'sameness':
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
       case 'finish':
-        // Hive merges since P5's queue (#1355).
+        // Combwork merges since P5's queue (#1355).
         return select('finish', [['combworkMerges', tr(V.finish.combworkMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
@@ -931,7 +931,7 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
           <ul>
             {check.projects.map((h) => (
               <li key={h.path} data-heir={h.name}>
-                {/* Another workspace's project (Hive's level) says which: names repeat across workspaces. */}
+                {/* Another workspace's project (Combwork's level) says which: names repeat across workspaces. */}
                 {h.workspace.path.toLowerCase() === workspacePath.toLowerCase() ? tr(T.heir, { project: h.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) }) : tr(T.heirElsewhere, { project: h.name, workspace: h.workspace.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) })}
                 {/* Each lane and card by name (HR5's round 1), as a project's warning lists its own. */}
                 {h.lanes.length > 0 && (

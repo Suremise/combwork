@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => {
       const f = path.join(claudeHome, name)
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
-    const hiveLog = () => {
+    const combworkLog = () => {
       const f = path.join(userData, 'logs', 'combwork.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
     }
@@ -144,7 +144,7 @@ const check = (name, ok, extra = '') => {
     await app.evaluate((_, v) => void (process.env.CW_TEST_WAKE_TAKE_MS = v), String(HUNG_MS))
     fs.writeFileSync(path.join(claudeHome, 'fake-clear-line-Builder'), '')
     check('its input empty at its prompt, the hold goes', !!(await until(async () => !(await live(agent.id))?.untakenLine)))
-    check('…the log says why', /gone from its input, nothing taken: what it rang for is offered again/.test(hiveLog()))
+    check('…the log says why', /gone from its input, nothing taken: what it rang for is offered again/.test(combworkLog()))
     check('…the message is typed again and read', !!(await until(() => read(second.body?.id))) && doorbells().length > before)
     // Its doorbell typed twice in all: the one the screen took, and once again; never a third time once it was read.
     const rangFor = doorbells().filter((r) => r.data.includes(`(${second.body?.id})`))

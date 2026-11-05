@@ -1,7 +1,7 @@
 // The scenarios: what a user asks an agent or the Assistant, what's in the workspace first, and what must be true after.
 // Checks look at what happened, never at wording:
 // - skills read (a successful read showing the skill);
-// - hive tool calls the server ran (with whether they worked);
+// - Combwork tool calls the server ran (with whether they worked);
 // - the board, notes and files afterwards.
 // Each has a `fake` prompt for the fake CLIs (Claude Code's and Codex's), which act the scenario out with their scripted
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
@@ -21,12 +21,12 @@ const LONG_DESIGN = (() => {
 })()
 
 /**
- * The subject's hive tool calls, by tool, refused ones too (each has ok, error and args): for checks where an attempt
+ * The subject's Combwork tool calls, by tool, refused ones too (each has ok, error and args): for checks where an attempt
  * is the fault ("didn't X") or that read refusals. A check that it did something counts only accepted calls, `ran`
  * (HI-2229: a model guessing a deferred tool's arguments makes refused calls).
  */
-const called = (o, tool) => o.hiveCalls.filter((c) => c.tool === tool)
-/** A hive call's arguments (logged as JSON text), or {} when they can't be read. */
+const called = (o, tool) => o.combworkCalls.filter((c) => c.tool === tool)
+/** A Combwork call's arguments (logged as JSON text), or {} when they can't be read. */
 const argsOf = (x) => {
   try {
     return typeof x.args === 'string' ? JSON.parse(x.args) : (x.args ?? {})
@@ -34,7 +34,7 @@ const argsOf = (x) => {
     return {}
   }
 }
-/** A fake builder's watch for its card's verdict, as card-loop starts it (a hive tool call through the real server). */
+/** A fake builder's watch for its card's verdict, as card-loop starts it (a Combwork tool call through the real server). */
 const verdictWatch = (n) => `cw cw_wait_for_tasks {"cards":["#${n}"],"changes":["verdict","column","comment"],"column":"passed","wake":true}`
 const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
 /**
@@ -432,7 +432,7 @@ const namesCards = (o, refs, ns) => Array.isArray(refs) && refs.length === ns.le
  */
 const MOVING_INTENTS = ['cw_start_card', 'cw_put_back', 'cw_submit', 'cw_verdict', 'cw_report_merge']
 const movesOf = (o, n) =>
-  o.hiveCalls.filter((x) => {
+  o.combworkCalls.filter((x) => {
     const a = argsOf(x)
     const moves = a.column !== undefined || a.override !== undefined
     if (x.tool === 'cw_update_task') return cardIs(o, a.number, n) && moves
@@ -451,7 +451,7 @@ const openAsks = (o, c, key, tools = ['cw_ask_user'], who = 'coder') => {
   return asked ? factsOf(o, key, 'ApprovalRequested').filter((f) => f.actor === `agent:${c.agents[who]?.id}` && f.data?.kind === 'decide' && open.has(f.data?.request)) : []
 }
 /** openAsks' check, its detail the card's For you and the calls. */
-const openAskCheck = (o, c, key, name, tools = ['cw_ask_user']) => [name, openAsks(o, c, key, tools).length > 0, `${JSON.stringify((o.cards[key]?.forYou ?? []).map((r) => r.request))}; ${o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')}`]
+const openAskCheck = (o, c, key, name, tools = ['cw_ask_user']) => [name, openAsks(o, c, key, tools).length > 0, `${JSON.stringify((o.cards[key]?.forYou ?? []).map((r) => r.request))}; ${o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')}`]
 /** The Override facts of the scenario's card `key` (#1319: the harness reads each card's facts). */
 const overridesOf = (o, key) => (o.facts?.[key] ?? []).filter((f) => f.kind === 'Override')
 /** A call's arguments (JSON) have key: value. */
@@ -836,7 +836,7 @@ const LANE_END = {
   /** Before the answer: asked the user on a lane card, bypassed nothing, moved nothing to Done. */
   before: (o, c) => [
     ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-    ['asked the user on a lane card (cw_cannot_within_rules or cw_ask_user: open under For you), and ended its turn', !!c.atAnswer, `${JSON.stringify(c.atAnswer?.asked ?? [])}; ${o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')}`],
+    ['asked the user on a lane card (cw_cannot_within_rules or cw_ask_user: open under For you), and ended its turn', !!c.atAnswer, `${JSON.stringify(c.atAnswer?.asked ?? [])}; ${o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')}`],
     ['bypassed nothing: the hook unchanged, no OK of its own, no commit before the answer', c.read('.git/hooks/pre-commit') === MAINTAINER_HOOK && !c.selfApproved && c.atAnswer?.head === c.head, JSON.stringify({ hook: c.read('.git/hooks/pre-commit') === MAINTAINER_HOOK, selfApproved: !!c.selfApproved, atAnswer: c.atAnswer?.head, start: c.head })],
     ['nothing Done before the answer', !!c.atAnswer && !c.atAnswer.columns.includes('done'), JSON.stringify(c.atAnswer?.columns)]
   ],
@@ -869,7 +869,7 @@ const SYNC_BEFORE = `module.exports = async function sync(run) {
 }
 `
 /** The Combwork tool calls in the transcript (mcp__combwork__x, combwork.x, Combwork's "combwork · x"), with their replies. */
-const hiveReplies = (o, tool) => o.tools.filter((t) => new RegExp(`(^|__|\\.|\\s)${tool}$`).test(t.name) && !t.isError)
+const combworkReplies = (o, tool) => o.tools.filter((t) => new RegExp(`(^|__|\\.|\\s)${tool}$`).test(t.name) && !t.isError)
 
 /** Three Todo cards with long descriptions, each with a phrase only its description has (one title with Unicode and quotes). */
 const TODO = [
@@ -881,7 +881,7 @@ async function todoCards(c) {
   for (const t of TODO) await c.card(t.key, { title: t.title, description: `Some background first.\n\n${'Context that only the full card has. '.repeat(8)}\n\nAcceptance: ${t.phrase}.` })
 }
 /** Every hive reply of these tools, as one text. */
-const replies = (o, ...tools) => tools.flatMap((t) => hiveReplies(o, t).map((x) => x.result)).join('\n')
+const replies = (o, ...tools) => tools.flatMap((t) => combworkReplies(o, t).map((x) => x.result)).join('\n')
 /** A small, harmless edit to a skill, inside the measured window (scenario beforeLaunch). */
 const editSkill = (c, name) => require('fs').appendFileSync(require('path').join(c.skillsDir, name, 'SKILL.md'), '\n<!-- edited for the skill-changed scenario -->\n')
 
@@ -1062,7 +1062,7 @@ const sentMessage = (c) => {
 }
 /** The delivery of the second message the Assistant left (`c.sent2`), as sentMessage. */
 const secondMessage = (c) => sentMessage({ sent: c.sent2, got: c.got })
-const contractWas = (o, on) => o.measures?.coreChars === require('../../src/shared/hiveGuidance.ts').hiveInstructions('alpha', 'agent', on).length
+const contractWas = (o, on) => o.measures?.coreChars === require('../../src/shared/combworkGuidance.ts').combworkInstructions('alpha', 'agent', on).length
 
 module.exports.FIXTURES_VERSION = FIXTURES_VERSION
 /**
@@ -1091,7 +1091,7 @@ module.exports.SCENARIOS = [
     fake: (c) =>
       `skill work-on-card then cw cw_start_card {"card":"#${c.cards.a}"} then ${LOOP_COMMIT} then cw cw_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: CONTRIBUTING.md added with its one line.\n\nWhat changed: CONTRIBUTING.md at the root. Checks: none needed for a text file.' })}`,
     expect: (o, c) => {
-      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['started it with cw_start_card', ran(o, 'cw_start_card').some((x) => cardIs(o, argsOf(x).card, c.cards.a)), calls],
@@ -1112,7 +1112,7 @@ module.exports.SCENARIOS = [
     // project reviews (Pair), Implementer builds and Coder reviews, as inReview's.
     // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       await pairInProject(c)
       await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
@@ -1251,7 +1251,7 @@ module.exports.SCENARIOS = [
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       // Implementer's submission in Review, Coder its reviewer (inReview: a reviewed project, its work committed).
       await inReview(c)
@@ -1271,9 +1271,9 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const n = c.cards.r
       const back = c.interruptedAt ?? Infinity
-      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       // Its verdicts once the card was back in Doing: the intent's, or review passed or failed through cw_update_task.
-      const verdicts = o.hiveCalls.filter((x) => Date.parse(x.at) > back && ((x.tool === 'cw_verdict' && cardIs(o, argsOf(x).card, n)) || (x.tool === 'cw_update_task' && cardIs(o, argsOf(x).number, n) && /^(passed|failed)$/.test(String(argsOf(x).review ?? '')))))
+      const verdicts = o.combworkCalls.filter((x) => Date.parse(x.at) > back && ((x.tool === 'cw_verdict' && cardIs(o, argsOf(x).card, n)) || (x.tool === 'cw_update_task' && cardIs(o, argsOf(x).number, n) && /^(passed|failed)$/.test(String(argsOf(x).review ?? '')))))
       const moves = movesOf(o, n).filter((x) => x.tool !== 'cw_verdict' && !(x.tool === 'cw_update_task' && argsOf(x).review))
       return [
         ['started the review with cw_start_review (a ReviewStarted fact)', ran(o, 'cw_start_review').some((x) => cardIs(o, argsOf(x).card, n)) && factsOf(o, 'r', 'ReviewStarted').length > 0, calls],
@@ -1344,7 +1344,7 @@ module.exports.SCENARIOS = [
       // Board calls between the decision and the agent's next full read of the card: their replies carry the flag.
       const reread = cardReads(o, c.cards.a).find((t) => t > decided) ?? Infinity
       // cw_submit's reply too (HI-2261: the first board reply after the decision was the submission's, which flagged it).
-      const between = o.hiveCalls.filter((x) => x.ok && /^cw_(?:(?:update|read|list|wait_for)_task|submit$)/.test(x.tool) && Date.parse(x.at) > decided && Date.parse(x.at) < reread)
+      const between = o.combworkCalls.filter((x) => x.ok && /^cw_(?:(?:update|read|list|wait_for)_task|submit$)/.test(x.tool) && Date.parse(x.at) > decided && Date.parse(x.at) < reread)
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the decision came while it worked on the card', decided > 0, history(o.cards.a).join(' | ')],
@@ -1734,7 +1734,7 @@ module.exports.SCENARIOS = [
       ['the review passed', history(o.cards.e).includes('Review passed'), history(o.cards.e).join(' | ')],
       ['the card is in Passed (reviewed, not merged)', o.cards.e?.column === 'passed', o.cards.e?.column],
       ['it kept its implementer', o.cards.e?.agentName === 'Implementer', o.cards.e?.agentName],
-      ['moved it by its verdict alone', !reviewerMoved(o, c.cards.e), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+      ['moved it by its verdict alone', !reviewerMoved(o, c.cards.e), o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
     ]
   },
   {
@@ -2035,7 +2035,7 @@ module.exports.SCENARIOS = [
     observe: (o) => [['read the generalist skill', read(o, 'generalist'), o.skillsRead.join(',')]],
     expect: (o, c) => [
       ['read no Combwork workflow skill (the generalist skill only)', o.skillsRead.every((s) => s === 'generalist'), o.skillsRead.join(',')],
-      ['changed nothing on the board', !o.hiveCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))],
+      ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))],
       ['did the work', /add/.test(c.read('math.js') ?? '')]
     ],
     fakeSkips: ['did the work']
@@ -2054,7 +2054,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => [
       ['made no git worktree of its own', worktreeCount(c) === c.worktrees, c.git('worktree', 'list')],
       ['left the project folder as it was', !/export /.test(c.read('math.js') ?? ''), c.read('math.js') ?? ''],
-      ['changed nothing on the board', !o.hiveCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
+      ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
     ]
   },
   {
@@ -2085,7 +2085,7 @@ module.exports.SCENARIOS = [
       ['its guidance said to run long commands through cw-progress', contractWas(o, true), String(o.measures?.coreChars)],
       ['ran the tests through cw-progress', testRuns(o).some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
       ['gave the run a title for the user (#251)', testRuns(o).some(titled), testRuns(o).map((t) => t.input).join(' | ')],
-      ['changed nothing on the board', !o.hiveCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
+      ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
     ],
     fakeSkips: ['ran the tests through cw-progress', 'gave the run a title for the user (#251)']
   },
@@ -2216,8 +2216,8 @@ module.exports.SCENARIOS = [
     // By key, as the guidance names cards (HI-2221: the checks count a key as well as a number).
     fake: (c) => `cw cw_read_task {"number":"AL-${c.cards.q}","detail":true}`,
     expect: (o, c) => [
-      ['read the card with cw_read_task', ran(o, 'cw_read_task').some((x) => cardIs(o, argsOf(x).number, c.cards.q)), o.hiveCalls.map((x) => x.tool).join(',')],
-      ["its reply had the card's acceptance line", hiveReplies(o, 'cw_read_task').some((t) => t.result.includes('ACCEPT-ZEBRA-42')), hiveReplies(o, 'cw_read_task').map((t) => t.result.slice(0, 120)).join(' | ')],
+      ['read the card with cw_read_task', ran(o, 'cw_read_task').some((x) => cardIs(o, argsOf(x).number, c.cards.q)), o.combworkCalls.map((x) => x.tool).join(',')],
+      ["its reply had the card's acceptance line", combworkReplies(o, 'cw_read_task').some((t) => t.result.includes('ACCEPT-ZEBRA-42')), combworkReplies(o, 'cw_read_task').map((t) => t.result.slice(0, 120)).join(' | ')],
       ['quoted it', /ACCEPT-ZEBRA-42/.test(o.finalReply), o.finalReply.slice(0, 200)],
       ['read it once (no repeated identical calls)', (o.measures?.repeatedCalls ?? 0) === 0, String(o.measures?.repeatedCalls)],
       ['the card is unchanged', o.cards.q?.column === 'todo' && !ran(o, 'cw_update_task').length && !movesOf(o, c.cards.q).length, o.cards.q?.column]
@@ -2239,7 +2239,7 @@ module.exports.SCENARIOS = [
       const whole = onDoc.filter((t) => (/^Read$/i.test(t.name) ? !/\b(limit|offset)\b/.test(t.input) : /bash|shell|powershell|exec|command/i.test(t.name) && /\b(cat|type|Get-Content|gc|more|less)\b/i.test(t.input) && !/-(TotalCount|Tail|First|Head)\b|\| *(head|Select-Object|Select-String|findstr|grep)/i.test(t.input)))
       const section = ran(o, 'cw_read_section').some((x) => /retry-policy/i.test(JSON.stringify(x.args)))
       return [
-        ['read the referenced section (by its heading, or a range)', section || (onDoc.length > 0 && whole.length === 0), `${o.hiveCalls.map((x) => x.tool).join(',')} | ${onDoc.map((t) => t.name).join(',')}`],
+        ['read the referenced section (by its heading, or a range)', section || (onDoc.length > 0 && whole.length === 0), `${o.combworkCalls.map((x) => x.tool).join(',')} | ${onDoc.map((t) => t.name).join(',')}`],
         ["didn't read the whole document", whole.length === 0, whole.map((t) => `${t.name} ${t.input.slice(0, 120)}`).join(' | ')],
         ['the work follows the section (7 retries, 90 seconds)', /\b7\b|seven/i.test(c.read('RETRY.md') ?? '') && /\b90\b|ninety/i.test(c.read('RETRY.md') ?? ''), c.read('RETRY.md') ?? 'no RETRY.md'],
         handedOnCheck(o, c, 'r')
@@ -2265,7 +2265,7 @@ module.exports.SCENARIOS = [
       // #819 round 2: a read of the closest through Combwork names the project's copy, as the prompt says.
       const reads = ran(o, 'cw_read_section')
       return [
-        ['read the closest section, or asked the user', closestRead || asked, `${o.hiveCalls.map((x) => x.tool).join(',')} | ${(o.finalReply ?? '').slice(0, 200)}`],
+        ['read the closest section, or asked the user', closestRead || asked, `${o.combworkCalls.map((x) => x.tool).join(',')} | ${(o.finalReply ?? '').slice(0, 200)}`],
         ['its cw_read_section calls read the project’s copy (from: "project")', reads.every((x) => argsOf(x).from === 'project'), reads.map((x) => JSON.stringify(argsOf(x))).join(' | ')],
         ["didn't read the whole document", whole.length === 0, whole.map((t) => `${t.name} ${t.input.slice(0, 120)}`).join(' | ')],
         ['did the work from it, or waits on the user', (/\b7\b|seven/i.test(c.read('RETRY.md') ?? '') && /\b90\b|ninety/i.test(c.read('RETRY.md') ?? '')) || asked, c.read('RETRY.md') ?? 'no RETRY.md']
@@ -2283,10 +2283,10 @@ module.exports.SCENARIOS = [
       const onDoc = o.tools.filter((t) => !t.isError && !/cw_/.test(t.name) && t.input.includes('DESIGN.md'))
       // A read of the whole file: the Read tool without a range, or a shell command that prints it all.
       const whole = onDoc.filter((t) => (/^Read$/i.test(t.name) ? !/\b(limit|offset)\b/.test(t.input) : /bash|shell|powershell|exec|command/i.test(t.name) && /\b(cat|type|Get-Content|gc|more|less)\b/i.test(t.input) && !/-(TotalCount|Tail|First|Head)\b|\| *(head|Select-Object|Select-String|findstr|grep)/i.test(t.input)))
-      // Only part of it: the hive tools by section (any CLI), or a range or search (Claude Code reads lines, #817's card).
+      // Only part of it: the Combwork tools by section (any CLI), or a range or search (Claude Code reads lines, #817's card).
       const hive = ran(o, 'cw_doc_outline').length + ran(o, 'cw_read_section').length
       return [
-        ['read only part of it: its outline and section, or a range', hive > 0 || (onDoc.length > 0 && whole.length === 0), `${o.hiveCalls.map((x) => x.tool).join(',')} | ${onDoc.map((t) => t.name).join(',')}`],
+        ['read only part of it: its outline and section, or a range', hive > 0 || (onDoc.length > 0 && whole.length === 0), `${o.combworkCalls.map((x) => x.tool).join(',')} | ${onDoc.map((t) => t.name).join(',')}`],
         ["didn't read the whole file", whole.length === 0, whole.map((t) => `${t.name} ${t.input.slice(0, 120)}`).join(' | ')],
         ['answered from the section (7 tries, 90 seconds)', /\b7\b|seven/i.test(o.finalReply) && /\b90\b|ninety/i.test(o.finalReply), o.finalReply.slice(0, 200)]
       ]
@@ -2323,7 +2323,7 @@ module.exports.SCENARIOS = [
     prompt: "Which cards are in alpha's Todo column? Just their numbers and titles, nothing more. Don't change anything.",
     fake: () => 'cw cw_list_tasks {"column":"todo"}',
     expect: (o, c) => [
-      ['listed the cards with cw_list_tasks', ran(o, 'cw_list_tasks').length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
+      ['listed the cards with cw_list_tasks', ran(o, 'cw_list_tasks').length >= 1, o.combworkCalls.map((x) => x.tool).join(',')],
       ["its reply had every Todo card's number and title", TODO.every((t) => replies(o, 'cw_list_tasks').includes(t.title) && replies(o, 'cw_list_tasks').includes(String(c.cards[t.key]))), replies(o, 'cw_list_tasks').slice(0, 200)],
       ['used the compact list (no details)', (o.measures?.toolDetailCalls ?? 0) === 0 && !ran(o, 'cw_list_tasks').some((x) => field(x.args, 'details', 'true')), String(o.measures?.toolDetailCalls)],
       ['read once (no repeated identical calls)', (o.measures?.repeatedCalls ?? 0) === 0, String(o.measures?.repeatedCalls)],
@@ -2339,7 +2339,7 @@ module.exports.SCENARIOS = [
     prompt: "Show me alpha's Todo cards with their full descriptions, including each one's acceptance line. Don't change anything.",
     fake: () => 'cw cw_list_tasks {"column":"todo","details":true}',
     expect: (o) => [
-      ['listed or read the cards', ran(o, 'cw_list_tasks').length + ran(o, 'cw_read_task').length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
+      ['listed or read the cards', ran(o, 'cw_list_tasks').length + ran(o, 'cw_read_task').length >= 1, o.combworkCalls.map((x) => x.tool).join(',')],
       ["its replies had every card's title and acceptance line", TODO.every((t) => replies(o, 'cw_list_tasks', 'cw_read_task').includes(t.phrase)), replies(o, 'cw_list_tasks', 'cw_read_task').slice(0, 200)],
       ['asked for the detail form (details=true, or each card read)', (o.measures?.toolDetailCalls ?? 0) >= 1 || ran(o, 'cw_read_task').length >= TODO.length, String(o.measures?.toolDetailCalls)],
       ['gave the acceptance lines', TODO.every((t) => o.finalReply.includes(t.phrase)), o.finalReply.slice(0, 200)],
@@ -2546,7 +2546,7 @@ module.exports.SCENARIOS = [
       const handed = handedOnAt(o, c, 'r') > 0 && handedOn(o, c, 'r')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-        ["didn't ask the user (no cw_notify or cw_ask_user)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["didn't ask the user (no cw_notify or cw_ask_user)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0, o.combworkCalls.map((x) => x.tool).join(',')],
         ['handed it on again for round three (back to Review, or its submission), or posted a design for its reviewer first', handed || designed, `${designed ? 'design posted; ' : ''}${history(o.cards.r).join(' | ')}`],
         ['ended its turn with a live watch (for the verdict, #376, or the design answer)', !!turnWatch(o), o.status],
         ['fixed it: the delay is awaited (or a design first, before the fix)', /await\s+wait\(/.test(c.read('sync.js') ?? '') || (designed && !handed), c.read('sync.js')],
@@ -2581,7 +2581,7 @@ module.exports.SCENARIOS = [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['failed it (the delay still isn’t awaited)', history(o.cards.q).includes('Review failed'), history(o.cards.q).join(' | ')],
         ['the verdict says the finding came back', /recurr|again|round 1|still/i.test(verdict), verdict.slice(0, 300)],
-        ["didn't ask the user (no cw_notify)", called(o, 'cw_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["didn't ask the user (no cw_notify)", called(o, 'cw_notify').length === 0, o.combworkCalls.map((x) => x.tool).join(',')],
         verdictLeftCheck(o, c, 'q', false),
         // Its watch for the card's next round (fresh, #434) is still live: one without fresh answers at once.
         ['ended its turn watching for the card to come back (fresh)', !!turnWatch(o), `${o.status}; ${JSON.stringify(ran(o, 'cw_wait_for_tasks').map((x) => argsOf(x)))}`],
@@ -2619,7 +2619,7 @@ module.exports.SCENARIOS = [
         ['handed on for round two: back into Review (the reviewer is woken), or its submission', handedOn(o, c, 'f') && (after.some((w) => /^(Moved to (the (top|bottom) of )?Review\b|Returned for review, round 2)/.test(w)) || submissionsOf(o, c, 'f').length > 0), h.join(' | ')],
         ['ended its turn with a live watch for the verdict (#376)', !!turnWatch(o), o.status],
         ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
-        ["didn't ask the user (no cw_notify)", called(o, 'cw_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["didn't ask the user (no cw_notify)", called(o, 'cw_notify').length === 0, o.combworkCalls.map((x) => x.tool).join(',')],
         ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.f)]
       ]
     },
@@ -2702,7 +2702,7 @@ module.exports.SCENARIOS = [
       const startedAt = ran(o, 'cw_lane').find((x) => argsOf(x).action === 'start')?.at
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-        ['registered the lane (cw_lane start)', starts.length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
+        ['registered the lane (cw_lane start)', starts.length >= 1, o.combworkCalls.map((x) => x.tool).join(',')],
         ['the cards in order, its reviewer, the rounds and the wait', namesCards(o, first.cards, [c.cards.a, c.cards.b]) &&/implementer/i.test(String(first.reviewer ?? '')) && first.rounds === 10 && first.waitMinutes === 360, JSON.stringify(first)],
         ["before its first card's review", !!startedAt && (!review || startedAt <= review.at), `${startedAt} / ${review?.at}`],
         ['one lane, not one a card', starts.length === 1, String(starts.length)],
@@ -2757,7 +2757,7 @@ module.exports.SCENARIOS = [
     // starts it with its line: the harness's own start raced that one (on Codex, refused as "already running or
     // starting"). The prompt below is a model's only as the line says it; the fake is typed its steps after it, the card
     // already in Doing.
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Make the greeting say Hi', description: CARD_LOOP_GREETING, agent: 'coder' })
@@ -2855,7 +2855,7 @@ module.exports.SCENARIOS = [
       const b = o.cards.b
       const started = (b?.history ?? []).find((h) => /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))
       // Coder's own start of #b, whose reply gives what Combwork's would have (HI-2092: Codex starts it rather than end its turn).
-      const own = hiveReplies(o, 'cw_start_card').find((t) => (namesCard(o, [argsOf({ args: t.input }).card], c.cards.b) || (!!b?.key && String(t.result).includes(`${b.key} is a card of your lane`))) && /card-loop skill as this lane's builder/.test(String(t.result)))
+      const own = combworkReplies(o, 'cw_start_card').find((t) => (namesCard(o, [argsOf({ args: t.input }).card], c.cards.b) || (!!b?.key && String(t.result).includes(`${b.key} is a card of your lane`))) && /card-loop skill as this lane's builder/.test(String(t.result)))
       const start = c.start ?? (own ? String(own.result) : null)
       return [
         // In Review once Coder has built it (HI-2047: its project has the first card's work, so it can be).
@@ -2864,7 +2864,7 @@ module.exports.SCENARIOS = [
         // HI-2047: a running lane's builder is pointed at card-loop alone.
         ["its start names card-loop as the lane's builder, not work-on-card", /card-loop skill as this lane's builder/.test(start ?? '') && !/work-on-card/.test(start ?? ''), String(start)],
         ['started by Combwork or by Coder itself, nobody else', !!started && /^(Combwork|Coder)/.test(started.by), JSON.stringify(started ?? null)],
-        ["didn't ask the user (no cw_notify, no question)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
+        ["didn't ask the user (no cw_notify, no question)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
       ]
     },
     observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
@@ -2889,7 +2889,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['reviewed the card already in Review', history(o.cards.b).includes('Started reviewing') && history(o.cards.b).some((h) => /^Review (passed|failed)$/.test(h)), history(o.cards.b).join(' | ')],
-        ["didn't ask the user (no cw_notify)", called(o, 'cw_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["didn't ask the user (no cw_notify)", called(o, 'cw_notify').length === 0, o.combworkCalls.map((x) => x.tool).join(',')],
         ["didn't retry a watch that answered Already", arrivals.length <= 1, JSON.stringify(arrivals)]
       ]
     }
@@ -3045,7 +3045,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Start Coder on card #${c.cards.h}.`,
     fake: 'work 1',
     expect: (o) => [
-      ["changed nothing (it can't): no change it asked for worked", !o.hiveCalls.some((x) => /cw_(start|create|update|prompt|add|reorder)_/.test(x.tool) && x.ok) && o.cards.h?.column === 'todo'],
+      ["changed nothing (it can't): no change it asked for worked", !o.combworkCalls.some((x) => /cw_(start|create|update|prompt|add|reorder)_/.test(x.tool) && x.ok) && o.cards.h?.column === 'todo'],
       ['no agent was started', !o.live.some((x) => x.project === 'alpha')]
     ]
   },
@@ -3139,8 +3139,8 @@ module.exports.SCENARIOS = [
         ['the card is in Todo', o.cards.k?.column === 'todo', o.cards.k?.column],
         ['it was started first (a Started fact)', factsOf(o, 'k', 'Started').length > 0, (o.facts?.k ?? []).map((f) => f.kind).join(',')],
         ['put back with why (the move records it)', !!back?.data.why, JSON.stringify(back?.data)],
-        ['started it with cw_start_card', ran(o, 'cw_start_card').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
-        ['put it back with cw_put_back', ran(o, 'cw_put_back').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+        ['started it with cw_start_card', ran(o, 'cw_start_card').length > 0, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['put it back with cw_put_back', ran(o, 'cw_put_back').length > 0, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }
   },
@@ -3168,7 +3168,7 @@ module.exports.SCENARIOS = [
         ['submitted it for review, which worked', submissionsOf(o, c, 's').length === 1 && o.cards.s?.column === 'review', `${o.cards.s?.column}: ${calls}`],
         // A notice of how things stand is no question, nor is a session's state alone: a question it recorded is.
         ['asked the user nothing (it was asked to commit)', !questionsToUser(o).length, `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300)}`],
-        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }
   },
@@ -3198,7 +3198,7 @@ module.exports.SCENARIOS = [
         ['committed nothing it wasn\'t asked to', c.git('rev-parse', 'HEAD').trim() === c.head, `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`],
         ['asked the user whether to commit (a question about committing: in its reply, through Combwork, or its CLI\'s question)', askedToCommit(o), `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300) || (o.finalReply ?? '').slice(0, 300)}`],
         ['the card stays in Doing', o.cards.s?.column === 'doing', o.cards.s?.column],
-        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }
   },
@@ -3220,7 +3220,7 @@ module.exports.SCENARIOS = [
     fake: (c) =>
       `cw cw_start_review {"card":"#${c.cards.r}"} then cw cw_request_builder {"card":"#${c.cards.r}","text":"Which Node version did you test on?"} then cw cw_verdict {"card":"#${c.cards.r}","pass":false,"failKind":"content","comment":"Round 1: FAILED. 1. greet.js has no test."}`,
     expect: (o) => {
-      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       return [
         ['it reviewed the submission (a ReviewStarted fact)', factsOf(o, 'r', 'ReviewStarted').length > 0, (o.facts?.r ?? []).map((f) => f.kind).join(',')],
         ['asked the builder (a ReviewerRequest fact)', factsOf(o, 'r', 'ReviewerRequest').length > 0],
@@ -3250,9 +3250,9 @@ module.exports.SCENARIOS = [
       const trees = worktreesOf(c)
       const made = trees.filter((t) => !c.trees.includes(t))
       // Its first conversation (where it read work-on-card and started the card) is replaced by the slot's: the checks
-      // read the hive calls, the repository and the card, which span both.
+      // read the Combwork calls, the repository and the card, which span both.
       return [
-        ['started it with cw_start_card', ran(o, 'cw_start_card').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['started it with cw_start_card', ran(o, 'cw_start_card').length > 0, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['Combwork lent the card a slot (its Started fact)', !!slot, JSON.stringify(started?.data)],
         ['made no worktree of its own: the only new one is the slot', made.length <= 1 && made.every((t) => !!slot && t.endsWith(slot.toLowerCase())), made.join(', ')],
         ['ran no git worktree command', runs(o, 'git worktree add').length === 0],
@@ -3266,7 +3266,7 @@ module.exports.SCENARIOS = [
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nrequire('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran')\nconsole.log('ok')\n" },
     // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       // Its check in the card (HI-2046: Combwork's line, not the prompt, starts a model's review).
       await inReview(c, false, 'greet.js returns "Hello, <name>", trimmed. Its check is node test.js.')
@@ -3291,9 +3291,9 @@ module.exports.SCENARIOS = [
       const inCopy = copy ? o.tools.filter((t) => !/^(Write|Edit|MultiEdit)$/i.test(t.name) && (norm(t.input).includes(norm(copy)) || (!!t.cwd && within(t.cwd, copy)))) : []
       return [
         ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
-        ['started the review with cw_start_review', ran(o, 'cw_start_review').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['started the review with cw_start_review', ran(o, 'cw_start_review').length > 0, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['Combwork lent it a review copy at its start', c.copyLeases.size > 0 || !!copyReply, [...c.copyLeases].join(', ')],
-        ['the reply it saw named the copy, with its folder', !!copyReply, hiveReplies(o, 'cw_start_review').map((t) => t.result.slice(0, 300)).join(' | ')],
+        ['the reply it saw named the copy, with its folder', !!copyReply, combworkReplies(o, 'cw_start_review').map((t) => t.result.slice(0, 300)).join(' | ')],
         ['read or ran its checks in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => `${t.cwd ? `[${t.cwd}] ` : ''}${t.input.slice(0, 80)}`).join(' | ')}`],
         // test.js leaves ran.txt beside itself: one in the project folder is a check run there, not in the copy (#1559).
         ['ran no command in the project folder (no ran.txt there)', !require('fs').existsSync(require('path').join(c.ws, 'alpha', 'ran.txt'))],
@@ -3309,7 +3309,7 @@ module.exports.SCENARIOS = [
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       await inReview(c, true)
     },
@@ -3373,7 +3373,7 @@ module.exports.SCENARIOS = [
     // card-loop-submit-watch's (HI-2215): the harness's own start raced it, and lost with 3 s between them. So the card's
     // decision says to have a design checked first, which a model reads once Combwork's line has started it; the prompt below
     // is a model's only as the line says it, and the fake is typed its steps after it, the card already in Doing.
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
@@ -3386,10 +3386,10 @@ module.exports.SCENARIOS = [
     fake: (c) =>
       `skill card-loop then cw cw_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true,"limitMinutes":30} then cw cw_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'design', text: 'Design: entries keep their time; reads past 5 minutes miss; a write deletes its key. A test for each.' })}`,
     expect: (o, c) => {
-      const tools = o.hiveCalls.map((x) => x.tool)
+      const tools = o.combworkCalls.map((x) => x.tool)
       const posted = ran(o, 'cw_loop_step').filter((x) => argsOf(x).step === 'design')
       const watchAt = tools.indexOf('cw_wait_for_tasks')
-      const postAt = tools.findIndex((t, i) => t === 'cw_loop_step' && argsOf(o.hiveCalls[i]).step === 'design')
+      const postAt = tools.findIndex((t, i) => t === 'cw_loop_step' && argsOf(o.combworkCalls[i]).step === 'design')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['posted a design with cw_loop_step (a LoopStep fact)', posted.length > 0 && factsOf(o, 'd', 'LoopStep').some((f) => f.data.step === 'design'), tools.join(',')],
@@ -3424,7 +3424,7 @@ module.exports.SCENARIOS = [
     fake: (c) =>
       `skill card-loop then cw cw_read_task {"number":${c.cards.d},"latestComment":true} then cw cw_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true} then cw cw_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'gaps', text: '1. Add a test for expiry and for invalidation on write.', design: c.design })}`,
     expect: (o, c) => {
-      const tools = o.hiveCalls.map((x) => x.tool)
+      const tools = o.combworkCalls.map((x) => x.tool)
       const answers = ran(o, 'cw_loop_step').filter((x) => ['ok', 'gaps'].includes(argsOf(x).step))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
@@ -3462,11 +3462,11 @@ module.exports.SCENARIOS = [
     fake: (c) =>
       `skill card-loop then cw cw_submit ${JSON.stringify({ card: `#${c.cards.f}`, summary: `Follow-up: greet.js trims the name, at ${c.commit}.`, followUp: true })}`,
     expect: (o) => {
-      const tools = o.hiveCalls.map((x) => x.tool)
+      const tools = o.combworkCalls.map((x) => x.tool)
       const subs = factsOf(o, 'f', 'Submitted')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-        ['submitted it with cw_submit followUp (a second Submitted fact, a follow-up)', tools.some((t, k) => t === 'cw_submit' && argsOf(o.hiveCalls[k]).followUp === true) && subs.length === 2 && subs[1].data.followUp === true, tools.join(',')],
+        ['submitted it with cw_submit followUp (a second Submitted fact, a follow-up)', tools.some((t, k) => t === 'cw_submit' && argsOf(o.combworkCalls[k]).followUp === true) && subs.length === 2 && subs[1].data.followUp === true, tools.join(',')],
         ['the card stays in Review, its own, in the same round', o.cards.f?.column === 'review' && o.cards.f?.agentName === 'Coder' && subs.length === 2 && subs[1].data.round === subs[0].data.round, `${o.cards.f?.column}, ${o.cards.f?.agentName}, ${subs.map((x) => x.data.round).join(',')}`],
         ['posted no loop step for it', !factsOf(o, 'f', 'LoopStep').length, tools.join(',')]
       ]
@@ -3502,7 +3502,7 @@ module.exports.SCENARIOS = [
     fake: (c) =>
       `skill card-loop then cw cw_read_task {"number":${c.cards.f},"latestComment":true} then cw cw_wait_for_tasks {"cards":[${c.cards.f}],"changes":["comment","column"],"wake":true} then cw cw_loop_step ${JSON.stringify({ card: `#${c.cards.f}`, step: 'gaps', text: '1. Add a test for the trimmed name.', design: c.followUp })}`,
     expect: (o, c) => {
-      const tools = o.hiveCalls.map((x) => x.tool)
+      const tools = o.combworkCalls.map((x) => x.tool)
       const answers = ran(o, 'cw_loop_step').filter((x) => ['ok', 'gaps'].includes(argsOf(x).step))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
@@ -3526,7 +3526,7 @@ module.exports.SCENARIOS = [
     fake: (c) =>
       `skill card-loop then cw cw_read_task {"number":${c.cards.a}} then cw cw_ask_assistant ${JSON.stringify({ card: `#${c.cards.a}`, text: `The user chose option A (the card's decision): please put #${c.cards.h} On Hold until after the release, and move #${c.cards.a} to Done with that decision as the reason.` })}`,
     expect: (o) => {
-      const tools = o.hiveCalls.map((x) => x.tool)
+      const tools = o.combworkCalls.map((x) => x.tool)
       const asked = ran(o, 'cw_ask_assistant')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
@@ -3553,7 +3553,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Your work on card #${c.cards.w} is done and committed: send it for review, as the work-on-card skill says.`,
     fake: (c) => `skill work-on-card then cw cw_update_task {"number":${c.cards.w},"column":"review","comment":"Round 1 ready: greet.js trims the name."}`,
     expect: (o) => {
-      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       return [
         ['the card is in Review', o.cards.w?.column === 'review', o.cards.w?.column],
         ['submitted by the rules (a Submitted fact with its summary)', factsOf(o, 'w', 'Submitted').some((f) => /trims/.test(String(f.data.summary))), (o.facts?.w ?? []).map((f) => f.kind).join(',')],
@@ -3578,7 +3578,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Review card #${c.cards.r}, as the review-agent-work skill says. Fail it: greet.js has no test.`,
     fake: (c) => `skill review-agent-work then boardreview ${c.cards.r} start then cw cw_update_task {"number":${c.cards.r},"review":"failed","comment":"Round 1: FAILED. 1. greet.js has no test."}`,
     expect: (o) => {
-      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       return [
         ['it reviewed the submission (a ReviewStarted fact)', factsOf(o, 'r', 'ReviewStarted').length > 0, (o.facts?.r ?? []).map((f) => f.kind).join(',')],
         ['failed it (a failed Verdict)', factsOf(o, 'r', 'Verdict').some((f) => f.data.pass === false), calls],
@@ -3602,7 +3602,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Work on card #${c.cards.s}.`,
     fake: (c) => `skill work-on-card then cw cw_start_card {"card":"#${c.cards.s}"} then ${LOOP_COMMIT} then cw cw_submit {"card":"#${c.cards.s}","summary":"greet.js ends with the comment // Hi."}`,
     expect: (o, c) => {
-      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['started it with cw_start_card', ran(o, 'cw_start_card').length > 0 && factsOf(o, 's', 'Started').length > 0, calls],
@@ -3634,9 +3634,9 @@ module.exports.SCENARIOS = [
       const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.cards ?? []).some((x) => x.number === n))
       const slot = factsOf(o, 'p', 'Started')[0]?.data?.slot
       const made = worktreesOf(c).filter((t) => !c.trees.includes(t))
-      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       // Its first conversation (card-loop read, the lane, the start) is replaced by the slot's (the work, the submission):
-      // the checks read the hive calls, the repository and the card, which span both, not the skills its transcript shows.
+      // the checks read the Combwork calls, the repository and the card, which span both, not the skills its transcript shows.
       return [
         ['registered its lane: the card, Implementer reviewing', !!lane && lane.reviewer?.name === 'Implementer', JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))],
         ['started it with cw_start_card, and Combwork lent the card a slot', ran(o, 'cw_start_card').length > 0 && !!slot, calls],
@@ -3661,7 +3661,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Have Coder work on card #${c.cards.i}, and tell me when it's done.`,
     fake: 'skill coordinate-agents',
     expect: (o, c) => {
-      const calls = o.hiveCalls
+      const calls = o.combworkCalls
       const start = calls.findIndex((x) => x.tool === 'cw_start_task' && x.ok)
       return [
         ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
@@ -3848,8 +3848,8 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const reads = ran(o, 'cw_read_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.q))
       return [
-        ['read the card (cw_read_task)', reads.length > 0, o.hiveCalls.map((x) => x.tool).join(',')],
-        ["its reply had Coder's question", hiveReplies(o, 'cw_read_task').some((t) => t.result.includes('Hello, friend')), hiveReplies(o, 'cw_read_task').map((t) => t.result.slice(0, 160)).join(' | ')],
+        ['read the card (cw_read_task)', reads.length > 0, o.combworkCalls.map((x) => x.tool).join(',')],
+        ["its reply had Coder's question", combworkReplies(o, 'cw_read_task').some((t) => t.result.includes('Hello, friend')), combworkReplies(o, 'cw_read_task').map((t) => t.result.slice(0, 160)).join(' | ')],
         ["didn't read the card's history for it", !reads.some((x) => argsOf(x).history === true), reads.map((x) => x.args).join(' | ')],
         ['said Coder waits for the user to answer which greeting', /Hello, friend|Hi there|which greeting|greeting/i.test(o.finalReply) && /(wait|answer|question|ask)/i.test(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
         ['changed nothing', !ran(o, 'cw_update_task').length && !movesOf(o, c.cards.q).length && o.cards.q?.column === 'doing', o.cards.q?.column]
@@ -3871,9 +3871,9 @@ module.exports.SCENARIOS = [
     prompt: 'Which card loops (lanes) are running, and which card is each on?',
     fake: 'cw cw_lane {"action":"list"}',
     expect: (o, c) => [
-      ['listed the lanes (cw_lane list), which worked', ran(o, 'cw_lane').some((x) => argsOf(x).action === 'list'), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+      ['listed the lanes (cw_lane list), which worked', ran(o, 'cw_lane').some((x) => argsOf(x).action === 'list'), o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
       // A call that would change a lane, refused or not; one naming no action (refused as such, HI-2260) changes nothing.
-      ['started, joined or ended none', !called(o, 'cw_lane').some((x) => ['start', 'join', 'end'].includes(argsOf(x).action)), o.hiveCalls.map((x) => x.args).join(' | ')],
+      ['started, joined or ended none', !called(o, 'cw_lane').some((x) => ['start', 'join', 'end'].includes(argsOf(x).action)), o.combworkCalls.map((x) => x.args).join(' | ')],
       ["its answer names the lane's current card", new RegExp(`#?${c.cards.a}\\b`).test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
     ],
     fakeSkips: ["its answer names the lane's current card"]
@@ -3895,7 +3895,7 @@ module.exports.SCENARIOS = [
       const starts = ran(o, 'cw_lane').map((x) => argsOf(x)).filter((x) => x.action === 'start')
       return [
         ['reordered the lane with cw_lane start and applyNow, the cards in the new order', starts.some((x) => x.applyNow === true && JSON.stringify((x.cards ?? []).map((n) => Number(String(n).replace(/\D/g, '')))) === JSON.stringify([c.cards.b, c.cards.a])), JSON.stringify(starts)],
-        ['abandoned or ended no lane', !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['abandoned or ended no lane', !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.combworkCalls.map((x) => x.tool).join(',')],
         [`#${c.cards.a} is back in Todo`, o.cards.a?.column === 'todo', o.cards.a?.column]
       ]
     },
@@ -3958,7 +3958,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.card('w', { title: 'Export the report', description: 'Add an export of the report. Open question for the user: CSV or JSON?', agent: 'implementer', column: 'doing' })
       // Coder reviews it in a card loop and waits for it to arrive in Review (a card watch): it takes no new task meanwhile.
-      // Its watch is made with its own token, as its hive tool makes it (#1545: a fake's typed command reached no real CLI).
+      // Its watch is made with its own token, as its Combwork tool makes it (#1545: a fake's typed command reached no real CLI).
       await coderTask(c)
       const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
       if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
@@ -3978,7 +3978,7 @@ module.exports.SCENARIOS = [
       const sent = msgs.some((x) => x.ok && /coder/i.test(String(argsOf(x).agent)) && /json/i.test(String(argsOf(x).text ?? '')))
       return [
         ['left Coder a message with the answer (cw_message_agent), which worked', sent, msgs.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
-        ["didn't give it a task or stop it", called(o, 'cw_prompt_agent').length === 0 && called(o, 'cw_stop_agent').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["didn't give it a task or stop it", called(o, 'cw_prompt_agent').length === 0 && called(o, 'cw_stop_agent').length === 0, o.combworkCalls.map((x) => x.tool).join(',')],
         ["didn't ask the user to paste it into Coder's pane", !/\bpaste\b/i.test(o.finalReply ?? '') && called(o, 'cw_notify').length === 0, (o.finalReply ?? '').slice(0, 300)],
         ["Coder's watch carries on", !!c.coderWatch?.includes(c.cards.w), JSON.stringify(c.coderWatch)]
       ]
@@ -4000,7 +4000,7 @@ module.exports.SCENARIOS = [
       const onB = ran(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.b) && field(x.args, 'review', 'start')) || ran(o, 'cw_start_review').some((x) => cardIs(o, argsOf(x).card, c.cards.b)) || ran(o, 'cw_wait_for_tasks').some((x) => namesCard(o, argsOf(x).cards, c.cards.b))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-        [`went on to #${c.cards.b} (began its review, or watched it)`, onB, o.hiveCalls.map((x) => x.tool).join(',')],
+        [`went on to #${c.cards.b} (began its review, or watched it)`, onB, o.combworkCalls.map((x) => x.tool).join(',')],
         [`didn't wait on #${c.cards.a} again`, !watchedA],
         ["didn't stop to ask the user", called(o, 'cw_notify').length === 0]
       ]
@@ -4078,7 +4078,7 @@ module.exports.SCENARIOS = [
         [`its return to Review is a diff to review (a commit after its base)`, !!c.returnDiff, JSON.stringify(c.returnDiff && { revision: c.returnDiff.revision, base: c.returnDiff.base, files: c.returnDiff.files })],
         ["reviewed the card after its return, with nobody prompting it (Combwork's wake)", ha.some((h) => by(h) && h.what === 'Started reviewing' && Date.parse(h.at) > back), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ['gave it a verdict', Number.isFinite(verdictAt), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
-        ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'cw_update_task').some((x) => before(x) && cardIs(o, argsOf(x).number, c.cards.b)) && !ran(o, 'cw_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && cardIs(o, argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
+        ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'cw_update_task').some((x) => before(x) && cardIs(o, argsOf(x).number, c.cards.b)) && !ran(o, 'cw_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && cardIs(o, argsOf(x).card, c.cards.b)), o.combworkCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
       ]
     },
     // Only the fake Claude Code answers a wake (its wake script); the fake Codex can't.
@@ -4102,7 +4102,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         [`reviewed #${c.cards.a}: started a review and gave a verdict`, h.includes('Started reviewing') && h.some((x) => /^Review (passed|failed)$/.test(x)), h.join(' | ')],
-        ["didn't ask the user (no cw_notify)", called(o, 'cw_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["didn't ask the user (no cw_notify)", called(o, 'cw_notify').length === 0, o.combworkCalls.map((x) => x.tool).join(',')],
         ['ended its turn with a live watch', !!turnWatch(o), o.status]
       ]
     }
@@ -4130,7 +4130,7 @@ module.exports.SCENARIOS = [
     fake: 'skill tune-settings cw cw_list_settings {"query":"transcript"}',
     expect: (o) => [
       ['read the tune-settings skill', read(o, 'tune-settings'), o.skillsRead.join(',')],
-      ['looked the settings up (cw_list_settings or cw_read_setting)', ran(o, 'cw_list_settings').length + ran(o, 'cw_read_setting').length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
+      ['looked the settings up (cw_list_settings or cw_read_setting)', ran(o, 'cw_list_settings').length + ran(o, 'cw_read_setting').length >= 1, o.combworkCalls.map((x) => x.tool).join(',')],
       ['changed no setting: it only suggested', ran(o, 'cw_update_setting').length === 0 && o.settings?.sessions?.transcriptWarnMB === 20 && o.settings?.sessions?.compactSuggestTokens === 200000, JSON.stringify(o.settings?.sessions ?? null)]
     ]
   },
@@ -4143,7 +4143,7 @@ module.exports.SCENARIOS = [
     prompt: 'Please set the transcript size warning (Settings → Sessions) to 50 MB.',
     fake: 'skill tune-settings cw cw_update_setting {"id":"sessions.transcriptWarnMB","value":50}',
     expect: (o) => [
-      ['changed it with cw_update_setting, which worked', ran(o, 'cw_update_setting').length >= 1, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+      ['changed it with cw_update_setting, which worked', ran(o, 'cw_update_setting').length >= 1, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
       ['the setting is 50 MB', o.settings?.sessions?.transcriptWarnMB === 50, String(o.settings?.sessions?.transcriptWarnMB)],
       ['changed nothing else of note', o.settings?.assistant?.control === 'look' && o.settings?.sessions?.compactSuggestTokens === 200000]
     ]
@@ -4158,7 +4158,7 @@ module.exports.SCENARIOS = [
     fake: 'cw cw_update_setting {"id":"assistant.control","value":"projects"}',
     expect: (o) => [
       ['its Control is still Look and advise', o.settings?.assistant?.control === 'look', String(o.settings?.assistant?.control)],
-      ['no change to it worked', !o.hiveCalls.some((x) => x.tool === 'cw_update_setting' && x.ok && /assistant\.control/.test(x.args ?? ''))]
+      ['no change to it worked', !o.combworkCalls.some((x) => x.tool === 'cw_update_setting' && x.ok && /assistant\.control/.test(x.args ?? ''))]
     ]
   },
   {
@@ -4178,9 +4178,9 @@ module.exports.SCENARIOS = [
       const adds = ran(o, 'cw_add_agent')
       const args = adds.map(argsOf)
       return [
-        ['added it with cw_add_agent, which worked', adds.length >= 1, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['added it with cw_add_agent, which worked', adds.length >= 1, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ["named Coder's connection (its id, or its name)", !!c.conn && args.some((a) => typeof a.connection === 'string' && (a.connection.trim() === c.conn || (!!c.connName && a.connection.trim().toLowerCase() === c.connName.toLowerCase()))), `${JSON.stringify(args)}; Coder's: ${c.conn} (${c.connName})`],
-        ['named no provider, model, effort, mode or context (its connection holds them)', !o.hiveCalls.some((x) => /^cw_(add|update)_agent$/.test(x.tool) && /"(provider|model|effort|mode|context200k)"\s*:/.test(x.args ?? '')), o.hiveCalls.filter((x) => x.tool.endsWith('_agent')).map((x) => x.args).join(' | ')],
+        ['named no provider, model, effort, mode or context (its connection holds them)', !o.combworkCalls.some((x) => /^cw_(add|update)_agent$/.test(x.tool) && /"(provider|model|effort|mode|context200k)"\s*:/.test(x.args ?? '')), o.combworkCalls.filter((x) => x.tool.endsWith('_agent')).map((x) => x.args).join(' | ')],
         ["started nothing", called(o, 'cw_start_agent').length === 0 && !args.some((a) => a.start || a.prompt)],
         ["made or changed no connection", ran(o, 'cw_connection').every((x) => /"action"\s*:\s*"list"/.test(x.args ?? '')), JSON.stringify(c.conn)]
       ]
@@ -4212,7 +4212,7 @@ module.exports.SCENARIOS = [
       const release = ran(o, 'cw_release_slot').find((x) => argsOf(x).action === 'release')
       const a = release ? argsOf(release) : {}
       return [
-        ['listed what alpha has to release first (cw_release_slot list)', listed >= 0 && (!release || called(o, 'cw_release_slot').indexOf(release) > listed), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['listed what alpha has to release first (cw_release_slot list)', listed >= 0 && (!release || called(o, 'cw_release_slot').indexOf(release) > listed), o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['released it with cw_release_slot release, confirming the slot and run list gave, which worked', !!release && a.slot === c.slot && a.confirm?.slot === c.slot && a.confirm?.run === c.run, release?.args ?? ''],
         ['the slot is free of that run: it has no writer now', c.writerAfter === null, JSON.stringify(c.writerAfter)],
         ['released nothing else (no carried slot, no other slot)', ran(o, 'cw_release_slot').filter((x) => argsOf(x).action === 'release').length === 1]
@@ -4268,7 +4268,7 @@ module.exports.SCENARIOS.push({
     const keys = ['q1', 'q2', 'q3', 'q4', 'q5'].map((k) => c.cards[k])
     const batches = ran(o, 'cw_update_tasks')
     return [
-      ['moved all five with one cw_update_tasks call', batches.length === 1 && keys.every((n) => String(batches[0].args).includes(String(n))), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+      ['moved all five with one cw_update_tasks call', batches.length === 1 && keys.every((n) => String(batches[0].args).includes(String(n))), o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
       ["didn't move them one at a time", !ran(o, 'cw_update_task').some((x) => keys.some((n) => cardIs(o, argsOf(x).number, n)))],
       ['the five cards are in Todo', keys.every((n) => o.allCards.some((x) => x.number === n && x.column === 'todo'))]
     ]
@@ -4319,7 +4319,7 @@ function laneStartLanded({ column, live, deliveries, shown }, n) {
  * (HI-2029, laneStarts) about a second after builderLane. Waited for until it has landed (laneStartLanded), so nothing of
  * the start is still on its way as the subject looks at the board.
  */
-async function hiveStartedLaneCard(c, key, n) {
+async function combworkStartedLaneCard(c, key, n) {
   const lib = require('../e2e/lib.cjs')
   const agent = c.agents[key]
   const ptyKey = lib.ptyKey(c.alpha, agent.id)
@@ -4360,7 +4360,7 @@ async function twoLanes(c, { d = false, aColumn = 'todo', cColumn = 'todo' } = {
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
   for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
     await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
-    if ((key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')) await hiveStartedLaneCard(c, key, cards[0])
+    if ((key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')) await combworkStartedLaneCard(c, key, cards[0])
   }
 }
 /**
@@ -4403,8 +4403,8 @@ const watchCovers = (w, cards) => !!w && ((w.lanes ?? []).includes('all') || (!w
 const liveWatchCovers = (o, cards) => watchCovers(turnWatch(o), cards)
 /** Board sweeps (cards, lanes or agents read) after its first wake watch: in a turn a wake started, not the first one. */
 const sweepsAfterWatch = (o) => {
-  const first = o.hiveCalls.findIndex((x) => x.tool === 'cw_wait_for_tasks' && x.ok && argsOf(x).wake === true)
-  return first < 0 ? 0 : o.hiveCalls.slice(first + 1).filter((x) => x.ok && ['cw_list_tasks', 'cw_lane', 'cw_project_status', 'cw_list_projects', 'cw_read_task'].includes(x.tool)).length
+  const first = o.combworkCalls.findIndex((x) => x.tool === 'cw_wait_for_tasks' && x.ok && argsOf(x).wake === true)
+  return first < 0 ? 0 : o.combworkCalls.slice(first + 1).filter((x) => x.ok && ['cw_list_tasks', 'cw_lane', 'cw_project_status', 'cw_list_projects', 'cw_read_task'].includes(x.tool)).length
 }
 const liveWatch = (o) => `${o.status}; ${JSON.stringify(o.watch)}; its turn ended watching: ${JSON.stringify(turnWatch(o))}; calls: ${cardWatches(o).map((x) => x.args).join(' | ')}`
 /** A brief the Assistant sent an agent (cw_prompt_agent's text, cw_start_agent's prompt), by the agent's name. */
@@ -4420,7 +4420,7 @@ const briefsTo = (o, name) =>
  * second start of the same pair gets its own reply, never the first's. One with no such reply left is left out.
  */
 const laneStartsOf = (o) => {
-  const laneReplies = hiveReplies(o, 'cw_lane').map((t) => String(t.result ?? ''))
+  const laneReplies = combworkReplies(o, 'cw_lane').map((t) => String(t.result ?? ''))
   let next = 0
   const out = []
   for (const args of ran(o, 'cw_lane').map((x) => argsOf(x))) {
@@ -4445,7 +4445,7 @@ const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
 const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
 /**
  * HI-2239's read policy (Darren's decision, 31 Oct: simplify). A file was read when Claude Code's `Read` worked on its
- * exact absolute path and gave back its facts; Combwork's own reads are the hive calls' (cw_read_section, cw_list_tasks,
+ * exact absolute path and gave back its facts; Combwork's own reads are the Combwork calls' (cw_read_section, cw_list_tasks,
  * each paired with its own reply: callsWithReplies). A shell command (or a Codex script) that may have read it is
  * unobservable: never credited, and never blamed (shellLookups: the check is left out, and the run records it).
  */
@@ -4469,13 +4469,13 @@ const readOf = (t, target, facts) => {
  */
 const shellLookups = (o, name) => (o.tools ?? []).filter((t) => SHELL_TOOLS.test(t.name) && String(t.input ?? '').toLowerCase().includes(name.toLowerCase()))
 /**
- * A hive tool's successful calls with their own replies (HR1, HI-2239 round 2): Combwork's log of the calls (exact
+ * A Combwork tool's successful calls with their own replies (HR1, HI-2239 round 2): Combwork's log of the calls (exact
  * arguments) and the transcript's replies, in order, paired one to one; when their counts differ the pairing isn't known,
  * and none is given.
  */
 const callsWithReplies = (o, tool) => {
   const calls = ran(o, tool)
-  const own = hiveReplies(o, tool)
+  const own = combworkReplies(o, tool)
   return calls.length === own.length ? calls.map((x, i) => ({ args: argsOf(x), reply: String(own[i].result ?? '') })) : []
 }
 module.exports.SCENARIOS.push(
@@ -4552,11 +4552,11 @@ module.exports.SCENARIOS.push(
       const { a, b } = c.cards
       const cc = c.cards.c
       return [
-        ['read the card', ran(o, 'cw_read_task').some((x) => cardIs(o, argsOf(x).number, a)), o.hiveCalls.map((x) => x.tool).join(',')],
-        ['swept the board (the cards, the lanes or the agents)', ['cw_list_tasks', 'cw_lane', 'cw_project_status', 'cw_list_projects'].some((t) => ran(o, t).length > 0), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['read the card', ran(o, 'cw_read_task').some((x) => cardIs(o, argsOf(x).number, a)), o.combworkCalls.map((x) => x.tool).join(',')],
+        ['swept the board (the cards, the lanes or the agents)', ['cw_list_tasks', 'cw_lane', 'cw_project_status', 'cw_list_projects'].some((t) => ran(o, t).length > 0), o.combworkCalls.map((x) => x.tool).join(',')],
         ["ended its turn watching again: both lanes' last cards (its live watch, waking on moves, comments and verdicts)", liveWatchCovers(o, [b, cc]), liveWatch(o)],
         // Its builder isn't running (a stopped lane): starting it on the fix is fine; reviewing it or a review card isn't.
-        ['left the review to the loop: no verdict of its own and no separate review card', !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, a) && argsOf(x).review) && !ran(o, 'cw_create_task').some((x) => /review/i.test(String(argsOf(x).title ?? ''))), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['left the review to the loop: no verdict of its own and no separate review card', !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, a) && argsOf(x).review) && !ran(o, 'cw_create_task').some((x) => /review/i.test(String(argsOf(x).title ?? ''))), o.combworkCalls.map((x) => x.tool).join(',')],
         ['told the user about the failed card', new RegExp(`#?${a}\\b`).test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
       ]
     },
@@ -4585,7 +4585,7 @@ module.exports.SCENARIOS.push(
       const { a, b } = c.cards
       const told = `${o.finalReply ?? ''} ${ran(o, 'cw_notify').map((x) => `${argsOf(x).title ?? ''} ${argsOf(x).message ?? ''}`).join(' ')}`
       return [
-        ['read the card', ran(o, 'cw_read_task').some((x) => cardIs(o, argsOf(x).number, a)), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['read the card', ran(o, 'cw_read_task').some((x) => cardIs(o, argsOf(x).number, a)), o.combworkCalls.map((x) => x.tool).join(',')],
         ['brought the user a simpler option with a recommendation', /simpl|smaller|narrow|reduce|scope/i.test(told) && /recommend|suggest|I'd|I would|propose/i.test(told), told.slice(0, 400)],
         ["left the choice to the user: no decision recorded, nothing sent to Coder or Implementer", !(o.cards.a?.decisions ?? []).length && !called(o, 'cw_message_agent').length && !called(o, 'cw_prompt_agent').length, JSON.stringify(o.cards.a?.decisions ?? [])],
         ["ended its turn watching again (its live watch)", liveWatchCovers(o, [b, c.cards.c]), liveWatch(o)]
@@ -4802,7 +4802,7 @@ module.exports.SCENARIOS.push(
         ["first watched both lanes' last cards (waking on moves, comments and verdicts)", covers(c.firstWatch, [b, cc]), JSON.stringify(c.firstWatch)],
         ["woken by Builder2's lane ending, it watched Coder's lane's end again", c.wakes >= 1 && covers(c.secondWatch, [b]), JSON.stringify({ wakes: c.wakes, watch: c.secondWatch })],
         ["Combwork's first wake said lanes are still running, to watch them all again", /Lanes are still running|watch the lanes again/.test(o.wakeLines?.[0] ?? ''), (o.wakeLines ?? []).join(' | ').slice(0, 300)],
-        ['swept the board on a wake (cards, lanes or agents, after its first watch)', sweeps >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
+        ['swept the board on a wake (cards, lanes or agents, after its first watch)', sweeps >= 1, o.combworkCalls.map((x) => x.tool).join(',')],
         ["woken again by Coder's lane ending", c.wakes >= 2, String(c.wakes)],
         ['both lanes ended', ours.length === 2 && ours.every((l) => l.state === 'ended'), JSON.stringify(ours.map((l) => [l.builder?.name, l.state]))],
         ['told the user both are done', /done|finished|ended|complete/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
@@ -4872,7 +4872,7 @@ module.exports.SCENARIOS.push(
         // A question about its review, as the check says (HI-2265: once the review passed within the trial, a question about
         // an optional follow-up card isn't one).
         ["didn't ask the user whether it should be reviewed", called(o, 'cw_notify').length === 0 && !askingSentences(o.finalReply).some((s) => /\breview|\bverdict|Implementer/i.test(s)), (o.finalReply ?? '').slice(0, 300)],
-        ['moved the card nowhere and gave no verdict of its own', !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).review)) && called(o, 'cw_verdict').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
+        ['moved the card nowhere and gave no verdict of its own', !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).review)) && called(o, 'cw_verdict').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
       ]
     },
     fakeSkips: ["didn't ask the user whether it should be reviewed"]
@@ -4923,7 +4923,7 @@ module.exports.SCENARIOS.push(
     fake: (c) => `cw cw_read_task {"number":${c.cards.a},"latestComment":true} then cw cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}`,
     expect: (o, c) => [
       ["asked the user nothing (no notification, request or question)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
-      ['left the fix to the loop: no decision, nothing sent to Coder or Implementer, no verdict', !(o.cards.a?.decisions ?? []).length && !called(o, 'cw_message_agent').length && !called(o, 'cw_prompt_agent').length && !called(o, 'cw_verdict').length, o.hiveCalls.map((x) => x.tool).join(',')],
+      ['left the fix to the loop: no decision, nothing sent to Coder or Implementer, no verdict', !(o.cards.a?.decisions ?? []).length && !called(o, 'cw_message_agent').length && !called(o, 'cw_prompt_agent').length && !called(o, 'cw_verdict').length, o.combworkCalls.map((x) => x.tool).join(',')],
       ['ended its turn watching the lane again (its live watch)', liveWatchCovers(o, [c.cards.b]), liveWatch(o)]
     ],
     fakeSkips: ["asked the user nothing (no notification, request or question)"]
@@ -4951,7 +4951,7 @@ module.exports.SCENARIOS.push(
     prompt: (c) => `[CW] #${c.cards.n} (Coder's card) is in Done; latest comment by Implementer: "Passed: the comparison is sound; "Hi" is recommended." Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then cw cw_read_task {"number":${c.cards.n},"latestComment":true} then cw cw_lane {"action":"list"}`,
     expect: (o) => [
-      ['moved no card and ended or abandoned no lane', !called(o, 'cw_update_task').some((x) => argsOf(x).column) && !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
+      ['moved no card and ended or abandoned no lane', !called(o, 'cw_update_task').some((x) => argsOf(x).column) && !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.combworkCalls.map((x) => x.tool).join(',')],
       ["asked the user nothing (no notification, request or question)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
     ],
     fakeSkips: ["asked the user nothing (no notification, request or question)"]
@@ -4989,7 +4989,7 @@ module.exports.SCENARIOS.push(
     fake: 'skill run-lanes then cw cw_lane {"action":"list"} then cw cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}',
     expect: (o, c) => [
       ["asked the user nothing (no notification, request or question)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
-      ["merged, moved and ended nothing itself (the builder's merge): no commit, no card moved, no merge reported, no lane ended", c.git('rev-parse', 'HEAD').trim() === c.head && ['a', 'b'].every((k) => !movesOf(o, c.cards[k]).length) && !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
+      ["merged, moved and ended nothing itself (the builder's merge): no commit, no card moved, no merge reported, no lane ended", c.git('rev-parse', 'HEAD').trim() === c.head && ['a', 'b'].every((k) => !movesOf(o, c.cards[k]).length) && !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.combworkCalls.map((x) => x.tool).join(',')],
       ['ended its turn watching the lanes again (its live watch)', !!turnWatch(o) && (turnWatch(o)?.lanes ?? []).length > 0, liveWatch(o)]
     ],
     fakeSkips: ["asked the user nothing (no notification, request or question)"]
@@ -5027,9 +5027,9 @@ module.exports.SCENARIOS.push(
       const lookedUp = cardRead || docRead
       const unobservable = !lookedUp && shellLookups(o, 'DEPLOY.md').length > 0
       return [
-        ...(unobservable ? [] : [['looked the card or its doc up (cw_read_task, cw_read_section or a detailed listing of alpha, or a Read of the doc)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')]]),
+        ...(unobservable ? [] : [['looked the card or its doc up (cw_read_task, cw_read_section or a detailed listing of alpha, or a Read of the doc)', lookedUp, o.combworkCalls.map((x) => x.tool).join(',')]]),
         ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
-        ['started Coder on the card', ran(o, 'cw_start_task').some((x) => cardIs(o, argsOf(x).number, p)) || briefsTo(o, 'Coder').some((t) => names(t, p)), o.hiveCalls.map((x) => x.tool).join(',')]
+        ['started Coder on the card', ran(o, 'cw_start_task').some((x) => cardIs(o, argsOf(x).number, p)) || briefsTo(o, 'Coder').some((t) => names(t, p)), o.combworkCalls.map((x) => x.tool).join(',')]
       ]
     },
     // A lookup by a shell command or script (HI-2239): what it read is unobservable, so the run records it.
@@ -5050,8 +5050,8 @@ module.exports.SCENARIOS.push(
     expect: (o) => {
       const looked = ['cw_list_tasks', 'cw_lane', 'cw_project_status', 'cw_list_projects', 'cw_read_task'].some((t) => ran(o, t).length > 0)
       return [
-        ['looked at the board, the lanes or the agents first', looked, o.hiveCalls.map((x) => x.tool).join(',')],
-        ['started, stopped or changed nothing (it was asked a question)', !['cw_start_task', 'cw_start_agent', 'cw_prompt_agent', 'cw_stop_agent', 'cw_update_task', 'cw_update_tasks'].some((t) => called(o, t).length > 0) && !called(o, 'cw_lane').some((x) => argsOf(x).action !== 'list'), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['looked at the board, the lanes or the agents first', looked, o.combworkCalls.map((x) => x.tool).join(',')],
+        ['started, stopped or changed nothing (it was asked a question)', !['cw_start_task', 'cw_start_agent', 'cw_prompt_agent', 'cw_stop_agent', 'cw_update_task', 'cw_update_tasks'].some((t) => called(o, t).length > 0) && !called(o, 'cw_lane').some((x) => argsOf(x).action !== 'list'), o.combworkCalls.map((x) => x.tool).join(',')],
         ['answered from what it found: names the files or cards the lanes touch', /greet|README|#?\d+/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
       ]
     },
@@ -5117,7 +5117,7 @@ module.exports.SCENARIOS.push(
     fake: 'skill run-lanes then cw cw_lane {"action":"list"}',
     expect: (o) => [
       ['said the lanes are done', /done|finished|ended|complete|merged/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)],
-      ['restarted and stopped nothing itself (the user decides)', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
+      ['restarted and stopped nothing itself (the user decides)', restartedNothing(o), o.combworkCalls.map((x) => x.tool).join(',')]
     ],
     fakeSkips: ['said the lanes are done']
   },
@@ -5144,7 +5144,7 @@ module.exports.SCENARIOS.push(
     expect: (o, c) => [
       ['no fresh-start suggestion while a lane runs', !suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
       ['ended its turn watching the running lane (a lane watch on it, or its card)', liveWatchCovers(o, [c.cards.c]) || (!!turnWatch(o) && (turnWatch(o)?.lanes ?? []).includes(c.running)), liveWatch(o)],
-      ['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
+      ['restarted and stopped nothing itself', restartedNothing(o), o.combworkCalls.map((x) => x.tool).join(',')]
     ],
     fakeSkips: ['no fresh-start suggestion while a lane runs']
   },
@@ -5171,7 +5171,7 @@ module.exports.SCENARIOS.push(
       ['passed the question on to the user', /empty name/i.test(o.finalReply ?? '') || ran(o, 'cw_notify').length > 0, (o.finalReply ?? '').slice(0, 300)],
       ["didn't answer for the user: no decision, nothing typed into Coder", !(o.cards.q?.decisions ?? []).length && called(o, 'cw_prompt_agent').length === 0, JSON.stringify(o.cards.q?.decisions ?? [])],
       ['no fresh-start suggestion while a question waits', !suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
-      ['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
+      ['restarted and stopped nothing itself', restartedNothing(o), o.combworkCalls.map((x) => x.tool).join(',')]
     ],
     fakeSkips: ['passed the question on to the user', 'no fresh-start suggestion while a question waits']
   },
@@ -5186,7 +5186,7 @@ module.exports.SCENARIOS.push(
     },
     prompt: (c) => `[CW] #${c.cards.a} (Coder's card) is in Done; latest comment by Coder: "Done: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then cw cw_read_task {"number":${c.cards.a},"latestComment":true}`,
-    expect: (o) => [['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]]
+    expect: (o) => [['restarted and stopped nothing itself', restartedNothing(o), o.combworkCalls.map((x) => x.tool).join(',')]]
   },
   {
     id: 'fresh-start-saves-first',
@@ -5207,7 +5207,7 @@ module.exports.SCENARIOS.push(
       return [
         ['wrote the idea to its journal (cw_journal_write, which worked)', saved, writes.map((x) => String(x.args).slice(0, 200)).join(' | ')],
         ["kept it open: the journal entry says it isn't decided (Windows or its own switch)", writes.some((x) => /dark/i.test(String(x.args)) && /windows|switch|toggle|undecided|open|not decided/i.test(String(x.args)))],
-        ['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
+        ['restarted and stopped nothing itself', restartedNothing(o), o.combworkCalls.map((x) => x.tool).join(',')]
       ]
     }
   }
@@ -5248,7 +5248,7 @@ for (const [id, name] of MODES) {
     fake: 'skill coordinate-agents',
     expect: (o, c) => [
       [`launched in ${name} mode`, launchedIn(c, name)],
-      ['started the card with cw_start_task, which worked', ran(o, 'cw_start_task').length >= 1, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+      ['started the card with cw_start_task, which worked', ran(o, 'cw_start_task').length >= 1, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
       ["didn't type the card into the agent instead", called(o, 'cw_prompt_agent').length === 0],
       // #402: one card on one agent is no team: run-lanes stays unread and no lane is started.
       ['stayed light: no run-lanes and no lane for one card', !read(o, 'run-lanes') && called(o, 'cw_lane').every((x) => argsOf(x).action === 'list'), o.skillsRead.join(',')]
@@ -5305,7 +5305,7 @@ module.exports.SCENARIOS.push(
       return [
         ['read the triage-report skill', read(o, 'triage-report'), o.skillsRead.join(',')],
         ['filed no new card for it', ran(o, 'cw_create_task').length === 0, ran(o, 'cw_create_task').map((x) => argsOf(x).title).join(' | ')],
-        [`added the report to #${p}, the card in Passed`, noted, o.hiveCalls.map((x) => x.tool).join(',')],
+        [`added the report to #${p}, the card in Passed`, noted, o.combworkCalls.map((x) => x.tool).join(',')],
         ['told the user the card in Passed already covers it', new RegExp(`#?${p}\\b`).test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)],
         ["didn't fix it itself", o.gitStatus.trim() === '', o.gitStatus]
       ]

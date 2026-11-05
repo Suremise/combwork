@@ -31,7 +31,7 @@ import { PurgeDialog } from '../components/Purge'
  * Sessions tab: the project's sessions as a tree on the left (provider → agent → session → the sub-sessions it
  * started, like the Files tree: counts, actions on any branch, keyboard) and a read-only transcript on the right.
  * Search filters the tree across names, dates, providers and transcript text, with each session's matches under it.
- * The Hive Assistant's conversations use it too (`assistant`): its own words, no agent level, its panel instead of an
+ * The Combwork Assistant's conversations use it too (`assistant`): its own words, no agent level, its panel instead of an
  * agent's pane.
  */
 
@@ -261,7 +261,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   // ---- branch actions: everything under a provider, an agent, or a session and its sub-sessions ----
   const branchName = (n: TreeNode): string => (n.kind === 'session' ? `"${sessionName(n.item)}"` : n.kind === 'agent' ? `${n.label} (${providerName(n.provider)})` : n.label)
   const bulkList = (n: TreeNode, action: SessionBulkAction): SessionListItem[] =>
-    // Archiving keeps Hive's copy: only Hive's own sessions have one (a sub-session started outside Hive goes with its session).
+    // Archiving keeps Combwork's copy: only Combwork's own sessions have one (a sub-session started outside Combwork goes with its session).
     sessionsIn(n).filter((s) => (action === 'delete' ? true : action === 'archive' ? !s.archived && s.source === 'combwork' : !!s.archived))
   const runBulk = async (n: TreeNode, action: SessionBulkAction): Promise<void> => {
     const list = bulkList(n, action)
@@ -984,7 +984,7 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
   const pinned = useRef(jump === null)
   /**
    * A jump placed the view (a search hit, a compaction): only the user's own scrolling follows the end again, not the
-   * scroll events of Hive's own scrolls (#1323: the opening scroll to the end, its event arriving after the jump, pinned
+   * scroll events of Combwork's own scrolls (#1323: the opening scroll to the end, its event arriving after the jump, pinned
    * the view again and the jump was scrolled away).
    */
   const placed = useRef(false)
@@ -1096,7 +1096,7 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
     if (!reg || !H) return
     const root = scroller.current
     if (!query || !root) {
-      reg.delete('hive-search')
+      reg.delete('cw-search')
       return
     }
     const ranges: Range[] = []
@@ -1111,8 +1111,8 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
         ranges.push(r)
       }
     }
-    reg.set('hive-search', new H(...ranges))
-    return () => void reg.delete('hive-search')
+    reg.set('cw-search', new H(...ranges))
+    return () => void reg.delete('cw-search')
   })
 
   const blocks = useMemo(() => (transcript ? toBlocks(transcript.items) : []), [transcript])
@@ -1403,7 +1403,7 @@ function ToolCall({ id, tool, open, toggle, project, sessionId, onImage, nested 
 }
 
 function OtherItem({ item, open, toggle }: { item: TranscriptItem; open: boolean; toggle: (id: number) => void }) {
-  // Hive's own notices are formatted here, in the language shown (#797): a language change shows them in it at once.
+  // Combwork's own notices are formatted here, in the language shown (#797): a language change shows them in it at once.
   useLanguage()
   if (item.kind === 'compaction') {
     const freed = Math.max(0, item.preTokens - item.postTokens)

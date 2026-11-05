@@ -6,9 +6,9 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 
-const base = tempDir('hive-hive-watch-')
+const base = tempDir('cw-hive-watch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -26,7 +26,7 @@ afterAll(async () => {
 })
 
 const events: string[] = []
-vi.spyOn(w, 'emit').mockImplementation((e: HiveEvent) => void events.push(e.type))
+vi.spyOn(w, 'emit').mockImplementation((e: CombworkEvent) => void events.push(e.type))
 const hive = join(ws, '.combwork')
 /** Waits for an event of this type after `from` (the watch's events come a moment after the write). */
 const told = (type: string, from: number): Promise<void> => vi.waitFor(() => expect(events.slice(from)).toContain(type), { timeout: 10_000, interval: 50 })
@@ -60,7 +60,7 @@ describe("a workspace's .combwork watch (HI-1797)", () => {
     // workspace.json changed outside Combwork: read again (it tells skills-changed).
     from = events.length
     const cfg = JSON.parse(String(await import('fs').then((f) => f.readFileSync(join(hive, 'workspace.json'), 'utf8'))))
-    writeFileSync(join(hive, 'workspace.json'), JSON.stringify({ ...cfg, hiveWatchTest: 1 }))
+    writeFileSync(join(hive, 'workspace.json'), JSON.stringify({ ...cfg, combworkWatchTest: 1 }))
     await told('skills-changed', from)
   })
 

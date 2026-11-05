@@ -174,7 +174,7 @@ describe('the canary dialect over them', () => {
 /** The files this card emptied, and where a literal there would be agent text whatever its words look like. */
 const FILES = ['src/main/slots.ts', 'src/main/slotCards.ts', 'src/main/slotRelease.ts', 'src/main/slotsApp.ts', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/reviewCopies.ts', 'src/main/templateApi.ts', 'src/main/agentTokens.ts', 'src/main/hookTokens.ts', 'src/shared/templates.ts', 'src/shared/templateConnections.ts']
 const TEXT_KEYS = /^(error|why|wait|waiting|refused|retry|failed|detail|notSaved|note|body|by|text|reason)$/
-const CALLS = /^(refused|Error|SlotReleaseRefused|HiveError|OpLost|fail|keep|giveUp|pass)$/
+const CALLS = /^(refused|Error|SlotReleaseRefused|CombworkError|OpLost|fail|keep|giveUp|pass)$/
 
 describe('no literal agent text left in these files', () => {
   it('has no words in an error, a refusal or a field agents read, but what agent-protocol marks', () => {

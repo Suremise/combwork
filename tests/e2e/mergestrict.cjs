@@ -37,7 +37,7 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
 
 ;(async () => {
   q.prepare(fx)
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })

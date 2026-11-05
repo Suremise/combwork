@@ -2,7 +2,7 @@
 // the board's store. Record-only with workflow rules not enforced (Settings → Advanced, #1263), as most of this file
 // runs: nothing moves. Enforced, it acts at the app level (S7, S41). A card works in its agent's worktree on its own line: a hand
 // merge of its branch after its pass (Integrated by outside, the card still Passed), a rebase after a pass (CarriedOver),
-// an amend with new content (Stale), a reset of the target under a Done card (LeftTarget), and two Hives racing on one
+// an amend with new content (Stale), a reset of the target under a Done card (LeftTarget), and two Combworks racing on one
 // head (the log says what is true now).
 import { execFileSync } from 'child_process'
 import { mkdirSync, renameSync, writeFileSync } from 'fs'
@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-reconciler-')
+const base = tempDir('cw-reconciler-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -135,7 +135,7 @@ describe('reconciliation in the app, record-only (#1217)', () => {
     expect(foldCard(factsOf(w, card)).head).toBe(amended)
   })
 
-  it('two Hives racing on one head (A→B seen by one, A→C by the other): the log says what is true now, once', async () => {
+  it('two Combworks racing on one head (A→B seen by one, A→C by the other): the log says what is true now, once', async () => {
     const { ws, w, repo, wt } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Race', project: 'p' }, user))).number
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))

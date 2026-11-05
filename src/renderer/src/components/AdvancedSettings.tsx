@@ -10,12 +10,12 @@ import { NumberField } from './NumberField'
 import { DottedId, Icon, IconButton, InfoTip, SearchInput, Switch, Tooltip } from './ui'
 import { cx } from '../util'
 import { ProviderIcon } from './ProviderIcon'
-import { HiveMark } from './Updates'
+import { CombworkMark } from './Updates'
 import { TabPanel, Tabs } from './Tabs'
 
 /**
- * Settings → Advanced's list (#367), in the manner of about:config: every overridable default, grouped by Hive and each
- * CLI, searchable, a modified one marked with its default beside it and Reset. A value that isn't valid says why (Hive
+ * Settings → Advanced's list (#367), in the manner of about:config: every overridable default, grouped by Combwork and each
+ * CLI, searchable, a modified one marked with its default beside it and Reset. A value that isn't valid says why (Combwork
  * uses the default); a CLI's value that no longer finds what the CLI was recorded sending, or that was made for another
  * CLI version, says so, with Keep for the installed version. Values a workspace can set have a This workspace box too.
  * advanced.json holds the same values, Show developer features too: Open advanced.json edits them by hand, and the list
@@ -33,8 +33,8 @@ const T = {
 const TABS_KEY = 'settings.advanced'
 
 /**
- * Its tabs (HI-1839): Hive, then each CLI with advanced values, in Hive's order (HI-2139), as the descriptors name them;
- * a group of a CLI Hive no longer offers keeps a tab after them.
+ * Its tabs (HI-1839): Combwork, then each CLI with advanced values, in Combwork's order (HI-2139), as the descriptors name them;
+ * a group of a CLI Combwork no longer offers keeps a tab after them.
  */
 const GROUPS: AdvancedGroup[] = (() => {
   const used = new Set(ADVANCED_DEFS.map((d) => d.group))
@@ -103,7 +103,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
         label={tr(T.tabs)}
         value={tab}
         onChange={choose}
-        items={groups.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <HiveMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }), tag: tr(T.off) } : {}) }))}
+        items={groups.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <CombworkMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }), tag: tr(T.off) } : {}) }))}
       />
       {/* Every group's rows stay mounted, the tab shown alone visible: a value being typed is never lost to a switch. */}
       {groups.map((g) => {
@@ -145,7 +145,7 @@ async function save(def: AdvancedDef, value: unknown, scope: 'app' | 'workspace'
 }
 
 /**
- * What a box shows for a value as written (in advanced.json or workspace.json): as Hive reads it when it checks out (a
+ * What a box shows for a value as written (in advanced.json or workspace.json): as Combwork reads it when it checks out (a
  * number written as text, "600", is 600), as written when it doesn't and the box can show text, else `fallback`.
  */
 function shownValue(def: AdvancedDef, raw: unknown, fallback: unknown): unknown {
@@ -247,7 +247,7 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
 }
 
 /**
- * Whether agents can read their inbox at all (#1432): owned by Settings → Agent API (their hive tools), so it is shown
+ * Whether agents can read their inbox at all (#1432): owned by Settings → Agent API (their Combwork tools), so it is shown
  * here as a link to that setting, not a second switch.
  */
 function InboxAvailableNote() {

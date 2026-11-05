@@ -35,7 +35,7 @@ vi.mock('fs/promises', async (original) => {
   return { ...real, default: { ...real, stat, lstat }, stat, lstat }
 })
 
-const base = tempDir('hive-observe-')
+const base = tempDir('cw-observe-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -48,7 +48,7 @@ const run = (cwd: string, ...args: string[]): string => execFileSync('git', args
 
 /** A repository on main with one commit (a.txt), `out/` and `node_modules/` ignored. */
 function repo(): string {
-  const p = tempDir('hive-observe-repo-')
+  const p = tempDir('cw-observe-repo-')
   run(p, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
   writeFileSync(join(p, 'a.txt'), 'a\n')
@@ -227,7 +227,7 @@ describe('the watcher on a Git repository', () => {
   })
 
   it("a move made just before a refresh's follow is still said (the line's and the folder's)", async () => {
-    const wt = join(tempDir('hive-observe-follow-'), 'wt')
+    const wt = join(tempDir('cw-observe-follow-'), 'wt')
     run(p, 'worktree', 'add', '-q', '-b', 'feature', wt)
     const a = run(p, 'rev-parse', 'HEAD')
     run(p, 'branch', 'side')
@@ -252,12 +252,12 @@ describe('the watcher on a Git repository', () => {
   it("an agent's edit hook counts in its folder", async () => {
     const t0 = Date.now()
     o.markEdits([join(p, 'src', 'x.ts')])
-    o.markEdits([join(tempDir('hive-observe-elsewhere-'), 'y.ts')])
+    o.markEdits([join(tempDir('cw-observe-elsewhere-'), 'y.ts')])
     expect((await between(t0)).paths).toEqual([':edit'])
   })
 
   it("a worktree's commit moves its line and its folder; its writes are its own", async () => {
-    const wt = join(tempDir('hive-observe-wt-'), 'wt')
+    const wt = join(tempDir('cw-observe-wt-'), 'wt')
     run(p, 'worktree', 'add', '-q', '-b', 'feature', wt)
     await vi.waitFor(() => expect(o.size.folders).toBe(2), { timeout: HUNG_MS })
     // Adding it can cost the main folder's watch an unnamed event (Windows lost track): its record restarts.
@@ -317,7 +317,7 @@ describe('the watcher on a Git repository', () => {
     fresh.follow([{ path: q, platform: 'git', root: q }])
     expect(isUnknown(await fresh.changedBetween(q, Date.now() - 1, Date.now()))).toBe(true)
     fresh.dispose()
-    expect(isUnknown(await o.changedBetween(tempDir('hive-observe-not-'), Date.now(), Date.now()))).toBe(true)
+    expect(isUnknown(await o.changedBetween(tempDir('cw-observe-not-'), Date.now(), Date.now()))).toBe(true)
   })
 })
 
@@ -326,7 +326,7 @@ describe('the watcher on a None folder', () => {
   afterEach(() => o.dispose())
 
   it('says what was written, for the hash cache', async () => {
-    const p = tempDir('hive-observe-none-')
+    const p = tempDir('cw-observe-none-')
     o = new Observer()
     o.follow([{ path: p, platform: 'none' }])
     const written: string[] = []
@@ -350,7 +350,7 @@ describe('the watcher on a None folder', () => {
   })
 
   it('a folder gone and back (#964): its watch ends, starts again, and the time between is unknown', async () => {
-    const parent = tempDir('hive-observe-gone-')
+    const parent = tempDir('cw-observe-gone-')
     const p = join(parent, 'project')
     mkdirSync(p)
     o = new Observer()
@@ -378,7 +378,7 @@ describe("the app's watcher follows the open workspaces", () => {
   afterEach(() => stopObserving())
 
   it('watches their repositories and folders, and closes them when the workspace closes', async () => {
-    const ws = tempDir('hive-observe-ws-')
+    const ws = tempDir('cw-observe-ws-')
     const git = join(ws, 'gitty')
     mkdirSync(git)
     run(git, 'init', '-q', '-b', 'main')
@@ -398,7 +398,7 @@ describe("the app's watcher follows the open workspaces", () => {
   it('a folder being deleted or removed is let go meanwhile, and watched again after', async () => {
     const o = new Observer()
     const p = repo()
-    const wt = join(tempDir('hive-observe-sus-'), 'wt')
+    const wt = join(tempDir('cw-observe-sus-'), 'wt')
     run(p, 'worktree', 'add', '-q', '-b', 'feature', wt)
     o.follow([{ path: p, platform: 'git', root: p }])
     expect(o.size).toEqual({ repos: 1, folders: 2 })
@@ -431,7 +431,7 @@ describe("the app's watcher follows the open workspaces", () => {
   it('follow() closes what it no longer needs; dispose closes everything', () => {
     const o = new Observer()
     const p = repo()
-    const n = tempDir('hive-observe-n-')
+    const n = tempDir('cw-observe-n-')
     o.follow([
       { path: p, platform: 'git', root: p },
       { path: n, platform: 'none' }

@@ -77,7 +77,7 @@ describe('scenario benchmarks', () => {
   it('more failures, errors or retries are worse even when every check passes and it is smaller', () => {
     const base = bench('baseline')
     for (const [k, v] of [
-      ['hiveCallErrors', 2],
+      ['combworkCallErrors', 2],
       ['apiFailed', 2],
       ['toolErrors', 1],
       ['apiCancelled', 1],
@@ -449,7 +449,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       { name: 'b', ok: true },
       { name: 'only a model', ok: null }
     ],
-    measures: measuresOf(report(0), report(2), { hiveCalls: [{ tool: 'cw_read_task', ok: true, args: '{"number":1}' }], skillsRead: ['work-on-card'] }, null),
+    measures: measuresOf(report(0), report(2), { combworkCalls: [{ tool: 'cw_read_task', ok: true, args: '{"number":1}' }], skillsRead: ['work-on-card'] }, null),
     coverage: { recording: true, dropped: 0, partial: [] },
     guidance: { atStart: { revision: 'g1' }, delivered: { guidance: 'g1', skills: { 'work-on-card': 'rev-a' } } },
     metricsOverheadMs: 12,
@@ -504,7 +504,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
   })
 
   it('keeps the newest runs in folders of their own; never overwrites a baseline, even saved three times in a second', () => {
-    const dir = tempDir('hive-results-')
+    const dir = tempDir('cw-results-')
     try {
       for (let i = 0; i < 35; i++) mkdirSync(join(dir, `2026-10-${String((i % 28) + 1).padStart(2, '0')}T${String(i).padStart(2, '0')}-00-00-fake`), { recursive: true })
       pruneResults(dir, 30)
@@ -535,7 +535,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
 
   it("never prunes a results folder a live runner holds, nor counts it; a dead runner's goes by age (HI-2234)", () => {
     const { resultsHeld, releaseResults } = require_('./scenarios/benchmark.cjs')
-    const dir = tempDir('hive-results-held-')
+    const dir = tempDir('cw-results-held-')
     try {
       // The oldest run is still going (pid 101, alive), as HI-2190's two-hour Codex trials were; then 40 short runs.
       const running = resultsFolder(dir, '2026-10-31T14-27-32-codex', 101)
@@ -565,7 +565,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
     const { resultsKind } = require_('./scenarios/benchmark.cjs')
     expect(['fake', 'fake-codex', 'fake-copilot', 'fake-2', 'fake-codex-3'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['fake', 'fake', 'fake', 'fake', 'fake'])
     expect(['codex', 'claude-code', 'copilot', 'codex-2'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['model', 'model', 'model', 'model'])
-    const dir = tempDir('hive-results-kinds-')
+    const dir = tempDir('cw-results-kinds-')
     try {
       const at = (h: number, m: number) => `2026-10-31T${String(h).padStart(2, '0')}-${String(m).padStart(2, '0')}-00`
       // A finished model trial, then 40 fake runs of each fake provider in turn after it.
@@ -592,7 +592,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
 
   it('a run whose results folder is removed under it makes it again with everything it had written (HI-2234)', () => {
     const { writeResults, resultsHeld } = require_('./scenarios/benchmark.cjs')
-    const dir = tempDir('hive-results-gone-')
+    const dir = tempDir('cw-results-gone-')
     try {
       const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
       const written = new Map<string, string>()
@@ -624,7 +624,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
 
   it('a results folder removed as the write is made, or during the recovery, is made again; only ENOENT is retried, a bounded number of times (HI-2234)', () => {
     const { writeResults, resultsHeld, WRITE_ATTEMPTS } = require_('./scenarios/benchmark.cjs')
-    const dir = tempDir('hive-results-race-')
+    const dir = tempDir('cw-results-race-')
     try {
       const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
       writeFileSync(join(out, 'results.json'), 'old')
@@ -677,7 +677,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
 })
 
 describe('kept comparisons (main/benchmarks.ts)', async () => {
-  const base = tempDir('hive-bench-')
+  const base = tempDir('cw-bench-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -923,7 +923,7 @@ describe('#117 round 2: checks are authoritative; the budget stops on unknown co
 })
 
 describe('kept comparisons: damage and closing mid-change (#117 round 2)', async () => {
-  const base = tempDir('hive-bench2-')
+  const base = tempDir('cw-bench2-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -1102,7 +1102,7 @@ describe('kept comparisons: damage and closing mid-change (#117 round 2)', async
 })
 
 describe('kept comparisons: bounds that hold under failing removals; quarantine by age (#117 round 4)', async () => {
-  const base = tempDir('hive-bench4-')
+  const base = tempDir('cw-bench4-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -1210,7 +1210,7 @@ describe('kept comparisons: bounds that hold under failing removals; quarantine 
 })
 
 describe('kept comparisons: Windows rename retries stop when the workspace goes (#117 round 5)', async () => {
-  const base = tempDir('hive-bench5-')
+  const base = tempDir('cw-bench5-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')

@@ -7,7 +7,7 @@ import { renameRetrying, writeTextAtomic } from './fsutil'
 import { createLogger } from './logger'
 import { englishText, withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
-import { errorText, hiveError } from './hiveError'
+import { errorText, combworkError } from './combworkError'
 import type { WorkspaceService } from './workspace'
 import { ownerOfName } from './projectNames'
 import { existsSync } from 'original-fs'
@@ -42,7 +42,7 @@ export const benchIo = { write: writeTextAtomic, renameOnce: (from: string, to: 
 /** A rename for this workspace's work: retried while Windows holds a file, the workspace checked before every attempt. */
 const guardedRename = (ctx: BenchContext, from: string, to: string): Promise<void> => renameRetrying(from, to, 20, () => live(ctx), (a, b) => benchIo.renameOnce(a, b))
 
-/** Index and kept files are read with a cap: they are Hive's, but on disk. */
+/** Index and kept files are read with a cap: they are Combwork's, but on disk. */
 const INDEX_BYTES = 512 * 1024
 const KEPT_BYTES = 4 * 1024 * 1024
 const MAX_SELECTED = 200
@@ -86,13 +86,13 @@ const M = {
 
 /** The context of a workspace now (synchronously: call it before awaiting anything). */
 export function benchContext(w: WorkspaceService): BenchContext {
-  if (!w.path || w.lifetime.aborted) throw hiveError(msg({ id: 'service.benchmarks.noWorkspace', defaultMessage: 'No workspace is open.', description: "An error on the Performance page: kept comparisons need a workspace open." }), undefined, { kind: 'conflict' })
+  if (!w.path || w.lifetime.aborted) throw combworkError(msg({ id: 'service.benchmarks.noWorkspace', defaultMessage: 'No workspace is open.', description: "An error on the Performance page: kept comparisons need a workspace open." }), undefined, { kind: 'conflict' })
   return { dir: join(w.path, CW_DIR, 'metrics', 'benchmarks'), lifetime: w.lifetime, workspacePath: w.path, idOf: (p) => w.projectIdsNow().byPath.get(join(w.path!, p).toLowerCase()) ?? null, ownerOf: (p) => ownerOfName(w, p) }
 }
 
 /** Refuses work whose workspace closed or switched since it started. */
 function live(ctx: BenchContext): void {
-  if (ctx.lifetime.aborted) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  if (ctx.lifetime.aborted) throw combworkError(M.closed, undefined, { kind: 'conflict' })
 }
 
 /** An index entry: a kept comparison, or one being added or removed by change `txn`. */
@@ -180,7 +180,7 @@ function acceptable(index: Index): boolean {
 }
 
 async function writeIndex(ctx: BenchContext, index: Index): Promise<void> {
-  if (!acceptable(index)) throw hiveError(msg({ id: 'service.benchmarks.unwritable', defaultMessage: 'Combwork refused to write a list of kept comparisons it couldn’t read back: nothing was changed.', description: "An error on the Performance page: the list of kept comparisons Combwork was about to write wouldn't read back as valid, so it wasn't written." }))
+  if (!acceptable(index)) throw combworkError(msg({ id: 'service.benchmarks.unwritable', defaultMessage: 'Combwork refused to write a list of kept comparisons it couldn’t read back: nothing was changed.', description: "An error on the Performance page: the list of kept comparisons Combwork was about to write wouldn't read back as valid, so it wasn't written." }))
   await commit(ctx, join(ctx.dir, 'index.json'), JSON.stringify(index, null, 2))
 }
 
@@ -233,13 +233,13 @@ async function readIndex(ctx: BenchContext): Promise<Index> {
   try {
     textValue = await readCapped(join(ctx.dir, 'index.json'), INDEX_BYTES)
   } catch (e) {
-    if (!isMissing(e)) throw hiveError(M.cantRead, { error: errorText(e) }, { cause: e })
+    if (!isMissing(e)) throw combworkError(M.cantRead, { error: errorText(e) }, { cause: e })
     textValue = null
     missing = true
   }
   const names = await readdir(ctx.dir).catch((e) => {
     if (isMissing(e)) return [] as string[]
-    throw hiveError(M.cantRead, { error: errorText(e) }, { cause: e })
+    throw combworkError(M.cantRead, { error: errorText(e) }, { cause: e })
   })
   // Staged copies are never authoritative: one left by an interrupted write goes.
   for (const f of names.filter((x) => /\.staged-[0-9a-f]+$/.test(x))) await rm(join(ctx.dir, f), { force: true }).catch(() => undefined)
@@ -403,14 +403,14 @@ function keep(ctx: BenchContext, a: Artifact): Promise<KeptEntry> {
     const evicted: IndexEntry[] = []
     while (active.length - evicted.length >= BENCHMARK_LIMITS.kept) {
       const oldest = active.filter((e) => !e.pinned && !evicted.includes(e)).sort((x, y) => x.keptAt.localeCompare(y.keptAt))[0]
-      if (!oldest) throw hiveError(msg({ id: 'service.benchmarks.allPinned', defaultMessage: '{n} are kept and all are pinned: unpin or remove one first.', description: 'An error keeping a comparison on the Performance page: the most that can be kept ({n}) are kept, all pinned, so none can make room.' }), { n: BENCHMARK_LIMITS.kept }, { kind: 'conflict' })
+      if (!oldest) throw combworkError(msg({ id: 'service.benchmarks.allPinned', defaultMessage: '{n} are kept and all are pinned: unpin or remove one first.', description: 'An error keeping a comparison on the Performance page: the most that can be kept ({n}) are kept, all pinned, so none can make room.' }), { n: BENCHMARK_LIMITS.kept }, { kind: 'conflict' })
       evicted.push(oldest)
     }
     // The change adds one entry to the index (the evicted ones stay, as removing, until their files are gone): refused,
     // before anything is recorded, if that would pass what the index may hold.
     if (index.entries.length + 1 > MAX_ENTRIES) {
       const waiting = index.entries.filter((e) => e.state === 'removing').length
-      throw hiveError(msg({ id: 'service.benchmarks.stuck', defaultMessage: '{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Combwork retries each time it reads the list.', description: "An error keeping a comparison on the Performance page: {n} removed comparisons' files couldn't be deleted yet (another program may have them open), and the list has no room until they are." }), { n: waiting }, { kind: 'conflict' })
+      throw combworkError(msg({ id: 'service.benchmarks.stuck', defaultMessage: '{n, plural, one {# removed comparison’s file couldn’t be deleted yet (in use?): nothing more can be kept until it is.} other {# removed comparisons’ files couldn’t be deleted yet (in use?): nothing more can be kept until they are.}} Combwork retries each time it reads the list.', description: "An error keeping a comparison on the Performance page: {n} removed comparisons' files couldn't be deleted yet (another program may have them open), and the list has no room until they are." }), { n: waiting }, { kind: 'conflict' })
     }
     const txn = randomBytes(6).toString('hex')
     const id = randomBytes(6).toString('hex')
@@ -475,7 +475,7 @@ export async function importBenchmark(ctx: BenchContext, scope: CompareScope, fr
   return { entry: await keep(ctx, parsed.artifact) }
 }
 
-/** An entry's facts and its name's kind, so the window says its description (and a name Hive gave it) in its language (#1104). */
+/** An entry's facts and its name's kind, so the window says its description (and a name Combwork gave it) in its language (#1104). */
 const shownFrom = (a: Artifact): Pick<KeptEntry, 'facts' | 'labelKind'> => {
   const facts = factsOf(a)
   return facts ? { facts, ...(a.labelKind ? { labelKind: a.labelKind } : {}) } : {}
@@ -487,7 +487,7 @@ const shownFrom = (a: Artifact): Pick<KeptEntry, 'facts' | 'labelKind'> => {
  */
 export async function keepReport(ctx: BenchContext, report: MetricsReport, appVersion: string, label?: string): Promise<KeptEntry> {
   live(ctx)
-  if (report.workspacePath.toLowerCase() !== ctx.workspacePath.toLowerCase()) throw hiveError(msg({ id: 'service.benchmarks.switched', defaultMessage: 'The workspace was switched: nothing was kept.', description: "An error keeping the Performance page's report as a comparison: the window opened another workspace meanwhile." }), undefined, { kind: 'conflict' })
+  if (report.workspacePath.toLowerCase() !== ctx.workspacePath.toLowerCase()) throw combworkError(msg({ id: 'service.benchmarks.switched', defaultMessage: 'The workspace was switched: nothing was kept.', description: "An error keeping the Performance page's report as a comparison: the window opened another workspace meanwhile." }), undefined, { kind: 'conflict' })
   const s = summaryOf(report, report.scope.kind === 'project' ? report.scope.project : undefined)
   const scope: CompareScope = report.scope.kind === 'project' ? { kind: 'project', project: report.scope.project } : report.filters?.own ? { kind: 'workspace', own: true } : { kind: 'workspace' }
   const a: Artifact = { schema: METRICS_EXPORT_SCHEMA, kind: 'export', label: (label?.trim() || `Kept ${s.from.slice(0, 10)} to ${s.to.slice(0, 10)}`).slice(0, 80), ...(label?.trim() ? {} : { labelKind: 'kept' as const }), createdAt: new Date().toISOString(), appVersion, scope, summary: s }
@@ -546,10 +546,10 @@ export function adoptBenchmarkOwners(ctx: BenchContext): Promise<void> {
 }
 
 /**
- * The index, with the facts the window describes a scope's comparisons from (#1104) added to those kept before Hive
+ * The index, with the facts the window describes a scope's comparisons from (#1104) added to those kept before Combwork
  * stored them: read from each one's kept file (bounded, through the normalisers, of the scope its entry says) and
  * written to the index once, in its turn and in the workspace it began in. A file that can't be read leaves its entry
- * as it was (its English shown). Names stay as they are: whether Hive gave one can't be known now.
+ * as it was (its English shown). Names stay as they are: whether Combwork gave one can't be known now.
  */
 async function withFacts(ctx: BenchContext, scope: CompareScope): Promise<Index> {
   const index = await readIndex(ctx)
@@ -585,14 +585,14 @@ export async function listBenchmarks(ctx: BenchContext, scope: CompareScope): Pr
 
 /** One kept artifact, if it is this scope's: its index entry, the file itself and the scope asked for must all agree. */
 export async function readBenchmark(ctx: BenchContext, scope: CompareScope, id: string): Promise<Artifact> {
-  if (!ID.test(id)) throw hiveError(msg({ id: 'service.benchmarks.noSuch', defaultMessage: 'No such comparison', description: 'An error on the Performance page: the kept comparison asked for is not there.' }), undefined, { kind: 'notFound' })
+  if (!ID.test(id)) throw combworkError(msg({ id: 'service.benchmarks.noSuch', defaultMessage: 'No such comparison', description: 'An error on the Performance page: the kept comparison asked for is not there.' }), undefined, { kind: 'notFound' })
   const index = await serial(ctx, () => readIndex(ctx))
   const entry = keptOf(index, scope, ctx).find((e) => e.id === id)
-  if (!entry) throw hiveError(msg({ id: 'service.benchmarks.noSuchHere', defaultMessage: 'No such comparison for this scope', description: "An error on the Performance page: the kept comparison asked for isn't one of the scope shown (the workspace, or a project)." }), undefined, { kind: 'notFound' })
+  if (!entry) throw combworkError(msg({ id: 'service.benchmarks.noSuchHere', defaultMessage: 'No such comparison for this scope', description: "An error on the Performance page: the kept comparison asked for isn't one of the scope shown (the workspace, or a project)." }), undefined, { kind: 'notFound' })
   const a = await readArtifactFile(ctx, id)
   live(ctx)
-  if (!a) throw hiveError(msg({ id: 'service.benchmarks.damaged', defaultMessage: 'That comparison file is missing or damaged: remove it and import it again.', description: "An error on the Performance page: a kept comparison's file can't be read." }))
-  if (compareScopeKey(a.scope) !== compareScopeKey(entry.scope)) throw hiveError(msg({ id: 'service.benchmarks.wrongScope', defaultMessage: 'That comparison file doesn’t match its scope: remove it and import it again.', description: "An error on the Performance page: a kept comparison's file is of another scope than its entry in the list says." }))
+  if (!a) throw combworkError(msg({ id: 'service.benchmarks.damaged', defaultMessage: 'That comparison file is missing or damaged: remove it and import it again.', description: "An error on the Performance page: a kept comparison's file can't be read." }))
+  if (compareScopeKey(a.scope) !== compareScopeKey(entry.scope)) throw combworkError(msg({ id: 'service.benchmarks.wrongScope', defaultMessage: 'That comparison file doesn’t match its scope: remove it and import it again.', description: "An error on the Performance page: a kept comparison's file is of another scope than its entry in the list says." }))
   return a
 }
 
@@ -609,7 +609,7 @@ export function removeBenchmark(ctx: BenchContext, scope: CompareScope, id: stri
     const txn = randomBytes(6).toString('hex')
     const marked: Index = { ...index, entries: index.entries.map((e) => (e.id === id ? { ...e, state: 'removing' as const, txn } : e)) }
     await writeIndex(ctx, marked)
-    if (!(await removeFile(ctx, id))) throw hiveError(msg({ id: 'service.benchmarks.notRemoved', defaultMessage: 'It is off the list, but its file couldn’t be removed yet: Combwork will try again.', description: "An error removing a kept comparison on the Performance page: it is no longer listed, but its file couldn't be deleted yet." }))
+    if (!(await removeFile(ctx, id))) throw combworkError(msg({ id: 'service.benchmarks.notRemoved', defaultMessage: 'It is off the list, but its file couldn’t be removed yet: Combwork will try again.', description: "An error removing a kept comparison on the Performance page: it is no longer listed, but its file couldn't be deleted yet." }))
     await writeIndex(ctx, { ...index, entries: index.entries.filter((e) => e.id !== id) })
   })
 }

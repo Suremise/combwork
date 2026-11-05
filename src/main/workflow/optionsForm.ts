@@ -14,7 +14,7 @@ import { cardLabel } from '../../shared/projectKeys'
 import { MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry } from '../../shared/workflow/facts'
 import { refusal } from '../../shared/workflow/refusals'
 import { config } from '../config'
-import { HiveError, hiveError } from '../hiveError'
+import { CombworkError, combworkError } from '../combworkError'
 import { projectPlatform } from '../platform/registry'
 import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
 import { listLanes } from '../lanes'
@@ -53,7 +53,7 @@ const IN_FLIGHT = new Set(['active', 'review', 'approved', 'merging'])
 /** A project of the workspace by its folder, with its platform (the Assistant's home has none). */
 function projectOf(ws: WorkspaceService, projectPath: string): { path: string; name: string; platform: PlatformId } {
   const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
-  if (!p?.platform) throw new HiveError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!p?.platform) throw new CombworkError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
   return { path: p.path, name: p.name, platform: p.platform.id }
 }
 
@@ -139,7 +139,7 @@ export async function workflowForm(ws: WorkspaceService, projectPath: string): P
 
 /**
  * The project's options for agents (`cw_project_status`, lean): the options in force, and which of them the project,
- * the workspace or Hive's settings set (the rest are the platform's all-off). `invalid`: why they work as all-off.
+ * the workspace or Combwork's settings set (the rest are the platform's all-off). `invalid`: why they work as all-off.
  */
 export async function workflowSummary(ws: WorkspaceService, projectPath: string): Promise<Record<string, unknown> | null> {
   const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
@@ -185,7 +185,7 @@ const isOptions = (v: unknown): v is Partial<WorkflowOptions> => !!v && typeof v
 function shapeOf(change: unknown): WorkflowChange {
   const c = change as Partial<WorkflowChange> | null
   const base = c?.base
-  if (!c || typeof c !== 'object' || !PRESET_IDS.includes(c.preset ?? null) || !isOptions(c.options) || (base !== undefined && (!base || !PRESET_IDS.includes(base.preset ?? null) || !isOptions(base.options)))) throw new HiveError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!c || typeof c !== 'object' || !PRESET_IDS.includes(c.preset ?? null) || !isOptions(c.options) || (base !== undefined && (!base || !PRESET_IDS.includes(base.preset ?? null) || !isOptions(base.options)))) throw new CombworkError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return { preset: c.preset ?? null, options: keptNames(c.options), ...(base ? { base: { preset: base.preset ?? null, options: base.options } } : {}) }
 }
 
@@ -201,7 +201,7 @@ const M = {
 }
 
 /** A form's save refused: the options changed after it read them (#1418). */
-export class WorkflowStale extends HiveError {
+export class WorkflowStale extends CombworkError {
   constructor() {
     super(M.changedMeanwhile, { kind: 'conflict' })
   }
@@ -257,7 +257,7 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
 }
 
 /** Options that can't be saved: refused with every reason, each a whole sentence of its own (in the window's language there). */
-export class WorkflowRefused extends HiveError {
+export class WorkflowRefused extends CombworkError {
   constructor(readonly problems: WorkflowProblem[]) {
     // agent-text: problemShown
     super({ lines: problems.map(problemShown) }, { kind: 'invalid' })
@@ -273,7 +273,7 @@ export class WorkflowRefused extends HiveError {
 export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void } = {}): Promise<WorkflowForm> {
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
-  // from this Hive or another.
+  // from this Combwork or another.
   return withRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
@@ -292,7 +292,7 @@ interface MergeAnswer {
 export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
   const project = projectOf(ws, projectPath)
   const a = raw as { card?: unknown; request?: unknown; style?: unknown; commitMessage?: unknown } | null
-  if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new HiveError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new CombworkError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   const answer: MergeAnswer = { card: a.card as number, request: a.request, style: a.style as WorkflowOptions['style'], commitMessage: a.commitMessage as CommitMessage }
   await withRepoLocks([project.path], () => workflowWrite(() => saveWorkflowOptions(ws, project.path, null, { answer })), { quiet: true, project: project.path })
 }
@@ -302,7 +302,7 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
  * while the project has the upgrade's mark (`mergeAsk`, kept for good) and the board no recorded choice
  * (`MERGE_CHOICE_KEY`). Its answer, or a save that chooses (changes G6 or G19 as they resolve), is recorded on the board
  * first, as one change of the board (its lock and transaction, which every answer, move and retirement of a request
- * takes, in this Hive or another): the answer's request checked there (still open, of its gate, bound to the card's
+ * takes, in this Combwork or another): the answer's request checked there (still open, of its gate, bound to the card's
  * open entry; else refused, nothing written), the choice recorded with its file write pending, the cards' rules (an
  * answer's: the project's cards in flight; a save's: those ticked and the card waiting with the question), then the
  * request answered as the user, or the question closed. project.json follows once that has committed, and the record
@@ -334,7 +334,7 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
     await saveSeams.beforeBoard?.()
     await boardWrite(ws, async () => {
       if (o.answer) target = await stillAsked(ws, project, o.answer)
-      // Chosen meanwhile (another Hive's answer): this one is refused, as an answered question's is.
+      // Chosen meanwhile (another Combwork's answer): this one is refused, as an answered question's is.
       else if (mergeChoiceOf(ws, project.name)) throw new WorkflowStale()
       // The caller's own check (HI-1502), in the board change that decides the save.
       o.check?.()
@@ -355,7 +355,7 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   workflowChanged(ws, project.path)
   // Names alone change no card's rules (#1417): nothing to apply to cards in flight, nor any queue to read again.
   if (namesOnly(plan.changed) && !plan.chosen) return workflowForm(ws, project.path)
-  // Whether Hive merges, and into what, may have changed: the windows read the project's queues again (#1356: which
+  // Whether Combwork merges, and into what, may have changed: the windows read the project's queues again (#1356: which
   // show follows the options too), whoever changed them (the window, the Assistant). A queue waiting for the merge
   // question (paused `mergeChoice`) carries on.
   const t = target || (await G.defaultBranch(project.path).catch(() => null))
@@ -432,7 +432,7 @@ async function settleLocked(ws: WorkspaceService, project: { path: string; name:
 export const saveSeams: { beforeBoard?: () => Promise<void>; recorded?: () => Promise<void>; beforeFile?: () => Promise<void> } = {}
 
 // A test copy (an unpackaged build) crashes at one of them when CW_TEST_MERGE_CHOICE_CRASH names it (HI-1697's crash
-// boundaries, tests/e2e/queueupgrade.cjs): Hive gone part way, as a crash leaves it.
+// boundaries, tests/e2e/queueupgrade.cjs): Combwork gone part way, as a crash leaves it.
 const crashAt = app?.isPackaged ? undefined : process.env.CW_TEST_MERGE_CHOICE_CRASH
 if (crashAt === 'recorded' || crashAt === 'beforeFile') saveSeams[crashAt] = () => (exitBy('app.exit', `a test crash at the merge choice's ${crashAt}`, () => app.exit(1)), new Promise<void>(() => undefined))
 
@@ -440,7 +440,7 @@ if (crashAt === 'recorded' || crashAt === 'beforeFile') saveSeams[crashAt] = () 
 function planOptions(ws: WorkspaceService, project: { path: string; name: string; platform: PlatformId }, cfg: ProjectConfig, change: WorkflowChange, answering: boolean): { workflow: ProjectWorkflow; changed: (keyof WorkflowOptions)[]; chosen: boolean } {
   // Its version control switched since the form was read (#1419): these options are the other platform's, refused.
   const now = projectPlatform(project.path, cfg.platform).id
-  if (now !== project.platform) throw hiveError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[now] }, { kind: 'conflict' })
+  if (now !== project.platform) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[now] }, { kind: 'conflict' })
   // A form read before another change (the Assistant's tool, another window) never writes over it (#1418).
   if (change.base && !sameBase(change.base, ownNow(cfg, project.platform))) throw new WorkflowStale()
   const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change, project.path)

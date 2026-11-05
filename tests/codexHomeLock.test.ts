@@ -11,7 +11,7 @@ import { junction } from './pathAliases'
 import { acquireCodexHome, codexLockDir, usesCodexHome } from './e2e/codexHomeLock.mjs'
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
-const tmp = tempDir('hive-codex-home-lock-')
+const tmp = tempDir('cw-codex-home-lock-')
 afterAll(() => rmSync(tmp, { recursive: true, force: true }))
 let number = 0
 const fixture = () => {

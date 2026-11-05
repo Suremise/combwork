@@ -2,17 +2,17 @@ import type { HookEvent, HookIds } from './providers/types'
 
 /**
  * The turn ledger (#648): which of a launch's CLI turns runs and which are over, by the CLI's own turn ids, so a hook
- * about a turn that is over can't make the agent working again (a PostToolUse that reaches Hive after the turn's Stop:
- * one way #642's Codex agent could have stayed "working"), and so Hive can tell a missing turn end from a busy agent.
+ * about a turn that is over can't make the agent working again (a PostToolUse that reaches Combwork after the turn's Stop:
+ * one way #642's Codex agent could have stayed "working"), and so Combwork can tell a missing turn end from a busy agent.
  * Pure, so each rule is unit-tested; SessionManager keeps one per launch and puts each hook through `admit` before the
  * status rules (hookStatus).
  *
  * The rules (the Assistant's, for #648):
  * 1. **Only a start opens or reopens a turn.** A prompt opens one. After its Stop, a turn reopens only on a start of it:
- *    a tool start with a call id not seen in it before (or none: a CLI whose hooks name no calls), or Hive's own
- *    continuation of a Stop (`hiveContinued`). End news (a tool end, an interrupt, the CLI idle, a refused sign-in, a
+ *    a tool start with a call id not seen in it before (or none: a CLI whose hooks name no calls), or Combwork's own
+ *    continuation of a Stop (`combworkContinued`). End news (a tool end, an interrupt, the CLI idle, a refused sign-in, a
  *    Stop) never reopens one. Any hook naming a turn that is neither the open nor the latest one is stale, with no effect
- *    on status, and **an id Hive doesn't remember is stale, never new**: the bound on the ids kept (`seen`) can't make an
+ *    on status, and **an id Combwork doesn't remember is stale, never new**: the bound on the ids kept (`seen`) can't make an
  *    old one a new turn. A prompt alone opens a turn under an id never seen (the CLI awaits its hook before the turn, so
  *    a prompt hook is never late). This holds for every kind of hook that names a turn, launch-wide ones too (a delayed
  *    PreCompact or SessionEnd of an earlier turn is stale); hooks naming none are launch-wide (SessionStart, a
@@ -26,31 +26,31 @@ import type { HookEvent, HookIds } from './providers/types'
  *      opens like any prompt. Should that hook be lost, a tool start whose call id the launch never saw opens the turn,
  *      only while the CLI's transcript says a task of it just ended (`woke`), never merely because a task runs.
  *    Past the bound on the ids kept (`forgot`), neither opens anything: an id not remembered may be an earlier one.
- * 2. **No screen timing decides a continuation**: rule 1 decides it from the ids alone, so a hook reaching Hive before the
+ * 2. **No screen timing decides a continuation**: rule 1 decides it from the ids alone, so a hook reaching Combwork before the
  *    CLI redraws changes nothing.
- * 3. **Times are when a hook reached Hive** (`now`, taken before it waits its turn in the launch's queue), not when it
+ * 3. **Times are when a hook reached Combwork** (`now`, taken before it waits its turn in the launch's queue), not when it
  *    was handled: the CLI's records are compared with them.
- * - A prompt in the running turn (its id) is one the CLI takes mid-turn; one Hive put there itself (`expectInjected`, a
+ * - A prompt in the running turn (its id) is one the CLI takes mid-turn; one Combwork put there itself (`expectInjected`, a
  *   message delivered into the running turn) isn't a new prompt at all.
- * - A Stop ends its turn, unless Hive's own reply carried it on (continuations fire no prompt, so only the Stop Hive
+ * - A Stop ends its turn, unless Combwork's own reply carried it on (continuations fire no prompt, so only the Stop Combwork
  *   answered with nothing ends it).
  *
- * A timer never ends a turn: silence (`silentFor`) only makes Hive look for the CLI's own record of the turn's end
+ * A timer never ends a turn: silence (`silentFor`) only makes Combwork look for the CLI's own record of the turn's end
  * (`reconciles` by id, `unheardStop` by its Stops' times) or read its screen, and failing those, say the state is unknown.
  */
 
 export type TurnState = 'running' | 'over'
 
 export interface Turn {
-  /** The CLI's id for it; null when its hooks name none (Copilot): Hive then knows only the latest turn. */
+  /** The CLI's id for it; null when its hooks name none (Copilot): Combwork then knows only the latest turn. */
   id: string | null
   state: TurnState
   /** When its first hook reached Hive (ms, as it arrived, not as it was handled): records from before it are earlier turns'. */
   startedAt: number
   /**
-   * When it last went on after it had stopped (ms, as the hook arrived): Hive continuing its Stop, or a new tool call
+   * When it last went on after it had stopped (ms, as the hook arrived): Combwork continuing its Stop, or a new tool call
    * after it (#1658); none while it runs as it began. The CLI's record of its end from before then is the end of the
-   * work it went on from, not of this run. (Its start sets none: its hooks may reach Hive after the CLI's own records.)
+   * work it went on from, not of this run. (Its start sets none: its hooks may reach Combwork after the CLI's own records.)
    */
   runFrom?: number
   /** Its tool calls started and not ended: their ids, or a count of those without one. */
@@ -58,9 +58,9 @@ export interface Turn {
   unnamedCalls: number
   /** The ids of every tool call it started: a start of one again after its Stop is no start of the turn. */
   callsSeen: Set<string>
-  /** Stops of it Hive received (each one Hive answered with a continuation, and the one that ended it). */
+  /** Stops of it Combwork received (each one Combwork answered with a continuation, and the one that ended it). */
   stops: number
-  /** Stops of it that Hive answered with a continuation. */
+  /** Stops of it that Combwork answered with a continuation. */
   continued: number
   /** How it ended (for the log): 'stop', 'interrupt', 'idle', 'transcript', 'screen', 'user'… */
   endedBy?: string
@@ -84,9 +84,9 @@ export interface TurnLedger {
   compaction: { id: string; open: boolean } | null
   /** Hooks received for the launch, in order (the receive sequence the log gives each). */
   seq: number
-  /** When Hive last heard from the CLI (a hook, the transcript growing, its screen showing it at work), ms. */
+  /** When Combwork last heard from the CLI (a hook, the transcript growing, its screen showing it at work), ms. */
   heard: number
-  /** Prompts Hive put into the running turn itself and hasn't seen yet (their text, flattened). */
+  /** Prompts Combwork put into the running turn itself and hasn't seen yet (their text, flattened). */
   injected: string[]
 }
 
@@ -98,7 +98,7 @@ export type Admitted =
   | { verdict: 'apply'; event: HookEvent; note?: string }
   /** Old news of a turn that is over, or of another turn: the status rules don't see it. */
   | { verdict: 'stale'; why: string }
-  /** A Stop Hive answered with a continuation: the turn goes on. */
+  /** A Stop Combwork answered with a continuation: the turn goes on. */
   | { verdict: 'continued' }
 
 /** At most this many turn ids are remembered (for the log's reasons; one not remembered is stale either way). */
@@ -120,7 +120,7 @@ function remember(ledger: TurnLedger, set: Set<string>, id: string, max: number)
 
 const flat = (text: string): string => text.replace(/\s+/g, ' ').trim()
 
-/** Hive puts `text` into the running turn itself (Messaging 5): its prompt hook isn't a new prompt. */
+/** Combwork puts `text` into the running turn itself (Messaging 5): its prompt hook isn't a new prompt. */
 export function expectInjected(ledger: TurnLedger, text: string): void {
   ledger.injected.push(flat(text))
   if (ledger.injected.length > MAX_INJECTED) ledger.injected.shift()
@@ -172,12 +172,12 @@ function what(ev: HookEvent): string {
 }
 
 /**
- * Takes a hook in: what the status rules should make of it. `hiveContinued`: Hive answered this Stop with a
+ * Takes a hook in: what the status rules should make of it. `combworkContinued`: Combwork answered this Stop with a
  * continuation. `woke`: the CLI's transcript says a background task of it just ended, so it may begin a turn by itself.
  * `now`: when the hook reached Hive (before it waited its turn in the launch's queue). Counts it (seq) and that the CLI
  * was heard.
  */
-export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { hiveContinued?: boolean; woke?: boolean; now?: number } = {}): Admitted {
+export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { combworkContinued?: boolean; woke?: boolean; now?: number } = {}): Admitted {
   const now = opts.now ?? Date.now()
   ledger.seq++
   ledger.heard = Math.max(ledger.heard, now)
@@ -240,7 +240,7 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
   // From here the hook names the latest turn, or none (a CLI whose hooks name none).
   switch (ev.kind) {
     case 'prompt': {
-      // Hive's own text in the running turn (a CLI that names no turn too: Copilot takes a drain as a new prompt).
+      // Combwork's own text in the running turn (a CLI that names no turn too: Copilot takes a drain as a new prompt).
       const i = running && ev.text ? ledger.injected.indexOf(flat(ev.text)) : -1
       if (i >= 0) {
         ledger.injected.splice(i, 1)
@@ -287,8 +287,8 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
       if (!a) begin(ledger, null, now)
       const t = ledger.active!
       t.stops++
-      if (opts.hiveContinued) {
-        // Hive's own continuation is a start of it (rule 1).
+      if (opts.combworkContinued) {
+        // Combwork's own continuation is a start of it (rule 1).
         if (t.state === 'over') reopen(t, now)
         else t.runFrom = now
         t.continued++
@@ -327,7 +327,7 @@ export function openCalls(ledger: TurnLedger): number {
 
 /**
  * Whether the CLI's own record that turn `turn` is over (its id as its hooks name turns), recorded `at` (ms), is about
- * the turn Hive has running: that turn, and its current run (#1658: one recorded before Hive continued it, or a new
+ * the turn Combwork has running: that turn, and its current run (#1658: one recorded before Combwork continued it, or a new
  * tool call reopened it, is the end of the work it went on from).
  */
 export function reconciles(ledger: TurnLedger, turn: string, at?: number): boolean {
@@ -336,10 +336,10 @@ export function reconciles(ledger: TurnLedger, turn: string, at?: number): boole
 }
 
 /**
- * Whether the CLI's own records show a Stop of the running turn that Hive never received, for CLIs whose records don't
+ * Whether the CLI's own records show a Stop of the running turn that Combwork never received, for CLIs whose records don't
  * name turns (Copilot): more of its Stops answered since the turn's first hook reached Hive (`stopEnds`, ms, as the CLI
- * recorded them) than Stops of the turn Hive got. One answered before the turn began is an earlier turn's; each Stop
- * Hive carried the turn on with is one of those it got, so a missed final one after continuations still counts.
+ * recorded them) than Stops of the turn Combwork got. One answered before the turn began is an earlier turn's; each Stop
+ * Combwork carried the turn on with is one of those it got, so a missed final one after continuations still counts.
  */
 export function unheardStop(ledger: TurnLedger, stopEnds: readonly number[]): boolean {
   const a = ledger.active
@@ -350,7 +350,7 @@ export function unheardStop(ledger: TurnLedger, stopEnds: readonly number[]): bo
 /**
  * Which turn a failure the CLI's records report belongs to (#1632, Codex's rollout): the turn it names (`turn`, as its
  * hooks name turns), else, for a CLI whose records name none, the latest turn begun before it was recorded (`at`, ms);
- * and of that turn, its latest run (#1658): a failure recorded before the turn last went on (Hive continued its Stop, a
+ * and of that turn, its latest run (#1658): a failure recorded before the turn last went on (Combwork continued its Stop, a
  * new tool call reopened it) ended the work it went on from, not this run. `running`/`over`: the latest turn's run,
  * still running or over; `older`: a turn or run before it (a newer one has begun, so the failure is history);
  * `unknown`: no turn of it seen yet (its hooks may still come), so nothing can be decided.

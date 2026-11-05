@@ -12,10 +12,10 @@ import { Icon, Tooltip } from '../components/ui'
 
 /**
  * The top of the Version Control tab (#1416, SPEC §16.6 and §16.3.5): the project's version control as a None · Git
- * choice, what Hive finds in its folder, and "Workflow: Git · Team", which opens the Workflow section. Hive never switches
+ * choice, what Combwork finds in its folder, and "Workflow: Git · Team", which opens the Workflow section. Combwork never switches
  * it silently (#1419): the user picks the other one (None always; Git only where a Git repository is found and nothing
- * else is), or takes the offer Hive makes when it detects a change, after the warning: what changes, that it applies
- * from the next card, and what keeps the old rules. Not now hides an offer until Hive starts again.
+ * else is), or takes the offer Combwork makes when it detects a change, after the warning: what changes, that it applies
+ * from the next card, and what keeps the old rules. Not now hides an offer until Combwork starts again.
  */
 
 /** The tab's words (the board's workflow link, #1420, says it as the tab does). */
@@ -57,7 +57,7 @@ const S = {
   notSwitched: msg({ id: 'git.vc.switch.notSwitched', defaultMessage: "{project} is a Git repository now, but it wasn't switched to Git: {error}", description: 'A notice after Initialise repository… chosen from Git’s page made the repository but switching the project to Git failed. {project} is its name, {error} why (already translated).' })
 }
 
-/** Offers hidden with Not now, by project and offer: until Hive starts again (in memory, as the upgrade banner's). */
+/** Offers hidden with Not now, by project and offer: until Combwork starts again (in memory, as the upgrade banner's). */
 const hiddenOffers = new Set<string>()
 const offerKey = (path: string, o: PlatformOffer): string => `${path.toLowerCase()}\n${o.why}`
 
@@ -171,13 +171,13 @@ function SwitchDetails({ project, check, names }: { project: ProjectInfo; check:
   )
 }
 
-/** The offer shown under the header (§16.3.5): the project's, unless Not now hid it until Hive starts again. */
+/** The offer shown under the header (§16.3.5): the project's, unless Not now hid it until Combwork starts again. */
 function shownOffer(project: ProjectInfo): PlatformOffer | null {
   const o = project.platform?.offer
   return o && !hiddenOffers.has(offerKey(project.path, o)) ? o : null
 }
 
-/** The offer Hive makes when what it detects differs from the platform in force (§16.3.5), until Not now. */
+/** The offer Combwork makes when what it detects differs from the platform in force (§16.3.5), until Not now. */
 function PlatformOfferLine({ project, platform, o, onHide }: { project: ProjectInfo; platform: PlatformId; o: PlatformOffer; onHide: () => void }) {
   const d = project.platform!.detected
   const text = o.why === 'gitFound' ? tr(S.gitFound, { root: d.root ?? project.path }) : o.why === 'otherFound' ? tr(S.otherFound, { vcs: d.other ?? '' }) : tr(S.repositoryGone)
@@ -204,7 +204,7 @@ function PlatformOfferLine({ project, platform, o, onHide }: { project: ProjectI
   )
 }
 
-/** What Hive finds in the folder, in the tab's words. */
+/** What Combwork finds in the folder, in the tab's words. */
 function factText(p: ProjectPlatform): string {
   const d = p.detected
   // Git still in force: what was found, not yet what it uses (the offer under the header says that).
@@ -249,7 +249,7 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
   useLanguage()
   const preset = form ? presetState(form) : null
   const [, redraw] = useState(0)
-  // The offer says what Hive found, with its action: the fact line beside the choice waits until it's hidden (Not now).
+  // The offer says what Combwork found, with its action: the fact line beside the choice waits until it's hidden (Not now).
   const offer = shownOffer(project)
   return (
     <>

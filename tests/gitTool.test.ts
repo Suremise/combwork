@@ -11,7 +11,7 @@ import { checkGit, gitExe, gitOnPath, gitProblem, gitTool, realGit, realGitBehin
 import { git, gitStatus } from '../src/main/git'
 import { withLauncherEnv } from '../src/main/gitWorker'
 import { branchStatus, createWorktree, removeCheckedWorktree, worktreeCheck } from '../src/main/worktrees'
-import { ensureHiveExcluded } from '../src/main/hiveVcs'
+import { ensureCombworkExcluded } from '../src/main/combworkVcs'
 import { tempDir, tempRoot } from './tempDir'
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -36,7 +36,7 @@ function hideGit(): void {
 
 /** A repository on main with one worktree, `cw/wt`, merged and clean (removable while git runs). */
 async function project(): Promise<{ p: string; wt: { path: string; branch: string; base: string } }> {
-  root = tempDir('hive-gittool-')
+  root = tempDir('cw-gittool-')
   const p = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', p)
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
@@ -122,7 +122,7 @@ describe('git missing', () => {
   it('.combwork is still excluded by the line Combwork writes, marked unconfirmed', async () => {
     const { p } = await project()
     hideGit()
-    expect(await ensureHiveExcluded(p)).toMatchObject({ excluded: true, unconfirmed: true })
+    expect(await ensureCombworkExcluded(p)).toMatchObject({ excluded: true, unconfirmed: true })
   })
 
   it('a git call that runs again clears it', async () => {
@@ -163,7 +163,7 @@ describe('the git Combwork starts', () => {
     for (const d of layouts.splice(0)) rmSync(d, { recursive: true, force: true })
   })
   function layout(mingw = 'mingw64'): { root: string; launcher: string; execPath: string; real: string } {
-    const top = tempDir('hive-gitexe-')
+    const top = tempDir('cw-gitexe-')
     layouts.push(top)
     const launcher = join(top, 'cmd', 'git.exe')
     const execPath = join(top, mingw, 'libexec', 'git-core')
@@ -194,7 +194,7 @@ describe('the git Combwork starts', () => {
 
   it("the real git's environment is the launcher's (git-wrapper.c): its MSYSTEM, PLINK_PROTOCOL, HOME, and its folders and ~\\bin before PATH", () => {
     const l = { pathFirst: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin', msystem: 'MINGW64' }
-    const top = tempDir('hive-gitenv-')
+    const top = tempDir('cw-gitenv-')
     layouts.push(top)
     const roaming = join(top, 'roaming')
     const local = join(top, 'local')
@@ -265,7 +265,7 @@ describe('the git Combwork starts', () => {
     const env: NodeJS.ProcessEnv = baseEnv()
     for (const k of Object.keys(env)) if (['PATH', 'HOME', 'HOMEDRIVE', 'HOMEPATH', 'USERPROFILE', 'MSYSTEM', 'PLINK_PROTOCOL'].includes(k.toUpperCase())) delete env[k]
     Object.assign(env, { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', PATH: `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, MSYSTEM: 'MSYS', HOMEDRIVE: roaming.slice(0, 2), HOMEPATH: roaming.slice(2), USERPROFILE: local })
-    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.hiveenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'hiveenv'], { cwd: p, env: e, encoding: 'utf8', windowsHide: true })
+    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.cwenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'cwenv'], { cwd: p, env: e, encoding: 'utf8', windowsHide: true })
     const through = said(launcher, env)
     // The launcher's own MSYSTEM (MINGW64, or UCRT64 on Git for Windows 2.56's UCRT64 build, HI-2400), not the inherited one.
     expect(through.startsWith(`${real.launcherEnv.msystem}|`)).toBe(true)

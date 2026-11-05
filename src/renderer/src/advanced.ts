@@ -15,18 +15,18 @@ export async function loadAdvanced(): Promise<void> {
   }
 }
 
-/** An advanced value as Hive uses it in this window (its workspace's own, the override, or the default). */
+/** An advanced value as Combwork uses it in this window (its workspace's own, the override, or the default). */
 export function useAdvancedValue<T extends string | number | string[] | boolean>(id: string): T {
   const state = useStore((s) => s.advanced)
   return advancedRow(advancedDef(id)!, state).value as T
 }
 /** An advanced value as this window has it now, for tests: a change reaches the window in the states' batch (HI-1938), after its IPC answers. */
-;(window as unknown as { __hiveAdvancedValue?: (id: string) => unknown }).__hiveAdvancedValue = (id) => {
+;(window as unknown as { __cwAdvancedValue?: (id: string) => unknown }).__cwAdvancedValue = (id) => {
   const def = advancedDef(id)
   return def ? advancedRow(def, useStore.getState().advanced).value : undefined
 }
 
-/** Whether right-click in a provider's terminal goes to its CLI rather than Hive's copy/paste (#737): off for a provider with no such setting. */
+/** Whether right-click in a provider's terminal goes to its CLI rather than Combwork's copy/paste (#737): off for a provider with no such setting. */
 export function useRightClickToCli(provider: string | undefined): boolean {
   const state = useStore((s) => s.advanced)
   const def = provider ? advancedDef(rightClickToCliId(provider)) : undefined

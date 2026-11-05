@@ -2,7 +2,7 @@
  * The canary dialect (dialects, HI-2065; design section 2, check 4): pseudo-localisation for agent text. Every id's text
  * wrapped in markers, `⟦id⟧…⟦/⟧`, put in a session's chain: what an agent then gets with any letter outside the markers
  * is text that bypassed the catalogue (hard-coded, or glued on in code). Tests run it over what agents get (unit tests of
- * the builders; tests/e2e/agentguidance.cjs through hive-mcp.js's dialect file) and grow with each extraction card.
+ * the builders; tests/e2e/agentguidance.cjs through cw-mcp.js's dialect file) and grow with each extraction card.
  * Imports nothing: the e2e scripts load it in plain Node.
  */
 
@@ -45,7 +45,7 @@ export function canarySplit(output: string): { outside: string; ids: string[]; u
 
 /**
  * What's wrong with an output a canary run produced: a letter outside the markers (once the values the test passed are
- * taken out: a project's name is the caller's, not Hive's wording), a marker naming an id the schema hasn't, unbalanced
+ * taken out: a project's name is the caller's, not Combwork's wording), a marker naming an id the schema hasn't, unbalanced
  * markers. Empty: every word came through the catalogue.
  */
 export function canaryProblems(output: string, schemaIds: ReadonlySet<string>, values: readonly string[] = []): string[] {

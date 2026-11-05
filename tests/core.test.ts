@@ -321,7 +321,7 @@ describe('providers migration', () => {
       expect(notifications({ version: 8, settings: { notifications: { whileFocused: 'windows', bannerScope } } }).bannerScope, bannerScope).toBe(bannerScope)
     }
     for (const whileFocused of ['inApp', 'nothing', 'windows']) expect('whileFocused' in notifications({ version: 8, settings: { notifications: { whileFocused } } }), whileFocused).toBe(false)
-    // Before version 6 everyone was moved to Show in Hive: their old onlyWhenUnfocused says nothing now, and goes.
+    // Before version 6 everyone was moved to Show in Combwork: their old onlyWhenUnfocused says nothing now, and goes.
     for (const onlyWhenUnfocused of [true, false]) {
       const n = notifications({ version: 5, settings: { notifications: { onlyWhenUnfocused, bannerScope: 'project' } } })
       expect(n.bannerScope).toBe('project')

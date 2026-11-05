@@ -121,7 +121,7 @@ describe('model IDs', () => {
 })
 
 describe('the chain', () => {
-  const base = tempDir('hive-dialects-chain-')
+  const base = tempDir('cw-dialects-chain-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   let n = 0
   /** A dialects folder with the usual layers, each overriding what is above it in the list. */
@@ -224,7 +224,7 @@ describe('the chain', () => {
 })
 
 describe('matching the model slot', () => {
-  const base = tempDir('hive-dialects-match-')
+  const base = tempDir('cw-dialects-match-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   let set: Awaited<ReturnType<typeof loadDialects>>
   beforeAll(async () => {
@@ -277,7 +277,7 @@ describe('matching the model slot', () => {
 })
 
 describe('one file per model in a CLI folder', () => {
-  const base = tempDir('hive-dialects-claims-')
+  const base = tempDir('cw-dialects-claims-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   let n = 0
   const folder = (): string => {
@@ -374,7 +374,7 @@ describe('one file per model in a CLI folder', () => {
 })
 
 describe('saving', () => {
-  const dir = tempDir('hive-dialects-save-')
+  const dir = tempDir('cw-dialects-save-')
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
   it('is refused, writing nothing, when a text fails the schema', async () => {
@@ -399,7 +399,7 @@ describe('saving', () => {
 })
 
 describe('a session’s resolved texts for hive-mcp.js', () => {
-  const dir = tempDir('hive-dialects-launch-')
+  const dir = tempDir('cw-dialects-launch-')
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
   it('go in a CW_DIALECT_FILE the process loader reads', async () => {
@@ -414,7 +414,7 @@ describe('a session’s resolved texts for hive-mcp.js', () => {
 })
 
 describe('the bundled dialect files', () => {
-  const base = tempDir('hive-dialects-bundled-')
+  const base = tempDir('cw-dialects-bundled-')
   const res = join(base, 'resources')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   let mod: typeof import('../src/main/bundled')

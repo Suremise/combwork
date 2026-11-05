@@ -12,7 +12,7 @@ import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
 import { journalSettings } from '../src/shared/journal'
 import type { BoardNotice } from '../src/main/boardStore'
 
-const base = tempDir('hive-board-store-')
+const base = tempDir('cw-board-store-')
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -55,7 +55,7 @@ async function open(ws: string): Promise<WS> {
 }
 const card = (num: number, fields: Record<string, unknown> = {}): Record<string, unknown> => ({ number: num, title: `Card ${num}`, description: `About ${num}`, project: 'p', agent: null, column: 'todo', order: num, labels: [], blocked: null, blockedBy: [], links: [], comments: [{ at: '2026-10-01T00:00:00.000Z', by: 'You', text: `Note ${num}`, id: `c${num}` }], history: [], archived: false, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z', ...fields })
 const fileOf = (c: Record<string, unknown>): string => JSON.stringify(c, null, 2) + '\n'
-const hiveFolders = (ws: string): string[] => readdirSync(join(ws, '.combwork')).sort()
+const combworkFolders = (ws: string): string[] => readdirSync(join(ws, '.combwork')).sort()
 
 describe('the database layer (db.ts)', () => {
   it('opens with WAL and its settings, runs each step once, recorded with the version that ran it', () => {
@@ -322,7 +322,7 @@ describe("moving the cards' files in (#1017)", () => {
     // The next number is board.json's: a new card never takes one used before.
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'New', project: 'p' }, user))).number).toBe(40)
     // The folder kept as it was, under its backup name; no stub in its place.
-    const kept = hiveFolders(ws).find((f) => f.startsWith('tasks.imported-'))!
+    const kept = combworkFolders(ws).find((f) => f.startsWith('tasks.imported-'))!
     expect(readdirSync(join(ws, '.combwork', kept)).sort()).toEqual(Object.keys(files).sort())
     expect(readFileSync(join(ws, '.combwork', kept, '1.json'), 'utf8')).toBe(files['1.json'])
     expect(existsSync(join(ws, '.combwork', 'tasks'))).toBe(false)
@@ -331,7 +331,7 @@ describe("moving the cards' files in (#1017)", () => {
     await disposeWorkspaceService(w)
     const again = await open(ws)
     expect((await inWorkspace(again, () => tasks.allTasks(again))).map((c) => c.number).sort((a, b) => a - b)).toEqual([1, 2, 40])
-    expect(hiveFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual([kept])
+    expect(combworkFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual([kept])
     await disposeWorkspaceService(again)
     expect(existsSync(join(ws, '.combwork', 'tasks'))).toBe(false)
   })
@@ -348,7 +348,7 @@ describe("moving the cards' files in (#1017)", () => {
     const again = await open(ws)
     // Not imported again (the change made meanwhile is kept), and the folder has its backup name now.
     expect((await inWorkspace(again, () => tasks.getTask(5, again))).title).toBe('Changed since')
-    expect(hiveFolders(ws).some((f) => f.startsWith('tasks.imported-'))).toBe(true)
+    expect(combworkFolders(ws).some((f) => f.startsWith('tasks.imported-'))).toBe(true)
     expect(existsSync(join(ws, '.combwork', 'tasks'))).toBe(false)
   })
 
@@ -358,7 +358,7 @@ describe("moving the cards' files in (#1017)", () => {
     expect(await inWorkspace(w, () => tasks.allTasks(w))).toEqual([])
     // The empty folder it was given (0.8's, with no cards) is left as it was, nothing written in it, at this open and the
     // next: no version reads it now, and nothing makes one (HI-2594).
-    expect(hiveFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual(['tasks'])
+    expect(combworkFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual(['tasks'])
     expect(readdirSync(join(ws, '.combwork', 'tasks'))).toEqual([])
     await disposeWorkspaceService(w)
     const fresh = join(base, `ws-${++n}`)
@@ -366,7 +366,7 @@ describe("moving the cards' files in (#1017)", () => {
     writeFileSync(join(fresh, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const again = await open(fresh)
     expect(await inWorkspace(again, () => tasks.allTasks(again))).toEqual([])
-    expect(hiveFolders(fresh).filter((f) => f.startsWith('tasks'))).toEqual([])
+    expect(combworkFolders(fresh).filter((f) => f.startsWith('tasks'))).toEqual([])
   })
 })
 

@@ -1,6 +1,6 @@
 // Generated from locales/en/main.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'main.accounts.badTarget': { target: string | number; cli: string | number }
   'main.accounts.checkHeld': { name: string | number; cli: string | number }
   'main.accounts.folderNotUsable': { name: string | number }

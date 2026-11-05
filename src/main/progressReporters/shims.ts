@@ -1,11 +1,11 @@
 // The cw-progress command on every session's PATH: a .cmd (cmd, PowerShell) and an extensionless sh script (Git
-// Bash) in Combwork's bin folder, each starting cw-progress.js with Hive's own executable as Node. Timings for its
-// estimates are kept beside them, in Hive's data (never in the user's project).
+// Bash) in Combwork's bin folder, each starting cw-progress.js with Combwork's own executable as Node. Timings for its
+// estimates are kept beside them, in Combwork's data (never in the user's project).
 import { mkdir, readFile, writeFile } from 'original-fs/promises'
 import { join } from 'path'
 
 export interface ShimPaths {
-  /** Hive's executable (run as Node). */
+  /** Combwork's executable (run as Node). */
   exec: string
   /** cw-progress.js, outside the asar. */
   script: string

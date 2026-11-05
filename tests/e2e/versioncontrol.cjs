@@ -151,7 +151,7 @@ function board(sql, ...args) {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'de')
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     await speak({ ...base, code: 'de', locale: 'de', messages })
     check('the tab and the fact line in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1 && (await text(fact)) === 'Dieser Ordner hat keine Versionsverwaltung.', HUNG_MS)), await text(fact))
     await shots('none-de', page.locator('.vc-view'))
@@ -192,7 +192,7 @@ function board(sql, ...args) {
       ipcMain.removeHandler('queue:history')
       ipcMain.handle('queue:history', () => [])
     }, { alpha, plain })
-    const said = (projectPath) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'queue-changed', workspacePath: ws, projectPath })
+    const said = (projectPath) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'queue-changed', workspacePath: ws, projectPath })
     const plainQueue = (models) => app.evaluate((_, m) => (globalThis.__vc.plain = m), models)
     const queueTab = page.locator('.git-sections [data-section="queue"]')
     const pick = async (name) => {
@@ -259,7 +259,7 @@ function board(sql, ...args) {
         const v = list.closest('.vc-view').getBoundingClientRect()
         const sel = list.querySelector('[aria-selected="true"]')
         const s = sel?.getBoundingClientRect()
-        const name = sel?.querySelector('.hive-tab-label')?.getBoundingClientRect()
+        const name = sel?.querySelector('.cw-tab-label')?.getBoundingClientRect()
         const others = [...list.querySelectorAll('[role="tab"]:not([aria-selected="true"])')]
         return {
           view: Math.round(v.width),

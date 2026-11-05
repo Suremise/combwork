@@ -31,7 +31,7 @@ vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undef
 /** A hung run's bound: every step here waits for a condition, never for time. */
 const HUNG_MS = 30_000
 const POWERSHELL = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-const dir = tempDir('hive-keeper-')
+const dir = tempDir('cw-keeper-')
 profile.dir = join(dir, 'profile')
 const src = join(dir, 'host.cs')
 writeFileSync(src, HOST_SOURCE)
@@ -45,17 +45,17 @@ writeFileSync(
   `param($src, $dir)
 $ErrorActionPreference = 'Stop'
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -Raw $src)
-[Console]::Out.WriteLine('self ' + [HiveJobs]::Keeper('100:5', $dir))
+[Console]::Out.WriteLine('self ' + [CombworkJobs]::Keeper('100:5', $dir))
 while ($null -ne ($line = [Console]::In.ReadLine())) {
   $a = $line.Split(' ')
   if ($a[0] -eq 'keep') { break }
-  if ($a[0] -eq 'add') { [Console]::Out.WriteLine('added ' + [HiveJobs]::Add($a[1], [int]$a[2])) }
-  if ($a[0] -eq 'follow') { [Console]::Out.WriteLine('followed ' + [HiveJobs]::Follow($a[1], [int]$a[2], 0x0001 -bor 0x100000)) }
-  if ($a[0] -eq 'failsnap') { [HiveJobs]::FailSnapshotsWhile = $a[1]; [Console]::Out.WriteLine('failsnap set') }
-  if ($a[0] -eq 'failenum') { [HiveJobs]::FailEnumerationWhile = $a[1]; [Console]::Out.WriteLine('failenum set') }
-  if ($a[0] -eq 'held') { [Console]::Out.WriteLine('held ' + $a[1] + ' ' + [HiveJobs]::IsHeld([int]$a[1])) }
+  if ($a[0] -eq 'add') { [Console]::Out.WriteLine('added ' + [CombworkJobs]::Add($a[1], [int]$a[2])) }
+  if ($a[0] -eq 'follow') { [Console]::Out.WriteLine('followed ' + [CombworkJobs]::Follow($a[1], [int]$a[2], 0x0001 -bor 0x100000)) }
+  if ($a[0] -eq 'failsnap') { [CombworkJobs]::FailSnapshotsWhile = $a[1]; [Console]::Out.WriteLine('failsnap set') }
+  if ($a[0] -eq 'failenum') { [CombworkJobs]::FailEnumerationWhile = $a[1]; [Console]::Out.WriteLine('failenum set') }
+  if ($a[0] -eq 'held') { [Console]::Out.WriteLine('held ' + $a[1] + ' ' + [CombworkJobs]::IsHeld([int]$a[1])) }
 }
-[HiveJobs]::Keep()
+[CombworkJobs]::Keep()
 `
 )
 

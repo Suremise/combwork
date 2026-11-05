@@ -130,7 +130,7 @@ describe("each test's result", () => {
 
 describe('the runner on the command line (focused.run)', () => {
   const run = (ids: unknown, jobs?: string) => {
-    const dir = tempDir('hive-focused-run-')
+    const dir = tempDir('cw-focused-run-')
     const tests = join(dir, 'tests.json')
     const results = join(dir, 'out', 'results.json')
     writeFileSync(tests, typeof ids === 'string' ? ids : JSON.stringify(ids))

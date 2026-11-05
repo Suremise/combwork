@@ -10,12 +10,12 @@ import { hashText, readJson, removePath, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { ProgressStore } from './progress'
 import { sessions } from './sessions'
-import { hiveWindows, windowShowing } from './windows'
+import { combworkWindows, windowShowing } from './windows'
 import { WorkspaceService } from './workspace'
 
 const log = createLogger('progress')
 
-/** Where Recent's runs are kept between starts (#352): a file per workspace in Hive's profile. */
+/** Where Recent's runs are kept between starts (#352): a file per workspace in Combwork's profile. */
 const historyDir = (): string => join(app.getPath('userData'), 'progress-history')
 const historyFile = (workspacePath: string): string => join(historyDir(), `${hashText(workspacePath.toLowerCase())}.json`)
 
@@ -113,6 +113,6 @@ export function startProgress(): void {
     generation++
     if (!s.general.progressPanel) progress.clear()
     // The taskbar follows at once either way.
-    for (const e of hiveWindows()) if (e.ws.path) showTaskbar(e.ws.path, progress.list(e.ws.path))
+    for (const e of combworkWindows()) if (e.ws.path) showTaskbar(e.ws.path, progress.list(e.ws.path))
   })
 }

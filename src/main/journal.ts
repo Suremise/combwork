@@ -84,9 +84,9 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
       `)
   },
   {
-    // Dialects (HI-2065, HI-2438): a summary Hive writes keeps its message id and values beside its English, as card
+    // Dialects (HI-2065, HI-2438): a summary Combwork writes keeps its message id and values beside its English, as card
     // history keeps whatText (#845), so it can be said in each reader's dialect when it is read (5b, 6b). JSON of a
-    // StoredText; null for the Assistant's own entries, for Hive's from before, and once the summary is edited.
+    // StoredText; null for the Assistant's own entries, for Combwork's from before, and once the summary is edited.
     version: 2,
     name: 'summary text', // agent-protocol: a migration's name, recorded in schema_version
     up: (db) => db.exec('ALTER TABLE entries ADD COLUMN summary_text TEXT')
@@ -247,7 +247,7 @@ function journalOf(home: string, at: Located = located(home)): Db {
 
 /**
  * Before a workspace's open lets its Assistant use the journal (HI-2200, as the board's HI-2199): while its file, as a
- * Hive that ended without quitting left it, can't be opened yet (another process still maps its `-shm`), waits for that,
+ * Combwork that ended without quitting left it, can't be opened yet (another process still maps its `-shm`), waits for that,
  * bounded (untilOpenable), instead of its first use failing. At once for a journal open already or a file closed
  * cleanly; ended when `signal` (the open's lifetime) aborts.
  */
@@ -272,7 +272,7 @@ const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_M
 
 /**
  * Closes a home's journal (its workspace closed, or before it is deleted): every connection to it, however it was spelt
- * as it opened (#1456: one opened through a junction or an 8.3 name would otherwise hold the folder until Hive quits).
+ * as it opened (#1456: one opened through a junction or an 8.3 name would otherwise hold the folder until Combwork quits).
  * The workspace is `place`, its real location as its window opened it, else as this spelling's journal opened: never
  * what the spelling resolves to now, so a junction removed or pointed at another workspace since neither keeps this
  * one's journals open nor closes another's.
@@ -337,7 +337,7 @@ export interface EntryInput {
   tags?: string[]
   /** The period a digest sums up ("2026-W42"). */
   digestOf?: string | null
-  /** The summary as Hive's message (its id and values), beside its English: a fact Hive writes (dialects, HI-2438). */
+  /** The summary as Combwork's message (its id and values), beside its English: a fact Combwork writes (dialects, HI-2438). */
   summaryText?: StoredText | null
 }
 
@@ -403,7 +403,7 @@ function writeEntryUnless(home: string, settings: JournalSettings, input: EntryI
 }
 
 /**
- * Writes an entry into a journal whose workspace no window may hold now (#1395: the unexpected close Hive finds as it
+ * Writes an entry into a journal whose workspace no window may hold now (#1395: the unexpected close Combwork finds as it
  * starts, for each workspace of the last run): as writeEntry while a window holds it; else on a connection of its own,
  * opened, written and closed here (a transient open), never kept nor made the journal's, so a window opening the
  * workspace meanwhile keeps its own (pruned and shown once it is opened). Refused while the journal is being deleted.
@@ -610,7 +610,7 @@ export function updateEntry(home: string, settings: JournalSettings, id: number,
   }
   if (patch.summary !== undefined) {
     set('summary = ?', oneLine(checkText('summary', patch.summary, ENTRY_LIMITS.summary, true)!))
-    // Edited: its words are the editor's now, no longer Hive's message.
+    // Edited: its words are the editor's now, no longer Combwork's message.
     set('summary_text = ?', null)
   }
   if (patch.kind !== undefined) {

@@ -5,12 +5,12 @@ import type { ViewerToken } from '../shared/types'
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 
 /**
  * The Agent API's read-only viewer tokens (#620): made and revoked by the user in Settings → Agent API, each named for
  * the app it is for ("Apiary"). A viewer reads and follows the workspace like the workspace token (every GET and the
- * event stream) and changes nothing: the API refuses its every other request. Kept beside the workspace token in Hive's
+ * event stream) and changes nothing: the API refuses its every other request. Kept beside the workspace token in Combwork's
  * profile (`agent-api-viewers.json`), never in a project.
  */
 const MAX_VIEWERS = 20
@@ -78,11 +78,11 @@ const REFUSED = {
 /** A new viewer token named `name`. Refuses an empty or taken name, and more than 20 tokens. */
 export function createViewerToken(name: string): Promise<ViewerToken> {
   const n = String(name ?? '').trim()
-  if (!n) return Promise.reject(hiveError(REFUSED.noName, undefined, { kind: 'invalid' })) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
-  if (n.length > MAX_NAME) return Promise.reject(hiveError(REFUSED.tooLong, { most: MAX_NAME }, { kind: 'invalid' })) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
+  if (!n) return Promise.reject(combworkError(REFUSED.noName, undefined, { kind: 'invalid' })) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
+  if (n.length > MAX_NAME) return Promise.reject(combworkError(REFUSED.tooLong, { most: MAX_NAME }, { kind: 'invalid' })) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
   return change(() => {
-    if (viewers.some((v) => v.name.toLowerCase() === n.toLowerCase())) throw hiveError(REFUSED.taken, { name: n }, { kind: 'conflict' }) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
-    if (viewers.length >= MAX_VIEWERS) throw hiveError(REFUSED.tooMany, { most: MAX_VIEWERS }, { kind: 'conflict' }) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
+    if (viewers.some((v) => v.name.toLowerCase() === n.toLowerCase())) throw combworkError(REFUSED.taken, { name: n }, { kind: 'conflict' }) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
+    if (viewers.length >= MAX_VIEWERS) throw combworkError(REFUSED.tooMany, { most: MAX_VIEWERS }, { kind: 'conflict' }) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
     const v: ViewerToken = { id: randomUUID(), name: n, token: randomBytes(32).toString('hex'), createdAt: new Date().toISOString() }
     viewers = [...viewers, v]
     return { ...v }

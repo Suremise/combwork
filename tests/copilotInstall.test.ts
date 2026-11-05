@@ -143,7 +143,7 @@ describe('Copilot readiness', () => {
 describe('Copilot discovery log', () => {
   it('leaves a candidate’s path and what it printed out of Copy Diagnostics (userText)', async () => {
     // A custom path in a private folder whose CLI prints a private name instead of its version.
-    const dir = tempDir('hive-copilot-')
+    const dir = tempDir('cw-copilot-')
     const exe = join(dir, 'Private Client', 'copilot.exe')
     mkdirSync(dirname(exe), { recursive: true })
     writeFileSync(exe, '')

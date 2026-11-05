@@ -250,7 +250,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     config.update((c) => {
       c.ui.skillsProvider = { ...c.ui.skillsProvider, [alpha]: 'codex' }
       c.ui.sessionsTree = { ...c.ui.sessionsTree, [alpha]: { 'agent:b1': true } }
-      c.ui.hiveVcsNotice = { ...c.ui.hiveVcsNotice, [alpha]: 'synced' }
+      c.ui.combworkVcsNotice = { ...c.ui.combworkVcsNotice, [alpha]: 'synced' }
       c.ui.assistantFold = { ...c.ui.assistantFold, [`${ws}|${alpha}`]: true }
       c.ui.panes = { ...c.ui.panes, [`assistant-open:${ws}`]: 1, [`progress-lanes-rows:${ws}`]: 7 }
     })
@@ -259,7 +259,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     const ws = at.toLowerCase()
     const alpha = join(at, 'alpha').toLowerCase()
     const ui = config.get().ui
-    return [ui.skillsProvider?.[alpha], ui.sessionsTree?.[alpha], ui.hiveVcsNotice?.[alpha], ui.assistantFold?.[`${ws}|${alpha}`], ui.panes?.[`assistant-open:${ws}`], ui.panes?.[`progress-lanes-rows:${ws}`]]
+    return [ui.skillsProvider?.[alpha], ui.sessionsTree?.[alpha], ui.combworkVcsNotice?.[alpha], ui.assistantFold?.[`${ws}|${alpha}`], ui.panes?.[`assistant-open:${ws}`], ui.panes?.[`progress-lanes-rows:${ws}`]]
   }
   const NONE = [undefined, undefined, undefined, undefined, undefined, undefined]
 
@@ -328,8 +328,8 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     renameSync(join(a, 'alpha'), join(b, 'alpha'))
     await openAt(ws, b)
     const ui = config.get().ui
-    expect([ui.skillsProvider?.[alphaB], ui.sessionsTree?.[alphaB], ui.hiveVcsNotice?.[alphaB], ui.assistantFold?.[`${b.toLowerCase()}|${alphaB}`]]).toEqual(['codex', { 'agent:b2': false }, 'synced', true])
-    expect([ui.skillsProvider?.[alphaA], ui.sessionsTree?.[alphaA], ui.hiveVcsNotice?.[alphaA], ui.assistantFold?.[`${a.toLowerCase()}|${alphaA}`]]).toEqual([undefined, undefined, undefined, undefined])
+    expect([ui.skillsProvider?.[alphaB], ui.sessionsTree?.[alphaB], ui.combworkVcsNotice?.[alphaB], ui.assistantFold?.[`${b.toLowerCase()}|${alphaB}`]]).toEqual(['codex', { 'agent:b2': false }, 'synced', true])
+    expect([ui.skillsProvider?.[alphaA], ui.sessionsTree?.[alphaA], ui.combworkVcsNotice?.[alphaA], ui.assistantFold?.[`${a.toLowerCase()}|${alphaA}`]]).toEqual([undefined, undefined, undefined, undefined])
     // The old workspace's other project and its panes are its own.
     expect(ui.skillsProvider?.[join(a, 'beta').toLowerCase()]).toBe('claude-code')
     expect([ui.panes?.[`assistant-open:${a.toLowerCase()}`], ui.panes?.[`progress-lanes-rows:${a.toLowerCase()}`]]).toEqual([1, 7])

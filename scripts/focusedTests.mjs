@@ -1,4 +1,4 @@
-// The hive project's focused-test runner (HI-1367): Hive's merge queue runs it as the project's focused.run, in the
+// The hive project's focused-test runner (HI-1367): Combwork's merge queue runs it as the project's focused.run, in the
 // checkout to test (cwd), after its focused.pick (tests/e2e/affected.mjs --pick) chose the tests.
 //   CW_FOCUSED_TESTS    a JSON file: the test ids, an array of strings. A unit test is its repo path
 //                         (tests/x.test.ts), an e2e suite its name (board).
@@ -176,7 +176,7 @@ async function runUnit(cwd, ids, jobs) {
 /** The e2e suites: one run of them, built and recorded, results from its run record. */
 async function runSuites(cwd, ids, jobs) {
   // Started as `npm run e2e` would be: the runner takes what it needs from its environment itself (the run context's
-  // allowlist for each suite, the shell's Hive variables for its Progress steps), less the queue's own variables.
+  // allowlist for each suite, the shell's Combwork variables for its Progress steps), less the queue's own variables.
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^CW_FOCUSED_/i.test(k)))
   const r = await run(process.execPath, [join(cwd, 'tests', 'e2e', 'run.mjs'), ...ids, '--build', '--record', '--jobs', String(jobs)], { cwd, env, keep: true })
   const path = recordPathFrom(r.out)

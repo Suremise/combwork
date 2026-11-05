@@ -86,7 +86,7 @@ vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
   return { ...stub, app: { ...stub.app, getPath: () => profile.dir } }
 })
-profile.dir = tempDir('hive-runrecords-profile-')
+profile.dir = tempDir('cw-runrecords-profile-')
 /** A hung run's bound: the records' writes follow each other, so this is never reached by a working one. */
 const HUNG_MS = 10_000
 const file = join(profile.dir, 'leftovers.json')
@@ -283,7 +283,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       jobs.onEnsure = () => undefined
       jobs.onAdd = () => undefined
       const m = await restarted()
-      m.setHiveIdentity(async () => HIVE)
+      m.setCombworkIdentity(async () => HIVE)
       return m
     }
     const failWrites = (m: typeof import('../src/main/agentProcesses')) => {

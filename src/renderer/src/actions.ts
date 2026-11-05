@@ -44,7 +44,7 @@ import { cardLabel, normalKey, suggestKey } from '@shared/projectKeys'
 /** Runs an async action and shows a toast if it fails. */
 /**
  * A long conversation's Hand Over to… (the notice's button, the footer's size): the dialog, if the agent may still hand
- * over now (#1057; Hive checks, knowing the lanes and merge slots as they are: a notice can be old by then), else a notice
+ * over now (#1057; Combwork checks, knowing the lanes and merge slots as they are: a notice can be old by then), else a notice
  * that it can when it has finished.
  */
 export async function handOverLongConversation(path: string, agentId: string, sessionId?: string): Promise<void> {
@@ -229,7 +229,7 @@ export async function createProject(): Promise<void> {
       label: tr(msg({ id: 'actions.project.key', defaultMessage: 'Key', description: "The New Project dialog: the label of the project's key box (2–4 letters, such as AM, that its cards are named by: AM-12)." })),
       hint: (k) => (normalKey(k) ? tr(msg({ id: 'actions.project.keyHint', defaultMessage: 'Its cards are named {first}, {second} and so on. You can change the key later in Project Settings.', description: 'Under the key box of the New Project dialog. {first} and {second} are the first two card names with the key typed, such as AM-1 and AM-2.' }), { first: `${normalKey(k)}-1`, second: `${normalKey(k)}-2` }) : ''),
       follow: (v) => (v.trim() ? suggestKey(v.trim(), '', held) : ''),
-      // Left empty, Hive suggests one, as for a folder opened.
+      // Left empty, Combwork suggests one, as for a folder opened.
       validate: (k) => (k.trim() ? keyProblemText(k, '', held) : null),
       set: (k) => (key = k)
     }
@@ -320,12 +320,12 @@ async function ensureAgent(path: string, agentId: string, resumes?: ProviderId):
 }
 
 /**
- * A provider once Hive has looked for the CLIs it depends on (#506), at most 20 s: at start, Automatic's pick (when
+ * A provider once Combwork has looked for the CLIs it depends on (#506), at most 20 s: at start, Automatic's pick (when
  * `auto` says it is used) and whether a CLI is installed aren't known yet, and deciding then would pick the wrong
- * provider or open Provider Setup. Null, said to the user, when Hive is still looking after that: nothing is decided from a guess.
+ * provider or open Provider Setup. Null, said to the user, when Combwork is still looking after that: nothing is decided from a guess.
  */
 /**
- * The connection a new agent gets (firstReadyConnection), once Hive knows whether the CLIs before it are installed: null
+ * The connection a new agent gets (firstReadyConnection), once Combwork knows whether the CLIs before it are installed: null
  * (and said) when it still doesn't after 20 s.
  */
 async function readyConnection(view: Parameters<typeof firstReadyConnection>[0], cli?: ProviderId): Promise<{ id?: string } | null> {
@@ -369,7 +369,7 @@ async function detectedProvider(resolve: () => ProviderId, auto: () => boolean):
   return null
 }
 
-/** Said when Hive hasn't finished finding which CLIs are installed. */
+/** Said when Combwork hasn't finished finding which CLIs are installed. */
 const LOOKING = {
   title: msg({ id: 'actions.provider.lookingTitle', defaultMessage: 'Still looking for the coding agents', description: "A warning's title: Combwork hasn't finished finding which coding agent CLIs are installed." }),
   message: msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Combwork is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Combwork is still looking for the coding agent CLIs.' })
@@ -454,7 +454,7 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
     return null
   }
   // Decision A (HI-2108): the first usable connection in the order of accounts (a session's CLI's, when resuming one),
-  // its CLI on and installed, as main's firstUsableAccount: waited for while Hive still looks for a CLI before it. Its CLI
+  // its CLI on and installed, as main's firstUsableAccount: waited for while Combwork still looks for a CLI before it. Its CLI
   // follows from it. Connections here but none on an installed CLI: the dialog, which says why. None usable here (no
   // account on, or a test copy on its CLI test home): the first CLI on and installed, as main's prepareAgent.
   const view = await call('connections:list').catch(() => null)
@@ -524,7 +524,7 @@ async function stopIfRunning(path: string, agentId: string, action: StopFor, the
 }
 
 function reveal(path: string, agentId: string): void {
-  // The Hive Assistant lives in its own panel.
+  // The Combwork Assistant lives in its own panel.
   if (isAssistantPath(path)) return setAssistantOpen(true)
   setProjectTab(path, 'session')
   set({ selectedProject: path })
@@ -560,7 +560,7 @@ async function startNew(path: string, id: string, opts: { skipSetup?: boolean })
  */
 export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListItem, 'agentId' | 'cwd' | 'slot'> & { provider?: ProviderId }, preferred?: string): string | null {
   if (!p) return preferred ?? null
-  // The Hive Assistant's sessions ran in the workspace folder, with its one agent.
+  // The Combwork Assistant's sessions ran in the workspace folder, with its one agent.
   if (isAssistantPath(p.path)) return p.agents[0]?.id ?? null
   // One in a slot resumes with its own agent (#1434: one writer per slot), if it is still there.
   if (item.slot) return p.agents.find((a) => a.id === item.agentId)?.id ?? null
@@ -640,7 +640,7 @@ async function resume(path: string, item: ResumeItem, held: string | null, agent
     const ok = await confirm({ ...freshQuestion(item.fresh, { assistant, agent: agentOf(p, target)?.name ?? item.agentName ?? '' }), action: 'start' })
     if (!ok) return
   } else if (item.recache && !item.recache.warm && item.recache.tokens > 20000) {
-    // The Hive Assistant's are conversations; an agent's are sessions.
+    // The Combwork Assistant's are conversations; an agent's are sessions.
     const what = isAssistantPath(path) ? 'conversation' : 'session'
     const choice = await choose({
       title: tr(msg({ id: 'actions.recache.title', defaultMessage: '{what, select, conversation {Resume conversation?} other {Resume session?}}', description: "Title of the question before resuming a session (other) or an Assistant conversation whose prompt cache expired." }), { what }),
@@ -693,7 +693,7 @@ export async function resumeLast(path: string | null = get().selectedProject, ag
 async function resumeLatest(path: string, id: string): Promise<void> {
   const p = project(path)
   const a = agentOf(p, id)
-  // Hive works out the session in the main process (AgentInfo.resume), skipping any open in another agent.
+  // Combwork works out the session in the main process (AgentInfo.resume), skipping any open in another agent.
   const list = a?.resume ? await attempt(listFailed(), () => call('session:list', path)) : []
   const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: legacyOf(a)?.path, provider: agentProviderOf(a), ...(a.resume.fresh ? { fresh: a.resume.fresh } : {}) } : null
   if (!last) {
@@ -817,7 +817,7 @@ async function resumeAll_(path: string): Promise<void> {
     try {
       await whileStarting(path, a.id, { kind: 'resume', sessionId: a.resume!.id }, () => call('session:start', path, { resumeId: a.resume!.id, name: a.resume!.name, agentId: a.id, auto: true }))
     } catch (e) {
-      // Hive resuming that same conversation meanwhile (a card's placement, HI-1746): resumed once that start is, its
+      // Combwork resuming that same conversation meanwhile (a card's placement, HI-1746): resumed once that start is, its
       // failure reported as Resume All's. Anything else it runs or starts: the refusal, as before.
       let joined: 'running' | 'other'
       try {
@@ -1000,13 +1000,13 @@ export async function archiveCurrent(path: string | null = get().selectedProject
   if (archived) await newSession(path, id)
 }
 
-/** Where a server is added (HI-2059): a project, or the Hive Assistant. */
+/** Where a server is added (HI-2059): a project, or the Combwork Assistant. */
 export type McpPlace = Pick<ProjectInfo, 'path' | 'name'> | 'assistant'
 
 const MCP_UPDATE_FAILED = msg({ id: 'actions.mcp.updateFailedAdded', defaultMessage: 'Could not update the server', description: "An error's title: adding an MCP server to a project or the Combwork Assistant, or removing it, failed." })
 
 /**
- * Add server… (HI-2059): a picker of the workspace's servers not yet added to a project or the Hive Assistant, the one
+ * Add server… (HI-2059): a picker of the workspace's servers not yet added to a project or the Combwork Assistant, the one
  * chosen showing what it runs (#550) before Add. Refused, in the dialog, if its definition was replaced or edited since
  * it was listed. It runs there from their next session.
  */
@@ -1035,7 +1035,7 @@ export async function addMcpServer(place: McpPlace): Promise<boolean> {
   return ok
 }
 
-/** Removes a server from a project or the Hive Assistant (HI-2059), at once: it is one Add away. */
+/** Removes a server from a project or the Combwork Assistant (HI-2059), at once: it is one Add away. */
 export async function removeMcpServer(place: McpPlace, server: Pick<McpServerInfo, 'name'>): Promise<boolean> {
   const done = await attempt(tr(MCP_UPDATE_FAILED), async () => {
     await call('mcp:remove', place === 'assistant' ? 'assistant' : place.path, server.name)
@@ -1047,7 +1047,7 @@ export async function removeMcpServer(place: McpPlace, server: Pick<McpServerInf
 }
 
 /**
- * Add to… (the MCP view, HI-2059): which projects, and the Hive Assistant, a server is added to, showing what it runs
+ * Add to… (the MCP view, HI-2059): which projects, and the Combwork Assistant, a server is added to, showing what it runs
  * (#550): those it is added to are ticked; unticking one removes it there. Files are written one by one, so a failure
  * midway says what changed and what didn't.
  */
@@ -1073,7 +1073,7 @@ export async function chooseMcpPlaces(server: Pick<McpServerInfo, 'name' | 'def'
     confirmLabel: tr(msg({ id: 'mcp.places.button', defaultMessage: 'Save', description: 'The MCP view’s Add to… dialog (HI-2059): the button that adds the server where ticked and removes it where unticked.' }))
   })
   if (!ok) return false
-  // The definition shown: if it was replaced or edited meanwhile, Hive refuses before changing anything.
+  // The definition shown: if it was replaced or edited meanwhile, Combwork refuses before changing anything.
   const r = await attempt(tr(MCP_UPDATE_FAILED), () => call('mcp:places', server.name, server.def ? { def: server.def, revision: server.revision } : undefined, picks, forAssistant))
   if (r?.failed.length) {
     const place = (p: string): string => (p === 'assistant' ? tr(MCP_ASSISTANT) : (projects.find((x) => samePath(x.path, p))?.name ?? basename(p)))
@@ -1131,7 +1131,7 @@ export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | '
 /**
  * Update (HI-545): never automatic. The new version downloaded and checked first; the dialog says the versions, where
  * it is added (those places keep it) and what it runs, the changed lines marked. If the definition or the places
- * change before it is applied, Hive writes nothing and the dialog opens again from what is there now.
+ * change before it is applied, Combwork writes nothing and the dialog opens again from what is there now.
  */
 export async function updateCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>, again = 0): Promise<boolean> {
   const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
@@ -1171,12 +1171,12 @@ export async function updateCatalogServer(row: Pick<McpCatalogRow, 'source' | 'n
   return true
 }
 
-/** Why a workspace MCP server can't be used, in the window's language (#849): Hive's own words, else the JSON reader's as it gave them. */
+/** Why a workspace MCP server can't be used, in the window's language (#849): Combwork's own words, else the JSON reader's as it gave them. */
 export const mcpErrorText = (server: Pick<McpServerInfo, 'error' | 'errorText'>): string | undefined => (server.errorText ? shownText(server.errorText) : server.error)
 
 /**
  * Where a workspace MCP server is added (HI-2059), in words, from the projects as the window has them: "Added in
- * Ambrosia", "Added in Ambrosia and for the Hive Assistant", "Added for the Hive Assistant only" or "Not added
+ * Ambrosia", "Added in Ambrosia and for the Combwork Assistant", "Added for the Combwork Assistant only" or "Not added
  * anywhere". A hidden project it is added to counts, unnamed.
  */
 export function mcpWhereText(server: Pick<McpServerInfo, 'def' | 'projects' | 'assistant'>, projects: readonly ProjectInfo[]): string {
@@ -1653,7 +1653,7 @@ export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEnt
   if (!p || !a) return
   const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
   const failed = tr(msg({ id: 'actions.template.addAgentFailed', defaultMessage: 'Could not add the agent', description: "An error's title: adding an agent from a template failed." }))
-  // Names made from the project's key that isn't known here: Hive says why (never a guessed key).
+  // Names made from the project's key that isn't known here: Combwork says why (never a guessed key).
   if (!key && usesKey(entry.agents)) {
     if (await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index))) await refreshWorkspace()
     return
@@ -1887,9 +1887,9 @@ export async function releaseCarriedSlot(path: string, agentId: string): Promise
 
 /**
  * Release Slot… on a held writer (#1506): a slot an agent's run that is over still holds, its processes not known to have
- * ended (Hive quit or closed with it running, its processes kept running, or not tracked). Shows who held it and what
- * Hive lists of its processes, offers to end those first, and releases it once the user confirms; main refuses while
- * its Hive or run still lives, or when the slot changed meanwhile (the refusal stays in the dialog).
+ * ended (Combwork quit or closed with it running, its processes kept running, or not tracked). Shows who held it and what
+ * Combwork lists of its processes, offers to end those first, and releases it once the user confirms; main refuses while
+ * its Combwork or run still lives, or when the slot changed meanwhile (the refusal stays in the dialog).
  */
 export async function releaseHeldSlot(path: string, slot: string): Promise<void> {
   const w = await attempt(tr(msg({ id: 'actions.releaseHeld.readFailed', defaultMessage: "Could not read the slot's writer", description: "An error's title: Combwork couldn't read who holds a slot, before Release Slot…'s question." })), () => call('slots:heldWriter', path, slot))
@@ -1903,9 +1903,9 @@ export async function releaseHeldSlot(path: string, slot: string): Promise<void>
     title: tr(msg({ id: 'actions.releaseHeld.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Combwork doesn't know that everything it started has." }), { agent, slot }),
     message: idle
       ? tr(msg({ id: 'actions.releaseHeld.messageIdleBroker', defaultMessage: "{slot} is held by {names}, Windows' idle Sandbox broker, left by {agent}'s last session there (run {run}). No Sandbox is running, so releasing it is safe.", description: "Release Slot… (HI-2309): the slot ({slot}) is held only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer), which the agent's ({agent}) last session left; no Sandbox runs, so nothing can write in the slot through it. {run} is the session's run id (a code such as 3f9a1c…)." }), { slot, names, agent, run: w.run })
-      : w.hive.self
-      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Combwork (process {pid}, running), but Combwork doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Combwork; its processes were kept running or Combwork could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Combwork's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
-      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Combwork that is no longer running (process {pid}). Combwork can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Combwork that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Combwork's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.hive.pid }),
+      : w.combwork.self
+      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Combwork (process {pid}, running), but Combwork doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Combwork; its processes were kept running or Combwork could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Combwork's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.combwork.pid })
+      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Combwork that is no longer running (process {pid}). Combwork can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Combwork that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Combwork's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.combwork.pid }),
     ...(w.processes?.list.length ? { list: w.processes.list.map((p) => tr(msg({ id: 'actions.releaseHeld.process', defaultMessage: '{label} (process {pid})', description: "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})." }), { label: p.label, pid: p.pid })), listOnly: true } : {}),
     detail: idle
       ? tr(msg({ id: 'actions.releaseHeld.detailIdleBroker', defaultMessage: 'Released, the broker is left running: it is Windows’ own, and closes by itself.', description: "Release Slot… (HI-2309), under the question about a slot held only by Windows' idle Sandbox broker: releasing doesn't end it unless the box below is ticked." }))

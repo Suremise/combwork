@@ -1,9 +1,9 @@
 import { msg, type Msg } from './i18n/msg'
 
 /**
- * What the skills Hive ships are for (their SKILL.md description), as the window shows them (#1104), by skill name.
+ * What the skills Combwork ships are for (their SKILL.md description), as the window shows them (#1104), by skill name.
  * Display only: agents read the SKILL.md, in English. The window shows one translated while the workspace's copy still
- * has Hive's words; an edited description shows as written. tests/skillDescriptions.test.ts keeps these equal to the
+ * has Combwork's words; an edited description shows as written. tests/skillDescriptions.test.ts keeps these equal to the
  * SKILL.md files, or to SHIPPED_SKILL_SOURCES where the window words it its own way.
  */
 export const SHIPPED_SKILL_DESCRIPTIONS: Record<string, Msg> = {
@@ -35,7 +35,7 @@ export const SHIPPED_SKILL_SOURCES: Record<string, string> = {
   'work-on-card': 'Carry a card from Combwork\'s task board through its work, from Doing to Review with a summary. Use when given a card to work on ("work on AM-12", a card Combwork started you on, more work back from Review). Not for reviewing one, nor a card loop (card-loop).' // i18n-ignore: the SKILL.md's own description (agents read it in English)
 }
 
-/** A Hive skill's description as the window shows it: one Hive ships, translated while its copy still has Hive's words. */
+/** A Combwork skill's description as the window shows it: one Combwork ships, translated while its copy still has Combwork's words. */
 export const shippedSkillDescription = (s: { name: string; description: string; level: string; bundled?: string }): Msg | undefined => {
   const shipped = s.level === 'combwork' && s.bundled ? SHIPPED_SKILL_DESCRIPTIONS[s.name] : undefined
   return shipped && (SHIPPED_SKILL_SOURCES[s.name] ?? shipped.defaultMessage) === s.description ? shipped : undefined

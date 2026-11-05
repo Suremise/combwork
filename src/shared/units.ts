@@ -1,4 +1,4 @@
-// How Hive shows token counts and sizes (#608), in the language it shows (#851): the figure from fmt (its decimal
+// How Combwork shows token counts and sizes (#608), in the language it shows (#851): the figure from fmt (its decimal
 // separator, "1,5"), the unit from a message, so a language can write "1,5 Ko". Unit tests reach them without the renderer.
 import { fmt, msg, tr } from './i18n'
 

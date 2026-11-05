@@ -8,7 +8,7 @@
 //
 // FormatJS's CLI (`formatjs extract`) reads the messages with its native binding, which exists for win32-x64, Linux and
 // macOS on arm64. Without it the CLI quietly finds nothing, so where the binding is missing (Windows on Arm) this reads
-// them itself, with Babel's parser, the same way (a unit test checks the two agree on Hive's source).
+// them itself, with Babel's parser, the same way (a unit test checks the two agree on Combwork's source).
 import { spawnSync } from 'child_process'
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'fs'
 import { createRequire } from 'module'

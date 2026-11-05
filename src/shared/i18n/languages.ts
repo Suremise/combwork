@@ -1,5 +1,5 @@
 /**
- * Hive's languages (#767): which there are, what each is called in itself, and which one Hive shows. English is the
+ * Combwork's languages (#767): which there are, what each is called in itself, and which one Combwork shows. English is the
  * source; the others are drafted by agents and say so in the picker, in their own words, until a native speaker has
  * reviewed them. Every language can be chosen, and what it hasn't translated yet shows in English; Automatic picks one
  * only once it has translations (a `locales/<code>/` folder), so Windows alone never gives anyone a language that is
@@ -27,7 +27,7 @@ export interface Language {
    */
   unitList?: 'narrow'
   /**
-   * Windows' UI font for its script, for the windows Hive draws without Chromium (the "Hive can't start" window): Segoe
+   * Windows' UI font for its script, for the windows Combwork draws without Chromium (the "Hive can't start" window): Segoe
    * UI has no CJK, so Windows' fallback mixes typefaces and narrows ，。 (#893). Segoe UI when not set.
    */
   uiFont?: string
@@ -37,7 +37,7 @@ export const SOURCE_LANGUAGE = 'en'
 
 /**
  * In the picker's order: by own name, Latin scripts first. Names, marks and notes are in each language's own words,
- * the same whatever language Hive shows, so they are never translated.
+ * the same whatever language Combwork shows, so they are never translated.
  */
 export const LANGUAGES: readonly Language[] = [
   { code: 'de', name: 'Deutsch', english: 'German', ai: true, aiMark: '(KI)', aiNote: 'Von KI übersetzt, Verbesserungen sind willkommen.', dir: 'ltr' },
@@ -59,7 +59,7 @@ export const PSEUDO_LANGUAGE = 'en-XA'
 /** Settings → General → Language: 'auto' (Windows' display languages) or a language's code. */
 export type LanguageSetting = 'auto' | string
 
-/** Hive's language a tag asks for (its code), or null. */
+/** Combwork's language a tag asks for (its code), or null. */
 export const languageOf = (code: string): Language | undefined => LANGUAGES.find((l) => l.code === code) ?? (code === PSEUDO_LANGUAGE ? LANGUAGES.find((l) => l.code === SOURCE_LANGUAGE) : undefined)
 
 /**
@@ -80,19 +80,19 @@ export function matchLanguage(tag: string, available?: readonly string[], pseudo
   return offered.find((l) => l.code.toLowerCase().split('-')[0] === lang)?.code ?? null
 }
 
-/** What Hive shows and how it formats: the language, and the locale for dates and numbers. */
+/** What Combwork shows and how it formats: the language, and the locale for dates and numbers. */
 export interface ChosenLanguage {
-  /** Hive's language: its translations. */
+  /** Combwork's language: its translations. */
   code: string
   /** The locale Intl formats with: the Windows tag that chose it (en-GB, de-AT), else the code (the pseudo-locale: en). */
   locale: string
 }
 
 /**
- * The language Hive shows: a forced one (the --lang start option or CW_LANG, for tests, screenshots and translators,
+ * The language Combwork shows: a forced one (the --lang start option or CW_LANG, for tests, screenshots and translators,
  * which may be the pseudo-locale or a language with no translations yet), else the setting, else the first of
- * Windows' preferred display languages Hive has translations for (`available`), else English. The setting may name
- * any of Hive's languages: it was chosen.
+ * Windows' preferred display languages Combwork has translations for (`available`), else English. The setting may name
+ * any of Combwork's languages: it was chosen.
  */
 export function resolveLanguage(setting: LanguageSetting | undefined, preferred: readonly string[], available: readonly string[], forced?: string | null): ChosenLanguage {
   const f = forced ? matchLanguage(forced, undefined, true) : null

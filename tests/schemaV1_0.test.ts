@@ -146,7 +146,7 @@ describe('the card JSON contract', () => {
 
   const live = process.env.CW_CARD_ROUNDTRIP_DB
   it.skipIf(!live)("round-trips every card of a live board's copy", () => {
-    const copy = join(tempDir('hive-roundtrip-'), 'combwork.db')
+    const copy = join(tempDir('cw-roundtrip-'), 'combwork.db')
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     const old = new DatabaseSync(copy)

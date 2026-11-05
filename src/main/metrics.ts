@@ -9,7 +9,7 @@ import { readTable, saveTable } from './storeTables'
 import { dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { englishText } from '../shared/advanced'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import type { WorkspaceService } from './workspace'
 import { CW_TOOLS } from '../shared/assistantTools'
 import { PROVIDERS } from '../shared/providers'
@@ -38,11 +38,11 @@ import type { LaunchWorkflow } from '../shared/workflow/roles'
 import { CW_DIR } from '../shared/defaults'
 
 /**
- * Hive's performance metrics, one store per open workspace (shared/metrics.ts has the contract). Recording is a few
+ * Combwork's performance metrics, one store per open workspace (shared/metrics.ts has the contract). Recording is a few
  * map updates into the current hour's bucket; nothing is read from disk on the request path. Buckets are hourly for 7
  * days, then folded into days, kept 30 days, and saved (debounced) in the workspace's database (#1019: `.combwork/combwork.db`,
  * a bucket and its series in their typed tables since #1212, storeTables.ts, so a save writes the buckets that changed, the hour under way, and appends a new
- * one; `.combwork/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Hive's tool names, provider ids), each
+ * one; `.combwork/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Combwork's tool names, provider ids), each
  * bucket has caps on projects and series, the store has a cap on buckets whichever way the clock moves, and the file
  * has a size cap: what doesn't fit is dropped and counted. The saved file is untrusted input: size-checked before it
  * is read and checked field by field. Nothing stores a prompt, a body, a token, a URL or a path.
@@ -70,7 +70,7 @@ export const METRICS_LIMITS = {
   saveDelayMs: 30_000,
   /**
    * Observation: how often an open, recording workspace notes that it is still being observed, and the stretches kept
-   * (newest last). A gap longer than touchMs and a little is a gap in observation (Hive closed, recording off, a reset).
+   * (newest last). A gap longer than touchMs and a little is a gap in observation (Combwork closed, recording off, a reset).
    */
   touchMs: 5 * 60_000,
   stretches: 500
@@ -145,14 +145,14 @@ const ROUTES = new Set<string>(['(no route)']) // i18n-ignore: a route label (a 
 export function knownRoute(template: string): void {
   ROUTES.add(template)
 }
-/** The Assistant's state view at a session start (#1032), measured as a reply of Hive's own beside the tools'. */
+/** The Assistant's state view at a session start (#1032), measured as a reply of Combwork's own beside the tools'. */
 export const START_VIEW_METRIC = 'session start view' // i18n-ignore: a metrics key, shown as a tool name in the developer's Performance view
 const TOOLS = new Set<string>([...CW_TOOLS, START_VIEW_METRIC])
 const PROVIDER_IDS = new Set<string>(PROVIDERS.map((p) => p.id))
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 const ROLES = new Set(['agent', 'assistant', 'api', 'viewer', 'unknown'])
 const WORKFLOWS = new Set<string>(['builder', 'reviewer', 'either', 'none'])
-/** A series' workflow side as saved: one Hive records, else `unknown` (saved before HI-2049, or not one it knows). */
+/** A series' workflow side as saved: one Combwork records, else `unknown` (saved before HI-2049, or not one it knows). */
 const workflowOf = (v: unknown): GuidanceSeries['workflow'] => (typeof v === 'string' && WORKFLOWS.has(v) ? (v as LaunchWorkflow) : 'unknown')
 const OUTCOMES = new Set(['ok', 'client-error', 'denied', 'server-error', 'cancelled', 'waiting'])
 const OTHER = '(other)'
@@ -162,7 +162,7 @@ const LABEL_MAX = 128
 /**
  * A project name as a label: the name itself, or for a name longer than LABEL_MAX its first characters, "|" and a hash
  * of the whole name (case-folded, as names are matched). "|" can't be in a project's name (Windows doesn't allow it in a
- * folder name, and Hive doesn't in a project's), so a shortened label never equals a real project's name: two folders
+ * folder name, and Combwork doesn't in a project's), so a shortened label never equals a real project's name: two folders
  * never share a label. A raw name with "|" (or that couldn't be a folder: empty, a separator, a NUL) gets none: null,
  * counted as untracked, never as the workspace's own. The same labels when recording, loading and querying.
  */
@@ -445,7 +445,7 @@ class Store {
    * What was saved: the workspace database's rows (#1019), each bucket checked as the file's were. Before they were moved
    * in, metrics.json, if it is no bigger than the file's cap and parses as buckets (the read itself capped: a file replaced
    * or grown meanwhile can't make it read more); the next save moves it in. A metrics.json found after the move (an older
-   * Hive's) is kept as a backup, unread.
+   * Combwork's) is kept as a backup, unread.
    */
   private load(): void {
     try {
@@ -605,7 +605,7 @@ class Store {
       const json = (): string => JSON.stringify({ version: 1, buckets: this.buckets, observed: this.observed, ...(this.evictedThrough ? { evictedThrough: this.evictedThrough } : {}), ...(this.renamesApplied ? { renamesApplied: this.renamesApplied } : {}) })
       let text = json()
       // Over the file's cap (in UTF-8 bytes, as it is read back): the oldest buckets go first, all of them if need be,
-      // so Hive never writes a file it would refuse to load.
+      // so Combwork never writes a file it would refuse to load.
       // Then, the buckets all gone, the oldest observation (it is small: this is only for a tiny cap).
       while (Buffer.byteLength(text, 'utf8') > METRICS_LIMITS.fileBytes && (this.buckets.length > 0 || this.observed.length > 0)) {
         if (this.buckets.length) this.evicted(this.buckets.sort((x, y) => x.start - y.start).shift()!, now)
@@ -755,7 +755,7 @@ const recording = (): boolean => config.settings.sessions?.recordPerformance !==
 /** How many open workspaces (windows, lifetimes) hold each store: observed while one does. */
 const holders = new Map<Store, number>()
 
-/** Notes every held store as observed every touchMs (unref'd: it never keeps Hive running). */
+/** Notes every held store as observed every touchMs (unref'd: it never keeps Combwork running). */
 let ticker: NodeJS.Timeout | null = null
 function startTicker(): void {
   if (ticker) return
@@ -849,7 +849,7 @@ export function applyMetricsRenames(h: MetricsHandle | null, batch: { from: stri
   return true
 }
 
-/** The handle's bucket now, if its workspace is still the one it was taken for and Hive is recording. */
+/** The handle's bucket now, if its workspace is still the one it was taken for and Combwork is recording. */
 function bucketOf(h: MetricsHandle | null): { store: Store; b: Bucket } | null {
   if (!h || h.lifetime.aborted || !recording()) return null
   h.store.touch(clock.now())
@@ -925,7 +925,7 @@ export function recordApi(h: MetricsHandle | null, project: string | null, r: { 
 /** At most this many reports in one bridge post, and these as the largest values taken. */
 export const MCP_REPORT_LIMITS = { events: 50, chars: 50_000_000, ms: 3_600_000, tools: 200 }
 
-/** One hive tool call the bridge answered (its report, checked: bad values are refused, not stored). */
+/** One Combwork tool call the bridge answered (its report, checked: bad values are refused, not stored). */
 export function recordMcp(h: MetricsHandle | null, project: string | null, role: McpSeries['role'], e: { tool: unknown; mode: unknown; ok: unknown; chars: unknown; bytes: unknown; ms: unknown }): boolean {
   const chars = count(e.chars, MCP_REPORT_LIMITS.chars)
   const bytes = count(e.bytes, MCP_REPORT_LIMITS.chars * 4)
@@ -957,7 +957,7 @@ export function recordMcp(h: MetricsHandle | null, project: string | null, role:
 
 /**
  * The bridge's tool list as one session start sent it to its CLI, on the workflow side of the launch it reported for
- * (HI-2049: that launch's own, `unknown` when Hive doesn't know it). A bridge from before HI-2049 sends no `toolsChars`:
+ * (HI-2049: that launch's own, `unknown` when Combwork doesn't know it). A bridge from before HI-2049 sends no `toolsChars`:
  * its start counts in `starts`, not `charStarts`; one from before HI-2063 sends no parts: in `charStarts`, not
  * `partStarts`. Parts come both or neither, with the characters, and add up to no more than them.
  */
@@ -1065,7 +1065,7 @@ export const appMetrics = {
 
 const toPart = (p: PartData): MetricsPart => ({ api: Object.values(p.api), mcp: Object.values(p.mcp), guidance: Object.values(p.guidance), catalog: Object.values(p.catalog) })
 
-/** What Hive doesn't measure (#850): the window's text, and its English for agents (`notMeasured`), item for item. */
+/** What Combwork doesn't measure (#850): the window's text, and its English for agents (`notMeasured`), item for item. */
 const NOT_MEASURED_TEXT = [
   msg({ id: 'service.metrics.notTokens', defaultMessage: 'Provider tokens per Combwork tool or per guidance part: providers report a session’s usage, not what each part of its context cost.', description: "On the Performance page, under What isn't measured: Combwork can't tell how many tokens each of its tools or guidance parts cost." }),
   msg({ id: 'service.metrics.notNetwork', defaultMessage: 'Provider network traffic: Combwork starts the CLIs; it is not a proxy between them and their providers.', description: "On the Performance page, under What isn't measured: the coding agent CLIs' own network traffic." }),
@@ -1156,9 +1156,9 @@ export function queryMetrics(w: WorkspaceService, q: MetricsQuery): Omit<Metrics
   const now = clock.now()
   const to = q.to ? Date.parse(q.to) : now
   const from = q.from ? Date.parse(q.from) : to - DAY
-  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) throw hiveError(msg({ id: 'service.metrics.badRange', defaultMessage: 'from and to must be ISO times, from before to', description: 'An error reading metrics: the range asked for is not two times in order. from and to are the parameters\' names: keep them, and ISO.' }), undefined, { kind: 'invalid' })
-  if (q.role !== undefined && !QUERY_ROLES.has(q.role)) throw hiveError(msg({ id: 'service.metrics.badRole', defaultMessage: 'role must be agent, assistant, api or viewer', description: "An error reading metrics: the role filter isn't one of its values. Keep role, agent, assistant, api and viewer as they are (a parameter and its values)." }), undefined, { kind: 'invalid' })
-  if (q.provider !== undefined && (typeof q.provider !== 'string' || q.provider.length > 64)) throw hiveError(msg({ id: 'service.metrics.badProvider', defaultMessage: 'provider must be a provider id', description: "An error reading metrics: the provider filter isn't a provider's id. Keep provider as it is (a parameter's name)." }), undefined, { kind: 'invalid' })
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) throw combworkError(msg({ id: 'service.metrics.badRange', defaultMessage: 'from and to must be ISO times, from before to', description: 'An error reading metrics: the range asked for is not two times in order. from and to are the parameters\' names: keep them, and ISO.' }), undefined, { kind: 'invalid' })
+  if (q.role !== undefined && !QUERY_ROLES.has(q.role)) throw combworkError(msg({ id: 'service.metrics.badRole', defaultMessage: 'role must be agent, assistant, api or viewer', description: "An error reading metrics: the role filter isn't one of its values. Keep role, agent, assistant, api and viewer as they are (a parameter and its values)." }), undefined, { kind: 'invalid' })
+  if (q.provider !== undefined && (typeof q.provider !== 'string' || q.provider.length > 64)) throw combworkError(msg({ id: 'service.metrics.badProvider', defaultMessage: 'provider must be a provider id', description: "An error reading metrics: the provider filter isn't a provider's id. Keep provider as it is (a parameter's name)." }), undefined, { kind: 'invalid' })
   const h = metricsHandle(w)
   if (h) {
     h.store.touch(now)

@@ -5,7 +5,7 @@ import { advanced } from '../../advanced'
 /**
  * Claude Code waiting to retry its model request (HI-1973): its transcript records each try as a system entry
  * (`claude-code.retry.subtype`, recorded as api_error) with which try it is of how many, the wait before the next and the
- * error (its HTTP status; none when the service couldn't be reached). Hive reads only the transcript's end, where a turn
+ * error (its HTTP status; none when the service couldn't be reached). Combwork reads only the transcript's end, where a turn
  * still retrying has them last, and never holds a file open past the read.
  */
 

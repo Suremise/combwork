@@ -33,7 +33,7 @@ type Delivery = { revision: string | null; problem?: string; lasting?: true }
 // Hook trust is checked against the Codex executable; not what these tests are about.
 ;(codex as unknown as { checkHookHashes: () => Promise<void> }).checkHookHashes = async () => undefined
 
-const base = tempDir('hive-codex-delivery-')
+const base = tempDir('cw-codex-delivery-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 beforeEach(() => {
   faults.folderFails = false

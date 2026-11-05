@@ -17,7 +17,7 @@ const PRIVATE = 'privatecustomer'
 const header = (text = false): RecordingHeader => ({
   type: 'recording',
   format: 1,
-  hive: '0.7.0',
+  combwork: '0.7.0',
   startedAt: '2026-10-12T09:00:00.000Z',
   source: { kind: 'session', label: 'alpha · B1', provider: 'claude-code' },
   text,
@@ -79,7 +79,7 @@ describe('recording', () => {
 describe('recordingToFixture', () => {
   it("keeps the CLI's events and Combwork's reading of them, in order, without times, paths or Combwork's own work", async () => {
     const f = recordingToFixture(await record(false))
-    expect(f).toMatchObject({ format: 1, provider: 'claude-code', cli: '2.1.296', hive: '0.7.0', recordedAt: '2026-10-12T09:00:00.000Z' })
+    expect(f).toMatchObject({ format: 1, provider: 'claude-code', cli: '2.1.296', combwork: '0.7.0', recordedAt: '2026-10-12T09:00:00.000Z' })
     expect(f.events.map((e) => `${e.kind} ${e.name}`)).toEqual(['hook UserPromptSubmit', 'hook PreToolUse'])
     const text = JSON.stringify(f)
     expect(text).not.toMatch(/work[\\/]+alpha|"seq"|"at"/)
@@ -95,7 +95,7 @@ describe('recordingToFixture', () => {
 })
 
 describe('compareContract', () => {
-  const fixture = (events: ConsoleFixture['events']): ConsoleFixture => ({ format: 1, provider: 'claude-code', cli: '2.1.296', hive: '0.7.0', recordedAt: '', events })
+  const fixture = (events: ConsoleFixture['events']): ConsoleFixture => ({ format: 1, provider: 'claude-code', cli: '2.1.296', combwork: '0.7.0', recordedAt: '', events })
   const pre = (raw: Record<string, unknown>, kind = 'toolStart'): ConsoleFixture['events'][number] => ({ kind: 'hook', name: 'PreToolUse', raw, made: { event: { kind }, status: 'working', actions: [] } })
   const stop = (status = 'finished', actions = ['releaseLocks', 'turnEnded']): ConsoleFixture['events'][number] => ({ kind: 'hook', name: 'Stop', raw: { hook_event_name: 'Stop' }, made: { event: { kind: 'stop', lastMessage: null }, status, actions } })
   const ready = (status = 'ready'): ConsoleFixture['events'][number] => ({ kind: 'terminal', name: 'ready', raw: { screen: '<text: 200 chars>' }, made: { status } })

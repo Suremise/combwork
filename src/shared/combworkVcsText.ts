@@ -1,10 +1,10 @@
 // What a project's .combwork version control notice says (#345): shared by the window and its tests.
 import { msg, tr } from './i18n'
-import type { HiveVcs } from './types'
+import type { CombworkVcs } from './types'
 
 /** The id of the user guide's heading on what .combwork holds and how it is kept out of version control. */
 // i18n-ignore: a user guide heading's id (#1535)
-export const CW_FOLDER_GUIDE = 'what-hive-keeps-in-a-project'
+export const CW_FOLDER_GUIDE = 'what-combwork-keeps-in-a-project'
 
 const M = {
   trackedTitle: msg({ id: 'git.combworkVcs.trackedTitle', defaultMessage: '{count, plural, one {# file in .combwork is committed to git} other {# files in .combwork are committed to git}}', description: "Title of the notice in a project's Overview and Project Settings: files in the project's .combwork folder were committed to git. Keep .combwork. No full stop: the notice adds it." }),
@@ -20,10 +20,10 @@ const M = {
 }
 
 /** One situation, so a notice dismissed for it shows again when the situation changes. */
-export const hiveVcsKey = (v: HiveVcs): string => `${v.state}|${v.vcs ?? ''}|${v.sync ?? ''}${v.tracked ? '|tracked' : ''}`
+export const combworkVcsKey = (v: CombworkVcs): string => `${v.state}|${v.vcs ?? ''}|${v.sync ?? ''}${v.tracked ? '|tracked' : ''}`
 
 /** What the notice says about a project's .combwork (#345), or null when version control already keeps it out and nothing syncs it. */
-export function hiveVcsText(v: HiveVcs | undefined): { title: string; detail: string; canExclude: boolean; canUntrack?: boolean } | null {
+export function combworkVcsText(v: CombworkVcs | undefined): { title: string; detail: string; canExclude: boolean; canUntrack?: boolean } | null {
   if (!v || (v.state === 'excluded' && !v.sync && !v.tracked)) return null
   // Committed before it was excluded (#364): excluding keeps new files out, but git goes on committing these.
   if (v.tracked) {

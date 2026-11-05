@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 import { as09, writeCard } from './boardDb'
 import { commit, gitRepo, sh } from './workflow/harness'
 
-const base = tempDir('hive-agentmoves-')
+const base = tempDir('cw-agentmoves-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

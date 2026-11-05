@@ -121,7 +121,7 @@ describe('Claude Code auto-compaction settings (#242)', () => {
     expect(autoCompactOf(['--autocompact', '300000'], {}, [], OPUS).estimate).toBeUndefined()
   })
 
-  const dir = tempDir('hive-autocompact-')
+  const dir = tempDir('cw-autocompact-')
   it("reads the command line's settings: the last --settings, a file or inline JSON, above the folder's (#273)", () => {
     const cwd = join(dir, 'cli')
     mkdirSync(cwd, { recursive: true })

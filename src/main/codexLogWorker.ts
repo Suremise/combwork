@@ -8,7 +8,7 @@ import { DatabaseSync } from 'node:sqlite'
  * is waiting to retry its model request (a 429). Off main's thread because a read of a file another process writes can
  * wait on its locks (bounded here by a 200 ms busy timeout) and an open can be slow (a scan). Never writes, never creates
  * a file, and keeps nothing open between reads: on Windows an open file can't be deleted or renamed, and the file is
- * Codex's (and a connection's folder Hive may remove). Any error answers no row, with why. No Electron here (a worker
+ * Codex's (and a connection's folder Combwork may remove). Any error answers no row, with why. No Electron here (a worker
  * can't load it): main logs.
  */
 

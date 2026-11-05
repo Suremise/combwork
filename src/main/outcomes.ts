@@ -3,7 +3,7 @@ import { msg } from '../shared/i18n'
 /**
  * What a notification says once its buttons' action is done or no longer applies (HI-2320, Darren: "once the action is
  * done or no longer needed it goes, and the entry says what happened"): shown in place of its buttons, in its pop-up and
- * its row under the bell. Short, in the language Hive shows.
+ * its row under the bell. Short, in the language Combwork shows.
  */
 export const OUTCOME = {
   conversationEnded: msg({ id: 'main.outcome.conversationEnded', defaultMessage: 'Its conversation ended', description: "What a notification about an agent's conversation (a long conversation's Hand Over to…) says once that conversation's session has ended (HI-2320), in place of its button." }),

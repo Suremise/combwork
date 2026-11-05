@@ -45,7 +45,7 @@ let queued: QueuedTip | null = null
 /** When a key was last pressed in this window. */
 let lastKeyAt: number | null = null
 
-/** The day's tip, when Hive starts: at most one a day, only with tips on, and when nothing else goes on. */
+/** The day's tip, when Combwork starts: at most one a day, only with tips on, and when nothing else goes on. */
 export function showTodaysTip(): void {
   if (!tipsOn() || get().tipShown) return
   const now = new Date()

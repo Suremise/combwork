@@ -1,4 +1,4 @@
-// What Hive says about unused worktrees (#353): shared by the window and its tests. Window text, in the language Hive
+// What Combwork says about unused worktrees (#353): shared by the window and its tests. Window text, in the language Combwork
 // shows (main's for lostLines, which main words for the removal's confirmation); reuseNote is also the Agent API's, so
 // it words its text in English unless given the window's tr().
 import type { UnusedWorktree, WorktreeReuse } from './types'
@@ -14,9 +14,9 @@ const M = {
   commitsNoBranch: msg({ id: 'workspace.unused.commitsNoBranch', defaultMessage: '{count, plural, one {# commit} other {# commits}} on no branch', description: "An unused worktree's state: commits only its detached HEAD has." }),
   changedFiles: msg({ id: 'workspace.unused.changedFiles', defaultMessage: '{count, plural, one {# changed file} other {# changed files}}', description: "An unused worktree's state: files changed and not committed." }),
   notChecked: msg({ id: 'workspace.unused.notChecked', defaultMessage: "Combwork couldn't check it", description: "An unused worktree's state when git couldn't say." }),
-  notMadeByHive: msg({ id: 'workspace.unused.notMadeByCombwork', defaultMessage: 'not made by Combwork', description: 'Who made an unused worktree: something other than Combwork (an agent\'s own git worktree add). Lower case: it follows its branch.' }),
+  notMadeByCombwork: msg({ id: 'workspace.unused.notMadeByCombwork', defaultMessage: 'not made by Combwork', description: 'Who made an unused worktree: something other than Combwork (an agent\'s own git worktree add). Lower case: it follows its branch.' }),
   was: msg({ id: 'workspace.unused.was', defaultMessage: 'was {agent}', description: "Who made an unused worktree: the Combwork agent that worked in it ({agent}: its name). Lower case: it follows its branch." }),
-  madeByHive: msg({ id: 'workspace.unused.madeByCombwork', defaultMessage: 'made by Combwork', description: 'Who made an unused worktree: Combwork, for an agent no longer known. Lower case: it follows its branch.' }),
+  madeByCombwork: msg({ id: 'workspace.unused.madeByCombwork', defaultMessage: 'made by Combwork', description: 'Who made an unused worktree: Combwork, for an agent no longer known. Lower case: it follows its branch.' }),
   detached: msg({ id: 'workspace.unused.detached', defaultMessage: '(detached)', description: "An unused worktree with no branch (a detached HEAD), in the Changes tab's picker." }),
   pickMerged: msg({ id: 'workspace.unused.pickMerged', defaultMessage: 'merged, clean', description: "An unused worktree in the Changes tab's picker: merged and with no changes. Lower case." }),
   pickWork: msg({ id: 'workspace.unused.pickWork', defaultMessage: 'holds work', description: "An unused worktree in the Changes tab's picker: it holds work that is nowhere else. Lower case." }),
@@ -59,12 +59,12 @@ export function unusedState(w: UnusedWorktree): string {
   return parts.length ? parts.join(' · ') : (c.reason ?? tr(M.notChecked))
 }
 
-/** Who made it, in a few words (#476): "was B4" (the Hive agent that worked there), "made by Hive", "not made by Hive". */
+/** Who made it, in a few words (#476): "was B4" (the Combwork agent that worked there), "made by Hive", "not made by Hive". */
 export function originLabel(w: Pick<UnusedWorktree, 'origin'>): string {
   const o = w.origin
   if (!o) return ''
-  if (o.madeBy === 'other') return tr(M.notMadeByHive)
-  return o.agentName ? tr(M.was, { agent: o.agentName }) : tr(M.madeByHive)
+  if (o.madeBy === 'other') return tr(M.notMadeByCombwork)
+  return o.agentName ? tr(M.was, { agent: o.agentName }) : tr(M.madeByCombwork)
 }
 
 /** Its name in lists (#1450): a slot's name (its branch after it, when it has one), else its branch, else "(detached)". */
@@ -73,7 +73,7 @@ export function unusedName(w: Pick<UnusedWorktree, 'branch' | 'slot'>): string {
   return w.branch ?? tr(M.detached)
 }
 
-/** What it is to Hive's pools, in a few words (#1450), or '' for a worktree no agent works in. */
+/** What it is to Combwork's pools, in a few words (#1450), or '' for a worktree no agent works in. */
 export function kindLabel(w: Pick<UnusedWorktree, 'kind'>): string {
   switch (w.kind) {
     case 'slot':

@@ -29,7 +29,7 @@ vi.mock('fs/promises', async () => {
   return { ...real, readFile, default: { ...real, readFile } }
 })
 
-const base = tempDir('hive-build-facts-')
+const base = tempDir('cw-build-facts-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -87,7 +87,7 @@ describe('a build fact', () => {
     const e = { source: 'combwork' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
     // Stored in English as agents read it; the window says it in the user's language (here English: the same line).
     expect(journalSummary(e)).toBe(e.summary)
-    // An old entry's "Built Hive …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
+    // An old entry's "Built Combwork …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
     const old = e.summary.replace(' Combwork ', ' Hive ')
     expect(journalSummary({ ...e, summary: old })).toBe(old)
     expect(journalSummary({ ...e, source: 'assistant' })).toBe(e.summary)
@@ -223,7 +223,7 @@ describe('the scripts tell Combwork of a build', () => {
   })
 
   it('says so when no workspace holds the checkout', async () => {
-    const lone = tempDir('hive-build-facts-lone-')
+    const lone = tempDir('cw-build-facts-lone-')
     expect(await script.recordBuild({ ...input, root: lone }, { env: {} })).toBe("Build not recorded in Combwork's journal: no Combwork workspace holds this checkout (CW_WORKSPACE names one).")
   })
 })

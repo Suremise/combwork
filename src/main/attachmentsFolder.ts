@@ -7,7 +7,7 @@ import { ATTACHMENTS_DIR, OLD_ATTACHMENTS_DIR, isSessionFolder, movedAttachmentP
 import { CW_DIR } from '../shared/defaults'
 import { insideReal, writeJsonAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 
 const log = createLogger('attachments')
@@ -43,7 +43,7 @@ export function forgetMoves(): void {
   moves.clear()
 }
 
-/** A folder Hive may keep attachments in: a real folder (not a link), really inside the host. */
+/** A folder Combwork may keep attachments in: a real folder (not a link), really inside the host. */
 async function isOwnFolder(host: string, p: string): Promise<boolean> {
   const st = await lstat(p).catch(() => null)
   return !!st && !st.isSymbolicLink() && st.isDirectory() && insideReal(p, [host])
@@ -58,14 +58,14 @@ const SESSION_FOLDER = /^(?!\.{1,2}$)[\w.-]+$/
  * or symbolic link, never really outside the host. Throws otherwise, so nothing is written through one.
  */
 export async function ownAttachmentsFolder(host: string, sessionFolder?: string): Promise<string> {
-  if (sessionFolder !== undefined && !SESSION_FOLDER.test(sessionFolder)) throw hiveError(msg({ id: 'service.attachments.badFolder', defaultMessage: 'Not a session folder name.', description: "An error: a name given for a session's attachments folder isn't one Combwork makes (a session id)." }), undefined, { kind: 'invalid' })
+  if (sessionFolder !== undefined && !SESSION_FOLDER.test(sessionFolder)) throw combworkError(msg({ id: 'service.attachments.badFolder', defaultMessage: 'Not a session folder name.', description: "An error: a name given for a session's attachments folder isn't one Combwork makes (a session id)." }), undefined, { kind: 'invalid' })
   const root = await attachmentsDir(host)
   const chain = [join(host, CW_DIR), root, ...(sessionFolder !== undefined ? [join(root, sessionFolder)] : [])]
   for (const p of chain) {
     if (!(await lstat(p).catch(() => null))) await mkdir(p).catch((e: NodeJS.ErrnoException) => (e.code === 'EEXIST' ? undefined : Promise.reject(e)))
     if (!(await isOwnFolder(host, p))) {
       log.warn(`${userText(p)} is a link or not a folder: no attachments are kept through it`)
-      throw hiveError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Combwork writes nothing through it." }), { folder: p })
+      throw combworkError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Combwork writes nothing through it." }), { folder: p })
     }
   }
   return chain[chain.length - 1]
@@ -101,11 +101,11 @@ export async function freeName(dir: string, name: string, suffix: (i: number) =>
  * it is with what it holds.
  */
 async function moveOldFolder(host: string): Promise<void> {
-  const hive = join(host, CW_DIR)
-  const old = join(hive, OLD_ATTACHMENTS_DIR)
+  const combwork = join(host, CW_DIR)
+  const old = join(combwork, OLD_ATTACHMENTS_DIR)
   if (!(await lstat(old).catch(() => null))) return
-  if (!(await isOwnFolder(host, hive)) || !(await isOwnFolder(host, old))) return log.warn(`${userText(old)} is a link or not a folder: Combwork leaves it alone`)
-  const dest = join(hive, ATTACHMENTS_DIR)
+  if (!(await isOwnFolder(host, combwork)) || !(await isOwnFolder(host, old))) return log.warn(`${userText(old)} is a link or not a folder: Combwork leaves it alone`)
+  const dest = join(combwork, ATTACHMENTS_DIR)
   const there = await lstat(dest).catch(() => null)
   if (there && !(await isOwnFolder(host, dest))) return log.warn(`${userText(dest)} is a link or not a folder: the images folder stays`)
   if (!there) {
@@ -143,7 +143,7 @@ async function moveOldFolder(host: string): Promise<void> {
       const target = await freeName(to, f, (i) => ` (moved${i > 1 ? ` ${i}` : ''})`)
       try {
         // A renamed file's new name is on disk before it moves: if recording it fails, it stays at its old path (where
-        // old links find it first); if the move then fails or Hive stops, the record is unused while the old path is.
+        // old links find it first); if the move then fails or Combwork stops, the record is unused while the old path is.
         if (target !== join(to, f)) await recordRenamed(dest, `${d}/${f}`, `${d}/${target.slice(to.length + 1)}`)
         await rename(join(from, f), target)
         moved++
@@ -177,7 +177,7 @@ async function recordRenamed(root: string, from: string, to: string): Promise<vo
   let map: Record<string, string> = {}
   try {
     const v = JSON.parse(await readFile(path, 'utf8')) as unknown
-    if (!v || typeof v !== 'object' || Array.isArray(v)) throw hiveError(msg({ id: 'service.attachments.badRecord', defaultMessage: '{file} is not a record of moved files', description: "An error: the file {file} where Combwork records attachments it renamed can't be read as one (damaged)." }), { file: MOVED_FILE })
+    if (!v || typeof v !== 'object' || Array.isArray(v)) throw combworkError(msg({ id: 'service.attachments.badRecord', defaultMessage: '{file} is not a record of moved files', description: "An error: the file {file} where Combwork records attachments it renamed can't be read as one (damaged)." }), { file: MOVED_FILE })
     map = v as Record<string, string>
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e

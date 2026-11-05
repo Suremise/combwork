@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 import { readCardIn } from './boardDb'
 import { closeAllBoards } from '../src/main/boardStore'
 
-const base = tempDir('hive-projectrename-')
+const base = tempDir('cw-projectrename-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => {
   closeAllBoards()

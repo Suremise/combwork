@@ -6,7 +6,7 @@ import { fmt, msg, tr } from '../shared/i18n'
 import { projectNow } from '../shared/projectIds'
 import { keyProblem, KEY_FORM, nameWithKey, normalKey, setCardNaming, suggestKey, type CardNames, type KeyHeld } from '../shared/projectKeys'
 import type { WorkspaceInfo } from '../shared/types'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { contextWorkspace, workspaceFor, type WorkspaceService } from './workspace'
 
@@ -147,10 +147,10 @@ export async function createProjectWithKey(ws: WorkspaceService, name: string, k
     // Its id read now, so it has its key before this returns (the chosen one is only known meanwhile).
     const ids = await ws.projectIds({ fresh: true })
     await keyProjects(ws)
-    // Never another key in its place without saying so (another Hive on the same workspace could have taken it).
+    // Never another key in its place without saying so (another Combwork on the same workspace could have taken it).
     const id = path ? ids.byPath.get(path) : undefined
     const now = id ? projectKeys(ws).find((h) => h.projectId === id && h.current)?.key : undefined
-    if (k && now && now !== k) throw hiveError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
+    if (k && now && now !== k) throw combworkError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
     return info
   } finally {
     if (path && wsPath && mine?.get(path) === k) {
@@ -172,11 +172,11 @@ const PROBLEM = {
 /** Refuses a key the project `id` can't take, saying why. */
 function refuseKey(k: string, id: string, held: KeyHeld[]): void {
   const problem = keyProblem(k, id, held)
-  if (problem === 'form') throw hiveError(PROBLEM.form, undefined, { kind: 'invalid' })
-  if (problem === 'taken') throw hiveError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
+  if (problem === 'form') throw combworkError(PROBLEM.form, undefined, { kind: 'invalid' })
+  if (problem === 'taken') throw combworkError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
   if (problem === 'prefix') {
     const other = held.find((h) => h.projectId !== id && (normalKey(h.key).startsWith(k) || k.startsWith(normalKey(h.key))))!.key
-    throw hiveError(PROBLEM.prefix, { key: k, other: normalKey(other) }, { kind: 'conflict' })
+    throw combworkError(PROBLEM.prefix, { key: k, other: normalKey(other) }, { kind: 'conflict' })
   }
 }
 
@@ -188,12 +188,12 @@ export async function changeProjectKey(ws: WorkspaceService, projectPath: string
   const path = ws.path
   const life = ws.lifetime
   const ids = await ws.projectIds({ fresh: true })
-  if (!path || !stillIn(ws, path, life)) throw hiveError(PROBLEM.closed, undefined, { kind: 'conflict' })
+  if (!path || !stillIn(ws, path, life)) throw combworkError(PROBLEM.closed, undefined, { kind: 'conflict' })
   const id = ids.byPath.get(resolve(projectPath).toLowerCase())
-  if (!id) throw hiveError(PROBLEM.unknownProject, undefined, { kind: 'invalid' })
+  if (!id) throw combworkError(PROBLEM.unknownProject, undefined, { kind: 'invalid' })
   const k = normalKey(String(key ?? ''))
   return boardWrite(ws, async () => {
-    if (!stillIn(ws, path, life)) throw hiveError(PROBLEM.closed, undefined, { kind: 'conflict' })
+    if (!stillIn(ws, path, life)) throw combworkError(PROBLEM.closed, undefined, { kind: 'conflict' })
     const held = projectKeys(ws)
     refuseKey(k, id, [...held, ...reserved(path)])
     if (held.some((h) => h.projectId === id && h.current && normalKey(h.key) === k)) return k
@@ -234,7 +234,7 @@ export function sayKeysOnce(ws: WorkspaceService): void {
 }
 
 /**
- * The card a reference names, for the Agent API and the hive tools (#1219; Darren, 20 Oct: tools take a key string too):
+ * The card a reference names, for the Agent API and the Combwork tools (#1219; Darren, 20 Oct: tools take a key string too):
  * a key (`HI-12`, any case, an old key too), an old number as `#1061`, or the number the tools take (`1061`, the old global
  * number until P8). Null for a key or number no card has.
  */

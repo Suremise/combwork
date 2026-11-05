@@ -11,7 +11,7 @@ import { commit, gitRepo, sh } from './harness'
 import { allOff } from '../../src/shared/workflow/options'
 import { foldCard, type Fact } from '../../src/shared/workflow/facts'
 
-const base = tempDir('hive-adoption-')
+const base = tempDir('cw-adoption-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')

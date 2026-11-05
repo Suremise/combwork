@@ -11,7 +11,7 @@ const { openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
 const { checkpointHooks } = await import('../src/main/walCheckpointWorker')
 
-const base = tempDir('hive-wal-checkpoint-')
+const base = tempDir('cw-wal-checkpoint-')
 let n = 0
 const DEFAULTS = { ...wal.checkpointLimits }
 afterEach(() => Object.assign(wal.checkpointLimits, DEFAULTS))

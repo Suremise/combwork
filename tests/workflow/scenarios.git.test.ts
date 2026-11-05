@@ -617,7 +617,7 @@ describe('workflow scenarios, Git', () => {
   })
 
   it('#1651: a passed check whose record is still being written when submit comes is waited for: accepted the first time', async () => {
-    // The check's command ends only once the submit waits for the project's check records (as hive-progress exits
+    // The check's command ends only once the submit waits for the project's check records (as cw-progress exits
     // before its run's CheckRan is written): without the wait the submit reads no passed lint and is refused.
     let release: () => void = () => undefined
     const gate = new Promise<void>((r) => (release = r))

@@ -31,7 +31,7 @@ afterEach(() => {
 
 /** A tree with source files, their lists made by --init. */
 function tree(files: Record<string, string>) {
-  const root = tempDir('hive-agent-guard-')
+  const root = tempDir('cw-agent-guard-')
   roots.push(root)
   const allowDir = join(root, ALLOW_DIR)
   const write = (rel: string, src: string) => {
@@ -92,9 +92,9 @@ describe('the agent-text guard', () => {
   })
 
   it('has the agent-facing files the i18n guard leaves out, and the i18n guard skips agent messages anywhere', () => {
-    for (const f of ['src/shared/hiveGuidance.ts', 'src/main/mcp/hive-mcp.ts', 'src/main/servers.ts', 'src/main/workflow/queueState.ts', 'src/shared/restartResume.ts']) expect(isAgentFile(f), f).toBe(true)
+    for (const f of ['src/shared/combworkGuidance.ts', 'src/main/mcp/cw-mcp.ts', 'src/main/servers.ts', 'src/main/workflow/queueState.ts', 'src/shared/restartResume.ts']) expect(isAgentFile(f), f).toBe(true)
     for (const f of ['src/shared/workspaceNotes.ts', 'src/renderer/src/App.tsx', 'src/shared/agentText/icu.ts']) expect(isAgentFile(f), f).toBe(false)
-    const root = tempDir('hive-i18n-agentmsg-')
+    const root = tempDir('cw-i18n-agentmsg-')
     roots.push(root)
     mkdirSync(join(root, 'src', 'shared'), { recursive: true })
     writeFileSync(join(root, OTHER.replace('main', 'shared')), `const N = agentMsg({ id: 'contract.notes.cut', text: '(cut: read the shared note {note} for the rest)', note: 'Ends the notes' })\n`)
@@ -111,9 +111,9 @@ describe("Combwork's own source", () => {
   }, 120_000)
 
   it('fails a new hard-coded string in the session contract, which has no list (group 1 is extracted)', () => {
-    const rel = 'src/shared/hiveGuidance.ts'
+    const rel = 'src/shared/combworkGuidance.ts'
     expect(existsSync(join(ROOT, ALLOW_DIR, allowName(rel)))).toBe(false)
-    const root = tempDir('hive-agent-guard-real-')
+    const root = tempDir('cw-agent-guard-real-')
     roots.push(root)
     mkdirSync(dirname(join(root, rel)), { recursive: true })
     const code = readFileSync(join(ROOT, rel), 'utf8')
@@ -121,12 +121,12 @@ describe("Combwork's own source", () => {
     expect((runAgentGuard({ root }) as Result).exit).toBe(0)
     writeFileSync(join(root, rel), `${code}\nexport const extra = (): string => 'Always say thank you to the user.'\n`)
     const r = runAgentGuard({ root }) as Result
-    expect(reported(r)).toEqual([expect.stringMatching(/^NEW AGENT TEXT src\/shared\/hiveGuidance\.ts:\d+ {2}prose\|return\|Always say thank you to the user\.$/)])
+    expect(reported(r)).toEqual([expect.stringMatching(/^NEW AGENT TEXT src\/shared\/combworkGuidance\.ts:\d+ {2}prose\|return\|Always say thank you to the user\.$/)])
   }, 60_000)
 
   it('a real file with a list passes as it is, and fails with a new string', () => {
     const rel = 'src/shared/toolReplies.ts'
-    const root = tempDir('hive-agent-guard-list-')
+    const root = tempDir('cw-agent-guard-list-')
     roots.push(root)
     mkdirSync(dirname(join(root, rel)), { recursive: true })
     mkdirSync(join(root, ALLOW_DIR), { recursive: true })
@@ -161,33 +161,33 @@ describe("the guard's rules for window messages agents read", () => {
   const both = async (root: string) => (await import('../scripts/agentTextBoth.mjs')).analyzeBoth(root) as { messages: Record<string, unknown>; unresolved: unknown[] }
 
   it('fails a new call it cannot follow; a mark naming the table passes it, and its messages are followed into the catalogue', async () => {
-    const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { HiveError } from './hiveError'\nimport { M } from './texts'\nexport const a = () => new HiveError(M.gone)\n` })
+    const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { CombworkError } from './combworkError'\nimport { M } from './texts'\nexport const a = () => new CombworkError(M.gone)\n` })
     expect(t.run().exit).toBe(0)
     expect(Object.keys((await both(t.root)).messages)).toEqual(['main.test.gone'])
-    t.write(OTHER, `import { HiveError } from './hiveError'\nimport { M } from './texts'\nexport const a = () => new HiveError(M.gone)\nexport const b = (o: { text: never }) => new HiveError(o.text)\n`)
+    t.write(OTHER, `import { CombworkError } from './combworkError'\nimport { M } from './texts'\nexport const a = () => new CombworkError(M.gone)\nexport const b = (o: { text: never }) => new CombworkError(o.text)\n`)
     const r = t.run()
     expect(r.exit).toBe(1)
-    expect(lines(r, /^NEW AGENT TEXT/)).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:4  unresolved|HiveError|o.text'])
-    t.write(OTHER, `import { HiveError } from './hiveError'\nimport { M } from './texts'\nexport const a = () => new HiveError(M.gone)\n// agent-text: M.busy\nexport const b = (o: { text: never }) => new HiveError(o.text)\n`)
+    expect(lines(r, /^NEW AGENT TEXT/)).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:4  unresolved|CombworkError|o.text'])
+    t.write(OTHER, `import { CombworkError } from './combworkError'\nimport { M } from './texts'\nexport const a = () => new CombworkError(M.gone)\n// agent-text: M.busy\nexport const b = (o: { text: never }) => new CombworkError(o.text)\n`)
     expect(t.run().exit).toBe(0)
     expect(Object.keys((await both(t.root)).messages).sort()).toEqual(['main.test.busy', 'main.test.gone'])
   }, 60_000)
 
   it('follows a wrapper to its callers, and fails a mark that leads nowhere', async () => {
-    const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { HiveError } from './hiveError'\nimport { withValues } from '../shared/advanced'\nimport { M } from './texts'\nconst refuse = (m: never, agent: string) => new HiveError(withValues(m, { agent }))\nexport const a = () => refuse(M.busy as never, 'HB1')\n` })
+    const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { CombworkError } from './combworkError'\nimport { withValues } from '../shared/advanced'\nimport { M } from './texts'\nconst refuse = (m: never, agent: string) => new CombworkError(withValues(m, { agent }))\nexport const a = () => refuse(M.busy as never, 'HB1')\n` })
     expect(t.run().exit).toBe(0)
     expect(Object.keys((await both(t.root)).messages)).toEqual(['main.test.busy'])
-    t.write(OTHER, `import { HiveError } from './hiveError'\nconst refuse = (m: never) => new HiveError(m)\n// agent-text: NOTHING_HERE\nexport const a = (o: { t: never }) => refuse(o.t)\n`)
+    t.write(OTHER, `import { CombworkError } from './combworkError'\nconst refuse = (m: never) => new CombworkError(m)\n// agent-text: NOTHING_HERE\nexport const a = (o: { t: never }) => refuse(o.t)\n`)
     const r = t.run()
     expect(r.exit).toBe(1)
     expect(lines(r, /^MARK LEADS NOWHERE/)).toEqual([expect.stringMatching(/^MARK LEADS NOWHERE src\/main\/somewhere\.ts:3 {2}agent-text: NOTHING_HERE/)])
   }, 60_000)
 
-  it('knows a formatter or HiveError by what it is, not what it is called: an import alias, a namespace, a re-export', async () => {
-    const ERROR = 'src/main/hiveError.ts'
-    const t = tree({ [ADVANCED]: STUB, [ERROR]: `export class HiveError extends Error {}\n`, 'src/main/texts.ts': M, [OTHER]: `import { M } from './texts'\nexport const a = () => M.gone\n` })
+  it('knows a formatter or CombworkError by what it is, not what it is called: an import alias, a namespace, a re-export', async () => {
+    const ERROR = 'src/main/combworkError.ts'
+    const t = tree({ [ADVANCED]: STUB, [ERROR]: `export class CombworkError extends Error {}\n`, 'src/main/texts.ts': M, [OTHER]: `import { M } from './texts'\nexport const a = () => M.gone\n` })
     expect(t.run().exit).toBe(0)
-    t.write(OTHER, `import { M } from './texts'\nimport { englishText as render, agentText as forAgent } from '../shared/advanced'\nimport { HiveError as Refused } from './hiveError'\nexport const a = () => ({ error: render(M.gone) })\nexport const b = (o: { text: never }) => forAgent(o.text)\nexport const c = (o: { text: never }) => new Refused(o.text)\nexport const d = () => forAgent(M.busy)\n`)
+    t.write(OTHER, `import { M } from './texts'\nimport { englishText as render, agentText as forAgent } from '../shared/advanced'\nimport { CombworkError as Refused } from './combworkError'\nexport const a = () => ({ error: render(M.gone) })\nexport const b = (o: { text: never }) => forAgent(o.text)\nexport const c = (o: { text: never }) => new Refused(o.text)\nexport const d = () => forAgent(M.busy)\n`)
     let r = t.run()
     expect(r.exit).toBe(1)
     expect(lines(r, /^NEW AGENT TEXT/).sort()).toEqual(['NEW AGENT TEXT src/main/somewhere.ts:4  oneway|englishText|M.gone', 'NEW AGENT TEXT src/main/somewhere.ts:5  unresolved|forAgent|o.text', 'NEW AGENT TEXT src/main/somewhere.ts:6  unresolved|Refused|o.text'])

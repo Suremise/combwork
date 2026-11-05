@@ -16,7 +16,7 @@ import { taskPrompt } from '../src/shared/tasks'
 import { taskRow, taskRowText } from '../src/shared/toolReplies'
 import { unexpectedCloseText } from '../src/shared/unexpectedClose'
 
-const base = tempDir('hive-keys-')
+const base = tempDir('cw-keys-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -380,13 +380,13 @@ describe("another project's card, for an agent confined to its own (round 1, fin
     const w = await open(ws)
     await keys.keyProjects(w)
     const [h, a] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'H', project: 'hive' }, user), await tasks.createTask({ title: 'A', project: 'ambrosia' }, user)])
-    const asHive = (ref: string): number | null => keys.cardOfRef(w, ref, 'hive')
-    expect([asHive('HI-1'), asHive('AM-1'), asHive('AM-99')]).toEqual([h.number, null, null])
+    const asCombwork = (ref: string): number | null => keys.cardOfRef(w, ref, 'hive')
+    expect([asCombwork('HI-1'), asCombwork('AM-1'), asCombwork('AM-99')]).toEqual([h.number, null, null])
     await keys.changeProjectKey(w, join(ws, 'ambrosia'), 'AMB')
-    expect([asHive('AM-1'), asHive('AMB-1')]).toEqual([null, null])
+    expect([asCombwork('AM-1'), asCombwork('AMB-1')]).toEqual([null, null])
     // Moved to hive: now its; its old keys find it for hive's agents, as they do for the Assistant.
     await inWorkspace(w, () => tasks.updateTask(a.number, { project: 'hive' }, user))
-    expect([asHive('AMB-1'), asHive('HI-2'), keys.cardOfRef(w, 'AMB-1')]).toEqual([a.number, a.number, a.number])
+    expect([asCombwork('AMB-1'), asCombwork('HI-2'), keys.cardOfRef(w, 'AMB-1')]).toEqual([a.number, a.number, a.number])
     // Names: by key only within the scope.
     expect(keys.cardNamesOf(w, 'ambrosia')(h.number)).toBe(`#${h.number}`)
     expect(keys.cardNamesOf(w, 'hive')(h.number)).toBe('HI-1')
@@ -435,9 +435,9 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     expect(named(() => wakeLine(cardChange(c.number, c, ['column'])))).not.toContain(`#${c.number}`)
     // The work of the workspace's window (HI-1661: its errors, notices and history lines) names it by key too.
     expect(inWorkspace(w, () => cardRef(c.number))).toBe('HI-1')
-    // Outside any workspace (the hive MCP server without names): its number, the only name it knows.
+    // Outside any workspace (the combwork MCP server without names): its number, the only name it knows.
     expect(wakeLine(cardChange(c.number, c, ['column']))).toContain(`[CW] #${c.number} is in Todo`)
-    // A text the hive MCP server words gets the names with its JSON.
+    // A text the combwork MCP server words gets the names with its JSON.
     const row = named(() => taskRow({ ...c, agent: null, stalled: null, blockedBy: [c.number] } as never))
     expect(taskRowText(row)).toContain(`after ${name}`)
     expect(taskRowText({ ...row, names: undefined })).toContain(`after #${c.number}`)
@@ -472,7 +472,7 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
   })
 
   it("every card argument of the hive tools takes a key as well as a number (Darren, 20 Oct: tools take a key string)", () => {
-    const src = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+    const src = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
     // No card argument is a number alone: a card is cardArg or cardsArg, or a number-or-string `before`.
     for (const m of src.matchAll(/(\w+): \{ type: 'number'[^}]*\}/g)) expect({ arg: m[1], card: /card|before/i.test(m[1]) }).toEqual({ arg: m[1], card: false })
     expect(src).toContain("items: { type: ['number', 'string'] }")

@@ -11,7 +11,7 @@ import { TipPopup } from './Tips'
 import { Icon } from './ui'
 
 /**
- * Hive's one pop-up system (HI-2320): every notification this window is given (components/Popups, from the store's
+ * Combwork's one pop-up system (HI-2320): every notification this window is given (components/Popups, from the store's
  * `toasts`) and the tip, in one place (Settings → Notifications → Pop-up position; bottom right by default, left of the
  * Assistant's panel), with one look, one stacking, one timing, hover and keyboard handling. The bell's list
  * (Overlays.tsx NotificationCenter) shows the same entries with the same text and buttons.
@@ -144,7 +144,7 @@ export function EntryActions({ t, onNavigate }: { t: ToastMessage; onNavigate?: 
 
 /**
  * One pop-up: closes by itself after its time (shared/notify.ts popupMs), kept while the pointer or the keyboard focus
- * is on it, or while the window isn't focused (HI-2320: Hive's own messages wait for you to come back); one that waits
+ * is on it, or while the window isn't focused (HI-2320: Combwork's own messages wait for you to come back); one that waits
  * for you stays until handled. Escape with the focus in it closes it.
  */
 function Popup({ t }: { t: ToastMessage }) {

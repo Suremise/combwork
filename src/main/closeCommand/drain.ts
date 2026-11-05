@@ -6,7 +6,7 @@ import { onWriteEnded, writesAt } from '../dbWrites'
 import { journalFile, journalOpen } from '../journal'
 import { checkpointsReleased } from '../walCheckpoint'
 
-// HI-1368's drain: a closed workspace's close command runs only once Hive has finished writing its databases. Its writes
+// HI-1368's drain: a closed workspace's close command runs only once Combwork has finished writing its databases. Its writes
 // under way (dbWrites: each counted from the moment it was asked for, its wait for the board's lock included) have
 // ended, its board and journal are closed (a save's lease kept neither open), and no WAL checkpoint holds either file.
 

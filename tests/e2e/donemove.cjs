@@ -1,4 +1,4 @@
-// Agents move cards into and out of Done like any other column: an agent's hive tools (the fake Claude Code's
+// Agents move cards into and out of Done like any other column: an agent's Combwork tools (the fake Claude Code's
 // "boardmove N COLUMN", which calls the API as they do) move a card to Done with no question, its history names the
 // agent, and the move is undone from the board (right-click → Move to) or by the agent. The card's prompt asks for
 // Review when the work is done. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -38,7 +38,7 @@ const until = async (fn, ms = 10000) => {
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47906), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47906), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

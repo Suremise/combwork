@@ -392,7 +392,7 @@ describe("a running lane's next card its builder hasn't started (HI-1741's laneN
 })
 
 describe('lane watches (main/watches.ts, #531)', async () => {
-  const base = tempDir('hive-lanewatch-')
+  const base = tempDir('cw-lanewatch-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { contextWorkspace, createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -1060,7 +1060,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
     await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')))
     await inWorkspace(w, () => tasks.updateTask(a, { review: 'start' }, agent('r1')))
-    // R1 asked for a stress proof; B1 runs it through hive-progress for the card, then in a background shell.
+    // R1 asked for a stress proof; B1 runs it through cw-progress for the card, then in a background shell.
     const since = new Date().toISOString()
     const t0 = Date.parse(since)
     const run = { agentId: 'b1', projectPath: alpha, card: a, state: 'running', staleReason: null, startedAt: t0, finishedAt: null as number | null } as unknown as ProgressRun

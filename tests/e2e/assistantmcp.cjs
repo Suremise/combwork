@@ -123,7 +123,7 @@ const check = (name, ok, extra = '') => {
     await places.getByRole('button', { name: 'Cancel' }).click()
     check('…cancelled, nothing changes', !!(await lib.until(async () => (await places.count()) === 0, HUNG_MS)) && JSON.stringify(wsMcp().assistant) === '["notes"]' && projectMcp(proj).enabled.join() === 'sandbox')
 
-    // --- Each launch has only its own servers, the hive server in both.
+    // --- Each launch has only its own servers, the combwork server in both.
     const assistantHome = (await inv('workspace:refresh')).assistant.path
     const agent = await lib.addAgent(inv, proj, { name: 'Builder' })
     const otherAgent = await lib.addAgent(inv, other, { name: 'Writer' })

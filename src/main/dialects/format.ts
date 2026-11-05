@@ -6,7 +6,7 @@
  * the id exists, and the text has exactly that id's placeholders, which parsing the ICU is how they are read (so text
  * that doesn't parse fails too). Nothing checks what a text says: "If someone write a bad instruction that's on them."
  * A save that fails is refused (store.ts); a file loaded with texts that fail keeps the passing ones, and those that
- * fail are outdated and fall through to the layer below (section 5). Hive never rewrites them.
+ * fail are outdated and fall through to the layer below (section 5). Combwork never rewrites them.
  *
  * Pure, and loadable in plain Node (imports name their `.ts`): the scenarios' harness reads a `--dialect` file with it.
  */

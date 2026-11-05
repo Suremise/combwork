@@ -6,8 +6,8 @@ import { progressWanted, VitestProgress } from './tests/progressReport.mts'
 import { startRunTemp } from './tests/runTemp.mts'
 
 // The run's temp folder is the tests' own, in combwork-test\tmp (tests/runTemp.mts, #992), not %TEMP%: Vitest's copies of the
-// modules it serves the workers (about 600 files a run, which it leaves behind), the temp files of Hive's code under test
-// and of the programs tests start (git) go there too, where Hive's Antivirus scanning setting covers them. Set before
+// modules it serves the workers (about 600 files a run, which it leaves behind), the temp files of Combwork's code under test
+// and of the programs tests start (git) go there too, where Combwork's Antivirus scanning setting covers them. Set before
 // Vitest starts its workers, which inherit it (TEMP, TMP and TMPDIR). It is the run's own folder, which tests/tempRun.ts
 // removes once the run has ended (#995); the next run's start removes one a stopped run left (HI-2102), as the board's
 // evidence rules allow (tests/e2e/evidence.cjs: read only if there is one to remove).
@@ -15,7 +15,7 @@ let evidence: { protects: (p: string) => string | null } | undefined
 startRunTemp((p) => (evidence ??= createRequire(import.meta.url)('./tests/e2e/evidence.cjs').evidenceFor(fileURLToPath(new URL('.', import.meta.url)))).protects(p))
 
 export default defineConfig({
-  // Hive's main-process modules import Electron; unit tests use a stub (no Electron binary needed, e.g. in CI). They
+  // Combwork's main-process modules import Electron; unit tests use a stub (no Electron binary needed, e.g. in CI). They
   // also use Electron's original-fs (no .asar handling, #246), which is Node's fs outside Electron: vi.mock('fs') and
   // vi.mock('fs/promises') reach them too. `@shared` is the renderer's name for src/shared, for a test of a renderer module
   // (HI-1863: its store).
@@ -43,7 +43,7 @@ export default defineConfig({
     maxWorkers: '50%',
     testTimeout: 20_000,
     hookTimeout: 30_000,
-    // Run inside a Hive agent's session: the files' progress in Hive's Progress panel (tests/progressReport.mts), added to
+    // Run inside a Combwork agent's session: the files' progress in Combwork's Progress panel (tests/progressReport.mts), added to
     // Vitest's own reporters (which it picks by where it runs: minimal for a coding agent), so the output is unchanged.
     ...(progressWanted() ? { reporters: [...configDefaults.reporters, new VitestProgress()] } : {})
   }

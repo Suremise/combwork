@@ -17,7 +17,7 @@ import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 
-const base = tempDir('hive-agenttext-lanes-')
+const base = tempDir('cw-agenttext-lanes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

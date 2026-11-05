@@ -2,7 +2,7 @@ import { EventEmitter } from 'events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { badgeDescription, badgeText, shouldFlash, windowTitle } from '../src/shared/taskbar'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
-import type { HiveEvent, SessionStatus } from '../src/shared/types'
+import type { CombworkEvent, SessionStatus } from '../src/shared/types'
 
 // Each project's window, a stand-in recording its taskbar flashes (main/taskbar.ts finds it by path).
 const windows = vi.hoisted(() => new Map<string, unknown>())
@@ -47,7 +47,7 @@ describe('the taskbar button flashing', () => {
     }
   }
   let stop: () => void
-  let emit: (e: HiveEvent) => void
+  let emit: (e: CombworkEvent) => void
   const status = (project: string, agentId: string, s: SessionStatus) =>
     emit({ type: 'session-status', state: { provider: 'claude-code', runId: 'r', projectPath: project, agentId, cwd: project, sessionId: '', status: s, startedAt: '', launchSignature: '', unseen: false } })
   const flashSetting = async (on: boolean) => {

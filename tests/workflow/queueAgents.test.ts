@@ -78,12 +78,12 @@ describe('refusals under Combwork merges (the card says what to do)', () => {
     expect(refusedBy(await e.wf.agentColumnMove(theirs.key, B1, 'done'), 'move.useIntent').next).toBe('Use the report merge intent instead.')
   })
 
-  it('the merge slot: refused for a card Combwork merges (refuseHiveMerge), nothing for an unknown card', async () => {
+  it('the merge slot: refused for a card Combwork merges (refuseCombworkMerge), nothing for an unknown card', async () => {
     const e = team()
     const { card } = await queued(e)
-    const r = await e.wf.refuseHiveMerge(card.key, B1, 'merge slot')
+    const r = await e.wf.refuseCombworkMerge(card.key, B1, 'merge slot')
     expect(r).toMatchObject({ refused: true, rule: 'merge.combworkMerges', override: null })
-    expect(await e.wf.refuseHiveMerge('AM-999', B1, 'merge slot')).toBeNull()
+    expect(await e.wf.refuseCombworkMerge('AM-999', B1, 'merge slot')).toBeNull()
   })
 
   it('the window shows the refusal in its own words, its next step by where the card is', async () => {
@@ -152,7 +152,7 @@ describe('with workflow rules off (Settings → Advanced)', () => {
     const { card, folder } = await queued(e)
     enforced = false
     expect(e.wf.combworkMergesRefusal(card)).toBeNull()
-    expect(await e.wf.refuseHiveMerge(card.key, B1, 'merge slot')).toBeNull()
+    expect(await e.wf.refuseCombworkMerge(card.key, B1, 'merge slot')).toBeNull()
     sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', sh(folder, 'rev-parse', 'HEAD'))
     moved(await e.wf.reportMerge(card.key, B1))
     const s = e.wf.state(card)

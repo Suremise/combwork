@@ -1,8 +1,8 @@
-// The merge queue's runner (#1360, SPEC §16.9.3): one runner per project and target across Hives on one combwork.db, taken
+// The merge queue's runner (#1360, SPEC §16.9.3): one runner per project and target across Combworks on one combwork.db, taken
 // over only from a dead process; every process it starts owned by its lease's job (queueJobs.ts) and recorded before
 // the command exists; an earlier runner's duties settled (its jobs and processes ended and seen gone) before a new one
 // runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
-// fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one combwork.db copy.
+// fenced by its lease. Combworks are Node processes (tests/queueRunnerHost.ts) on one combwork.db copy.
 import { spawn, type ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
@@ -127,7 +127,7 @@ const ends = (p: Listed): Promise<void> => vi.waitFor(async () => expect(await r
 
 const forward = (p: string): string => p.replace(/\\/g, '/')
 
-describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () => {
+describe('one runner per target across Combworks (#1360)', { timeout: 180_000 }, () => {
   it("one runs, and the other doesn't while the first lives", async () => {
     const w = world()
     try {

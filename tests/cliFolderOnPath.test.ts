@@ -9,7 +9,7 @@ import { delimiter, join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 
-const home = tempDir('hive-cli-folder-')
+const home = tempDir('cw-cli-folder-')
 const bin = join(home, '.local', 'bin')
 const exe = join(bin, process.platform === 'win32' ? 'claude.exe' : 'claude')
 mkdirSync(bin, { recursive: true })

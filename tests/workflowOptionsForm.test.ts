@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { Contradiction, WorkflowOptions } from '../src/shared/workflow/options'
 
-const base = tempDir('hive-wfoptions-')
+const base = tempDir('cw-wfoptions-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -1033,7 +1033,7 @@ describe("G15 saved before P7: the one-time step (#1445)", () => {
     expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate).toBe(false)
   })
 
-  it("a run that read no mark before another finished never overwrites the user's choice made since (HR5: two Hives)", async () => {
+  it("a run that read no mark before another finished never overwrites the user's choice made since (HR5: two Combworks)", async () => {
     const { w, repo } = await workspace({})
     const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
     await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false } } }))

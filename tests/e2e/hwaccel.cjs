@@ -30,7 +30,7 @@ const relaunches = () => (fs.existsSync(relaunchLog) ? fs.readFileSync(relaunchL
 /** Starts a copy of Combwork on the profile, with `args` after the app's folder. */
 async function start(args = []) {
   const claude = lib.fakeClaude(userData, claudeHome, [proj])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_TEST_RELAUNCH_LOG: relaunchLog, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_RELAUNCH_LOG: relaunchLog, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT, ...args], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

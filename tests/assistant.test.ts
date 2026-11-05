@@ -8,7 +8,7 @@ import { legacyLaunchSettings as agentLaunchSettings } from '../src/shared/conne
 import type { AppSettings, ProjectConfig } from '../src/shared/types'
 import { assistantTools, controlAllows } from '../src/shared/assistantTools'
 import { assistantStatusLine } from '../src/shared/assistantStatus'
-import { controlRules } from '../src/shared/hiveGuidance'
+import { controlRules } from '../src/shared/combworkGuidance'
 import { promptArg } from '../src/main/providers/common'
 
 const settings = (patch: Partial<AppSettings['assistant']> = {}): AppSettings => ({ ...structuredClone(DEFAULT_SETTINGS), assistant: { ...structuredClone(DEFAULT_SETTINGS.assistant), ...patch } })
@@ -29,7 +29,7 @@ describe('Assistant settings', () => {
     expect(l.provider).toBe('claude-code')
     expect(l.model).toBe('opus')
     expect(l.effort).toBe('high')
-    // Not Plan: plan mode blocks the hive tools the Assistant works with.
+    // Not Plan: plan mode blocks the Combwork tools the Assistant works with.
     expect(l.permissionMode).toBe('auto')
     const codex = assistantProjectConfig(cfg(), settings({ provider: 'codex' }))
     expect(agentLaunchSettings(codex.agents[0], codex, s).permissionMode).toBe('approve-for-me')

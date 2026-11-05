@@ -1,6 +1,6 @@
 // Reconciliation (SPEC §16.4.4): observed facts are reconciled against recorded ones, never refused. Work done outside
-// Hive counts: a commit or merge made in a terminal is observed and the rules never fight it. Observations name the
-// observed fact they follow (their dedupe key), so two Hives observing one workspace write each transition once, and
+// Combwork counts: a commit or merge made in a terminal is observed and the rules never fight it. Observations name the
+// observed fact they follow (their dedupe key), so two Combworks observing one workspace write each transition once, and
 // a writer that loses the race reads the platform again and writes only what is true now (§16.17).
 //
 // Called by the app's reconciler (reconciler.ts, #1217) on the watcher's events, and by the runtime's tests. The table's
@@ -115,7 +115,7 @@ async function attributeOnce(wf: Workflow, hooks: ReconcileHooks): Promise<'done
             tx.appendObserved(card.id, { kind: 'CommitAttributed', actor: 'outside', source: 'observed', dedupe: `commit:${commit}`, data: { commit, how: how as 'trailer' | 'onlyCard' } })
             if (h.moves) {
               const moved = tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${h.lastHeadFact}`, data: { line, from: h.head, to: commit } })
-              // Already observed (another Hive's): its log says where the head is now, read again at its next commit.
+              // Already observed (another Combwork's): its log says where the head is now, read again at its next commit.
               if (moved) Object.assign(h, { lastHeadFact: moved.seq, head: commit })
               else heads.delete(card.id)
             }
@@ -320,7 +320,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   if (waits && s.approved?.revision && s.approved.base) {
     const back = card.stage === 'active' ? null : 'approved'
     const approved = { base: s.approved.base, revision: s.approved.revision, key: s.latest?.key }
-    // Found in the target, not by Hive → Done (outside); the queue drops the entry; the lane counts it.
+    // Found in the target, not by Combwork → Done (outside); the queue drops the entry; the lane counts it.
     if (approved.revision !== base) {
       const c = await G.contains(project, target, approved)
       if (!isUnknown(c) && c) return integratedOutside(wf, card, s, approved.revision, c.method, [])
@@ -361,7 +361,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       await wf.write(card, r, 'combwork', (w) => {
         // Only while the head observation it follows is still the newest (a newer one is read by the next run).
         if (!sameCycle(w, s) || w.state().lastHeadFact !== s.lastHeadFact) return
-        // Observed once per head observation (§16.17): two Hives seeing the same new revision write one fact, and a line
+        // Observed once per head observation (§16.17): two Combworks seeing the same new revision write one fact, and a line
         // that comes back to a revision it had before (#1623: away, back, away again) is observed each time.
         if (same) {
           observed(w, 'CarriedOver', `carried:${s.cycle}:${s.lastHeadFact}`, { from: approved.revision, to: head, toBase: b2 as string, how: 'replay' })
@@ -440,11 +440,11 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
   const th = await G.lineHead(wf.cfg.project, target)
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
     if (!sameCycle(w, s)) return
-    // Unique per cycle: two Hives observing the same merge write one `Integrated` (§16.17).
+    // Unique per cycle: two Combworks observing the same merge write one `Integrated` (§16.17).
     const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } }) // i18n-ignore: a fact's kind and codes, not text
     if (f) w.written.push(f as Fact)
     // With the rules enforced: the card Done, its queue entry and slot released, its lane told (P3 records only; the
-    // card stays). Also for an integration recorded before (the rules off then, or another Hive's): applied once, until
+    // card stays). Also for an integration recorded before (the rules off then, or another Combwork's): applied once, until
     // the card is Done.
     if (!wf.cfg.reconcileActs || w.current === 'done') return
     const open = openEntry(w.state())
@@ -513,7 +513,7 @@ function staleEffects(w: Write, back: StageId | null, why: string): void {
 }
 
 /**
- * Where Hive merges, an Approved card the queue let go of because its pass went stale (its newest entry cancelled so),
+ * Where Combwork merges, an Approved card the queue let go of because its pass went stale (its newest entry cancelled so),
  * with no follow-up waiting and approved now: one to queue again (#1623). One taken out otherwise (Remove from queue, a
  * follow-up, On Hold) is left for what took it out.
  */
@@ -547,7 +547,7 @@ function holdsAgain(wf: Workflow, w: Write): void {
 }
 
 /**
- * An observed fact of a write, once (its dedupe key, unique per card and kind): null when another Hive already wrote it,
+ * An observed fact of a write, once (its dedupe key, unique per card and kind): null when another Combwork already wrote it,
  * else the fact, counted as the write's. Under the write's ruleset, as its recorded facts are.
  */
 function observed<K extends 'Stale' | 'CarriedOver'>(w: Write, kind: K, dedupe: string, data: FactData[K]): Fact<K> | null {
@@ -573,7 +573,7 @@ function presence(path: string): 'there' | 'gone' | 'unknown' {
 /**
  * The card's target, observed (`TargetMoved`, §16.4.4): its head now against the last one recorded this cycle, read
  * again under the write's lock from the ref files (a cheap read: no git process), so what is written is the move from the
- * newest recorded head to the head now. Keyed by the fact it follows: two Hives write each move once; a run that finds
+ * newest recorded head to the head now. Keyed by the fact it follows: two Combworks write each move once; a run that finds
  * no move writes nothing, and one after a time closed records what changed meanwhile. Replies with the head git read
  * (none when it couldn't be read, or there's no target).
  */

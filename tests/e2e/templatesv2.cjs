@@ -84,8 +84,8 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     // --- The Templates view: Combwork's six first, read-only, each suggesting a preset.
     await page.locator('.activitybar [aria-label="Templates"]').click()
     const sidebar = page.locator('.sidebar')
-    const hiveRows = sidebar.locator('.template-row[data-scope="hive"]')
-    check("the Templates view lists Combwork's own: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool", !!(await until(async () => JSON.stringify(await hiveRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']), HUNG_MS)), JSON.stringify(await hiveRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))))
+    const combworkRows = sidebar.locator('.template-row[data-scope="hive"]')
+    check("the Templates view lists Combwork's own: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool", !!(await until(async () => JSON.stringify(await combworkRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']), HUNG_MS)), JSON.stringify(await combworkRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))))
     check('…and none of the 0.9 ones (still in the folders)', (await sidebar.locator('.template-row:not([data-scope="hive"])').count()) === 0)
     await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
     const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="hive"]')

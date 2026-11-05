@@ -2,7 +2,7 @@
 // agents) or to add one agent from. What a template holds and what it leaves out (sessions, folders and branches, setup
 // state, the Assistant's mode: those belong to the project), checked as untrusted input when read. #127 adds the places
 // to manage them (the Templates view, a project's Templates tab) and sharing them as files (export, import). #1436: the
-// format's version 2 (no worktrees, each agent's role in the workflow, a suggested preset and pairs) and Hive's own.
+// format's version 2 (no worktrees, each agent's role in the workflow, a suggested preset and pairs) and Combwork's own.
 // HI-1910: its workflow, a section per version control (workflow/templateOptions.ts), read through its whitelist.
 import { AGENT_LIMIT_MAX, ROLE_MAX, SESSION_LAYOUTS, projectAgents } from './defaults'
 import { isKnownProvider } from './providers'
@@ -20,11 +20,11 @@ export const TEMPLATE_VERSION = 2
 /** A template's name is at most this long. */
 export const TEMPLATE_NAME_MAX = 60
 /**
- * Where a template is kept: Hive's own (#1436, read-only: shipped with Hive, copied to the workspace or a project to
+ * Where a template is kept: Combwork's own (#1436, read-only: shipped with Combwork, copied to the workspace or a project to
  * change), for every project of the workspace, or for one project (its .combwork, private to it).
  */
 export type TemplateScope = 'combwork' | 'workspace' | 'project'
-/** The places templates are written to (Hive's own are never changed). */
+/** The places templates are written to (Combwork's own are never changed). */
 export const TEMPLATE_SCOPES: readonly TemplateScope[] = ['workspace', 'project']
 /** The preset a template suggests for the project it is loaded into (#1436: offered, never applied silently). */
 export type SuggestedPreset = 'solo' | 'pair' | 'team'
@@ -56,11 +56,11 @@ export interface TemplateRef extends TemplateDest {
 /**
  * One agent of a template: its role in the workflow (#1430), its note, its MCP servers and the CLI it suggests; never
  * where it works (#1436: agents aren't pinned to folders) nor what it runs on (HI-2109, decision G: no connection, model,
- * effort, mode or context; those are the connection's, chosen when it is loaded). Its provider may be one this Hive
- * doesn't know (a template from a newer Hive, imported): kept and shown, never used.
+ * effort, mode or context; those are the connection's, chosen when it is loaded). Its provider may be one this Combwork
+ * doesn't know (a template from a newer Combwork, imported): kept and shown, never used.
  */
 export interface TemplateAgent {
-  /** Its name, or a pattern of the project's key (`{key}-B1`: Hive's own templates, #1123 names). */
+  /** Its name, or a pattern of the project's key (`{key}-B1`: Combwork's own templates, #1123 names). */
   name: string
   role: WorkflowRole
   /** What it is for, in the user's words (the agent's note, `AgentDef.role`). */
@@ -114,7 +114,7 @@ export interface TemplateEntry {
   pairs?: TemplatePair[]
   workflow?: TemplateWorkflows
   workflowDropped?: PlatformId[]
-  /** It can't be used (damaged, made by a newer Hive…): why, in English (the log, a refusal's message). */
+  /** It can't be used (damaged, made by a newer Combwork…): why, in English (the log, a refusal's message). */
   problem?: string
   /** Why, as text for the window to show in its language (#870), following a change of language. */
   problemText?: Text
@@ -204,7 +204,7 @@ const TOO_MANY = agentMsg({
   note: "Why the Assistant can't load a template (HI-2001): more agents than the project's Maximum agents, which only the Assistant's loads keep to. {count} and {max} are digits."
 })
 
-/** Why a listed template can't be used, in the language Hive shows now (call it when rendering); undefined when it can be. */
+/** Why a listed template can't be used, in the language Combwork shows now (call it when rendering); undefined when it can be. */
 export const shownProblem = (t: Pick<TemplateEntry, 'problem' | 'problemText'>): string | undefined => (t.problemText ? shownText(t.problemText) : t.problem)
 
 /** Whether readTemplate read a template, rather than why it can't be used. */
@@ -223,7 +223,7 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   if (version < TEMPLATE_VERSION) return M.from09
   if (!text(raw.name, TEMPLATE_NAME_MAX)) return withValues(M.badName, { max: TEMPLATE_NAME_MAX })
   if (!Array.isArray(raw.agents) || !raw.agents.length) return M.noAgents
-  // Any template Hive could have saved (#562): whether it fits a project is its load's to say (templateLimitText).
+  // Any template Combwork could have saved (#562): whether it fits a project is its load's to say (templateLimitText).
   if (raw.agents.length > AGENT_LIMIT_MAX) return withValues(M.tooManyAny, { count: raw.agents.length, max: AGENT_LIMIT_MAX })
   const agents: TemplateAgent[] = []
   for (const [i, a] of raw.agents.entries()) {
@@ -233,7 +233,7 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
     // a number's 2 digits).
     const token = /\{[^}]*\}/.exec(name.replace(NAME_TOKENS, ''))?.[0]
     if (token) return withValues(M.badToken, { name, token })
-    // The CLI it suggests (HI-2109): one this Hive doesn't know is kept (flagged where it is shown) as long as it looks
+    // The CLI it suggests (HI-2109): one this Combwork doesn't know is kept (flagged where it is shown) as long as it looks
     // like one; anything else is no suggestion, never a refusal.
     const provider = isProviderId(a.provider) ? a.provider : undefined
     if (a.role !== undefined && !isWorkflowRole(a.role)) return withValues(M.badRole, { name })
@@ -265,7 +265,7 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   const layout: PageLayout = raw.layout === 'auto' || SESSION_LAYOUTS.some((l) => l.value === raw.layout) ? (raw.layout as PageLayout) : 'auto'
   const savedAt = typeof raw.savedAt === 'string' && Number.isFinite(Date.parse(raw.savedAt)) ? raw.savedAt : ''
   // A description that isn't one (not text, or too long) is left out rather than refusing the template; so are a
-  // suggestion and a reviewer mode Hive doesn't know (from a newer Hive): only suggestions.
+  // suggestion and a reviewer mode Combwork doesn't know (from a newer Combwork): only suggestions.
   const description = typeof raw.description === 'string' && raw.description.length <= TEMPLATE_DESCRIPTION_MAX ? raw.description.trim() : ''
   const suggestedPreset = SUGGESTED_PRESETS.find((p) => p === raw.suggestedPreset)
   const reviewerMode = raw.reviewerMode === 'lane' || raw.reviewerMode === 'pool' ? raw.reviewerMode : undefined
@@ -310,16 +310,16 @@ export const pairNames = (agents: readonly Pick<TemplateAgent, 'name' | 'role'>[
 /** Where a pair's agent is among a template's agents (by its numbered name, any case), or -1. */
 export const pairIndex = (agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], name: string): number => pairNames(agents).findIndex((n) => n.toLowerCase() === name.toLowerCase())
 
-/** A provider's id as Hive writes one: known to this Hive or not. */
+/** A provider's id as Combwork writes one: known to this Combwork or not. */
 const isProviderId = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0-9-]{0,39}$/.test(v)
 
-/** The CLIs a template's agents suggest that this Hive doesn't know (each once). */
+/** The CLIs a template's agents suggest that this Combwork doesn't know (each once). */
 export function unknownProviders(agents: readonly TemplateAgent[]): string[] {
   return [...new Set(agents.map((a) => a.provider).filter((p): p is string => !!p && !isKnownProvider(p)))]
 }
 
 /**
- * What an exported file holds: the template as Hive reads it, nothing else (no paths, session ids or user names: none
+ * What an exported file holds: the template as Combwork reads it, nothing else (no paths, session ids or user names: none
  * are in a template, and anything else a file had is dropped when it is read).
  */
 export function exportable(t: AgentTemplate): AgentTemplate {
@@ -362,7 +362,7 @@ export const expandName = (pattern: string, key: string, n: number): string => p
 
 /**
  * A template's agent names for a project (#1123 names, #1440): each pattern made with the project's key (`HI-B1` in hive)
- * and the agent's number among the agents of the same pattern, from 1 (in Hive's own, `{key}-B{n}` is every builder:
+ * and the agent's number among the agents of the same pattern, from 1 (in Combwork's own, `{key}-B{n}` is every builder:
  * its number among its role), so agents of one pattern never share a name. A name without tokens is itself.
  */
 export function templateAgentNames(agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], key: string): string[] {
@@ -417,7 +417,7 @@ export function templateFile(name: string, n = 1): string {
   return `${base}${n > 1 ? `-${n}` : ''}.json`
 }
 
-/** A file name Hive could have made: what calls may name (never a path). */
+/** A file name Combwork could have made: what calls may name (never a path). */
 export const isTemplateFile = (file: unknown): file is string => typeof file === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*\.json$/.test(file) && file.length <= 64
 
 /** A name not yet taken (case aside): itself, else "Builder 2", "Builder 3"… */

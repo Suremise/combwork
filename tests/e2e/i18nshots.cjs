@@ -113,7 +113,7 @@ if (require.main === module) {
     fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
     const port = lib.port(47834)
-    const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: port, ...cenv, CW_LANG: lang, CW_TEST_NOTIFY_LOG: path.join(dir, 'notify.log') })
+    const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: port, ...cenv, CW_LANG: lang, CW_TEST_NOTIFY_LOG: path.join(dir, 'notify.log') })
     const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
     try {
       const page = await app.firstWindow()
@@ -155,7 +155,7 @@ if (require.main === module) {
          */
         authored: (text, within) => english?.authored.push({ text, within }),
         /** Runs a command by its id, as the menu does (App.tsx's menu-command event). */
-        command: (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args }),
+        command: (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args }),
         /** The Agent API, with the test copy's token. */
         api: async (method, route, body) => {
           const r = await fetch(`http://127.0.0.1:${port}${route}`, { method, headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -177,7 +177,7 @@ if (require.main === module) {
         // Painted in it: two frames after the change, with the terminals on screen fitted to their panes (a theme change
         // and a pane that changed size fit them a moment later, and their lines re-wrap then: #896).
         await page.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))))
-        if (!(await lib.until(() => page.evaluate(() => window.__hiveTerminalsFitted?.() ?? true), HUNG_MS))) throw new Error("the terminals weren't fitted to their panes")
+        if (!(await lib.until(() => page.evaluate(() => window.__cwTerminalsFitted?.() ?? true), HUNG_MS))) throw new Error("the terminals weren't fitted to their panes")
         await page.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))))
       }
 

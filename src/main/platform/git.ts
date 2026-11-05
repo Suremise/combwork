@@ -78,10 +78,10 @@ const KEPT_MAX = 20_000
 const kept = new Map<string, unknown>()
 
 /**
- * HI-2115: an answer about fixed commits (full ids) that can't change, kept for as long as Hive runs, not only for a
+ * HI-2115: an answer about fixed commits (full ids) that can't change, kept for as long as Combwork runs, not only for a
  * step: whether one is another's ancestor, their merge base, a range's first parents. The reconciler asked them again
  * at every ref change for every card under way (a git each, several a second while lanes build). Unknown answers are
- * asked again. Kept only for a plain repository (`plainRepo`, the one rule of Hive's git caches): otherwise (replace
+ * asked again. Kept only for a plain repository (`plainRepo`, the one rule of Combwork's git caches): otherwise (replace
  * refs, grafts or shallow history can give the same ids other answers; a reftable can hold replacements unseen) nothing
  * is kept or answered from what was, checked before each answer kept is given and again before one is kept (it may
  * have changed while git ran). An answer kept for a plain repository holds whenever it is plain again: its commits are
@@ -717,7 +717,7 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
   if (at && !at.ok) return null
   const index = at ? at.out.trim() : join(gitDir!, 'index')
   const lock = `${index}.lock`
-  const next = `${index}.hive-line`
+  const next = `${index}.cw-line`
   let fd: number | null
   try {
     fd = openSync(lock, 'wx')

@@ -81,7 +81,7 @@ describe('antivirus (#316)', () => {
   })
 
   it('Combwork’s test area is for people developing Combwork only: a dev build, or a workspace holding Combwork’s repository', () => {
-    expect([testsEligible({ packaged: false, holdsHive: false }), testsEligible({ packaged: true, holdsHive: true }), testsEligible({ packaged: true, holdsHive: false })]).toEqual([true, true, false])
+    expect([testsEligible({ packaged: false, holdsCombwork: false }), testsEligible({ packaged: true, holdsCombwork: true }), testsEligible({ packaged: true, holdsCombwork: false })]).toEqual([true, true, false])
   })
 
   it('Defender with real-time protection and a hidden list: every folder unknown, and the workspace likely slowed', () => {
@@ -105,7 +105,7 @@ describe('antivirus (#316)', () => {
 
   it('with the list hidden: what Combwork added counts as excluded (unconfirmed), and an administrator check is used', () => {
     const added = status(probe(), { added: folders.map((f) => f.path.toUpperCase()) })
-    expect([added.paths.map((p) => [p.state, p.addedByHive]), added.slowed]).toEqual([[['added', true], ['added', true], ['added', true]], false])
+    expect([added.paths.map((p) => [p.state, p.addedByCombwork]), added.slowed]).toEqual([[['added', true], ['added', true], ['added', true]], false])
     const checked = status(probe(), { adminCheck: { at: '2026-10-06T17:00:00Z', exclusions: ['D:\\Development\\HIVE'] } })
     expect([checked.exclusionsFrom, checked.adminCheckedAt, checked.paths.map((p) => p.state)]).toEqual(['admin-check', '2026-10-06T17:00:00Z', ['excluded', 'not-excluded', 'not-excluded']])
     expect(status(probe({ exclusions: [] }), { adminCheck: { at: 'x', exclusions: ['D:\\Development'] } }).paths[0].state).toBe('not-excluded')
@@ -319,7 +319,7 @@ describe('antivirus scripts (#316)', () => {
 
 describe('antivirus status cache (#322)', () => {
   // On a fixture only (CW_TEST_ANTIVIRUS): every probe is logged, so a request that probes again shows the status wasn't kept.
-  const base = tempDir('hive-av-cache-')
+  const base = tempDir('cw-av-cache-')
   const fixture = join(base, 'fixture.json')
   const callLog = join(base, 'calls.log')
   const env = { fixture: process.env.CW_TEST_ANTIVIRUS, log: process.env.CW_TEST_ANTIVIRUS_LOG }

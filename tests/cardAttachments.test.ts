@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 
-const base = tempDir('hive-cardattach-')
+const base = tempDir('cw-cardattach-')
 const trashDir = join(base, 'trash')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -312,7 +312,7 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     const agent = { kind: 'agent', project: 'p' } as const
     const own = file(join(root, 'p', 'src'), 'mine.png', 'mine')
     const slot = file(join(w.worktreesRoot, 'p', 'slot-a'), 'slot.png', 'slot')
-    const shot = file(tempDir('hive-shot-'), 'screenshot.png', 'shot')
+    const shot = file(tempDir('cw-shot-'), 'screenshot.png', 'shot')
     for (const ok of [own, slot, shot]) expect(await att.attachableSource(w, agent, ok)).toBeTruthy()
     // Another project: refused, though the test workspace is itself in the temp folder.
     await expect(att.attachableSource(w, agent, file(join(root, 'q'), 'theirs.png', 'theirs'))).rejects.toThrow(/not a file that can be attached/)
@@ -344,11 +344,11 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     const script = { kind: 'workspace' } as const
     // Everything a test makes is in the run's temp folder: the temp folder is one of its own here, so the rest is outside it.
     const was = process.env.CW_EVIDENCE
-    const temp = tempDir('hive-temp-')
+    const temp = tempDir('cw-temp-')
     att.attachTestHooks.temp = temp
-    const evidence = tempDir('hive-evidence-')
+    const evidence = tempDir('cw-evidence-')
     const zip = file(join(evidence, 'run4'), 'run4.zip', 'zip bytes')
-    const elsewhere = file(tempDir('hive-elsewhere-'), 'other.zip', 'other')
+    const elsewhere = file(tempDir('cw-elsewhere-'), 'other.zip', 'other')
     try {
       // Not listed: refused, naming the accepted folders, Temp's path and where to add one.
       const refused = await att.attachableSource(w, agent, zip).then(() => 'attached', (e: Error) => e.message)
@@ -472,7 +472,7 @@ describe("a card's change with files (HI-1700, s11 §3–4)", () => {
 
   it("an agent's files with no draft are linked at the end of the description; the reply says what was stored", async () => {
     const { w } = await workspace()
-    const shot = file(tempDir('hive-shot2-'), 'shot.png', 'agent shot')
+    const shot = file(tempDir('cw-shot2-'), 'shot.png', 'agent shot')
     const real = await att.attachableSource(w, { kind: 'agent', project: 'p' }, shot)
     const staging = await att.stage(join(w.path!, 'p'), null, [{ path: real, name: 'shot.png' }])
     const made = await inWorkspace(w, () => tasks.changeWithAttachments({ kind: 'agent', name: 'B1' }, { staging, drafts: [null] }, 'description', () => tasks.createTask({ title: 'With a shot', project: 'p', description: 'See the screenshot.' }, user)))

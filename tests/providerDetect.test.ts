@@ -7,7 +7,7 @@ import * as electron from 'electron'
 import type { AgentInstallInfo, ProviderId } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-provider-detect-')
+const base = tempDir('cw-provider-detect-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { config } = await import('../src/main/config')

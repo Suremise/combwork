@@ -1,5 +1,5 @@
 // A launch's side of the workflow, as its metrics count it (HI-2049): its part in the running lanes as it launches,
-// which wins over its own role, taken once; and a tool list its hive server reports later counts on that launch's side,
+// which wins over its own role, taken once; and a tool list its combwork server reports later counts on that launch's side,
 // never on the side of the launch that took its place.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { launchWorkflow } from '../src/shared/workflow/roles'
 
-const base = tempDir('hive-launchworkflow-')
+const base = tempDir('cw-launchworkflow-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection.
 process.env.CW_USER_DATA = join(base, 'profile')
@@ -119,7 +119,7 @@ describe('the side a launch is counted on', () => {
     sessions.laneParts = async () => ['builder']
     let sides: Record<string, string> = {}
     const second = await launchSide('amb1', (runId) => {
-      // The first launch's hive server reports late (its CLI restarted meanwhile): unknown, not the builder launch's.
+      // The first launch's combwork server reports late (its CLI restarted meanwhile): unknown, not the builder launch's.
       sides = { first: sessions.launchSide(p, 'amb1', first.runId), second: sessions.launchSide(p, 'amb1', runId), none: sessions.launchSide(p, 'amb1', null), other: sessions.launchSide(p, 'nobody', runId) }
     })
     expect(second.runId).not.toBe(first.runId)

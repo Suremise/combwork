@@ -21,14 +21,14 @@ import { agentTextSchema, checkTexts } from '../src/main/dialects'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 
-const base = tempDir('hive-agenttext-both-')
+const base = tempDir('cw-agenttext-both-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { apiErrorReply, entryForAgents, metricsForAgents } = await import('../src/main/servers')
 const { agentEnglish, columnError, unknownTask } = await import('../src/main/tasks')
 const { agentBusyError } = await import('../src/main/taskStart')
-const { HiveError } = await import('../src/main/hiveError')
+const { CombworkError } = await import('../src/main/combworkError')
 
 const ROOT = join(__dirname, '..')
 const catalogue = readCatalogue(ROOT) as Record<string, { text: string; note?: string; audience?: string }>
@@ -97,7 +97,7 @@ describe('agentText: the window messages agents read', () => {
 
 describe("forAgents: agents' own words as agent messages", () => {
   it('englishText says the agent branch in the Default, shownText the window branch, agentText the agent branch in the chain', () => {
-    const e = unknownTask(12) as InstanceType<typeof HiveError>
+    const e = unknownTask(12) as InstanceType<typeof CombworkError>
     expect(englishText(e.text)).toBe('Unknown task #12')
     expect(shownText(e.text)).not.toBe('Unknown task #12')
     using({ 'board.agent.unknownTask': 'No card #{n} here' })
@@ -106,7 +106,7 @@ describe("forAgents: agents' own words as agent messages", () => {
     expect(asAgent(() => englishText(e.text))).toBe('Unknown task #12')
   })
 
-  it("a HiveError made inside an agent's scope keeps its message the Default's English; the API's reply is the override", () => {
+  it("a CombworkError made inside an agent's scope keeps its message the Default's English; the API's reply is the override", () => {
     using({ 'board.agent.unknownTask': 'No card #{n} here' })
     const e = asAgent(() => unknownTask(4096)) as Error
     expect(e.message).toBe('Unknown task #4096')
@@ -233,7 +233,7 @@ describe('card history and Combwork’s comments, said when read', () => {
     const { cardChange } = await import('../src/shared/watch')
     const failure = { entry: 'q-1', revision: 'abc1234', target: 'main', reason: 'conflict' as const, transient: false, files: ['a.ts'], log: Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n') }
     const written = returnedComment('HI-1', failure)
-    // What commentAsHive keeps: the English and the window's message as they are, through the card file's JSON.
+    // What commentAsCombwork keeps: the English and the window's message as they are, through the card file's JSON.
     const comment = { at: '2026-11-03T10:00:01.000Z', by: 'Combwork', text: written.text, appText: JSON.parse(JSON.stringify(written.shown)), id: 'c1' }
     const card = { number: 1, column: 'doing', history: [{ at: '2026-11-03T10:00:00.000Z', by: 'Combwork', what: 'Moved to Doing' }], comments: [comment] }
     expect(written.text).toMatch(/^HI-1 came back from the merge queue: a conflict with main in a\.ts\./)
@@ -300,7 +300,7 @@ describe('a dialect override of a shared UI id, end to end', () => {
     expect(outdated.map((o) => o.id)).toEqual(['tasks.error.unknownColumn'])
     using(texts)
     const m = descriptor('tasks.error.archived')
-    const e = new HiveError(withValues(m, { card: 'HI-9' }))
+    const e = new CombworkError(withValues(m, { card: 'HI-9' }))
     expect(asAgent(() => apiErrorReply(e)).body.error).toBe('Card HI-9 is archived: bring it back first.')
     expect(asAgent(() => shownText(e.text))).toBe(englishText(e.text))
     expect(e.message).toBe(englishText(e.text))

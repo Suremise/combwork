@@ -47,7 +47,7 @@ function manyCommits(folder: string, line: string, n: number, trailer?: (i: numb
   for (let i = 1; i <= n; i++) {
     const key = trailer?.(i)
     const msg = `step ${i}\n${key ? `\nCombwork-Card: ${key}\n` : ''}`
-    s += `commit refs/heads/${line}\ncommitter Hive Test <test@hive.invalid> ${1_800_000_000 + i} +0000\ndata ${Buffer.byteLength(msg)}\n${msg}${i === 1 ? `from ${from}\n` : ''}\n`
+    s += `commit refs/heads/${line}\ncommitter Combwork Test <test@hive.invalid> ${1_800_000_000 + i} +0000\ndata ${Buffer.byteLength(msg)}\n${msg}${i === 1 ? `from ${from}\n` : ''}\n`
   }
   execFileSync('git', ['fast-import', '--quiet'], { cwd: folder, input: s, stdio: ['pipe', 'pipe', 'pipe'] })
 }

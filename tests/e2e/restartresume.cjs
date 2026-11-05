@@ -64,7 +64,7 @@ const alive = (pid) => {
  * Combwork's main process, as its running marker names it (process.pid in Combwork: what the installer finds, and what a request
  * must name). Playwright's launched process isn't always it.
  */
-async function hivePid(launchedAt) {
+async function combworkPid(launchedAt) {
   const m = await lib.until(() => {
     try {
       const r = JSON.parse(fs.readFileSync(path.join(userData, 'running.json'), 'utf8'))
@@ -81,7 +81,7 @@ const gone = (pid) => lib.until(() => !alive(pid), HUNG_MS, 200)
 /** Starts a copy of Combwork on the profile, its workspace restored. */
 async function start() {
   const launchedAt = Date.now()
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   identities.push(...lib.identify([app.process().pid]))
   const page = await app.firstWindow()
@@ -94,7 +94,7 @@ async function start() {
     return { status: r.status, body: await r.json().catch(() => null) }
   }
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const pid = await hivePid(launchedAt)
+  const pid = await combworkPid(launchedAt)
   identities.push(...lib.identify([pid]))
   return { app, page, inv, api, live, pid }
 }
@@ -120,7 +120,7 @@ function processStart(pid) {
   return r.stdout.trim()
 }
 
-/** The installer's request, as hiveAskToClose.ps1 writes it, for a copy's process: written beside, then renamed. */
+/** The installer's request, as askToClose.ps1 writes it, for a copy's process: written beside, then renamed. */
 function writeRequest(pid, nonce) {
   const text = JSON.stringify({ v: 1, nonce, pid, pidCreated: processStart(pid), exe: lib.ELECTRON, reason: 'install', at: new Date().toISOString() })
   fs.writeFileSync(`${requestFile}.tmp`, text)

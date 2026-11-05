@@ -1,7 +1,7 @@
 // Custom commands' model (HI-1954, src/shared/commands.ts): cleaning what is saved, HI-1368's single commands adopted
 // into the lists once and the same way again, points resolved, and placeholders filled as written or said missing.
 import { describe, expect, it } from 'vitest'
-import { cleanHive, cleanWorkspace, commandsVersion, fillCommand, isCommandId, migrateHiveCommands, migratedId, migrateWorkspaceCommands, newCommandId, resolvePoint } from '../src/shared/commands'
+import { cleanCombwork, cleanWorkspace, commandsVersion, fillCommand, isCommandId, migrateCombworkCommands, migratedId, migrateWorkspaceCommands, newCommandId, resolvePoint } from '../src/shared/commands'
 import { DEFAULT_APP_CONFIG, mergeDefaults, migrateConfig } from '../src/shared/defaults'
 
 const A = 'c-0000000a'
@@ -25,7 +25,7 @@ describe('what is saved', () => {
     const w = cleanWorkspace({ onOpen: { run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }, { scope: 'workspace', id: B }], onUpdate: true }, onClose: { run: [{ scope: 'other', id: A }], onUpdate: true } })
     expect(w.onOpen).toEqual({ run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }] })
     expect(w.onClose).toEqual({ run: [], onUpdate: true })
-    expect(cleanHive({ onQuit: { run: [{ scope: 'workspace', id: A }, { scope: 'combwork', id: B }] } }).onQuit).toEqual({ run: [{ scope: 'combwork', id: B }] })
+    expect(cleanCombwork({ onQuit: { run: [{ scope: 'workspace', id: A }, { scope: 'combwork', id: B }] } }).onQuit).toEqual({ run: [{ scope: 'combwork', id: B }] })
   })
 
   it('new ids are well formed and differ', () => {
@@ -52,7 +52,7 @@ describe("HI-1368's single commands adopted (one way, the same again)", () => {
 
   it('an empty or missing command adopts nothing', () => {
     expect(migrateWorkspaceCommands({ onClose: { command: '  ', onUpdate: true } }, 'x')).toEqual({ list: [], onOpen: { run: [] }, onClose: { run: [] } })
-    expect(migrateHiveCommands({}, 'x')).toEqual({ list: [], onQuit: { run: [] } })
+    expect(migrateCombworkCommands({}, 'x')).toEqual({ list: [], onQuit: { run: [] } })
   })
 
   it("Combwork's When Combwork quits, run, at config load: adopted, and general.onQuit gone", () => {
@@ -67,9 +67,9 @@ describe("HI-1368's single commands adopted (one way, the same again)", () => {
 
 describe('points and versions', () => {
   it("a point resolves in order, from its scopes' lists; a ref to a deleted command is null", () => {
-    const hive = [{ id: A, name: 'H', command: 'h' }]
+    const combwork = [{ id: A, name: 'H', command: 'h' }]
     const workspace = [{ id: B, name: 'W', command: 'w' }]
-    const r = resolvePoint({ run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }, { scope: 'combwork', id: B }] }, { hive, workspace })
+    const r = resolvePoint({ run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }, { scope: 'combwork', id: B }] }, { combwork, workspace })
     expect(r.map((x) => x.command?.name ?? null)).toEqual(['W', 'H', null])
   })
 

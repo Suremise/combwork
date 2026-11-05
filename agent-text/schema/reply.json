@@ -311,7 +311,7 @@
       "hasProject": "select",
       "project": "plain",
       "at": "plain",
-      "byHive": "select",
+      "byCombwork": "select",
       "importance": "plain",
       "changed": "select",
       "updatedAt": "plain"
@@ -668,7 +668,7 @@
       "slot": "plain",
       "agent": "plain",
       "run": "plain",
-      "hive": "plain"
+      "combwork": "plain"
     }
   },
   "reply.release.none": {

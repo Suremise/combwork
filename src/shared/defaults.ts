@@ -1,6 +1,6 @@
 import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
 import { CLAUDE_CODE } from './claude'
-import { MIGRATED_QUIT, migrateHiveCommands } from './commands'
+import { MIGRATED_QUIT, migrateCombworkCommands } from './commands'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './agentLimits'
 import { DEFAULT_COLUMN_COLORS } from './tasks'
 import { formatDateTime } from './dates'
@@ -26,7 +26,7 @@ export function assertSessionId(id: unknown): string {
 export const DEFAULT_API_PORT = 47821
 
 /**
- * Personas Hive shipped until working modes replaced them (#259), and the mode each became. A workspace's copy Hive
+ * Personas Combwork shipped until working modes replaced them (#259), and the mode each became. A workspace's copy Combwork
  * never changed goes; one the user changed is theirs and stays. A choice of a removed one moves to its mode.
  */
 export const RETIRED_PERSONAS: Record<string, string> = { overseer: 'coordinator', orchestrator: 'coordinator', reviewer: 'qa-triager' }
@@ -75,7 +75,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Automatic (#474): the first provider turned on and installed, in the order below.
   defaultProvider: AUTO_PROVIDER,
   providerOrder: [],
-  // Hive's own order: no screen sets it since decision A (HI-2113); a 0.9 order is still read.
+  // Combwork's own order: no screen sets it since decision A (HI-2113); a 0.9 order is still read.
   notifications: {
     chimeEnabled: true,
     chimeSound: 'chime',
@@ -296,7 +296,7 @@ export function layoutForAgents(count: number): SessionLayout {
   return count >= 5 ? 'grid6' : count === 4 ? 'grid' : count === 3 ? 'columns3' : count === 2 ? 'columns2' : 'single'
 }
 
-/** Whether a saved layout is one Hive knows ('auto' included). */
+/** Whether a saved layout is one Combwork knows ('auto' included). */
 const isLayout = (v: unknown): v is PageLayout => v === 'auto' || SESSION_LAYOUTS.some((l) => l.value === v)
 
 /**
@@ -441,7 +441,7 @@ export function mostUrgent<T extends { status: string; unseen?: boolean }>(state
   return list.some((s) => s.unseen) && !top.unseen ? { ...top, unseen: true } : top
 }
 
-/** The status message of a session while it compacts its conversation (started from Hive or by the CLI itself). */
+/** The status message of a session while it compacts its conversation (started from Combwork or by the CLI itself). */
 export const COMPACTING_MESSAGE = 'Compacting the conversation…' // i18n-ignore: a stored status message that isCompacting compares (the window's words are the session statuses', E10c)
 
 /** Whether a session is compacting its conversation now. */
@@ -505,7 +505,7 @@ export interface ModelShown {
  */
 export function agentModelShown(provider: ProviderId, chosen: string | undefined, globalModel: string, info: ModelInfo, running?: string | null): ModelShown {
   const own = chosen && chosen !== 'inherit' ? chosen : ''
-  // Nothing chosen in Hive: the CLI's default, which its own settings may give as an alias too (Claude Code's `model`).
+  // Nothing chosen in Combwork: the CLI's default, which its own settings may give as an alias too (Claude Code's `model`).
   const choice = own || globalModel || info?.defaultModel || ''
   const name = running ? modelIdName(provider, running, info) : choice ? runsAsName(provider, choice, info) : null
   if (!name) return { label: trNow(msg({ id: 'agents.model.cliDefault', defaultMessage: '{cli} default', description: "An agent's model when nothing is chosen and the CLI doesn't say which it uses: the CLI's own default ({cli}: \"Claude Code\")." }), { cli: providerDescriptor(provider).name }), chosenAs: null }
@@ -589,8 +589,8 @@ const V1_LIMITS: Record<string, Pick<PlanLimit, 'id' | 'label' | 'windowMinutes'
 const OLD_ASSISTANT_DEFAULTS: Record<string, { model?: string; effort: string }> = { 'claude-code': { model: 'sonnet', effort: 'low' }, codex: { effort: 'low' } }
 
 export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppConfig {
-  // HI-1954: Hive's commands cleaned, and HI-1368's When Hive quits, run adopted as one of them (once; written next save).
-  cfg.settings.commands = migrateHiveCommands({ commands: raw?.settings?.commands, onQuit: raw?.settings?.general?.onQuit }, trNow(MIGRATED_QUIT))
+  // HI-1954: Combwork's commands cleaned, and HI-1368's When Combwork quits, run adopted as one of them (once; written next save).
+  cfg.settings.commands = migrateCombworkCommands({ commands: raw?.settings?.commands, onQuit: raw?.settings?.general?.onQuit }, trNow(MIGRATED_QUIT))
   delete cfg.settings.general.onQuit
   const g = cfg.settings.general
   const q = g.confirmOnQuit as unknown
@@ -637,7 +637,7 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
     }
   }
   migrateAgentsWorktreeSettings(cfg)
-  // HI-1766: Settings → Agents → File locks is Hive's workflow default.
+  // HI-1766: Settings → Agents → File locks is Combwork's workflow default.
   migrateGlobalFileLocks(cfg.settings)
   if (raw && (raw.version ?? 1) < 5 && cfg.settings.sessions.transcriptWarnMB === 50) {
     // 50 MB was the default up to 0.3.x (saved into every config); long transcripts slow things well before that.
@@ -646,7 +646,7 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
   }
   migratePersonaNames(cfg, raw)
   if (raw && (raw.version ?? 1) < 7) {
-    // Up to 0.3.x Hive shipped character personas; working modes replaced them (#259): a default persona that went
+    // Up to 0.3.x Combwork shipped character personas; working modes replaced them (#259): a default persona that went
     // becomes the closest mode.
     const was = cfg.settings.assistant.mode
     if (RETIRED_PERSONAS[was]) cfg.settings.assistant.mode = RETIRED_PERSONAS[was]
@@ -659,9 +659,9 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
   }
   const notifications = cfg.settings.notifications as unknown as Record<string, unknown>
   if (raw && (raw.version ?? 1) < 9) {
-    // HI-2320: one notification system. *While Hive is focused* went: Windows notifications only with no Hive window
-    // focused. Show nothing (version 6 on; before it, "Only when Hive is in the background" moved everyone to Show in
-    // Hive) becomes *Only in the bell* for agents' pop-ups, which keeps the Windows notifications in the background;
+    // HI-2320: one notification system. *While Combwork is focused* went: Windows notifications only with no Combwork window
+    // focused. Show nothing (version 6 on; before it, "Only when Combwork is in the background" moved everyone to Show in
+    // Combwork) becomes *Only in the bell* for agents' pop-ups, which keeps the Windows notifications in the background;
     // a Windows notification while focused becomes a pop-up. The banners' old default place, top centre, moves to the
     // pop-ups' corner, bottom right (Darren, 2 Nov); any other place chosen is kept.
     const was = (raw.version ?? 1) < 6 ? 'inApp' : notifications.whileFocused
@@ -671,10 +671,10 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
   delete notifications.whileFocused
   delete notifications.onlyWhenUnfocused
   cfg.version = 9
-  // Settings for providers this version doesn't know are kept (a newer Hive wrote them), but never used.
+  // Settings for providers this version doesn't know are kept (a newer Combwork wrote them), but never used.
   if (!isDefaultProviderValue(cfg.settings.defaultProvider)) cfg.settings.defaultProvider = AUTO_PROVIDER
   // 0.9's providers' order (HI-1965): no list follows it since HI-2139, but the migration reads it (what Automatic
-  // picked), so it is kept as it was saved: a list of ids, each once; ids this Hive doesn't know are kept (a newer Hive's).
+  // picked), so it is kept as it was saved: a list of ids, each once; ids this Combwork doesn't know are kept (a newer Combwork's).
   const order: unknown = cfg.settings.providerOrder
   cfg.settings.providerOrder = Array.isArray(order) ? [...new Set(order.filter((x): x is ProviderId => typeof x === 'string' && x.length > 0 && x.length <= 64))] : []
   // Its revision went with the window's moves (HI-2113).
@@ -706,12 +706,12 @@ export function withLegacySettings(cfg: AppConfig): AppConfig & { settings: AppS
   }
 }
 
-/** Hive's own default for the git-ignored files copied into each new slot and review copy (HI-1765). */
+/** Combwork's own default for the git-ignored files copied into each new slot and review copy (HI-1765). */
 export const SLOT_COPY_DEFAULT = '.env*'
 
 /**
  * Until 1.0's HI-1765, Settings → Agents & Worktrees had "Copy into new worktrees" (`agents.worktreeCopy`) and "Default
- * merge style" (`agents.mergeStyle`). The copy is now Hive's slot default (`slotDefaults.copy`, a workflow default for
+ * merge style" (`agents.mergeStyle`). The copy is now Combwork's slot default (`slotDefaults.copy`, a workflow default for
  * Git): a value saved there moves over, unless the new one is already set or it is the old default (saved into every
  * config, so nobody chose it: the built-in default stands). The merge style went: the merge dialogs follow each
  * project's own. Both old keys are dropped on every load, so they can't come back.
@@ -787,7 +787,7 @@ export function migrateProjectConfig(raw: Record<string, any>): Record<string, a
   }
   if (!isLayout(out.layout)) out = { ...out, layout: 'auto' }
   if (Array.isArray(out.agents) && out.agents.some((a: unknown) => !!a && typeof a === 'object' && 'persona' in a)) {
-    // Until 0.9.3 the Hive Assistant's mode was its persona (#1084).
+    // Until 0.9.3 the Combwork Assistant's mode was its persona (#1084).
     out = { ...out, agents: out.agents.map((a: unknown) => (a && typeof a === 'object' && 'persona' in a ? withMode(a as Record<string, unknown>) : a)) }
   }
   // HI-1766: Card loops and File locks are the project's workflow options.
@@ -899,7 +899,7 @@ export interface SessionNaming {
   usage?: { customTitle?: string | null; firstActivity?: string | null } | null
 }
 
-/** Hive's automatic name for a new session ("<project> · <agent> · <date>"), which counts as no name. */
+/** Combwork's automatic name for a new session ("<project> · <agent> · <date>"), which counts as no name. */
 export function isAutoSessionName(name: string | null | undefined, projectName: string): boolean {
   return !name || (name.startsWith(`${projectName} · `) && /\d{1,4}[/.-]\d{1,2}/.test(name))
 }
@@ -962,7 +962,7 @@ export function unmergedWork(st: AgentBranchStatus | null | undefined, tr?: Tr):
   return { badge: st.ahead > 0 ? String(st.ahead) : '•', text: parts.join(' · ') }
 }
 
-/** Where Hive's releases (and its update feed) are published. */
+/** Where Combwork's releases (and its update feed) are published. */
 export const RELEASES_URL = 'https://github.com/Suremise/combwork/releases'
 /** The same repository, for the updater's feed (HI-2311): electron-builder.yml's publish block names it too (a test checks). */
 export const RELEASES_REPO = { owner: 'Suremise', repo: 'combwork' } as const // i18n-ignore: a GitHub repository's owner and name
@@ -984,7 +984,7 @@ export function resolveKeybinding(id: string, fallback: string | undefined, glob
   return fallback
 }
 
-/** Keys Hive never lets a shortcut take: typing, clipboard and undo, and the terminal's own mode switch. */
+/** Keys Combwork never lets a shortcut take: typing, clipboard and undo, and the terminal's own mode switch. */
 export function keybindingProblem(key: string): string | null {
   const parts = key.split(' ')
   for (const p of parts) {

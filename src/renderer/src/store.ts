@@ -116,7 +116,7 @@ export interface ConfirmRequest {
   message: string
   /** Items (paths) under the message, one per line, with a Copy button (#347): never lines joined into message. */
   list?: readonly string[]
-  /** The list is to read, not to copy (a CLI's clipboard text Hive asks about, #1292): no Copy button. */
+  /** The list is to read, not to copy (a CLI's clipboard text Combwork asks about, #1292): no Copy button. */
   listOnly?: boolean
   /** The list is text as it was written (a CLI's clipboard text, #1292): monospace, its spacing kept, even with listOnly. */
   listMono?: boolean
@@ -209,7 +209,7 @@ interface State {
   settings: AppSettings | null
   /** Settings → Advanced (#367): advanced.json's overrides, this window's workspace's own values and the installed CLIs. */
   advanced: AdvancedState | null
-  /** Moves on each time main says Hive's accounts changed (HI-980): Settings → Accounts reads them again. */
+  /** Moves on each time main says Combwork's accounts changed (HI-980): Settings → Accounts reads them again. */
   connectionsChanged: number
   workspace: WorkspaceInfo | null
   /** The recent workspaces as this window sees them (#144). */
@@ -240,7 +240,7 @@ interface State {
   tipsOpen: boolean
   api: AgentApiInfo | null
   appInfo: AppInfo | null
-  /** The language Hive shows (#767): components render again when it changes (useLanguage). */
+  /** The language Combwork shows (#767): components render again when it changes (useLanguage). */
   language: string
 
   activity: Activity
@@ -276,9 +276,9 @@ interface State {
   /** The provider each project's Skills tab last showed, by project path in lower case (#118; saved in ui). */
   skillsProvider: Record<string, string>
   /** Each project's Skills tab groups, open or folded as last left (#118; saved in ui). */
-  skillsFold: Record<string, { hive?: boolean; provider?: boolean }>
+  skillsFold: Record<string, { combwork?: boolean; provider?: boolean }>
   sessionsTree: Record<string, Record<string, boolean>>
-  hiveVcsNotice: Record<string, string>
+  combworkVcsNotice: Record<string, string>
   assistantFold: Record<string, boolean>
   /** Each workspace's board: collapsed columns and folded cards (#170; saved in ui), by workspace path in lower case. */
   boardFold: Record<string, BoardFold>
@@ -297,7 +297,7 @@ interface State {
   /** The template the Templates view shows (templateKey), and which ones its list shows: all, workspace or a project's path. */
   selectedTemplate: string | null
   templateFilter: string
-  /** A Hive skill to open for editing (not preview) when the Skills view shows it: from a project's Edit in workspace. */
+  /** A Combwork skill to open for editing (not preview) when the Skills view shows it: from a project's Edit in workspace. */
   skillEdit: string | null
   selectedMcp: string | null
   /** The MCP view's tab (HI-545): the installed servers, or the catalogues' servers to install. */
@@ -314,7 +314,7 @@ interface State {
   assistantSection: 'conversations' | 'modes' | 'images' | 'journal' | 'digests'
   /** Bumped when this window's workspace's Assistant journal changes (#1033): its browser reads it again. */
   journalVersion: number
-  /** The Hive Assistant's panel is shown (per workspace, saved in the pane sizes as assistant-open:<path>). */
+  /** The Combwork Assistant's panel is shown (per workspace, saved in the pane sizes as assistant-open:<path>). */
   assistantOpen: boolean
   /** This window's workspace's progress runs (newest first), for the Progress panel. */
   progressRuns: ProgressRun[]
@@ -341,7 +341,7 @@ interface State {
   tileStripRoom: number | null
   /** Assistant Settings is open. */
   assistantSettingsOpen: boolean
-  /** What the Hive Assistant did in this window's workspace (oldest first), and what it is asking the user. */
+  /** What the Combwork Assistant did in this window's workspace (oldest first), and what it is asking the user. */
   assistantActions: AssistantAction[]
   assistantQuestions: AssistantQuestion[]
   /** The Assistant's changes kept for undo, by the user's message (#1283), and what each undo in this window did. */
@@ -382,12 +382,12 @@ interface State {
   aboutOpen: boolean
   /** Help → Copy Diagnostics: the preview dialog. */
   diagnosticsOpen: boolean
-  /** Hive's own update state, and whether its dialog is open. */
+  /** Combwork's own update state, and whether its dialog is open. */
   update: UpdateState | null
   updateOpen: boolean
   /** The Provider Setup dialog, open at a provider (or at the first one). */
   setupOpen: ProviderId | true | false
-  /** Repair… for a moved workspace (#146), and the move whose banner was hidden (until Hive restarts). */
+  /** Repair… for a moved workspace (#146), and the move whose banner was hidden (until Combwork restarts). */
   moveRepairOpen: boolean
   /** The Review… dialog for cards an older Hive saved (#1044). */
   setAsideOpen: boolean
@@ -400,11 +400,11 @@ interface State {
   quitRequest: QuitSession[] | null
   /** Files with unsaved edits listed in the quit dialog (absolute paths). */
   quitUnsaved: string[]
-  /** 'window': the dialog is for closing this window (its workspace's sessions), not quitting Hive. */
+  /** 'window': the dialog is for closing this window (its workspace's sessions), not quitting Combwork. */
   quitScope: QuitScope
-  /** Hive will quit once no agent is working. */
+  /** Combwork will quit once no agent is working. */
   quitPending: { working: number } | null
-  /** How many Hive windows are open (File → Exit closes them all). */
+  /** How many Combwork windows are open (File → Exit closes them all). */
   windowCount: number
   /** Working agents keeping the PC awake (0: none). */
   keepAwake: number
@@ -594,7 +594,7 @@ export const useStore = create<State>(() => ({
   skillsProvider: {},
   skillsFold: {},
   sessionsTree: {},
-  hiveVcsNotice: {},
+  combworkVcsNotice: {},
   assistantFold: {},
   boardFold: {},
   progressFilter: {},
@@ -735,7 +735,7 @@ export const useStore = create<State>(() => ({
   sessionEpoch: {}
 }))
 
-// Automatic's default provider (#474) follows what Hive found, as this window last heard: unknown until it has said (#506).
+// Automatic's default provider (#474) follows what Combwork found, as this window last heard: unknown until it has said (#506).
 setInstalledCheck((id) => {
   const i = useStore.getState().providers[id]
   return !i ? null : i.found ? true : i.checking ? null : false
@@ -800,7 +800,7 @@ useStore.subscribe((s, prev) => {
   if (s.settings !== prev.settings) setDateStyle({ date: s.settings?.general.dateFormat, time: s.settings?.general.timeFormat })
 })
 
-/** The language Hive shows, for a component that shows translated text: it renders again when it changes (#767). */
+/** The language Combwork shows, for a component that shows translated text: it renders again when it changes (#767). */
 export function useLanguage(): string {
   return useStore((s) => s.language)
 }
@@ -1044,14 +1044,14 @@ export function showPage(p: ProjectInfo, page: number): void {
   focusAgent(p.path, last && ids.includes(last) ? last : ids[0])
 }
 
-/** A project, or the Hive Assistant (a session host like a project), by path. */
+/** A project, or the Combwork Assistant (a session host like a project), by path. */
 export function findProject(s: Pick<State, 'workspace'>, path: string | null | undefined): ProjectInfo | null {
   if (!path || !s.workspace) return null
   const p = path.toLowerCase()
   return s.workspace.projects.find((x) => x.path.toLowerCase() === p) ?? (s.workspace.assistant?.path.toLowerCase() === p ? s.workspace.assistant : null)
 }
 
-/** Whether a path is the open workspace's Hive Assistant. */
+/** Whether a path is the open workspace's Combwork Assistant. */
 export function isAssistantPath(path: string | null | undefined): boolean {
   const a = get().workspace?.assistant
   return !!path && !!a && a.path.toLowerCase() === path.toLowerCase()
@@ -1059,7 +1059,7 @@ export function isAssistantPath(path: string | null | undefined): boolean {
 
 const assistantOpenKey = (ws: string): string => `assistant-open:${ws.toLowerCase()}`
 
-/** Shows or hides the Hive Assistant's panel, remembered per workspace. */
+/** Shows or hides the Combwork Assistant's panel, remembered per workspace. */
 export function setAssistantOpen(open: boolean): void {
   const ws = get().workspace?.path
   set({ assistantOpen: open })
@@ -1119,11 +1119,11 @@ export function chooseTab(key: string, id: string): void {
   void window.combwork.invoke('ui:set', { tabs: kept }).catch(() => undefined)
 }
 
-/** Settings → Version Control's tabs (HI-1837): Hive defaults and the open workspace's, by their rows' ids. */
+/** Settings → Version Control's tabs (HI-1837): Combwork defaults and the open workspace's, by their rows' ids. */
 export const WORKFLOW_DEFAULTS_TABS = 'settings.workflow'
 export const WORKFLOW_DEFAULTS_TAB = { global: 'workflow.defaults', workspace: 'workflow.workspaceDefaults' } as const
 
-/** Opens Settings → Version Control on a level's tab (a "From Hive defaults" or "From the workspace" origin's link). */
+/** Opens Settings → Version Control on a level's tab (a "From Combwork defaults" or "From the workspace" origin's link). */
 export function showWorkflowDefaults(level: keyof typeof WORKFLOW_DEFAULTS_TAB): void {
   chooseTab(WORKFLOW_DEFAULTS_TABS, WORKFLOW_DEFAULTS_TAB[level])
   set({ settingsSection: 'workflow', settingsQuery: '', settingsModifiedOnly: false })
@@ -1296,7 +1296,7 @@ export async function openCardActivity(c: TaskCard): Promise<void> {
 
 /** A card's Activity openings settled, and those dropped as the window went elsewhere: a test copy's window reads them. */
 const cardOpenings = { settled: 0, dropped: 0 }
-;(window as unknown as { __hiveCardActivity?: typeof cardOpenings }).__hiveCardActivity = cardOpenings
+;(window as unknown as { __cwCardActivity?: typeof cardOpenings }).__cwCardActivity = cardOpenings
 
 /** Shows an agent's pane on the Session tab and focuses it. */
 export function revealAgent(p: ProjectInfo, agentId: string): void {
@@ -1352,7 +1352,7 @@ export function leaveSettingsForSidePanel(): void {
 /** Each view shown, counted: a card's Activity found after the window went elsewhere isn't opened (openCardActivity). */
 let navigations = 0
 
-/** Shows the Hive Assistant view (activity bar) on its conversations, its modes, its attachments ('images') or its journal. */
+/** Shows the Combwork Assistant view (activity bar) on its conversations, its modes, its attachments ('images') or its journal. */
 export function showAssistantView(section: 'conversations' | 'modes' | 'images' | 'journal' | 'digests'): void {
   set({ assistantSection: section })
   showView('assistant')
@@ -1572,7 +1572,7 @@ function withLiveState(workspace: WorkspaceInfo, state: LiveSessionState): Works
     const primary = agents.find((a) => a.live)
     return { ...p, agents, live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, active: live ? true : p.active }
   })
-  // The Hive Assistant's one agent.
+  // The Combwork Assistant's one agent.
   const a = workspace.assistant
   const assistant =
     a && a.path.toLowerCase() === state.projectPath.toLowerCase()

@@ -2,7 +2,7 @@
   "format": 1,
   "provider": "copilot",
   "cli": "1.0.105",
-  "hive": "1.0.0-rc.9",
+  "combwork": "1.0.0-rc.9",
   "recordedAt": "2026-10-28T13:02:27.498Z",
   "events": [
     {

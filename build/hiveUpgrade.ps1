@@ -1,7 +1,7 @@
 # The Combwork installer's upgrade from Hive Desktop (HI-2460, SPEC §4.3): run by installer.nsh's customInit (the outer
 # instance, as the user), after it holds both installers' mutexes, before anything is installed. In order, and nothing
 # after a step that failed:
-#   1. Asks the running app of each exact installation to close (hiveAskToClose.ps1): the Combwork of -InstallDir, and
+#   1. Asks the running app of each exact installation to close (askToClose.ps1): the Combwork of -InstallDir, and
 #      the Hive Desktop recorded under its own app ID's keys (its InstallLocation), then checks by exact executable path
 #      that neither main process runs (an enumeration that fails counts as running).
 #   2. Removes Hive Desktop: its uninstaller, as electron-builder's uninstallOldVersion runs one (a copy, /S
@@ -142,7 +142,7 @@ if (-not $SkipAsk) {
     if (-not $pair[0]) { continue }
     $code = 5
     try {
-      & (Join-Path $here 'hiveAskToClose.ps1') -InstallDir $pair[0] -ExeName $pair[1] -AckMs $AckMs -ExitMs $ExitMs | Out-Null
+      & (Join-Path $here 'askToClose.ps1') -InstallDir $pair[0] -ExeName $pair[1] -AckMs $AckMs -ExitMs $ExitMs | Out-Null
       $code = $LASTEXITCODE
     } catch { $code = 5 }
     Say "asked $(Join-Path $pair[0] $pair[1]) to close: $code"

@@ -4,7 +4,7 @@ import { advanced } from '../../advanced'
 /**
  * Codex's /permissions menu (#396): each preset on a numbered line, by the label Codex draws for it. Codex 0.160 listed
  * Read Only, Ask for approval, Approve for me, Full Access; 0.161 lists Ask for approval, Approve for me, Full Access,
- * Read Only, whichever is current. So Hive picks a preset by its label on the screen, never by where it used to be:
+ * Read Only, whichever is current. So Combwork picks a preset by its label on the screen, never by where it used to be:
  *
  *   › 1. Ask for approval (current)  Read and edit workspace files and run commands, with approval required for …
  *     2. Approve for me              Only ask for actions detected as potentially unsafe

@@ -25,7 +25,7 @@ const { config } = await import('../src/main/config')
 const { connectionLoginChanged, forgetConnectionUsage, mergePlanUsage, nextWarning, planNotice, reportPlanUsage, usageLogin, warningKey } = await import('../src/main/planUsage')
 const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
 const { rolloutPlanUsage } = await import('../src/main/providers/codex/rollout')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { setNotifyHost } = await import('../src/main/notify')
 const { DEFAULT_SETTINGS } = await import('../src/shared/defaults')
 
@@ -83,7 +83,7 @@ describe('a plan usage warning', () => {
     g.__osShown = []
     seen.length = 0
     focused = false
-    off = onHiveEvent((e) => void seen.push(e as never))
+    off = onCombworkEvent((e) => void seen.push(e as never))
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
     config.get().planWarnings = {}
     setNotifyHost({ focused: () => (focused ? { win: win as never, workspacePath: 'C:\\Work\\A', projectPath: 'C:\\Work\\A\\alpha' } : null), fallback: () => win as never, workspaceOf: () => null })
@@ -144,7 +144,7 @@ describe('plan usage per connection (HI-1756)', () => {
   }
   beforeEach(() => {
     events.length = 0
-    off = onHiveEvent((e) => void events.push(e as never))
+    off = onCombworkEvent((e) => void events.push(e as never))
     // A window owns the warnings (HI-2320: told once, to one window), whose events the listeners hear.
     setNotifyHost({ focused: () => null, fallback: () => ({ isDestroyed: () => false, webContents: { id: 8, send: () => undefined } }) as never, workspaceOf: () => null })
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
@@ -359,7 +359,7 @@ describe('the plan usage Combwork keeps from its sessions (#383)', () => {
 
   it('tells the windows of a raw change across a warning threshold, though it rounds the same (round 4, finding 1)', () => {
     const told: number[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'plan-usage') told.push((e as { usage: { limits: { id: string; usedPercent: number }[] } }).usage.limits.find((l) => l.id === 'seven_day')!.usedPercent)
     })
     const update = vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))

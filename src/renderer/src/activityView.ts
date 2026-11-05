@@ -7,7 +7,7 @@ import type { ActivityFilter } from '@shared/activity'
 export interface ActivityView extends ActivityFilter {
   /** The agent whose tab shows. */
   tab?: string
-  /** The agent's own processes (its CLI, its terminal, hive-mcp.js) shown too; hidden by default. */
+  /** The agent's own processes (its CLI, its terminal, cw-mcp.js) shown too; hidden by default. */
   showOwn?: boolean
   /**
    * The workspace level's (HI-1664): opened for this card, its agents in `agents` (found again as agents start and

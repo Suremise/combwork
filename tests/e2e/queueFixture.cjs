@@ -78,7 +78,7 @@ const queueOptions = (fx, over = {}) => ({ review: 'agent', noSelfReview: true, 
  * Launches Combwork on the fixture (its profile, a port, CLAUDE_CONFIG_DIR) and opens the workspace; sets the options
  * unless `keepOptions`. The page's helpers: inv, card, facts, kinds.
  */
-async function startHive(fx, { port, env = {}, keepOptions = false } = {}) {
+async function startCombwork(fx, { port, env = {}, keepOptions = false } = {}) {
   const { app, page, inv } = await lib.launch({ userData: fx.userData, env: { CW_API_PORT: String(port), CLAUDE_CONFIG_DIR: fx.claudeHome, CW_TEST_TIPS: 'off', ...env } })
   await lib.openWorkspace(inv, page, fx.ws)
   if (!keepOptions) await inv('workflow:setOptions', fx.alpha, { preset: null, options: queueOptions(fx) })
@@ -88,7 +88,7 @@ async function startHive(fx, { port, env = {}, keepOptions = false } = {}) {
   return { app, page, inv, port, card, facts, kinds }
 }
 
-/** The fake agents' launches (fake-launches.jsonl), as their hive tools read their tokens. */
+/** The fake agents' launches (fake-launches.jsonl), as their Combwork tools read their tokens. */
 function launches(fx) {
   const f = path.join(fx.claudeHome, 'fake-launches.jsonl')
   const text = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
@@ -376,7 +376,7 @@ async function mergesTab(h, project = 'alpha') {
 /**
  * Another Combwork's profile on the fixture's workspace (#1358's queuelease: S50, two copies on one combwork.db), set up as
  * prepare sets the fixture's own: the fake Claude Code, quiet, the Agent API on. Returns the fixture with that profile,
- * for startHive.
+ * for startCombwork.
  */
 function otherProfile(fx, suffix) {
   const userData = `${fx.userData}-${suffix}`
@@ -392,4 +392,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startHive, agent, renewed, rejoin,releaseHeld, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startCombwork, agent, renewed, rejoin,releaseHeld, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }

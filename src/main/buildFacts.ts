@@ -13,7 +13,7 @@ import type { WorkspaceService } from './workspace'
 const log = createLogger('builds')
 
 /**
- * Builds recorded as facts (#1534, #1062): the scripts' successful builds, written into the workspace's journal as Hive's
+ * Builds recorded as facts (#1534, #1062): the scripts' successful builds, written into the workspace's journal as Combwork's
  * own entries, while Settings → Advanced → Record builds in the journal is on and the journal (on, with events in its
  * scope) takes them. The scripts' side is scripts/buildFact.mjs. Agent-facing English (the window shows a build's line
  * in the user's language: journalBuilds.ts).
@@ -50,7 +50,7 @@ const CLAIMED = '.taking'
 const CLAIM_STALE_MS = 10 * 60_000
 
 /**
- * The builds left as markers while Hive wasn't running (or couldn't be reached), each recorded once as the workspace
+ * The builds left as markers while Combwork wasn't running (or couldn't be reached), each recorded once as the workspace
  * opens. Each is first claimed by renaming it (`<name>.<claim>.taking`), so two pickups at once (a workspace reopened
  * while the last one's runs, #1534 round 1) never both take it: the second's rename finds it gone. A marker goes once it
  * has been read, whatever became of it (written, the switch off, the journal off, or not a build), so a later switch-on

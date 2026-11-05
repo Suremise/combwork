@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { COMPACTING_MESSAGE } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-auto-compaction-')
+const base = tempDir('cw-auto-compaction-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

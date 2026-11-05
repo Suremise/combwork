@@ -13,7 +13,7 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-usage-backfill-')
+const base = tempDir('cw-usage-backfill-')
 // The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Combwork, and the user's
 // ~/.codex (a thousand rollouts) took 14 s of it under a full unit run's load.
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')

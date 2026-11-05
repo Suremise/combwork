@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import type { PurgeTarget, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-purge-')
+const base = tempDir('cw-purge-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, as a folder of the test's: what went there can be told from what was deleted for good.
 const bin = join(base, 'bin')

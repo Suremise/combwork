@@ -1,10 +1,10 @@
 // A waiting agent's pop-up stays until it is answered (#157); main tells every window once the agent no longer asks
 // (src/main/notices.ts), and its entries say so (HI-2320).
 import { afterEach, describe, expect, it } from 'vitest'
-import { emit, onHiveEvent } from '../src/main/events'
+import { emit, onCombworkEvent } from '../src/main/events'
 import { startNoticeResolver } from '../src/main/notices'
 import { askOffer, resetOffers, setNotifyHost, tell } from '../src/main/notify'
-import type { HiveEvent, LiveSessionState } from '../src/shared/types'
+import type { CombworkEvent, LiveSessionState } from '../src/shared/types'
 
 const state = (agentId: string, status: LiveSessionState['status'], question?: string): LiveSessionState =>
   ({ projectPath: 'C:\\Work\\Alpha', agentId, status, ...(question ? { question } : {}) }) as LiveSessionState
@@ -13,7 +13,7 @@ describe('closing waiting banners', () => {
   it('once an agent stops asking, or its session ends, every window hears it; never for one that was not asking', () => {
     const stop = startNoticeResolver()
     const resolved: string[] = []
-    const off = onHiveEvent((e: HiveEvent) => {
+    const off = onCombworkEvent((e: CombworkEvent) => {
       if (e.type === 'notice-resolved') resolved.push(e.agentId)
     })
     try {
@@ -49,7 +49,7 @@ describe('a waiting agent\'s entries, by ask', () => {
   it('the agent no longer asking resolves the entries of its asks so far, never a later ask\'s', () => {
     const stop = startNoticeResolver()
     const resolved: { ids: string[]; outcome: string }[] = []
-    const off = onHiveEvent((e: HiveEvent) => {
+    const off = onCombworkEvent((e: CombworkEvent) => {
       if (e.type === 'toast-resolved') resolved.push({ ids: e.ids, outcome: e.outcome })
     })
     const owner = { isDestroyed: () => false, webContents: { id: 3, send: () => undefined } }

@@ -62,7 +62,7 @@ needs no `--build` (#274).
 
 **The installer's suites** (`packaged*`) test `dist\win-unpacked`, not `out/`: a run of only those doesn't look at
 `out/` (unless `CW_PROGRESS_CHECK_DEV=1`). Instead the runner checks what `dist\win-unpacked` itself was built from:
-`npm run dist` records that inside it (`win-unpacked\.hive-build-info.json`) once it is sure, and removes it when it
+`npm run dist` records that inside it (`win-unpacked\.cw-build-info.json`) once it is sure, and removes it when it
 starts. Not `dist\build-info.json`: that describes the installer set, which a worktree's `npm run dist` copies into the
 main checkout's `dist` without `win-unpacked`, so there it can describe another build than the one the suites would
 run. When the record's code isn't the fingerprint of the code now, or there is none, the runner warns and a run
@@ -72,7 +72,7 @@ another commit, or from before an edit, is reported.
 
 **Windows** (#1253): no suite puts a window on the screen or takes the focus. A dev test copy is quiet itself
 (`testQuiet`: off screen, unfocusable, no notifications). A packaged Combwork isn't, unless it is 1.0 with
-`CW_TEST_QUIET=1` (which `hiveEnv` sets); a released 0.9 can't be changed at all. So `lib.cjs`'s `_electron.launch`
+`CW_TEST_QUIET=1` (which `combworkEnv` sets); a released 0.9 can't be changed at all. So `lib.cjs`'s `_electron.launch`
 does it from outside for every packaged Combwork a suite starts (`packaged`, `packaged-transcript`, `packaged-workers`, `boardupgrade` and
 `upgradelane`'s 0.9 from `CW_E2E_V09` or the main checkout's `dist\win-unpacked`, `plan` with `CW_EXE`). It
 starts with `--hidden` (Combwork makes its windows but shows none, as when started at sign-in). As soon as Playwright
@@ -81,7 +81,7 @@ the taskbar, then shows them inactive so they draw for screenshots. From then on
 raising or flashing a window keeps it off screen, Windows notifications are dropped, and message boxes answer as
 cancelled. A window already shown when it is reached fails the launch, saying so. Only its tray icon can appear.
 `packaged-progress` and `packaged-mcp` run Combwork.exe as Node and show nothing. Checked in Windows Sandbox (0.9.3, a
-watcher of on-screen windows and the foreground: none from Hive, as the app was then named) and on the host for these suites (the card says how).
+watcher of on-screen windows and the foreground: none from Combwork, as the app was then named) and on the host for these suites (the card says how).
 
 **No update checks** (#1332): a packaged Combwork checks GitHub 30 s after it starts and every 6 hours, and each check
 fetches the release's `latest.yml`, which GitHub counts as a download. A packaged test Combwork never does: 1.0 with
@@ -139,7 +139,7 @@ runner's full test run is tracked in #499; the diagnostics record it and keep it
 a run uses of its own comes from one place, `runContext.cjs` (with `lanes.mjs` for ports and folders and `build.mjs`
 for the build), and the e2e runner, `lib.cjs` and the scenario harness all take it from there.
 
-- **Environments are built from an allowlist.** A suite (from the runner), a test copy of Combwork (`lib.hiveEnv({
+- **Environments are built from an allowlist.** A suite (from the runner), a test copy of Combwork (`lib.combworkEnv({
   CW_USER_DATA, … })`, which `lib.launch()` uses) and a child that is part of Combwork, such as the combwork MCP server or the
   `cw-progress` wrapper (`lib.childEnv({ … })`), get Windows' own variables, the user's folders and the network's
   proxy and certificates (`ALLOW`), plus what the context sets: the profile, quiet and tips off, the suite's folder
@@ -152,7 +152,7 @@ for the build), and the e2e runner, `lib.cjs` and the scenario harness all take 
   `CW_TEST_CLAUDE_HOME`, `CW_TEST_QUIET` (`0` shows the copies), `CW_TEST_PROGRESS_TIMINGS`,
   `CW_PROGRESS_CHECK_DEV`, `CW_EXE`, `REPLYSIZE_OUT`. A new setting a suite must get from the person running it is
   added there. `CW_E2E_NATIVE` never is: it only works with a suite run on its own.
-- **No child environment from `process.env`.** `lib.cjs` refuses to start a test Combwork whose environment `lib.hiveEnv`
+- **No child environment from `process.env`.** `lib.cjs` refuses to start a test Combwork whose environment `lib.combworkEnv`
   didn't build, and `tests/e2esuites.test.ts` fails for a suite, the runner or the scenario harness that spreads or
   passes `process.env`. The fake CLIs are the exception: they stand for Claude Code and Codex, which start their MCP
   servers from their own environment (a test Combwork's session's, already the context's). A suite's own tools (git, a
@@ -169,7 +169,7 @@ for the build), and the e2e runner, `lib.cjs` and the scenario harness all take 
   test home for the model trials (`CLAUDE_TEST_HOME`); each suite keeps its own `CLAUDE_CONFIG_DIR` folders in its lane.
   **Every test copy of Combwork gets the CLI homes** (#382, #452): Combwork looks for the CLIs when it starts, and their sign-in
   checks (`claude auth status`, `codex login status`, Copilot's `config.json` and `gh auth status`) read the home they
-  are given, else yours. `lib.hiveEnv` gives `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME` and `GH_CONFIG_DIR` as
+  are given, else yours. `lib.combworkEnv` gives `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME` and `GH_CONFIG_DIR` as
   empty folders of the suite's (`<suite folder>\cli-homes\claude`, `\codex`, `\copilot` and `\gh`, `runContext.cliHomes`;
   the empty gh config hides your GitHub CLI login, which Copilot falls back to) unless the suite gives a test home (the
   fake Claude Code's, `lib.ownClaudeHome`, the Codex test home). `lib.cjs` refuses to start a test Combwork with one missing
@@ -299,7 +299,7 @@ same code while every required check still runs:
   commits first, so it is the commit the round names), each suite's result and time,
   and the logs folder. Paste the printed block into the card comment. When real suites ran, the record also names the
   real CLIs' versions as the suites' test copies of Combwork selected them ("Real CLIs (as Combwork selected them): Claude Code
-  2.1.292, Codex 0.160.1"; each Combwork notes its choice in the suite's `hive-clis.jsonl`, `CW_TEST_CLI_LOG`), and
+  2.1.292, Codex 0.160.1"; each Combwork notes its choice in the suite's `cw-clis.jsonl`, `CW_TEST_CLI_LOG`), and
   `run-record.json` beside it holds them per suite: `npm run tested-clis` makes the release's "Tested with" manifest
   from it (#365, RELEASING.md). The runner itself never starts a CLI.
 - **The reviewer** checks the record instead of repeating it (#533): its fingerprint is the code it's reviewing
@@ -383,7 +383,7 @@ scripted stand-in model.
 
 ### The i18n screenshot route: every screen in another language
 
-Every suite runs Combwork in English (`lib.hiveEnv` sets `CW_LANG=en`, #767): they find what they click by its English
+Every suite runs Combwork in English (`lib.combworkEnv` sets `CW_LANG=en`, #767): they find what they click by its English
 text, and numbers and dates come out the same on any Windows. Whether the window works in **another language** is
 the **i18nshots** route's (#769; #756's design, section 4): it opens each screen and photographs it in both themes, for
 a person or an agent to look at. Under the pseudo-locale (`en-XA`: English accented, longer and in brackets) any text
@@ -458,14 +458,14 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
 
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the
   release-combwork skill), with the verdict and report folder commented on the release card.
-- **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --hive "<the main checkout>"
+- **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --repo "<the main checkout>"
   --report "$env:LOCALAPPDATA\combwork-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
-  upgrade start; `--hive` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
+  upgrade start; `--repo` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
   <a 1.1 release candidate's installer>` adds scenario 10, the upgrade from that RC, so the names upgrade, HI-2587, is
   checked from 1.0.0 and from an RC alike: pass it for 1.1's release candidates). It drives the
   hive-mcp project's **windows-sandbox MCP server** over stdio as any MCP client does, starting its own copy of it, so
   it needs no MCP registration: `--server <its server.js>` (or `WSB_SERVER`), else the copy Combwork installed from the MCP
-  catalogue in the workspace holding `--hive` (`<workspace>\.combwork\mcp\windows-sandbox`), else a hive-mcp checkout
+  catalogue in the workspace holding `--repo` (`<workspace>\.combwork\mcp\windows-sandbox`), else a combwork-mcp checkout
   beside it (`<hive>\..\mcp\servers\windows-sandbox`). The server keeps its run folders in
   `%LOCALAPPDATA%\combwork-test\sandbox`.
 - **What's where:** the runner (`checks.cjs`) maps this checkout's `tests` folder and `playwright-core` read-only into
@@ -626,9 +626,9 @@ Everything goes in `%LOCALAPPDATA%\combwork-test\e2e` (override with `CW_E2E_DIR
 Nothing touches your Combwork profile, your clipboard, your real Claude Code and Codex homes (#368, #382: above) or your
 **Recycle Bin**. What Combwork moves to the
 Recycle Bin (Delete in Files, notes, skills, templates, cards, session copies, Clean Up, Delete Project) a test copy
-moves into its suite's trash folder instead, `<suite folder>\trash` (`CW_TEST_TRASH_DIR`, set by `lib.hiveEnv`;
+moves into its suite's trash folder instead, `<suite folder>\trash` (`CW_TEST_TRASH_DIR`, set by `lib.combworkEnv`;
 without it, a test profile's `test-trash`; a packaged Combwork too, `CW_EXE` or `dist\win-unpacked`, when quiet:
-`CW_TEST_QUIET=1`, which `hiveEnv` sets, #1599), which goes with the suite's folder (#414). A move is one rename, whole or not at all (an item on another drive than
+`CW_TEST_QUIET=1`, which `combworkEnv` sets, #1599), which goes with the suite's folder (#414). A move is one rename, whole or not at all (an item on another drive than
 that folder is refused, changing nothing), and then a line in its `trash.jsonl` (`{ at, from, to }`; best effort: a
 line that can't be written is a warning in the test copy's log, and the deletion still counts): a suite checks what it deleted arrived with `lib.trashed(path)` (`board`, `files`,
 `storage`, `sessiontree`). Combwork's one way there is `trash()` in `src/main/trash.ts` (`tests/trash.test.ts` fails for a
@@ -660,7 +660,7 @@ startup failure shows no dialog.
 its lane's port, so no later runner took that lane). Playwright starts Electron through `cmd.exe /c`, so the pid it
 gives is that shell's: a killed suite takes the shell with it, while Combwork's main process, the shell's child, runs on.
 `lib.cjs` records each copy's main process as it starts (the shell's child, by the process tree), by pid and when it
-started, in the suite's folder (`.hive-copies.jsonl`, looked up in the background, so a launch returns as before).
+started, in the suite's folder (`.cw-copies.jsonl`, looked up in the background, so a launch returns as before).
 Once a suite has ended, however it ended (passed, failed, timed out, killed), the runner ends what is left of the
 copies it recorded (`folderProcesses.cjs` `endCopies`); and each run's start, before it takes a lane, ends the copies
 an earlier run recorded in the lanes no running runner holds, started before it looked (`leftCopies.mjs`). Only what
@@ -735,7 +735,7 @@ card is Done.
 ## Writing one
 
 Start from an existing suite and use `lib.cjs`:
-- `hiveEnv({ CW_USER_DATA, … })` as the environment of every test Combwork it starts (or `launch()`), `childEnv({ … })`
+- `combworkEnv({ CW_USER_DATA, … })` as the environment of every test Combwork it starts (or `launch()`), `childEnv({ … })`
   for a child that is part of Combwork (the combwork MCP server, `cw-progress`); never `process.env` (Run context, above);
 - `port(<default>)` for its Agent API port (never a fixed number, so it can run beside others); add it to an area in
   `affected.mjs` and to `suites.mjs` (sorted), with `serial: '<why>'` if it can't run beside others;
@@ -756,7 +756,7 @@ Start from an existing suite and use `lib.cjs`:
 
 **The registry's PATH** (unpackaged builds only, #472): Combwork adds the folders of the PATH Windows gives new programs to its own before it looks for the CLIs. A test copy (a test profile) never reads the machine's: `CW_TEST_REGISTRY_PATH` (`;`-separated folders, none when unset) stands in for it, and a suite can change it while Combwork runs, as an installer would (`freshpath`). So a suite's PATH without a CLI (or git, `gitmissing`) stays without it.
 
-**Quiet test copies** (unpackaged builds only): a copy of Combwork started with a test profile (`CW_USER_DATA`, which every suite sets) is quiet, however it was started (the runner, `node tests/e2e/<suite>.cjs`, a scenario or a Playwright script), and so is one started with `CW_TEST_QUIET=1`. `CW_TEST_QUIET=0` turns it off, for a suite that needs a real window (listed in `LOUD` in `tests/testQuiet.test.ts`, which fails for a suite that starts Combwork without a test profile or turns quiet off unlisted). So the copies of Combwork the suites start never interrupt you: their windows open off screen, to the left of your screens, and never take focus (`showInactive`; Chromium's occlusion tracking is off for them, so they still draw), and they raise no Windows notification, taskbar flash or chime (`src/main/testQuiet.ts`; the window still counts a chime, for `window.__hiveChimes`). Set `CW_TEST_NOTIFY_LOG=<file>` to have each notification, flash and chime they would have made written there as a JSON line (`{ kind, title, body }`); `bursts` checks its notifications that way. The message Combwork shows when it can't start from its install folder (`src/main/installDir.ts`) is recorded there too (`kind: 'dialog'`), and `CW_TEST_DIALOG_SNAPSHOT=<png>` draws it off screen to that picture without showing it; `CW_TEST_INSTALL_DIR` makes Combwork check a test folder's permissions instead of its own folder's (`installdir`). Quitting with processes agents left running asks in a native dialog (#507), which a quiet copy skips (leaving them running, and listed again at its next start: `leftovers-restart`, #614) unless started with `CW_TEST_ASK_LEFTOVERS=1`: `leftovers` sets it and stubs the dialog, and sets `CW_TEST_JOB_KILL_FAILS=1` in Combwork's main process while it runs to make ending them fail, as Windows refusing would, and starts a second copy with `CW_TEST_PROCESS_TRACKER=silent` and `CW_TEST_TRACKER_WAIT_MS=3000` (a tracker that never gets going: agents start untracked, with one notice; `=fail` acts out one that can't start at all). Suites that need a focused window stub it (`inbox`, `progress`, `taskbar`) rather than taking OS focus. Maximising is simulated the same way: `carddialog` gives its off-screen window a screen's work-area size, makes `isMaximized()` say so and emits `maximize`/`unmaximize`, which checks Combwork's handling of them (the card kept in the window, the title-bar buttons dimmed) but not Electron's and Windows' own maximise. For that, run it on its own with **`CW_E2E_NATIVE=1 node tests/e2e/carddialog.cjs`** (PowerShell: `$env:CW_E2E_NATIVE='1'; node tests/e2e/carddialog.cjs`): the same checks with the real `maximize()`/`unmaximize()` in a normal window, which **comes on screen, takes the focus and fills the screen** while it runs, so only when asked. The runner drops `CW_E2E_NATIVE`, so full and `--affected` runs stay quiet.
+**Quiet test copies** (unpackaged builds only): a copy of Combwork started with a test profile (`CW_USER_DATA`, which every suite sets) is quiet, however it was started (the runner, `node tests/e2e/<suite>.cjs`, a scenario or a Playwright script), and so is one started with `CW_TEST_QUIET=1`. `CW_TEST_QUIET=0` turns it off, for a suite that needs a real window (listed in `LOUD` in `tests/testQuiet.test.ts`, which fails for a suite that starts Combwork without a test profile or turns quiet off unlisted). So the copies of Combwork the suites start never interrupt you: their windows open off screen, to the left of your screens, and never take focus (`showInactive`; Chromium's occlusion tracking is off for them, so they still draw), and they raise no Windows notification, taskbar flash or chime (`src/main/testQuiet.ts`; the window still counts a chime, for `window.__cwChimes`). Set `CW_TEST_NOTIFY_LOG=<file>` to have each notification, flash and chime they would have made written there as a JSON line (`{ kind, title, body }`); `bursts` checks its notifications that way. The message Combwork shows when it can't start from its install folder (`src/main/installDir.ts`) is recorded there too (`kind: 'dialog'`), and `CW_TEST_DIALOG_SNAPSHOT=<png>` draws it off screen to that picture without showing it; `CW_TEST_INSTALL_DIR` makes Combwork check a test folder's permissions instead of its own folder's (`installdir`). Quitting with processes agents left running asks in a native dialog (#507), which a quiet copy skips (leaving them running, and listed again at its next start: `leftovers-restart`, #614) unless started with `CW_TEST_ASK_LEFTOVERS=1`: `leftovers` sets it and stubs the dialog, and sets `CW_TEST_JOB_KILL_FAILS=1` in Combwork's main process while it runs to make ending them fail, as Windows refusing would, and starts a second copy with `CW_TEST_PROCESS_TRACKER=silent` and `CW_TEST_TRACKER_WAIT_MS=3000` (a tracker that never gets going: agents start untracked, with one notice; `=fail` acts out one that can't start at all). Suites that need a focused window stub it (`inbox`, `progress`, `taskbar`) rather than taking OS focus. Maximising is simulated the same way: `carddialog` gives its off-screen window a screen's work-area size, makes `isMaximized()` say so and emits `maximize`/`unmaximize`, which checks Combwork's handling of them (the card kept in the window, the title-bar buttons dimmed) but not Electron's and Windows' own maximise. For that, run it on its own with **`CW_E2E_NATIVE=1 node tests/e2e/carddialog.cjs`** (PowerShell: `$env:CW_E2E_NATIVE='1'; node tests/e2e/carddialog.cjs`): the same checks with the real `maximize()`/`unmaximize()` in a normal window, which **comes on screen, takes the focus and fills the screen** while it runs, so only when asked. The runner drops `CW_E2E_NATIVE`, so full and `--affected` runs stay quiet.
 
 **React's commit bursts and chains** (HI-1387, HI-1865): a render loop (a setState per event in a useEffect, #1366)
 only throws once React's nested-update limit (50) is passed, and a production build says nothing before then. So a quiet
@@ -774,7 +774,7 @@ are recorded only: fast typing makes one as large as a loop's (HI-1864), but eac
 `commitburst` checks a deliberate loop is caught (its burst and chain both reach 50) and typing's chain stays short,
 shows a child run failing at a chain of 60 and passing once it accepts it, and accepts its own loop.
 
-**Tips** are off in every test copy of Combwork (`lib.hiveEnv` sets `CW_TEST_TIPS=off`, which unpackaged builds and quiet packaged ones take, #1599: a profile that doesn't set *Show a tip when Combwork starts* gets it off), so no tip card covers what a suite clicks. A suite about tips (`tips`) turns them on in its profile.
+**Tips** are off in every test copy of Combwork (`lib.combworkEnv` sets `CW_TEST_TIPS=off`, which unpackaged builds and quiet packaged ones take, #1599: a profile that doesn't set *Show a tip when Combwork starts* gets it off), so no tip card covers what a suite clicks. A suite about tips (`tips`) turns them on in its profile.
 
 **A fake Claude Code** (`fake-claude/fake-claude.cmd`) runs agents without signing in or spending tokens: set it as
 the profile's Claude Code path (`settings.providers['claude-code'].executablePath`) and start Combwork with

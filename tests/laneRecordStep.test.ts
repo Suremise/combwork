@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-lane-record-')
+const base = tempDir('cw-lane-record-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -131,7 +131,7 @@ describe('the one lane record step (#1291)', () => {
     expect(up.tables).not.toEqual(expect.arrayContaining(['workflow_lane_cards']))
     expect(up.cardCols).not.toContain('lane')
     expect(up.cardCols).not.toContain('lane_reviewer')
-    // Every lane reads as lanes.ts keeps one (else its next save would drop it), the runtime's by Hive.
+    // Every lane reads as lanes.ts keeps one (else its next save would drop it), the runtime's by Combwork.
     expect(up.lanesDocs.map((d) => readLane(d)?.id).sort()).toEqual(['C', 'C-2', 'E', 'K', 'L'])
     expect(readLane(up.lanesDocs.find((d) => (d as { id: string }).id === 'L'))).toMatchObject({ project: 'p', builder: { id: 'combwork', name: 'Combwork' }, reviewer: { id: 'R1', name: 'R1' }, cards: [1, 2], state: 'active', endedAt: null })
     expect(readLane(up.lanesDocs.find((d) => (d as { id: string }).id === 'E'))).toMatchObject({ cards: [4], state: 'ended', reviewer: null })

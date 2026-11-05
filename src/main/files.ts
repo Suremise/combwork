@@ -9,7 +9,7 @@ import { emit } from './events'
 import { heldOpen, insideReal, isInUse, trashAllOrNothing, withFileLock } from './fsutil'
 import { INDEX_BUSY, git } from './git'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { workspace, workspaceFor } from './workspace'
@@ -46,16 +46,16 @@ function inProject(projectPath: string, rel: string, allowRoot = false, entry = 
   const abs = resolve(root, rel || '.')
   if (abs === root) {
     if (allowRoot) return abs
-    throw hiveError(msg({ id: 'service.files.needsEntry', defaultMessage: 'This action needs a file or folder inside the project', description: "An error in the Files tab: the action (rename, move, delete…) was given the project's own folder, not something in it." }))
+    throw combworkError(msg({ id: 'service.files.needsEntry', defaultMessage: 'This action needs a file or folder inside the project', description: "An error in the Files tab: the action (rename, move, delete…) was given the project's own folder, not something in it." }))
   }
-  if (!abs.toLowerCase().startsWith(root.toLowerCase() + sep)) throw hiveError(M.outside)
-  if (!insideReal(entry ? dirname(abs) : abs, [root])) throw hiveError(msg({ id: 'service.files.throughLink', defaultMessage: 'Path leads outside the project (through a link)', description: "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project." }))
+  if (!abs.toLowerCase().startsWith(root.toLowerCase() + sep)) throw combworkError(M.outside)
+  if (!insideReal(entry ? dirname(abs) : abs, [root])) throw combworkError(msg({ id: 'service.files.throughLink', defaultMessage: 'Path leads outside the project (through a link)', description: "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project." }))
   return abs
 }
 
 function validName(name: string): string {
   const n = name.trim()
-  if (!n || n === '.' || n === '..' || /[\\/:*?"<>|]/.test(n)) throw hiveError(msg({ id: 'service.files.badName', defaultMessage: '"{name}" is not a valid name', description: "An error making or renaming a file or folder: {name} is empty, . or .., or has a character Windows can't have in a name." }), { name })
+  if (!n || n === '.' || n === '..' || /[\\/:*?"<>|]/.test(n)) throw combworkError(msg({ id: 'service.files.badName', defaultMessage: '"{name}" is not a valid name', description: "An error making or renaming a file or folder: {name} is empty, . or .., or has a character Windows can't have in a name." }), { name })
   return n
 }
 
@@ -174,9 +174,9 @@ export async function create(projectPath: string, parentRel: string, name: strin
   const parent = inProject(projectPath, parentRel, true)
   // Allow "sub/dir/file.txt" to create intermediate folders, like VS Code.
   const parts = name.split(/[\\/]/).filter(Boolean).map(validName)
-  if (!parts.length) throw hiveError(msg({ id: 'service.files.nameRequired', defaultMessage: 'A name is required', description: 'An error making a file or folder with no name.' }))
+  if (!parts.length) throw combworkError(msg({ id: 'service.files.nameRequired', defaultMessage: 'A name is required', description: 'An error making a file or folder with no name.' }))
   const abs = inProject(projectPath, toRel(projectPath, join(parent, ...parts)))
-  if (existsSync(abs)) throw hiveError(M.exists, { name: parts.join('/') })
+  if (existsSync(abs)) throw combworkError(M.exists, { name: parts.join('/') })
   if (isDir) await mkdir(abs, { recursive: true })
   else {
     await mkdir(dirname(abs), { recursive: true })
@@ -191,7 +191,7 @@ export async function renameEntry(projectPath: string, rel: string, newName: str
   const dest = join(dirname(abs), validName(newName))
   if (dest === abs) return rel
   // A case-only rename on Windows is the same file, so existsSync would be true.
-  if (existsSync(dest) && dest.toLowerCase() !== abs.toLowerCase()) throw hiveError(M.exists, { name: newName })
+  if (existsSync(dest) && dest.toLowerCase() !== abs.toLowerCase()) throw combworkError(M.exists, { name: newName })
   await rename(abs, dest)
   return toRel(projectPath, dest)
 }
@@ -199,7 +199,7 @@ export async function renameEntry(projectPath: string, rel: string, newName: str
 function assertNotInside(src: string, destDir: string): void {
   const s = src.toLowerCase()
   const d = destDir.toLowerCase()
-  if (d === s || d.startsWith(s + sep)) throw hiveError(msg({ id: 'service.files.insideItself', defaultMessage: 'Cannot put "{name}" inside itself', description: 'An error moving a folder ({name}) into itself, or into a folder inside it.' }), { name: basename(src) })
+  if (d === s || d.startsWith(s + sep)) throw combworkError(msg({ id: 'service.files.insideItself', defaultMessage: 'Cannot put "{name}" inside itself', description: 'An error moving a folder ({name}) into itself, or into a folder inside it.' }), { name: basename(src) })
 }
 
 /** Moves entries into destRel. Returns their new relative paths. */
@@ -218,7 +218,7 @@ export async function move(projectPath: string, rels: string[], destRel: string)
     }
     assertNotInside(src, destDir)
     const dest = join(destDir, basename(src))
-    if (existsSync(dest) || taken.has(dest.toLowerCase())) throw hiveError(msg({ id: 'service.files.existsIn', defaultMessage: '{root, select, yes {"{name}" already exists in the project root} other {"{name}" already exists in {folder}}}', description: 'An error moving files: the folder they go to already has one called {name}. {root} is yes when that folder is the project\'s own (its root), else {folder} is its path in the project.' }), { name: basename(src), root: destRel ? 'no' : 'yes', folder: destRel })
+    if (existsSync(dest) || taken.has(dest.toLowerCase())) throw combworkError(msg({ id: 'service.files.existsIn', defaultMessage: '{root, select, yes {"{name}" already exists in the project root} other {"{name}" already exists in {folder}}}', description: 'An error moving files: the folder they go to already has one called {name}. {root} is yes when that folder is the project\'s own (its root), else {folder} is its path in the project.' }), { name: basename(src), root: destRel ? 'no' : 'yes', folder: destRel })
     taken.add(dest.toLowerCase())
     plan.push({ src, dest, rel })
   }
@@ -468,7 +468,7 @@ export function unwatchAll(): void {
 
 /**
  * A session host's attachments folder (.combwork/attachments, moved from .combwork/images first), when it is a real folder of
- * the host's own: never one linked from elsewhere (a junction or symbolic link), which Hive neither lists nor deletes
+ * the host's own: never one linked from elsewhere (a junction or symbolic link), which Combwork neither lists nor deletes
  * through. Null when there is none.
  */
 async function attachmentsRoot(host: string): Promise<string | null> {
@@ -482,10 +482,10 @@ async function attachmentsRoot(host: string): Promise<string | null> {
   return root
 }
 
-/** Throws unless p is a real folder or file (not a link) inside the attachments root, as Hive keeps them. */
+/** Throws unless p is a real folder or file (not a link) inside the attachments root, as Combwork keeps them. */
 async function assertOwnAttachment(root: string, p: string, kind: 'dir' | 'file'): Promise<void> {
   const st = await lstat(p).catch(() => null)
-  if (!st || st.isSymbolicLink() || (kind === 'dir' ? !st.isDirectory() : !st.isFile()) || !insideReal(p, [root])) throw hiveError(M.notKept)
+  if (!st || st.isSymbolicLink() || (kind === 'dir' ? !st.isDirectory() : !st.isFile()) || !insideReal(p, [root])) throw combworkError(M.notKept)
 }
 
 /** The attachments root and the session folder of a path in it (`<root>\<session>\<file>`); throws for anything else. */
@@ -493,11 +493,11 @@ async function attachmentAt(projectPath: string, path: string): Promise<{ root: 
   const root = await attachmentsRoot(projectPath)
   const abs = resolve(path)
   const parts = root ? relative(root, abs).split(sep) : []
-  if (!root || parts.length !== 2 || parts[0] === '..' || !isSessionFolder(parts[0])) throw hiveError(msg({ id: 'service.files.notAttachment', defaultMessage: 'Not a session attachment', description: "An error opening or deleting a session's attachment: the path isn't a file in a session's attachments folder." }))
+  if (!root || parts.length !== 2 || parts[0] === '..' || !isSessionFolder(parts[0])) throw combworkError(msg({ id: 'service.files.notAttachment', defaultMessage: 'Not a session attachment', description: "An error opening or deleting a session's attachment: the path isn't a file in a session's attachments folder." }))
   return { root, sessionId: assertSessionId(parts[0]), abs }
 }
 
-/** A project's session attachments, or the Hive Assistant's (its home is a session host: `.combwork/assistant/.combwork/attachments`). */
+/** A project's session attachments, or the Combwork Assistant's (its home is a session host: `.combwork/assistant/.combwork/attachments`). */
 export async function listAttachments(projectPath: string): Promise<SessionAttachmentGroup[]> {
   projectPath = workspace.assertSessionHost(projectPath)
   const root = await attachmentsRoot(projectPath)
@@ -541,7 +541,7 @@ export async function readAttachment(projectPath: string, path: string): Promise
 /**
  * Moves a session attachment to the Recycle Bin (a project's or the Assistant's), with the checks of deleting sessions
  * (#239): with its session reserved and not running (whileStopped: it can't resume and paste meanwhile), only a file
- * Hive keeps (no link out of .combwork/attachments), and not one another program has open.
+ * Combwork keeps (no link out of .combwork/attachments), and not one another program has open.
  */
 export async function trashAttachment(projectPath: string, path: string): Promise<void> {
   projectPath = workspace.assertSessionHost(projectPath)
@@ -549,7 +549,7 @@ export async function trashAttachment(projectPath: string, path: string): Promis
   await sessions.whileStopped(projectPath, sessionId, async () => {
     await assertOwnAttachment(root, join(root, sessionId), 'dir')
     await assertOwnAttachment(root, abs, 'file')
-    if (await heldOpen(abs)) throw hiveError(M.inUse)
+    if (await heldOpen(abs)) throw combworkError(M.inUse)
     await toTrash(abs)
   })
 }
@@ -562,9 +562,9 @@ export async function trashAttachment(projectPath: string, path: string): Promis
 export async function trashAttachmentGroup(projectPath: string, sessionId: string): Promise<number> {
   projectPath = workspace.assertSessionHost(projectPath)
   assertSessionId(sessionId)
-  if (!isSessionFolder(sessionId)) throw hiveError(M.notKept)
+  if (!isSessionFolder(sessionId)) throw combworkError(M.notKept)
   const root = await attachmentsRoot(projectPath)
-  if (!root) throw hiveError(M.notKept)
+  if (!root) throw combworkError(M.notKept)
   const dir = join(root, sessionId)
   // Reserved and not running from here to the end: it can't resume (and paste) while its attachments go.
   const n = await sessions.whileStopped(projectPath, sessionId, async () => {
@@ -574,10 +574,10 @@ export async function trashAttachmentGroup(projectPath: string, sessionId: strin
     try {
       await trashAllOrNothing(files, (f) => toTrash(f))
     } catch (e) {
-      if (isInUse(e)) throw hiveError(msg({ id: 'service.files.groupInUse', defaultMessage: 'Another program has one of these files open. Close it, then try again.', description: "An error deleting a session's attachments: another program has one of them open, so none was moved." }), undefined, { cause: e })
+      if (isInUse(e)) throw combworkError(msg({ id: 'service.files.groupInUse', defaultMessage: 'Another program has one of these files open. Close it, then try again.', description: "An error deleting a session's attachments: another program has one of them open, so none was moved." }), undefined, { cause: e })
       throw e
     }
-    // The folder goes too once empty (Hive makes it again for the next attachment).
+    // The folder goes too once empty (Combwork makes it again for the next attachment).
     await rmdir(dir).catch(() => undefined)
     return files.length
   })

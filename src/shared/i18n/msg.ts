@@ -22,11 +22,11 @@ declare global {
    * Each message's placeholders and their types, by id: generated per area into `shared/i18n/values/<area>.d.ts`
    * from `locales/en/<area>.json`, so `tr(m, values)` checks the names and types. `undefined`: it takes none.
    */
-  interface HiveMessageValues {}
+  interface CombworkMessageValues {}
 }
 
 /** The values `tr()` takes for a message: its generated ones, none, or any (a message not generated yet). */
-export type MessageArgs<Id extends string> = string extends Id ? [values?: Values] : Id extends keyof HiveMessageValues ? (HiveMessageValues[Id] extends undefined ? [] : [values: HiveMessageValues[Id]]) : [values?: Values]
+export type MessageArgs<Id extends string> = string extends Id ? [values?: Values] : Id extends keyof CombworkMessageValues ? (CombworkMessageValues[Id] extends undefined ? [] : [values: CombworkMessageValues[Id]]) : [values?: Values]
 
 /** A message, as data. The identity function extraction looks for: keep its argument a literal object. */
 export const msg = <const Id extends string>(m: Msg<Id>): Msg<Id> => m

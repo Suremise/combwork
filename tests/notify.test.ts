@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { kindOfLevel, keepPopups, MAX_POPUPS, notifyRoute, popupMs, popupRole, staysUntilHandled, toldWhenAway, type NotifyKind } from '../src/shared/notify'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 
 const KINDS: NotifyKind[] = ['needsYou', 'finished', 'work', 'usage', 'warning', 'result', 'transcript', 'update', 'quit', 'tip']
 const on = { ...DEFAULT_SETTINGS.notifications }
@@ -122,8 +122,8 @@ describe('one pop-up system: stacking, timing, roles', () => {
 
 // main/notify.ts: one entry per event, one owner, offers resolved by their own key.
 describe('tell(): one entry, one window', () => {
-  const sent = new Map<number, HiveEvent[]>()
-  const win = (id: number, focusedNow = false) => ({ id, focusedNow, isDestroyed: () => false, webContents: { id, send: (_c: string, e: HiveEvent) => sent.set(id, [...(sent.get(id) ?? []), e]) } })
+  const sent = new Map<number, CombworkEvent[]>()
+  const win = (id: number, focusedNow = false) => ({ id, focusedNow, isDestroyed: () => false, webContents: { id, send: (_c: string, e: CombworkEvent) => sent.set(id, [...(sent.get(id) ?? []), e]) } })
   const A = win(1)
   const B = win(2)
   let focused: ReturnType<typeof win> | null = null
@@ -219,7 +219,7 @@ describe('tell(): one entry, one window', () => {
   it("an offer resolves its own entries only: an old one's completion never clears a newer offer for the same agent", () => {
     focused = A
     const resolved: { ids: string[]; outcome: string }[] = []
-    const off = (async () => (await import('../src/main/events')).onHiveEvent((e) => e.type === 'toast-resolved' && void resolved.push({ ids: e.ids, outcome: e.outcome })))()
+    const off = (async () => (await import('../src/main/events')).onCombworkEvent((e) => e.type === 'toast-resolved' && void resolved.push({ ids: e.ids, outcome: e.outcome })))()
     return off.then((stop) => {
       const oldOffer = notify.askOffer('C:\\Work\\A\\alpha', 'a1')
       const old = notify.tell({ kind: 'needsYou', title: 'old ask', projectPath: 'C:\\Work\\A\\alpha', agentId: 'a1', offer: oldOffer })

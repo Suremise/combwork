@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { Fact } from '../src/shared/workflow/facts'
 
-const base = tempDir('hive-run-checks-')
+const base = tempDir('cw-run-checks-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -32,7 +32,7 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 
 /** A repository on main with one commit (a.txt), `out/` ignored. */
 function repo(): string {
-  const p = tempDir('hive-run-checks-repo-')
+  const p = tempDir('cw-run-checks-repo-')
   git(p, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
   writeFileSync(join(p, 'a.txt'), 'a\n')
@@ -159,7 +159,7 @@ describe('a run as a check on Git (#1222)', () => {
   it("a card on its own line counts only on its line's revision, not on an older checkout elsewhere (HR5's round 1 finding 2)", async () => {
     await watched()
     const a = git(p, 'rev-parse', 'HEAD')
-    const wt = join(tempDir('hive-run-checks-wt-'), 'card')
+    const wt = join(tempDir('cw-run-checks-wt-'), 'card')
     git(p, 'worktree', 'add', '-q', '-b', 'feature', wt)
     const b = commit(wt, 'feature.txt', 'feature\n')
     const facts: Fact[] = [{ seq: 1, card: 7, kind: 'Started', at: '2026-10-20T10:00:00.000Z', actor: 'agent:B1', source: 'recorded', data: { folder: wt, line: 'feature', base: a, target: 'main', builder: 'B1', cardKind: 'code' } }]
@@ -185,7 +185,7 @@ describe('a run as a check on None (#1222)', () => {
   let p: string
   afterEach(() => o?.dispose())
   const folder = async (): Promise<RunFor> => {
-    p = tempDir('hive-run-checks-none-')
+    p = tempDir('cw-run-checks-none-')
     writeFileSync(join(p, 'doc.md'), 'the doc\n')
     writeFileSync(join(p, 'other.md'), 'another\n')
     o = new Observer()

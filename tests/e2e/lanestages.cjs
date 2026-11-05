@@ -29,7 +29,7 @@ const beta = path.join(fx.ws, 'beta')
 ;(async () => {
   q.prepare(fx)
   lib.gitProject(beta)
-  let h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     const { inv } = h
     let page = h.page
@@ -271,7 +271,7 @@ const beta = path.join(fx.ws, 'beta')
     // Resume until the record is gone (nothing left to offer) and no offer shows.
     const restartRecord = path.join(fx.userData, 'restart.json')
     const offered = fs.existsSync(restartRecord)
-    h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { CW_LANG: 'ja' } })
+    h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env: { CW_LANG: 'ja' } })
     page = h.page
     page.on('pageerror', (e) => check('no page errors (ja)', false, e.message))
     await lib.fitWindow(h.app, page, { width: 1500, height: 950 })
@@ -317,7 +317,7 @@ const beta = path.join(fx.ws, 'beta')
     const ptDir = path.join(lib.ROOT, 'locales', 'pt-BR')
     const pt = Object.assign({}, ...fs.readdirSync(ptDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(ptDir, f), 'utf8'))))
     const base = (await h.inv('app:info')).language
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: { ...base, code: 'pt-BR', locale: 'pt-BR', messages: pt } })
+    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: { ...base, code: 'pt-BR', locale: 'pt-BR', messages: pt } })
     const ptTitle = pt['board.lanes.legendTitle']
     check('pt-BR: the legend in Portuguese', !!(await hover(barJa, (t) => t.includes(ptTitle))), await tipText())
     const todoRow = page.locator('.tip .lanes-legend-row[data-category="todo"]')

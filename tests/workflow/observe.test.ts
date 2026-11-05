@@ -1,4 +1,4 @@
-// Observations by two Hives on one workspace (#1118, SPEC §16.17): each transition is written once, a repeat of the same
+// Observations by two Combworks on one workspace (#1118, SPEC §16.17): each transition is written once, a repeat of the same
 // values later is still recorded, and a writer that loses the race reads the platform again and writes only what is
 // true now. Two Workflows on separate connections to one store file stand in for the dev and the installed Combwork.
 import { afterEach, describe, expect, it } from 'vitest'
@@ -16,7 +16,7 @@ afterEach(() => {
 
 const heads = (e: Env, card: number) => e.store.facts(card).filter((f) => f.kind === 'HeadMoved').map((f) => (f.data as FactData['HeadMoved']).to)
 
-describe('two Hives observing one workspace', () => {
+describe('two Combworks observing one workspace', () => {
   it('S59: HEAD goes A→B→A→B → four HeadMoved facts, each once; a card reopened and merged again → a second Integrated in the new cycle', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
     const other = e.another()
@@ -93,7 +93,7 @@ describe('two Hives observing one workspace', () => {
     expect(heads(e, card.id).filter((h) => h === e2)).toHaveLength(0)
   })
 
-  it('S50 (core): both Hives observe the same hand merge → one Integrated fact', async () => {
+  it('S50 (core): both Combworks observe the same hand merge → one Integrated fact', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
     const other = e.another()
     const card = e.wf.createCard({ title: 'Merged by hand' })

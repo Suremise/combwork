@@ -210,11 +210,11 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
   // Names of Combwork tools in the transcript: a direct call (mcp__combwork__x, combwork.x, Combwork's "combwork · x"), or one written in a
   // Codex script (tools.mcp__combwork__x(...)), which may or may not have run: a script whose calls were read from its
   // rollout (HI-2235) is a `script` item, its calls tools of their own.
-  const hiveName = (name) => /(?:^|[_.\s])(cw_[a-z]+(?:_[a-z]+)*)$/.exec(name)?.[1]
+  const combworkName = (name) => /(?:^|[_.\s])(cw_[a-z]+(?:_[a-z]+)*)$/.exec(name)?.[1]
   const scripts = items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, input: String(x.tool.input ?? '') }))
-  const hiveMentions = [...tools, ...scripts].flatMap((t) => (hiveName(t.name) ? [hiveName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__combwork__)?(cw_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
+  const combworkMentions = [...tools, ...scripts].flatMap((t) => (combworkName(t.name) ? [combworkName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__combwork__)?(cw_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
   const replies = items.filter((x) => x.kind === 'assistant').map((x) => x.text)
-  return { tools, skillsRead, skillRefsRead, hiveMentions, finalReply: replies.at(-1) ?? '', replies }
+  return { tools, skillsRead, skillRefsRead, combworkMentions, finalReply: replies.at(-1) ?? '', replies }
 }
 
 /**
@@ -750,26 +750,26 @@ async function runScenario(sc, providerKey, opts = {}) {
     // that compare the skill service's work on unchanged and changed revisions.
     if (sc.beforeLaunch) await sc.beforeLaunch(ctx)
     // Combwork's log as the session under test starts: its Combwork tools connecting is counted from here.
-    const launchMark = lib.hiveLogLines(userData).length
+    const launchMark = lib.combworkLogLines(userData).length
     // A subject Combwork starts itself (HI-2046: a reviewer given a card that reached Review outside a lane): its launch is
     // the session under test, and Combwork's line its prompt.
-    const byHive = !!sc.startedByHive
+    const byCombwork = !!sc.startedByCombwork
     // A prompt given at launch (HI-2225), on the CLI's command line: the session's first input, before anything setup left
     // for it (Combwork types nothing into a launch whose CLI hasn't taken its task yet, #712, and a wake waits for the turn
     // after), so a wake can't come first and do the prompt's work without it. Never with beforePrompt, which waits for
     // that wake's turn.
-    const atLaunch = !byHive && !!sc.promptAtLaunch
+    const atLaunch = !byCombwork && !!sc.promptAtLaunch
     if (atLaunch && sc.beforePrompt) throw new Error(`${sc.id}: promptAtLaunch and beforePrompt don't go together`)
     const launchPrompt = !atLaunch ? null : p.fake ? (typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake) : typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     // The run the session under test launched as (HI-2225), known before any prompt can have Combwork relaunch it (a card
     // given in a slot): its trust is answered as it starts (below); a later run's is answered while its turn is waited for.
     let launchRun = null
-    if (!byHive) {
+    if (!byCombwork) {
       // Refused as already running or starting (HI-2215): Combwork started it itself after setup (a lane's card, a review),
-      // which a scenario says with startedByHive; never taken as Combwork's start here, whose line would then race the prompt.
+      // which a scenario says with startedByCombwork; never taken as Combwork's start here, whose line would then race the prompt.
       const refused = await inv('session:start', host, { agentId, ...(atLaunch ? { prompt: launchPrompt } : {}) }).then((st) => ((launchRun = st?.runId ?? null), null), (e) => e)
       if (refused && /already running or starting/i.test(String(refused.message))) {
-        result.error = `setup: Combwork started the session under test itself (${String(refused.message).replace(/^.*Error: /, '')}): mark the scenario startedByHive, or have its setup leave it unstarted`
+        result.error = `setup: Combwork started the session under test itself (${String(refused.message).replace(/^.*Error: /, '')}): mark the scenario startedByCombwork, or have its setup leave it unstarted`
         return result
       }
       if (refused) throw refused
@@ -831,14 +831,14 @@ async function runScenario(sc, providerKey, opts = {}) {
       const s = await live()
       if (s?.status === 'ready' || s?.status === 'finished') break
       // Combwork's line already at work: a model's turn on it is the trial. The prompt given at launch, the same.
-      if (((byHive && !p.fake) || atLaunch) && ['working', 'background'].includes(s?.status)) break
+      if (((byCombwork && !p.fake) || atLaunch) && ['working', 'background'].includes(s?.status)) break
       const screen = plain(await inv('pty:buffer', key).catch(() => ''))
       if (screen) lastScreen = screen
       // Exited before its session started (an OAuth session it couldn't refresh, #577): no prompt can reach it.
-      const hiveLog = path.join(userData, 'logs', 'combwork.log')
+      const combworkLog = path.join(userData, 'logs', 'combwork.log')
       if (s) seen = true
-      else if (seen || ptyExitedIn(hiveLog, agentId)) {
-        endedAtLaunch = launchEnded({ screen: lastScreen, reason: startFailureIn(hiveLog), auth: p.provider === 'claude-code' ? claudeAuthStatus(hiveLog, agentId, env) : null })
+      else if (seen || ptyExitedIn(combworkLog, agentId)) {
+        endedAtLaunch = launchEnded({ screen: lastScreen, reason: startFailureIn(combworkLog), auth: p.provider === 'claude-code' ? claudeAuthStatus(combworkLog, agentId, env) : null })
         if (endedAtLaunch.environment) return skipFor(endedAtLaunch.environment)
         break
       }
@@ -881,16 +881,16 @@ async function runScenario(sc, providerKey, opts = {}) {
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
     // Started by Combwork: its line, once the conversation has it. A model works on it, typed nothing more; a fake (which
     // does nothing on a line it has no script for) is typed its steps once that turn is over.
-    let hiveLine = null
-    if (byHive && !endedAtLaunch) {
+    let combworkLine = null
+    if (byCombwork && !endedAtLaunch) {
       const lineOf = async () => (await conversation()).find((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[CW]'))?.text ?? null
-      await lib.until(async () => !!(hiveLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), 60000)
-      if (!hiveLine) {
+      await lib.until(async () => !!(combworkLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), 60000)
+      if (!combworkLine) {
         result.error = "Combwork's line never reached the session under test"
         return result
       }
     }
-    const text = launchPrompt ?? (p.fake ? fakePrompt : (hiveLine ?? prompt))
+    const text = launchPrompt ?? (p.fake ? fakePrompt : (combworkLine ?? prompt))
     // The prompt is sent, then checked: a CLI still drawing its first screen can drop an Enter (sent again) or the
     // whole line (typed again).
     const submitted = async () => {
@@ -903,12 +903,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Where the prompt's states begin (HI-2086): a watch a turn before it left (a setup wake's, beforePrompt) isn't the
     // prompt's. A model started by Combwork's line has no prompt typed: its turn is the line's, all of them; a prompt given at
     // launch was the first input, so the same.
-    const statesFrom = (hiveLine && !p.fake) || atLaunch ? 0 : ((await page.evaluate(() => (window.__subjectStatuses ?? []).length).catch(() => 0)) ?? 0)
-    if (!endedAtLaunch && !(hiveLine && !p.fake) && !atLaunch) {
+    const statesFrom = (combworkLine && !p.fake) || atLaunch ? 0 : ((await page.evaluate(() => (window.__subjectStatuses ?? []).length).catch(() => 0)) ?? 0)
+    if (!endedAtLaunch && !(combworkLine && !p.fake) && !atLaunch) {
       turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
       // Real Claude Code: its first prompt waits for its Combwork tools, as Combwork's own first line does (HI-1148).
-      const ready = p.provider === 'claude-code' ? () => lib.hiveToolsConnected(userData, agentId, launchMark) : null
+      const ready = p.provider === 'claude-code' ? () => lib.combworkToolsConnected(userData, agentId, launchMark) : null
       if (!(await lib.sendPrompt(inv, key, text, { submitted, ready, waitMs: 20000 }))) {
         // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
         const drawn = String((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(mark)
@@ -1027,10 +1027,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     })
     observed.guidance = result.guidance
     // What the Combwork MCP servers ran: the subject's own calls, and everyone's (an agent the Assistant started).
-    observed.allHiveCalls = readMcpLog(mcpLog)
+    observed.allCombworkCalls = readMcpLog(mcpLog)
     observed.mcpLists = readMcpLists(mcpLog)
     observed.mcpReports = readJsonLines(mcpLog).filter((l) => l.kind === 'reported')
-    observed.hiveCalls = observed.allHiveCalls.filter((c) => (sc.role === 'assistant' ? c.role === 'assistant' : c.agent === coder.id))
+    observed.combworkCalls = observed.allCombworkCalls.filter((c) => (sc.role === 'assistant' ? c.role === 'assistant' : c.agent === coder.id))
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.

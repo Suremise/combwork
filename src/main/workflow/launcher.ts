@@ -1,5 +1,5 @@
-// A command's launcher (#1360; shared with hive-progress's isolated checks, #1435): a process that is put in a job on
-// Hive's process supervisor, and recorded, before the command it runs exists. Node built-ins only: hive-progress runs
+// A command's launcher (#1360; shared with cw-progress's isolated checks, #1435): a process that is put in a job on
+// Combwork's process supervisor, and recorded, before the command it runs exists. Node built-ins only: hive-progress runs
 // outside the asar and may only require these and out/main/chunks.
 
 import { spawn, type ChildProcess } from 'child_process'
@@ -11,10 +11,10 @@ export const SIGNALLED = 129
 /**
  * The launcher (run by Node): waits for its input's first line, then runs the command it was given (CW_QUEUE_LAUNCH,
  * JSON: command, args, shell, verbatim: Windows' arguments as given, a shell's command line) with its own output and what follows on its input, and exits with its code. Its input
- * closing before that line (Hive gone, or the launch given up) ends it with nothing run.
+ * closing before that line (Combwork gone, or the launch given up) ends it with nothing run.
  */
 const LAUNCHER = `
-// A process of its own, not Hive's: its exit isn't one of Hive's ways out (exitBy).
+// A process of its own, not Combwork's: its exit isn't one of Combwork's ways out (exitBy).
 const end = process.exit.bind(process)
 let got = '', started = false
 process.stdin.on('data', (d) => {
@@ -52,7 +52,7 @@ process.stdin.on('end', () => { if (!started) end(70) })
 `
 
 /**
- * Starts a command's launcher, waiting: detached (outside Hive's own job), hidden, in `cwd` with `env`. Hive's own
+ * Starts a command's launcher, waiting: detached (outside Combwork's own job), hidden, in `cwd` with `env`. Combwork's own
  * executable runs it as Node (ELECTRON_RUN_AS_NODE, which the command gets back as it was). The clock readings either
  * side of its start come back with it, for the job's check and the record.
  */

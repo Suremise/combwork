@@ -25,9 +25,9 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47902) } })
   try {
     await lib.openWorkspace(inv, page, ws)
-    const logged = (since, test) => lib.hiveLogLines(userData).slice(since).find(test)
+    const logged = (since, test) => lib.combworkLogLines(userData).slice(since).find(test)
     // Its lines so far (the file ends with a newline: the empty piece after it isn't one).
-    const linesNow = () => lib.hiveLogLines(userData).filter((l, i, all) => i < all.length - 1 || l !== '').length
+    const linesNow = () => lib.combworkLogLines(userData).filter((l, i, all) => i < all.length - 1 || l !== '').length
 
     // --- A slow render on the Task Board: a long-task line, naming the board.
     await page.getByRole('button', { name: 'Task Board' }).click()
@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
       w.emit('responsive')
     })
     const shortLines = await lib.until(async () => {
-      const ls = lib.hiveLogLines(userData).slice(shortFrom)
+      const ls = lib.combworkLogLines(userData).slice(shortFrom)
       const start = ls.find((l) => l.includes("The window's page isn't responding ("))
       const end = ls.find((l) => l.includes("The window's page responds again"))
       return start && end ? { start, end } : null

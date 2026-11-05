@@ -131,7 +131,7 @@ const copiesOf = (prefix) => (fs.existsSync(backupsNow()) ? fs.readdirSync(backu
  * `ms`: its calls' bound (longer while the dev build holds the upgrade's lock, which they may wait on).
  */
 async function startOld(old, mayFail = false, ms = HUNG_MS) {
-  const app = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ CW_USER_DATA: oldProfile }) })
+  const app = await _electron.launch({ executablePath: old.exe, args: [], env: lib.combworkEnv({ CW_USER_DATA: oldProfile }) })
   try {
     const page = await app.firstWindow()
     await lib.appReady(page)

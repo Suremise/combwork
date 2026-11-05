@@ -68,7 +68,7 @@ export interface AgentNow {
   runId: string | null
   /** Prompts its CLI has taken in this launch. */
   prompts: number
-  /** It was given a prompt its CLI hasn't taken yet (typed by Hive, or its launch's task, #712): it counts as working. */
+  /** It was given a prompt its CLI hasn't taken yet (typed by Combwork, or its launch's task, #712): it counts as working. */
   pending: boolean
   statusMessage?: string | null
   backgroundTasks?: number
@@ -116,7 +116,7 @@ export function agentEvent(now: AgentNow, mark: AgentMark | undefined, ignoreBac
   }
 }
 
-/** A saved condition, checked (null: not one Hive would have made). */
+/** A saved condition, checked (null: not one Combwork would have made). */
 export function readSavedAgentCondition(v: unknown): AgentWatchCondition | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
   const r = v as Record<string, unknown>
@@ -217,7 +217,7 @@ export function replyPart(agentName: string, where: string, text: string, max = 
 }
 
 /**
- * The one line Hive types to wake a watcher (#416): each agent that changed and what it did, with the start of its
+ * The one line Combwork types to wake a watcher (#416): each agent that changed and what it did, with the start of its
  * latest reply, then what to do; and what the user sent it from its pane since, for the Assistant (#418). One line within
  * WAKE_MAX_BYTES: replies give way first, then they are left out. `user`: the user's name (userNameOf, #426).
  */
@@ -235,7 +235,7 @@ export function agentWakeLine(changes: { agent: WatchedAgent; event: AgentEvent 
   return jsonBytes(short) <= WAKE_MAX_BYTES ? short : brief(counted)
 }
 
-/** The line Hive types when an agent watch's limit passes with every agent still working. */
+/** The line Combwork types when an agent watch's limit passes with every agent still working. */
 export function agentLimitLine(cond: AgentWatchCondition, minutes: number): string {
   const hours = minutes >= 60
   return NOTICE_PREFIX + say(T.limit, { agents: names(cond.agents), n: cond.agents.length, hours: hours ? 'yes' : 'no', time: String(hours ? Math.round((minutes / 60) * 10) / 10 : minutes) })

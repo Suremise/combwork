@@ -13,7 +13,7 @@ import { tempDir } from './tempDir'
 
 /** A workspace folder with a long name and a .combwork, a junction to it, and its 8.3 name where the volume has one. */
 function aliased(): { real: string; via: string; short: string | null } {
-  const base = tempDir('hive-fence-')
+  const base = tempDir('cw-fence-')
   const real = join(base, 'WorkspaceWithLongName')
   mkdirSync(join(real, '.combwork'), { recursive: true })
   return { real, via: junction(real, join(base, 'via-junction')), short: shortPath(real) }

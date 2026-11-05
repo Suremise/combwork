@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-livecost-')
+const base = tempDir('cw-livecost-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { config } = await import('../src/main/config')

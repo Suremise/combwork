@@ -8,7 +8,7 @@ import { cardRef } from './projectKeys'
 
 /**
  * Why a session can't be resumed, for the Sessions tab's marker and its disabled Resume buttons (the reason is their
- * tooltip), or null when it can. From what Hive already knows: the session (a sub-session, its transcript), its
+ * tooltip), or null when it can. From what Combwork already knows: the session (a sub-session, its transcript), its
  * provider (turned on, installed) and the agents that could run it now.
  */
 export interface ResumeContext {
@@ -22,7 +22,7 @@ export interface ResumeContext {
   runners: readonly { id: string; name: string }[]
   /** Resume may add an agent for it (a session from the project folder, and room for another agent). */
   canAddAgent: boolean
-  /** The Hive Assistant's conversations: its one agent resumes each in the provider it ran in (#506). */
+  /** The Combwork Assistant's conversations: its one agent resumes each in the provider it ran in (#506). */
   assistant?: boolean
   /** The project's folder: a session that recorded it ran there, not in a worktree. */
   projectPath?: string
@@ -60,7 +60,7 @@ export function holdText(h: ResumeHold, agent: string): Text {
 }
 
 /**
- * A hold in plain words, short, for the lists of agents Resume All and Hive's start left (#1434): "its slot is free.
+ * A hold in plain words, short, for the lists of agents Resume All and Combwork's start left (#1434): "its slot is free.
  * Resume it by hand to take it", "its slot now holds AM-14's work", "after AM-14".
  */
 export function holdShort(h: ResumeHold): Text {

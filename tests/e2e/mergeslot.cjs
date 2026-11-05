@@ -1,4 +1,4 @@
-// The merge slot (#350) on fake Claude Code agents (fake-claude/), through the real hive tool: two agents claiming at
+// The merge slot (#350) on fake Claude Code agents (fake-claude/), through the real Combwork tool: two agents claiming at
 // once merge one after the other and the second runs its checks once; the waiter's status says who it waits for, and
 // the project's Overview and the Progress panel show the holder and the line; a holder whose session ends frees the
 // slot; a hold that runs out passes on and is reported; the user releases a holder from the Overview; the Merge dialog
@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_MERGE_HOLD_MS: String(HOLD_MS) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_MERGE_HOLD_MS: String(HOLD_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

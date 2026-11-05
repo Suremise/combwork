@@ -15,10 +15,10 @@ vi.mock('fs/promises', async (original) => {
   const real = await original<typeof import('fs/promises')>()
   return {
     ...real,
-    // A swap's copy writes each file into its staging place (a .hive-new- name): the hook runs before the first.
+    // A swap's copy writes each file into its staging place (a .cw-new- name): the hook runs before the first.
     open: async (path: string, flags?: string, mode?: number) => {
       const h = hooks.onCopy
-      if (h && flags === 'w' && /\.hive-new-/.test(String(path))) {
+      if (h && flags === 'w' && /\.cw-new-/.test(String(path))) {
         hooks.onCopy = null
         await h()
       }
@@ -35,7 +35,7 @@ vi.mock('fs/promises', async (original) => {
 })
 
 const RES = join(__dirname, '..', 'resources')
-const base = tempDir('hive-bundled-race-')
+const base = tempDir('cw-bundled-race-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
@@ -111,7 +111,7 @@ async function older(): Promise<{ ws: string; w: ReturnType<typeof wsMod.createW
 }
 
 /** Combwork's swap leftovers (dot-names) in a folder: there should be none once a sync is over. */
-const leftovers = (dir: string): string[] => readdirSync(dir).filter((f) => /\.hive-(new|old|back)-/.test(f))
+const leftovers = (dir: string): string[] => readdirSync(dir).filter((f) => /\.cw-(new|old|back)-/.test(f))
 
 describe('a skill changed while Combwork updates it', () => {
   it('edited while the new version is copied: the edit stays, the update is abandoned', async () => {
@@ -155,7 +155,7 @@ describe('a skill changed while Combwork updates it', () => {
   it('written to after it was moved aside (a file left open): put back as the user has it', async () => {
     const t = await older()
     hooks.afterRename = (from, to) => {
-      if (from.toLowerCase() !== t.skill.toLowerCase() || !/\.hive-old-/.test(to)) return false
+      if (from.toLowerCase() !== t.skill.toLowerCase() || !/\.cw-old-/.test(to)) return false
       writeFileSync(join(to, 'SKILL.md'), OLD_HANDOVER + 'LATE EDIT\n')
       return true
     }
@@ -170,8 +170,8 @@ describe('a skill changed while Combwork updates it', () => {
     const t = await older()
     let old = ''
     hooks.afterRename = (from, to) => {
-      if (from.toLowerCase() === t.skill.toLowerCase() && /\.hive-old-/.test(to)) old = to
-      if (!old || !/\.hive-new-/.test(from) || to.toLowerCase() !== t.skill.toLowerCase()) return false
+      if (from.toLowerCase() === t.skill.toLowerCase() && /\.cw-old-/.test(to)) old = to
+      if (!old || !/\.cw-new-/.test(from) || to.toLowerCase() !== t.skill.toLowerCase()) return false
       writeFileSync(join(old, 'SKILL.md'), OLD_HANDOVER + 'LATEST EDIT\n')
       return true
     }
@@ -186,8 +186,8 @@ describe('a skill changed while Combwork updates it', () => {
     const t = await older()
     let old = ''
     hooks.afterRename = (from, to) => {
-      if (from.toLowerCase() === t.skill.toLowerCase() && /\.hive-old-/.test(to)) old = to
-      if (!old || !/\.hive-new-/.test(from) || to.toLowerCase() !== t.skill.toLowerCase()) return false
+      if (from.toLowerCase() === t.skill.toLowerCase() && /\.cw-old-/.test(to)) old = to
+      if (!old || !/\.cw-new-/.test(from) || to.toLowerCase() !== t.skill.toLowerCase()) return false
       writeFileSync(join(old, 'SKILL.md'), 'OLD COPY EDIT')
       writeFileSync(join(t.skill, 'SKILL.md'), 'NEW COPY USER EDIT')
       return true
@@ -205,13 +205,13 @@ describe('a skill changed while Combwork updates it', () => {
     let t = await older()
     let old = ''
     const editOldAfterPublish = (from: string, to: string): boolean => {
-      if (from.toLowerCase() === t.skill.toLowerCase() && /\.hive-old-/.test(to)) old = to
-      if (!old || !/\.hive-new-/.test(from) || to.toLowerCase() !== t.skill.toLowerCase()) return false
+      if (from.toLowerCase() === t.skill.toLowerCase() && /\.cw-old-/.test(to)) old = to
+      if (!old || !/\.cw-new-/.test(from) || to.toLowerCase() !== t.skill.toLowerCase()) return false
       writeFileSync(join(old, 'SKILL.md'), 'EDITED OLD')
       return true
     }
     hooks.afterRename = editOldAfterPublish
-    hooks.failRename = (from, to) => from.toLowerCase() === t.skill.toLowerCase() && /\.hive-back-/.test(to)
+    hooks.failRename = (from, to) => from.toLowerCase() === t.skill.toLowerCase() && /\.cw-back-/.test(to)
     await t.sync()
     expect(conflictText(join(t.ws, '.combwork', 'skills'), 'handover')).toEqual(['EDITED OLD'])
     expect(existsSync(join(t.skill, 'SKILL.md'))).toBe(true)
@@ -223,7 +223,7 @@ describe('a skill changed while Combwork updates it', () => {
     t = await older()
     old = ''
     hooks.afterRename = editOldAfterPublish
-    hooks.failRename = (from, to) => /\.hive-old-/.test(from) && to.toLowerCase() === t.skill.toLowerCase()
+    hooks.failRename = (from, to) => /\.cw-old-/.test(from) && to.toLowerCase() === t.skill.toLowerCase()
     await t.sync()
     expect(conflictText(join(t.ws, '.combwork', 'skills'), 'handover')).toEqual(['EDITED OLD'])
     expect(await fsutil.contentHash(t.skill)).toBe(await fsutil.contentHash(join(RES, 'skills', 'handover')))
@@ -252,7 +252,7 @@ describe('a retired persona changed while Combwork removes it (#259)', () => {
     const chosen = async () => (await wsMod.inWorkspace(t.w, () => t.w.projectConfig(t.w.assistantHome))).agents.find((a) => a.id === 'assistant')?.mode
     return { ...t, retired: mode, chosen }
   }
-  const movedAside = (to: string) => /\.overseer\.md\.hive-old-/.test(to)
+  const movedAside = (to: string) => /\.overseer\.md\.cw-old-/.test(to)
 
   it('untouched: it goes, and the Assistant moves to Coordinator', async () => {
     const t = await retiring()
@@ -368,7 +368,7 @@ describe('a mode changed while Combwork updates it', () => {
     t = await older()
     await onlyMode(t)
     hooks.afterRename = (from, to) => {
-      if (from.toLowerCase() !== t.mode.toLowerCase() || !/\.hive-old-/.test(to)) return false
+      if (from.toLowerCase() !== t.mode.toLowerCase() || !/\.cw-old-/.test(to)) return false
       writeFileSync(to, OLD_PLANNER + 'LATE EDIT\n')
       return true
     }
@@ -389,8 +389,8 @@ describe('a mode edited twice while Combwork updates it', () => {
     writeFileSync(manifest, JSON.stringify(m))
     let old = ''
     hooks.afterRename = (from, to) => {
-      if (from.toLowerCase() === t.mode.toLowerCase() && /\.hive-old-/.test(to)) old = to
-      if (!old || !/\.hive-new-/.test(from) || to.toLowerCase() !== t.mode.toLowerCase()) return false
+      if (from.toLowerCase() === t.mode.toLowerCase() && /\.cw-old-/.test(to)) old = to
+      if (!old || !/\.cw-new-/.test(from) || to.toLowerCase() !== t.mode.toLowerCase()) return false
       writeFileSync(old, 'OLD MODE EDIT')
       writeFileSync(t.mode, 'NEW MODE EDIT')
       return true
@@ -409,16 +409,16 @@ describe('after a crash in a swap', () => {
     const t = await older()
     const skills = join(t.ws, '.combwork', 'skills')
     rmSync(t.skill, { recursive: true, force: true })
-    mkdirSync(join(skills, '.handover.hive-old-1-5'))
-    writeFileSync(join(skills, '.handover.hive-old-1-5', 'SKILL.md'), 'ORIGINAL USER EDIT')
-    mkdirSync(join(skills, '.handover.hive-back-1-5'))
-    writeFileSync(join(skills, '.handover.hive-back-1-5', 'SKILL.md'), 'BACKUP USER EDIT')
+    mkdirSync(join(skills, '.handover.cw-old-1-5'))
+    writeFileSync(join(skills, '.handover.cw-old-1-5', 'SKILL.md'), 'ORIGINAL USER EDIT')
+    mkdirSync(join(skills, '.handover.cw-back-1-5'))
+    writeFileSync(join(skills, '.handover.cw-back-1-5', 'SKILL.md'), 'BACKUP USER EDIT')
     // A backup that is just a version Combwork shipped is Combwork's: removed.
-    cpSync(join(RES, 'skills', 'pick-up'), join(skills, '.pick-up.hive-back-1-6'), { recursive: true })
+    cpSync(join(RES, 'skills', 'pick-up'), join(skills, '.pick-up.cw-back-1-6'), { recursive: true })
     await t.sync()
     expect(readFileSync(join(t.skill, 'SKILL.md'), 'utf8')).toBe('ORIGINAL USER EDIT')
     expect(conflictText(skills, 'handover')).toEqual(['BACKUP USER EDIT'])
-    expect(existsSync(join(skills, '.pick-up.hive-back-1-6'))).toBe(false)
+    expect(existsSync(join(skills, '.pick-up.cw-back-1-6'))).toBe(false)
     expect(leftovers(skills)).toEqual([])
     await wsMod.disposeWorkspaceService(t.w)
   })
@@ -428,15 +428,15 @@ describe('after a crash in a swap', () => {
     const skills = join(t.ws, '.combwork', 'skills')
     const modes = join(t.ws, '.combwork', 'modes')
     // handover in place, with an old copy beside it that the user had edited; pick-up's old copy is Combwork's own.
-    mkdirSync(join(skills, '.handover.hive-old-1-1'))
-    writeFileSync(join(skills, '.handover.hive-old-1-1', 'SKILL.md'), 'USER WORK')
-    cpSync(join(RES, 'skills', 'pick-up'), join(skills, '.pick-up.hive-old-1-2'), { recursive: true })
-    writeFileSync(join(modes, '.planner.md.hive-old-1-3'), 'USER MODE WORK')
+    mkdirSync(join(skills, '.handover.cw-old-1-1'))
+    writeFileSync(join(skills, '.handover.cw-old-1-1', 'SKILL.md'), 'USER WORK')
+    cpSync(join(RES, 'skills', 'pick-up'), join(skills, '.pick-up.cw-old-1-2'), { recursive: true })
+    writeFileSync(join(modes, '.planner.md.cw-old-1-3'), 'USER MODE WORK')
     await t.sync()
     const conflict = readdirSync(skills).find((f) => f.startsWith('handover-conflict-'))
     expect(conflict).toBeDefined()
     expect(readFileSync(join(skills, conflict!, 'SKILL.md'), 'utf8')).toBe('USER WORK')
-    expect(existsSync(join(skills, '.pick-up.hive-old-1-2'))).toBe(false)
+    expect(existsSync(join(skills, '.pick-up.cw-old-1-2'))).toBe(false)
     const modeConflict = readdirSync(modes).find((f) => /^planner-conflict-.*\.md$/.test(f))
     expect(modeConflict && readFileSync(join(modes, modeConflict), 'utf8')).toBe('USER MODE WORK')
     expect(leftovers(skills)).toEqual([])

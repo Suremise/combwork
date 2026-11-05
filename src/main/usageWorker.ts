@@ -16,10 +16,10 @@ import { newUsageParser, parserShape, restoreParser, saveParser, type RawUsagePa
 
 /**
  * The usage worker (#1106): a thread of its own that keeps each workspace's usage history (usageDb.ts), so reading the
- * CLIs' transcripts never holds up Hive's main process. It reads only what a transcript added since it was last read,
+ * CLIs' transcripts never holds up Combwork's main process. It reads only what a transcript added since it was last read,
  * taking up the parser's saved state; makes the session's rows (shared/usageLedger.ts) and writes them with its own
  * node:sqlite connection to `.combwork/usage.db`, one short transaction a session (WAL: main and other readers never wait for
- * it; another Hive's worker on the same workspace waits up to db.ts's busy timeout, and a session it recorded meanwhile
+ * it; another Combwork's worker on the same workspace waits up to db.ts's busy timeout, and a session it recorded meanwhile
  * is left as it wrote it). It answers main's queries on that file too, so main never opens it. Jobs run one at a time,
  * in the order main sends them (main keeps the queue and its priorities, usageHistory.ts); queries are answered at once,
  * between a job's reads. It also reads a transcript's usage so far for main (#1147: a running session's footer and
@@ -28,7 +28,7 @@ import { newUsageParser, parserShape, restoreParser, saveParser, type RawUsagePa
  */
 
 export interface IngestJob extends SessionMeta {
-  /** The file to read (the CLI's transcript, or Hive's backup of it), as main found it; null when it has none. */
+  /** The file to read (the CLI's transcript, or Combwork's backup of it), as main found it; null when it has none. */
   path: string | null
   /** The cards the session's agent held (main works them out from the board). */
   holds: SessionHold[]
@@ -123,7 +123,7 @@ function close(file: string): void {
 }
 
 /**
- * Each file's wait to be openable before its first open (HI-2200, as the board's HI-2199): just after a Hive ended
+ * Each file's wait to be openable before its first open (HI-2200, as the board's HI-2199): just after a Combwork ended
  * without quitting, another process can still map its `-shm`, and every open fails until it lets go. Here, in the
  * worker, the wait holds no one's typing; the file's requests wait with it. A close of the file meanwhile ends the wait,
  * marks it closed and lets it go, and the requests that waited on it are refused (the file isn't opened again for a
@@ -297,7 +297,7 @@ function inTurn<T>(path: string, fn: () => Promise<T>): Promise<T> {
 
 /**
  * A session's saved parser state, when it was made from this file's bytes: the same path, at least as long, its bytes
- * before the offset as they were (a file that shrank and grew again between reads is another), by this Hive's parser.
+ * before the offset as they were (a file that shrank and grew again between reads is another), by this Combwork's parser.
  * A compressed backup (#1110) is finished and read whole: no state for it.
  */
 async function takeUp(cur: ReturnType<typeof cursorOf>, path: string, size: number, provider: ProviderId, session: string): Promise<{ parser: RawUsageParser; from: number } | null> {
@@ -318,9 +318,9 @@ const readResult = (c: ReadEntry, reportsIgnored = false): ReadResult => {
 
 /**
  * What a transcript used so far, for main (#1147): unchanged since it was last read, as it was; else what it added, fed
- * to its parser. One not read in this run (Hive restarted, a session resumed) takes its session's saved state up from the
+ * to its parser. One not read in this run (Combwork restarted, a session resumed) takes its session's saved state up from the
  * history (`seed`), so only what was added since is read; without one, it is read from the start, here, never in main.
- * Null when it can't be read, or for a provider this Hive can't read.
+ * Null when it can't be read, or for a provider this Combwork can't read.
  */
 async function readUsage(path: string, session: string, provider: ProviderId, seed: ReadSeed | null, noWait = false, reportsIgnored = false): Promise<ReadResult | null> {
   // A start's read (#1177) never queues behind the file's turn (the import ingesting it): it gets nothing instead.
@@ -370,7 +370,7 @@ async function readUsage(path: string, session: string, provider: ProviderId, se
 /**
  * Records what a session used from its file: unchanged since it was read, nothing (its cards re-shared from what is stored
  * when their holds changed); else from where it was left (its parser's saved state, made from this file's bytes), or from
- * the start (no state of this parser's shape and Hive's version, a file that shrank or is another). Usage history is only
+ * the start (no state of this parser's shape and Combwork's version, a file that shrank or is another). Usage history is only
  * added to (#1106 round 3): what it read replaces the session's rows when it counts at least as much, every day, in each
  * count; when it doesn't (a backup that lags the transcript it replaced, a rewritten file), what the rows counted becomes
  * part of the session's baseline, which no write goes below, so both are kept. `failed`: the file couldn't be read (it
@@ -475,7 +475,7 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   const due = !isGz(job.path) && (job.keepState === 'now' || (job.keepState === 'running' && (!now?.stateAt || Date.now() - Date.parse(now.stateAt) >= STATE_EVERY_MS)))
   const w: SessionWrite = {
     ...job,
-    // An external session a record now has is Hive's; one recorded as Hive's stays so.
+    // An external session a record now has is Combwork's; one recorded as Combwork's stays so.
     source: job.external && (!now || now.source === 'external') ? 'external' : 'transcript',
     path: job.path,
     size: st.size,

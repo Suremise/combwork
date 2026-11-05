@@ -16,7 +16,7 @@ import { tempDir } from './tempDir'
 // As on GitHub's runner (#447): the temp folder by its 8.3 short name where it has one (git lists worktrees by their long
 // names; a junction makes another name on any machine, #448), and no global git config (tests/noGlobalGit.ts), so no
 // user identity but the repository's own.
-const made = tempDir('hive-unusedwt-')
+const made = tempDir('cw-unusedwt-')
 const base = shortPath(made) ?? made
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })
@@ -30,7 +30,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
   return { ...real, git: ((cwd, args, ...rest) => (failing?.(args) ? failed() : real.git(cwd, args, ...rest))) as typeof real.git }
 })
 
-const { PREVIEW_MS, hiveWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, setQueueNeed, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
+const { PREVIEW_MS, combworkWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, setQueueNeed, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
 const { createWorktree } = await import('../src/main/worktrees')
 const { addAgent, reserveForRemoval, worktreeChecks } = await import('../src/main/projectAgents')
 const { gitTestHooks } = await import('../src/main/git')
@@ -314,7 +314,7 @@ describe('listing', () => {
     const copy = join(root, 'copies', `copy-${++n}`)
     const q = join(root, `queue-0123456789ab-ef${n}`)
     const plain = await tree(`plain${n}`)
-    const of = (path: string): Promise<'copy' | 'queue' | null> => run(async () => hiveWorktreeOf(proj, path))
+    const of = (path: string): Promise<'copy' | 'queue' | null> => run(async () => combworkWorktreeOf(proj, path))
     expect(await of(copy)).toBe('copy')
     // As git may list it: another case, the other slash.
     expect(await of(copy.toUpperCase().replace(/\\/g, '/'))).toBe('copy')

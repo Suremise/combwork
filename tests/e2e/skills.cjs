@@ -203,9 +203,9 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await pick.count()) === 1, 10000)
   const pickOptions = await pick.locator('option').allInnerTexts()
   check('project tab: a dropdown of the providers, starting on the default one', pickOptions.length === 2 && pickOptions[0].startsWith('Claude Code') && pickOptions[1].startsWith('Codex') && (await pick.inputValue()) === 'claude-code', JSON.stringify({ pickOptions, value: await pick.inputValue() }))
-  const hiveToggle = page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first()
+  const combworkToggle = page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first()
   const providerToggle = page.locator('.skill-provider-toggle')
-  check('project tab: Combwork skills at the top, open', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1)
+  check('project tab: Combwork skills at the top, open', (await combworkToggle.getAttribute('aria-expanded')) === 'true' && (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1)
   check('…then that provider’s skills only, folded', (await page.locator('.skill-provider').count()) === 1 && /claude code skills/i.test(await providerToggle.innerText()) && (await providerToggle.getAttribute('aria-expanded')) === 'false' && (await page.locator('.skill-provider .skill-group', { hasText: 'Local' }).count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'skills-project-folded.png') })
   await providerToggle.click()
@@ -230,7 +230,7 @@ const check = (name, ok, extra = '') => {
   // The dropdown's choice and what is open are kept for the project: away from the tab and back, and in the saved
   // preferences (here: Codex, its skills open, Combwork's folded).
   await pick.selectOption('codex')
-  await hiveToggle.click()
+  await combworkToggle.click()
   await page.keyboard.press('Alt+1')
   await sleep(300)
   await lib.openMoreTab(page, 'Skills')
@@ -238,7 +238,7 @@ const check = (name, ok, extra = '') => {
   const saved = await inv('ui:get')
   const savedPick = saved.skillsProvider ?? {}
   check('the provider shown is remembered for the project', (await pick.inputValue()) === 'codex' && savedPick[proj.toLowerCase()] === 'codex', JSON.stringify({ value: await pick.inputValue(), savedPick }))
-  check('…and which groups are open', (await hiveToggle.getAttribute('aria-expanded')) === 'false' && (await providerToggle.getAttribute('aria-expanded')) === 'true' && JSON.stringify(saved.skillsFold?.[proj.toLowerCase()]) === JSON.stringify({ hive: false, provider: true }), JSON.stringify(saved.skillsFold))
+  check('…and which groups are open', (await combworkToggle.getAttribute('aria-expanded')) === 'false' && (await providerToggle.getAttribute('aria-expanded')) === 'true' && JSON.stringify(saved.skillsFold?.[proj.toLowerCase()]) === JSON.stringify({ hive: false, provider: true }), JSON.stringify(saved.skillsFold))
 
   // A local skill is edited in place (not preview) and can be deleted there.
   const localRow = page.locator('.skill-provider').first().locator('.skill-row', { hasText: 'lint-rules' })
@@ -249,14 +249,14 @@ const check = (name, ok, extra = '') => {
   check('local skill deleted in the project tab', !fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules')) && fs.existsSync(path.join(proj, '.claude', 'skills', 'lint-rules')))
 
   // "Edit in workspace" on a Combwork skill opens it in the Skills view, in the editor. Combwork's group unfolded first.
-  await hiveToggle.click()
-  check('the Combwork group unfolds', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && !!(await lib.until(async () => (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1, HUNG_MS)))
-  const hiveRow = page.locator('.skill-row', { hasText: 'workspace-note' }).first()
-  await hiveRow.click()
+  await combworkToggle.click()
+  check('the Combwork group unfolds', (await combworkToggle.getAttribute('aria-expanded')) === 'true' && !!(await lib.until(async () => (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1, HUNG_MS)))
+  const combworkRow = page.locator('.skill-row', { hasText: 'workspace-note' }).first()
+  await combworkRow.click()
   await lib.until(async () => (await page.locator('.split .editor-toolbar', { hasText: 'workspace-note' }).count()) === 1, 5000)
   check('project tab: a Combwork skill (view only) has no warning', (await page.locator('.skills-warning').count()) === 0)
-  await hiveRow.hover()
-  await hiveRow.locator('button[aria-label^="Edit in the workspace"]').click()
+  await combworkRow.hover()
+  await combworkRow.locator('button[aria-label^="Edit in the workspace"]').click()
   // The project tab's row for the same skill stays in the DOM, hidden and selected, and the Skills view draws its own row
   // once its list is read (#717). Counting both, the old check passed at once on the hidden row and then read once: 1
   // while the Skills view's list wasn't drawn yet, 2 (a failure) once it was, which under load it was by the read. Only a

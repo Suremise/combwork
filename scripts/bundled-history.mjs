@@ -1,4 +1,4 @@
-// Records each version of Hive's bundled skills, modes and dialect files (resources/skills, resources/modes,
+// Records each version of Combwork's bundled skills, modes and dialect files (resources/skills, resources/modes,
 // resources/dialects/<folder>/*.json, HI-2439) in src/main/bundledHistory.json, oldest first, so a workspace's untouched copy of an older version can be told from one
 // the user changed (src/main/bundled.ts). Run it after changing a bundled skill, mode or dialect file: `npm run bundled-history`
 // (tests/bundled.test.ts fails until the current versions are recorded). Entries are only ever appended.
@@ -30,7 +30,7 @@ function filesOnDisk(path) {
   const walk = (rel) => {
     for (const e of readdirSync(rel ? join(path, rel) : path, { withFileTypes: true })) {
       const r = rel ? `${rel}/${e.name}` : e.name
-      // contentHash() counts a link as one (never following it); Hive ships none, so none may be recorded either.
+      // contentHash() counts a link as one (never following it); Combwork ships none, so none may be recorded either.
       if (e.isSymbolicLink()) throw new Error(`${path}/${r} is a link: bundled skills and modes are plain files`)
       if (e.isDirectory()) walk(r)
       else if (e.isFile() && !SKIP.has(e.name)) files.push([r, readFileSync(join(path, r))])

@@ -343,7 +343,7 @@ export interface RunDetail {
 }
 
 /**
- * Everything Hive has for a run, in the order its details show it: what ran (its title and command), who (agent,
+ * Everything Combwork has for a run, in the order its details show it: what ran (its title and command), who (agent,
  * project, provider), when it started and ended (in the user's date and time format), how long against what was
  * expected, its steps, its state and why, the exit code and a log the reporter named. `project` is its project's name.
  */
@@ -388,7 +388,7 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
   if (r.testedCheckout && r.testedCheckout !== r.revision) out.push({ label: tr(msg({ id: 'board.details.testedOn', defaultMessage: 'Tested on', description: "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)." })), text: r.testedCheckout, code: true })
   // The folder it ran in, as its reporter said (#1446): the run's own, never where its agent works now.
   if (r.folder) out.push({ label: tr(msg({ id: 'board.details.folder', defaultMessage: 'Folder', description: "A label in a run's details (Progress panel): the folder it ran in follows (a path), as it was when it ran." })), text: r.folder, code: true })
-  // The review or check copy it ran in (#1435): an isolated check's, or a reviewer's, at exactly that revision; Hive's
+  // The review or check copy it ran in (#1435): an isolated check's, or a reviewer's, at exactly that revision; Combwork's
   // setup run in one too (HI-1710), credited to the agent whose lease held it.
   if (r.copy) out.push({ label: tr(msg({ id: 'board.details.copy', defaultMessage: 'Copy', description: "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Combwork keeps at exactly the card's revision, which nothing else writes." })), text: r.copy })
   // How it counted as a check of its card's revision (#1222, SPEC §16.13), once it finished.
@@ -437,10 +437,10 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
 }
 
 /**
- * Who ran a run, as the window shows it (#872): a name Hive gave it (`defaultName`: "Script" for a script, "Agent" for
+ * Who ran a run, as the window shows it (#872): a name Combwork gave it (`defaultName`: "Script" for a script, "Agent" for
  * a kept run with no name, "Hive (merge queue)" for the queue's own runs, #1349, "Hive (slot <name>)" for a slot's warming,
  * #1429) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
- * too. The stored name stays English: agents read it through the Agent API and hive-progress.
+ * too. The stored name stays English: agents read it through the Agent API and cw-progress.
  */
 export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'>, tr: Tr): string {
   if (r.defaultName === 'script') return tr(msg({ id: 'board.progress.script', defaultMessage: 'Script', description: "Who ran a run in the Progress panel when a script (a program calling Combwork's Agent API) ran it, not an agent." }))

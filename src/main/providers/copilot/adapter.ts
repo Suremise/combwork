@@ -28,9 +28,9 @@ import { agentMsg, say } from '../../../shared/agentText'
 const log = createLogger('copilot')
 
 /**
- * The hooks Hive gives Copilot, by their PascalCase names: with those, Copilot sends Claude Code-style payloads
- * (hook_event_name, session_id, tool_name, tool_input), which Hive's hook server reads as they are. Each is an HTTP hook
- * to Hive's hook server (Copilot allows plain http to localhost with COPILOT_HOOK_ALLOW_LOCALHOST=1), so no shell or
+ * The hooks Combwork gives Copilot, by their PascalCase names: with those, Copilot sends Claude Code-style payloads
+ * (hook_event_name, session_id, tool_name, tool_input), which Combwork's hook server reads as they are. Each is an HTTP hook
+ * to Combwork's hook server (Copilot allows plain http to localhost with COPILOT_HOOK_ALLOW_LOCALHOST=1), so no shell or
  * curl is involved. Not PermissionRequest: Copilot sends it also when it approves a call itself (Allow all), so it says
  * nothing about a person being asked; Notification (permission_prompt, elicitation_dialog) does. Checked with 1.0.93.
  */
@@ -48,11 +48,11 @@ export const toolNamesLine = (): string => say(TOOL_NAMES, { server: TOOLS_SERVE
 /** Copilot's file tools, as its hooks name them (Edit: path, old_str, new_str; Write: path, file_text; 1.0.93). */
 const EDIT_TOOL = /^(edit|write|create|str_replace\w*|multi_?edit)$/i
 
-/** The hooks.json of the launch's plugin: Hive's hook server for every event, with the launch's token. */
+/** The hooks.json of the launch's plugin: Combwork's hook server for every event, with the launch's token. */
 export function copilotHooks(hookUrl: string, token: string): Record<string, unknown> {
   const hooks: Record<string, unknown[]> = {}
   for (const ev of HOOK_EVENTS) {
-    // PreToolUse answers with a file-lock decision, so it gets longer; if Hive doesn't answer in time, the call goes ahead.
+    // PreToolUse answers with a file-lock decision, so it gets longer; if Combwork doesn't answer in time, the call goes ahead.
     // Both are advanced settings (#367).
     hooks[ev] = [{ type: 'http', url: hookUrl, headers: { Authorization: `Bearer ${token}` }, timeoutSec: advanced.number(ev === 'PreToolUse' ? 'copilot.hooks.preToolUseTimeoutSeconds' : 'copilot.hooks.timeoutSeconds') }] // i18n-ignore: an HTTP header Copilot sends
   }
@@ -63,7 +63,7 @@ export function copilotHooks(hookUrl: string, token: string): Record<string, unk
  * Why a Copilot model call it tries again failed, from its message (HI-1973, `copilot.retry.message`'s named groups): the
  * HTTP status (a valid one only, 100–599), or 429 for a rate limit's words (Copilot 1.0.105's hook gives the service's
  * own error body, with no status: "Rate limit reached for requests"), and whether its service couldn't be reached.
- * None: a failure Hive can't name.
+ * None: a failure Combwork can't name.
  */
 export function copilotRetryOf(message: string): { status: number | null; network: boolean } {
   const m = advanced.pattern('copilot.retry.message').exec(message)
@@ -71,7 +71,7 @@ export function copilotRetryOf(message: string): { status: number | null; networ
   return { status: Number.isInteger(status) && status >= 100 && status <= 599 ? status : m?.groups?.limited ? 429 : null, network: !!m?.groups?.network }
 }
 
-/** A workspace MCP server (Claude Code's JSON format, as Hive keeps them) in Copilot's mcp-config format. */
+/** A workspace MCP server (Claude Code's JSON format, as Combwork keeps them) in Copilot's mcp-config format. */
 export function copilotMcpServer(def: McpServerDef): Record<string, unknown> | null {
   if (typeof def.url === 'string' && def.url) {
     return { type: def.type === 'sse' ? 'sse' : 'http', url: def.url, ...(def.headers ? { headers: def.headers } : {}), tools: ['*'] }
@@ -116,7 +116,7 @@ function readJsonc(path: string): Record<string, any> {
   }
 }
 
-/** MCP servers in one of Copilot's config files ({ mcpServers } or VS Code's { servers }), as Hive's definitions. */
+/** MCP servers in one of Copilot's config files ({ mcpServers } or VS Code's { servers }), as Combwork's definitions. */
 function mcpServersIn(file: string): Record<string, McpServerDef> {
   const j = readJsonc(file)
   const servers = j.mcpServers ?? j.servers
@@ -135,7 +135,7 @@ export class CopilotAdapter implements ProviderAdapter {
    */
   private readonly questions = new Map<string, string>()
   /**
-   * A parent Copilot session's identity, when Hive runs inside one: none known. The sign-in tokens Copilot would use are
+   * A parent Copilot session's identity, when Combwork runs inside one: none known. The sign-in tokens Copilot would use are
    * taken out of Copilot's own environment instead (home.ts COPILOT_ENV_STRIP): this list applies to every child.
    */
   readonly envToStrip: string[] = []
@@ -186,7 +186,7 @@ export class CopilotAdapter implements ProviderAdapter {
     return copilotUpdateRetry(executable, exitCode)
   }
 
-  /** Copilot's own sign-in, run in a terminal for the user to complete (never typed into by Hive). */
+  /** Copilot's own sign-in, run in a terminal for the user to complete (never typed into by Combwork). */
   loginCommand(executable: string): CommandSpec {
     return copilotLoginCommand(executable)
   }
@@ -207,7 +207,7 @@ export class CopilotAdapter implements ProviderAdapter {
     return isProviderEnabled(config.settings, this.id) ? readCopilotModels(executable, env) : Promise.resolve(null)
   }
 
-  /** The model in Copilot's own settings.json (or COPILOT_MODEL), which it runs unless Hive passes one. */
+  /** The model in Copilot's own settings.json (or COPILOT_MODEL), which it runs unless Combwork passes one. */
   configuredDefaultModel(): string | null {
     const m = process.env.COPILOT_MODEL || readJsonc(join(copilotHome(), 'settings.json')).model
     return typeof m === 'string' && m.trim() ? m.trim() : null
@@ -222,7 +222,7 @@ export class CopilotAdapter implements ProviderAdapter {
   // Launch
   // -------------------------------------------------------------------------
 
-  /** Copilot reads Hive's copies in the project's .agents/skills, shared with Codex (syncAgentsSkills). */
+  /** Copilot reads Combwork's copies in the project's .agents/skills, shared with Codex (syncAgentsSkills). */
   skillCopyPath(ctx: LaunchContext, skill: string): string {
     return agentsSkillCopyPath(ctx.cwd, skill)
   }
@@ -238,8 +238,8 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   /**
-   * This launch's custom instructions: the Hive Assistant's role and mode, and Hive's guidance when Copilot won't show
-   * the hive server's instructions (their switch off, #1167: without --allow-all-mcp-server-instructions it leaves them
+   * This launch's custom instructions: the Combwork Assistant's role and mode, and Combwork's guidance when Copilot won't show
+   * the combwork server's instructions (their switch off, #1167: without --allow-all-mcp-server-instructions it leaves them
    * out, whatever the server is called), then the Workspace notes note (#1433).
    */
   private customInstructions(ctx: LaunchContext): string {
@@ -261,7 +261,7 @@ export class CopilotAdapter implements ProviderAdapter {
     }
     // The servers' own env and headers may hold secrets: the launch's private folder, never the project (#345).
     await writeJsonAtomic(join(ctx.privateDir, 'mcp.json'), { mcpServers: servers })
-    // The Hive Assistant's role and mode. Hive's guidance itself comes with the hive MCP server's instructions, which
+    // The Combwork Assistant's role and mode. Combwork's guidance itself comes with the combwork MCP server's instructions, which
     // Copilot shows with --allow-all-mcp-server-instructions; with that switched off, here too (customInstructions).
     const custom = this.customInstructions(ctx)
     if (custom) {
@@ -272,7 +272,7 @@ export class CopilotAdapter implements ProviderAdapter {
     return delivered
   }
 
-  /** MCP servers Copilot would load besides Hive's: the user's own, the project's, and its built-in GitHub ones. */
+  /** MCP servers Copilot would load besides Combwork's: the user's own, the project's, and its built-in GitHub ones. */
   private otherMcpServers(cwd: string): string[] {
     const names = new Set<string>()
     for (const f of [join(copilotHome(), 'mcp-config.json'), join(cwd, '.mcp.json'), join(cwd, '.github', 'mcp.json')]) for (const n of Object.keys(mcpServersIn(f))) names.add(n)
@@ -284,27 +284,27 @@ export class CopilotAdapter implements ProviderAdapter {
     if (ctx.resume) args.push('--resume', assertSessionId(ctx.sessionId))
     else {
       args.push('--session-id', assertSessionId(ctx.sessionId))
-      // Through cmd.exe (a launcher Hive can't start directly), its special characters can't be passed safely.
+      // Through cmd.exe (a launcher Combwork can't start directly), its special characters can't be passed safely.
       if (ctx.name) args.push('--name', runsThroughCmd(executable) ? ctx.name.replace(/["%^&|<>!]/g, ' ').replace(/\s+/g, ' ').trim() : ctx.name)
     }
     args.push('--plugin-dir', this.pluginDir(ctx))
     args.push('--additional-mcp-config', `@${join(ctx.privateDir, 'mcp.json')}`)
-    // Hive's guidance is the hive MCP server's instructions: Copilot includes only allowlisted servers' without this.
+    // Combwork's guidance is the combwork MCP server's instructions: Copilot includes only allowlisted servers' without this.
     if (launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions')) args.push('--allow-all-mcp-server-instructions')
     // Only the workspace's MCP servers, as for the other CLIs: Copilot's built-in GitHub servers and the user's and the
-    // project's own are turned off for Hive's sessions (never by editing their config). Switched off (#1281), they load
+    // project's own are turned off for Combwork's sessions (never by editing their config). Switched off (#1281), they load
     // too: the --additional-mcp-config servers win over Copilot's own of the same name (1.0.100), hive included, and are
-    // never disabled by name (--disable-mcp-server <name> would turn Hive's off with the user's).
+    // never disabled by name (--disable-mcp-server <name> would turn Combwork's off with the user's).
     if (launchOverrides(ctx.overrides, COPILOT, 'mcpIsolation')) {
       args.push('--disable-builtin-mcps')
       for (const name of this.otherMcpServers(ctx.cwd)) if (!ctx.mcpServers[name]) args.push('--disable-mcp-server', name)
     }
-    // Hive's own tools run without asking in every mode, as for the other CLIs: the Agent API decides what an agent may
-    // do with them. The Assistant only the ones its Control settings let it use without asking (trustedHiveTools).
+    // Combwork's own tools run without asking in every mode, as for the other CLIs: the Agent API decides what an agent may
+    // do with them. The Assistant only the ones its Control settings let it use without asking (trustedCombworkTools).
     // Copilot's patterns: <server> for all its tools, <server>(<tool>) for one (#468).
     // Switched off (#1281), none: Copilot asks per its own mode.
     if (ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, COPILOT, 'preApproveCombworkTools')) {
-      if (ctx.trustedHiveTools) for (const t of ctx.trustedHiveTools) args.push(`--allow-tool=${TOOLS_SERVER}(${t})`)
+      if (ctx.trustedCombworkTools) for (const t of ctx.trustedCombworkTools) args.push(`--allow-tool=${TOOLS_SERVER}(${t})`)
       else args.push(`--allow-tool=${TOOLS_SERVER}`)
     }
     if (ctx.model) args.push('--model', ctx.model)
@@ -318,13 +318,13 @@ export class CopilotAdapter implements ProviderAdapter {
     }
     args.push(...noAutoUpdateArgs(launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate')))
     // Never --mouse or --no-mouse (#737): Copilot saves either into the user's own settings (~/.copilot/settings.json),
-    // changing their Copilot outside Hive. It keeps its own mouse handling: Shift+drag makes the terminal's selection.
+    // changing their Copilot outside Combwork. It keeps its own mouse handling: Shift+drag makes the terminal's selection.
     args.push(...ctx.extraArgs)
     // A first task: Copilot starts interactive and runs it (after the folder-trust question, if it asks one).
     if (ctx.initialPrompt) args.push('-i', promptArg(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
     const env = copilotEnv(ctx.env, launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate'), launchOverrides(ctx.overrides, COPILOT, 'stripGitHubTokens'))
-    // Hive's hook server is plain http on 127.0.0.1, which Copilot allows for hooks only with this.
+    // Combwork's hook server is plain http on 127.0.0.1, which Copilot allows for hooks only with this.
     env.COPILOT_HOOK_ALLOW_LOCALHOST = '1'
     if (this.customInstructions(ctx)) {
       const own = this.instructionsDir(ctx)
@@ -432,13 +432,13 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   /**
-   * The launch's hooks (HI-982): Hive's, as its launch plugin passes them (copilotHooks). Copilot may load others too
-   * (the folder's, its own plugins'), which Hive doesn't read: said so, never listed as none.
+   * The launch's hooks (HI-982): Combwork's, as its launch plugin passes them (copilotHooks). Copilot may load others too
+   * (the folder's, its own plugins'), which Combwork doesn't read: said so, never listed as none.
    */
   launchHooks(ctx: LaunchContext): LaunchHooks {
     const token = ctx.env.CW_HOOK_TOKEN ?? ''
-    const hive = rowsOfHooksTable(copilotHooks(ctx.hookUrl, token).hooks, { source: 'plugin', status: 'passed', observed: true }, [token])
-    const rows = hive.rows.map((r) => ({ ...r, source: 'combwork' as const }))
+    const combwork = rowsOfHooksTable(copilotHooks(ctx.hookUrl, token).hooks, { source: 'plugin', status: 'passed', observed: true }, [token])
+    const rows = combwork.rows.map((r) => ({ ...r, source: 'combwork' as const }))
     return { listing: { basis: 'launch', rows, notes: [{ kind: 'othersUnread' }] }, receivers: Object.fromEntries(rows.map((r) => [r.event, r.type])) }
   }
 
@@ -589,13 +589,13 @@ export class CopilotAdapter implements ProviderAdapter {
 
   /**
    * Copilot reads skills from its own folder and ~/.agents/skills, and in a project from .github/skills, .agents/skills
-   * (where Hive's copies are, shared with Codex) and .claude/skills: first found by name wins.
+   * (where Combwork's copies are, shared with Codex) and .claude/skills: first found by name wins.
    */
   skillRoots(): SkillRoots {
-    return { machine: [join(copilotHome(), 'skills'), join(homedir(), '.agents', 'skills')], plugins: join(copilotHome(), 'installed-plugins'), local: [join('.github', 'skills'), AGENTS_SKILLS, join('.claude', 'skills')], hiveCopyPrefix: 'cw-' }
+    return { machine: [join(copilotHome(), 'skills'), join(homedir(), '.agents', 'skills')], plugins: join(copilotHome(), 'installed-plugins'), local: [join('.github', 'skills'), AGENTS_SKILLS, join('.claude', 'skills')], combworkCopyPrefix: 'cw-' }
   }
 
-  /** Servers in the project's .github/mcp.json, which Hive leaves off until copied to the workspace. */
+  /** Servers in the project's .github/mcp.json, which Combwork leaves off until copied to the workspace. */
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {
     return mcpServersIn(join(projectPath, '.github', 'mcp.json'))
   }

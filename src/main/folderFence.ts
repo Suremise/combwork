@@ -3,8 +3,8 @@ import { createLogger, userText } from './logger'
 
 /**
  * Folders being changed under the agents working in them (#646): a Git action that switches the project folder's branch
- * or pulls into it, and anything else that rewrites a folder's files at once (1.0's merges Hive does itself). While one
- * runs, Hive starts no turn there of its own: nothing is typed into an agent working in that folder (lineWriter, so every
+ * or pulls into it, and anything else that rewrites a folder's files at once (1.0's merges Combwork does itself). While one
+ * runs, Combwork starts no turn there of its own: nothing is typed into an agent working in that folder (lineWriter, so every
  * delivery: messages, wakes, loop wakes, tasks) and no agent starts or resumes there (sessions' launch); both wait for it.
  * A fence lasts as long as what it guards (`changingFolder`), never longer. What the user types into a terminal can't be
  * held. In memory: an operation runs in one process.
@@ -33,7 +33,7 @@ export const inFolder = (path: string, folder: string): boolean => {
 
 /**
  * Runs `fn` with `folder` fenced: no Hive-sent line is typed and no agent starts in it until `fn` settles. The fence is
- * up before `fn` starts, so a check `fn` makes first (an agent there busy?) can't be overtaken by a turn Hive starts.
+ * up before `fn` starts, so a check `fn` makes first (an agent there busy?) can't be overtaken by a turn Combwork starts.
  */
 export async function changingFolder<T>(folder: string, what: string, fn: () => Promise<T>): Promise<T> {
   let release!: () => void
@@ -56,7 +56,7 @@ export async function changingFolder<T>(folder: string, what: string, fn: () => 
   }
 }
 
-/** What is changing the folder `path` is in now (null: nothing): Hive types nothing into an agent working there. */
+/** What is changing the folder `path` is in now (null: nothing): Combwork types nothing into an agent working there. */
 export function folderChanging(path: string | null | undefined): string | null {
   if (!path) return null
   for (const f of fences) if (inFolder(path, f.folder)) return f.what

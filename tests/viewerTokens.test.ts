@@ -18,14 +18,14 @@ afterEach(() => {
 
 /** The viewer tokens module fresh, on an empty profile of its own (its tokens are kept in memory once read). */
 async function fresh() {
-  const profile = tempDir('hive-viewer-tokens-')
+  const profile = tempDir('cw-viewer-tokens-')
   dirs.push(profile)
   vi.resetModules()
   // Electron's mock as these fresh modules import it.
   const electron = await import('electron')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
   const { createViewerToken } = await import('../src/main/viewerTokens')
-  const { HiveError, windowError } = await import('../src/main/hiveError')
+  const { CombworkError, windowError } = await import('../src/main/combworkError')
   // The i18n these modules use: a test's language is set here, on the same instance.
   const { setLanguage } = await import('../src/shared/i18n')
   putBack = () => setLanguage('en', {})
@@ -34,7 +34,7 @@ async function fresh() {
     try {
       await p
     } catch (e) {
-      expect(e).toBeInstanceOf(HiveError)
+      expect(e).toBeInstanceOf(CombworkError)
       return { english: (e as Error).message, shown: (windowError(e) as Error).message }
     }
     throw new Error('not refused')

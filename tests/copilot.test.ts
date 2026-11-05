@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 
 // Payloads and screens as Copilot CLI 1.0.93 sent and drew them (the #403 spike), with paths shortened.
 
-const base = tempDir('hive-copilot-')
+const base = tempDir('cw-copilot-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 // Never the user's ~/.copilot: the adapter reads its mcp-config.json and settings.json.
 process.env.COPILOT_HOME = join(base, 'copilot-home')
@@ -95,7 +95,7 @@ describe('Copilot footer and modes', () => {
 
 describe('Copilot launch', () => {
   it('starts a new session under the id Combwork chose, with its hooks, MCP servers and modes', () => {
-    const ctx = context({ model: 'claude-sonnet-5.5', effort: 'high', trustedHiveTools: ['cw_list_tasks', 'cw_read_task'], initialPrompt: 'Fix the bug' })
+    const ctx = context({ model: 'claude-sonnet-5.5', effort: 'high', trustedCombworkTools: ['cw_list_tasks', 'cw_read_task'], initialPrompt: 'Fix the bug' })
     const { file, args, env } = copilot.buildCommand(ctx.executable, ctx)
     expect(file).toBe('C:\\bin\\copilot.exe')
     expect(args.slice(0, 4)).toEqual(['--session-id', ctx.sessionId, '--name', 'Agent 1'])
@@ -115,7 +115,7 @@ describe('Copilot launch', () => {
     expect(COPILOT_ENV_STRIP).toEqual(['GH_TOKEN', 'GITHUB_TOKEN'])
     expect(env?.COPILOT_GITHUB_TOKEN).toBe('github_pat_x')
     expect(env).toMatchObject({ PATH: 'C:\\Windows', CW_HOOK_TOKEN: 'tok123', COPILOT_HOOK_ALLOW_LOCALHOST: '1', COPILOT_AUTO_UPDATE: 'false' })
-    // Its custom instructions: the hive tools' names (#1530).
+    // Its custom instructions: the Combwork tools' names (#1530).
     expect(env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(ctx.privateDir, 'instructions'))
     // The token never goes on the command line.
     expect(args.join(' ')).not.toContain('tok123')
@@ -125,9 +125,9 @@ describe('Copilot launch', () => {
     const allow = (over: Partial<LaunchContext>) => copilot.buildCommand('x.exe', context(over)).args.filter((a) => a.startsWith('--allow-tool='))
     expect(allow({})).toEqual(['--allow-tool=combwork'])
     expect(allow({ permissionMode: 'plan' })).toEqual(['--allow-tool=combwork'])
-    expect(allow({ trustedHiveTools: [] })).toEqual([])
-    expect(allow({ trustedHiveTools: ['cw_read_task'] })).toEqual(['--allow-tool=combwork(cw_read_task)'])
-    // No hive server, nothing to approve.
+    expect(allow({ trustedCombworkTools: [] })).toEqual([])
+    expect(allow({ trustedCombworkTools: ['cw_read_task'] })).toEqual(['--allow-tool=combwork(cw_read_task)'])
+    // No combwork server, nothing to approve.
     expect(allow({ mcpServers: {} })).toEqual([])
   })
 
@@ -225,7 +225,7 @@ describe('Copilot launch', () => {
 
   it('takes its exit grace from Settings → Advanced (copilot.exit.graceSeconds), at each stop (#727)', async () => {
     const { stopWaitMs } = await import('../src/main/sessions')
-    advanced.load(tempDir('hive-copilot-advanced-'))
+    advanced.load(tempDir('cw-copilot-advanced-'))
     try {
       expect(copilot.exitKeys.graceMs).toBe(10_000)
       await advanced.set('copilot.exit.graceSeconds', 25)
@@ -295,7 +295,7 @@ describe('Copilot hooks', () => {
     const [pre, notification, post] = readFileSync(join(__dirname, 'fixtures', 'advanced', 'question-copilot-1.0.105.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l) as Record<string, unknown>)
     const asked = (message: string) => ({ kind: 'ask', ask: { kind: 'question', blocking: true, message } })
     // Overridden in a profile of its own, never the user's.
-    beforeAll(() => advanced.load(tempDir('hive-copilot-question-')))
+    beforeAll(() => advanced.load(tempDir('cw-copilot-question-')))
     afterAll(async () => {
       await advanced.set('copilot.question.tool', null)
       await advanced.set('copilot.question.field', null)

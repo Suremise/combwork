@@ -44,7 +44,7 @@ export const DEV_SEAMS = [
   'CW_TEST_UPGRADE_HOLD', 'CW_TEST_WAKE_TAKE_MS'
 ]
 /**
- * The seams a packaged Combwork honours too, when quiet (#1253: lib.hiveEnv starts every test copy quiet), among them the two
+ * The seams a packaged Combwork honours too, when quiet (#1253: lib.combworkEnv starts every test copy quiet), among them the two
  * every test copy is given, CW_TEST_TIPS and CW_TEST_TRASH_DIR (#1599: takesTestSeams in src/main/testQuiet.ts).
  */
 export const PACKAGED_SEAMS = ['CW_TEST_ASK_LEFTOVERS', 'CW_TEST_DIALOG_SNAPSHOT', 'CW_TEST_NOTIFY_LOG', 'CW_TEST_QUIET', 'CW_TEST_TIPS', 'CW_TEST_TOKEN_LOG', 'CW_TEST_TRASH_DIR']

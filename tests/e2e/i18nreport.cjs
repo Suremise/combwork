@@ -123,7 +123,7 @@ app.whenReady().then(() => {
   const main = path.join(dir, 'main.js')
   fs.writeFileSync(page0, PAGE)
   fs.writeFileSync(main, MAIN)
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [main], cwd: dir, env: lib.hiveEnv({ CW_USER_DATA: path.join(dir, 'profile') }), timeout: 20000 })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [main], cwd: dir, env: lib.combworkEnv({ CW_USER_DATA: path.join(dir, 'profile') }), timeout: 20000 })
   try {
     const page = await app.firstWindow()
     await page.waitForLoadState('load')

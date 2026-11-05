@@ -12,7 +12,7 @@ import { estimateFor, evictionOrder, KEEP_KEYS, ProgressRun, progressTarget, rec
 import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, KEEPALIVE_MS, keepAliveDue, parseArgs, parseProcessList, replyTimeoutMs, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted, type WrapperIo } from '../src/main/progressReporters/wrapper'
 import { installShims, shimFiles, withBinOnPath } from '../src/main/progressReporters/shims'
 import { removeOldShims } from '../src/main/nameUpgradeProfile'
-import { hiveInstructions, progressRule, wrapsLongCommands } from '../src/shared/hiveGuidance'
+import { combworkInstructions, progressRule, wrapsLongCommands } from '../src/shared/combworkGuidance'
 import { STALE_GRACE_MS } from '../src/shared/progress'
 import { launchParts } from '../src/main/guidance'
 import { tempDir } from './tempDir'
@@ -20,7 +20,7 @@ import { tempDir } from './tempDir'
 type Identity = { pid: number; started: number }
 const { identify, stillSame, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Identity[]; stillSame: (ids: Identity[]) => number[]; endExactly: (ids: Identity[]) => number }
 
-const dir = tempDir('hive-progress-')
+const dir = tempDir('cw-progress-')
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 // Nothing under test may end the test's own process (#547: a worker once exited mid-file, dropping 19 tests): a call
 // to process.exit fails the test that made it, with where it came from.
@@ -943,16 +943,16 @@ describe("agents told to run long commands through hive-progress (Settings → G
     expect(wrapsLongCommands({ progressPanel: true, progressCommands: true })).toBe(true)
     expect(wrapsLongCommands({ progressPanel: true, progressCommands: false })).toBe(false)
     expect(wrapsLongCommands({ progressPanel: false, progressCommands: true })).toBe(false)
-    expect(hiveInstructions('web')).toContain(progressRule(true))
+    expect(combworkInstructions('web')).toContain(progressRule(true))
     expect(progressRule(true)).toMatch(/over 30 s.*in the background too.*`cw-progress --title "<what and why, in a few words>" -- <command>`/)
-    expect(hiveInstructions('web', 'agent', false)).toContain(progressRule(false))
+    expect(combworkInstructions('web', 'agent', false)).toContain(progressRule(false))
     expect(progressRule(false)).toMatch(/only when the user asks/)
-    expect(hiveInstructions('', 'assistant')).not.toMatch(/hive-progress/)
+    expect(combworkInstructions('', 'assistant')).not.toMatch(/hive-progress/)
   })
 
   it("a launch's guidance is measured as the contract it got, either way", () => {
     for (const on of [true, false]) {
-      const parts = launchParts(`${hiveInstructions('web', 'agent', on)}\nLatest.`, 'agent', 'web', null)
+      const parts = launchParts(`${combworkInstructions('web', 'agent', on)}\nLatest.`, 'agent', 'web', null)
       expect(parts.customChars, String(on)).toBe('\nLatest.'.length)
     }
   })

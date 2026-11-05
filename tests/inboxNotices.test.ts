@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { inboxNotice, noticeCounts } from '../src/shared/doorbell'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-inbox-notices-')
+const base = tempDir('cw-inbox-notices-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

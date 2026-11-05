@@ -42,7 +42,7 @@ vi.mock('fs', async (importOriginal) => {
 
 let dir = ''
 beforeEach(async () => {
-  dir = tempDir('hive-synccopy-')
+  dir = tempDir('cw-synccopy-')
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })

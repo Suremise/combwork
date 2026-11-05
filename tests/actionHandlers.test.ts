@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
 
-const base = tempDir('hive-action-handlers-')
+const base = tempDir('cw-action-handlers-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 
@@ -217,7 +217,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     }
   }
   const stateOf = (ws: string, id: number): string => (store.workspaceDb(ws).reader.prepare('SELECT state FROM card_actions WHERE id = ?').get(id) as { state: string }).state
-  const hiveComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Combwork')
+  const combworkComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Combwork')
 
   it('written once on the card, its English and its message; a run again (after a restart) writes nothing more', async () => {
     const { w, ws } = await open()
@@ -226,7 +226,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, id)).toBe('done')
-    const said = await hiveComments(w, c)
+    const said = await combworkComments(w, c)
     expect(said).toHaveLength(1)
     expect(said[0]).toMatchObject({ id: `action-${id}`, text: expect.stringMatching(/^alpha-\d+ came back from the merge queue: a conflict with main in a\.txt\./), appText: { id: 'tasks.history.queueReturned' } })
     // As a restart would find it: pending again, run again. Its comment is there already (its id): none more.
@@ -234,7 +234,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, id)).toBe('done')
-    expect(await hiveComments(w, c)).toHaveLength(1)
+    expect(await combworkComments(w, c)).toHaveLength(1)
   })
 
   it("a write that fails: the action is recorded failed, never done without its comment; an archived card's is done with none", async () => {
@@ -249,7 +249,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
       notices.noticeTestHooks.commentFails = undefined
     }
     expect(stateOf(ws, id)).toBe('failed')
-    expect(await hiveComments(w, failing)).toHaveLength(0)
+    expect(await combworkComments(w, failing)).toHaveLength(0)
     // Archived since: nothing to say it on, done.
     const c = await newCard(w)
     await inWorkspace(w, () => tasks.archiveTask(c, true))
@@ -257,7 +257,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, gone)).toBe('done')
-    expect(await hiveComments(w, c)).toHaveLength(0)
+    expect(await combworkComments(w, c)).toHaveLength(0)
   })
 })
 
@@ -800,7 +800,7 @@ describe('notices (#1266, §16.11.4)', () => {
     expect(st.notices).toHaveLength(1)
   })
 
-  it('two followers of one board (two Hives) tell an event once', async () => {
+  it('two followers of one board (two Combworks) tell an event once', async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })
     const c = await inReview(w)
@@ -809,7 +809,7 @@ describe('notices (#1266, §16.11.4)', () => {
     notices.noticeTestHooks.hold = true
     try {
       await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Which greeting?' }, b1))
-      // Two looks at once, each reading the marks before either writes (as two Hives would; Combwork opens a workspace once
+      // Two looks at once, each reading the marks before either writes (as two Combworks would; Combwork opens a workspace once
       // per process): the second's board change finds the marks the first moved on.
       await Promise.all([notices.checkLanesNow(w), notices.checkLanesNow(w)])
     } finally {
@@ -859,7 +859,7 @@ async function anotherWorker(): Promise<typeof worker> {
     .replace(/from '(\.\.?\/[^']+)'/g, (_m, rel: string) => `from '${abs(rel)}'`)
     // Runs only when the test asks: no subscription of its own to the board's commits, which would outlive the test.
     .replace(/\nonBoardCommitted\(\(ws\) => \{[\s\S]*$/, '\n')
-  const file = join(tempDir('hive-another-worker-'), 'actionWorker.ts')
+  const file = join(tempDir('cw-another-worker-'), 'actionWorker.ts')
   writeFileSync(file, code)
   return (await import(/* @vite-ignore */ pathToFileURL(file).href)) as typeof worker
 }
@@ -901,7 +901,7 @@ describe('writers at once (#1266 round 3)', () => {
     expect((store.workspaceDb(ws).reader.prepare('SELECT state FROM deliveries WHERE id = ?').get(own.id) as { state: string }).state).toBe('received')
   })
 
-  it('two independent workers (two Hives) never run a repeatable action at once; one whose Combwork ended runs once its lease passes', async () => {
+  it('two independent workers (two Combworks) never run a repeatable action at once; one whose Combwork ended runs once its lease passes', async () => {
     const { w, ws } = await open()
     const c = await newCard(w)
     await settled()

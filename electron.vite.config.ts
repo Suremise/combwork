@@ -8,23 +8,23 @@ const MONACO_DOMPURIFY = /[\\/]monaco-editor[\\/]esm[\\/]vs[\\/]base[\\/]browser
 const MONACO_SANITIZE = /[\\/]monaco-editor[\\/]esm[\\/]vs[\\/]base[\\/]browser[\\/]domSanitize\.js$/
 
 /**
- * Monaco's DOMPurify is Hive's (#1141). monaco-editor 0.57.0 bundles its own copy of DOMPurify 3.4.15 (two IN_PLACE
+ * Monaco's DOMPurify is Combwork's (#1141). monaco-editor 0.57.0 bundles its own copy of DOMPurify 3.4.15 (two IN_PLACE
  * advisories: Monaco doesn't sanitise in place, but the copy ships) and never imports the dompurify package it lists, so
- * package.json's override alone wouldn't change what ships. Its one import, from vs/base/browser/domSanitize.js, is Hive's
+ * package.json's override alone wouldn't change what ships. Its one import, from vs/base/browser/domSanitize.js, is Combwork's
  * dompurify (3.4.17 since HI-2421, the same library two patches on) instead, and a build that would still take Monaco's
  * copy fails. The dev server's pre-bundled Monaco keeps its copy (development only). Remove this and the override once
  * Monaco bundles 3.4.17 or later: tests/monacoDompurify.test.ts fails then to say so.
  */
 export function monacoDompurify(): Plugin {
   return {
-    name: 'hive-monaco-dompurify',
+    name: 'cw-monaco-dompurify',
     enforce: 'pre',
     resolveId(source: string, importer?: string) {
       if (source !== './dompurify/dompurify.js' || !importer || !MONACO_SANITIZE.test(importer)) return null
       return resolve(__dirname, 'node_modules/dompurify/dist/purify.es.mjs')
     },
     load(id: string) {
-      if (MONACO_DOMPURIFY.test(id)) throw new Error(`Monaco's own DOMPurify would be bundled (${id}): see hive-monaco-dompurify in electron.vite.config.ts (#1141)`)
+      if (MONACO_DOMPURIFY.test(id)) throw new Error(`Monaco's own DOMPurify would be bundled (${id}): see cw-monaco-dompurify in electron.vite.config.ts (#1141)`)
       return null
     }
   }
@@ -43,10 +43,10 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           // The scripts agents' sessions run, named for what agents see (HI-2463: cw-*); their sources keep hive-* names.
-          'cw-mcp': resolve(__dirname, 'src/main/mcp/hive-mcp.ts'),
-          'cw-progress': resolve(__dirname, 'src/main/progressReporters/hive-progress.ts'),
+          'cw-mcp': resolve(__dirname, 'src/main/mcp/cw-mcp.ts'),
+          'cw-progress': resolve(__dirname, 'src/main/progressReporters/cw-progress.ts'),
           // The close commands' runner (HI-1368), run as Node outside the asar.
-          'cw-close-runner': resolve(__dirname, 'src/main/closeCommand/hive-close-runner.ts'),
+          'cw-close-runner': resolve(__dirname, 'src/main/closeCommand/cw-close-runner.ts'),
           // The usage history's worker thread (#1106).
           'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
           // The repository lock's worker thread (HI-1680).
@@ -64,7 +64,7 @@ export default defineConfig({
           // Codex's log's worker thread (HI-1972).
           'codex-log-worker': resolve(__dirname, 'src/main/codexLogWorker.ts'),
           // The .hive → .combwork move's card rewrite (HI-2462).
-          'hive-move-worker': resolve(__dirname, 'src/main/hiveMoveWorker.ts')
+          'cw-move-worker': resolve(__dirname, 'src/main/combworkMoveWorker.ts')
         }
       }
     }
@@ -85,10 +85,10 @@ export default defineConfig({
       monacoDompurify(),
       {
         // Codicons' base rule (.codicon[class*='codicon-'] { font: 16px/1 codicon }) comes twice: from
-        // @vscode/codicons at start, and from Monaco when an editor first loads. As plain CSS it ties with Hive's own
+        // @vscode/codicons at start, and from Monaco when an editor first loads. As plain CSS it ties with Combwork's own
         // icon sizes (.activity-btn .codicon …), so whichever loaded last won and every shell icon fell to 16px. Both
-        // copies go in a cascade layer, below Hive's (unlayered) styles: Hive's icon rules win whatever loads when.
-        name: 'hive-codicons-layer',
+        // copies go in a cascade layer, below Combwork's (unlayered) styles: Combwork's icon rules win whatever loads when.
+        name: 'cw-codicons-layer',
         enforce: 'pre',
         transform(code: string, id: string) {
           if (!/[\\/](?:@vscode[\\/]codicons[\\/]dist|ui[\\/]codicons[\\/]codicon)[\\/]codicon\.css(?:\?|$)/.test(id)) return null
@@ -97,7 +97,7 @@ export default defineConfig({
       },
       {
         // The dev server's hot reload needs ws: and localhost; a build connects to nothing.
-        name: 'hive-production-csp',
+        name: 'cw-production-csp',
         apply: 'build',
         transformIndexHtml: (html: string) => html.replace(" connect-src 'self' ws: http://localhost:*", " connect-src 'self'")
       }

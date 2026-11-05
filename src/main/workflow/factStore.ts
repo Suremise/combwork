@@ -1,6 +1,6 @@
 // The fact log's store (SPEC §16.4.1, §16.4.5): facts, the card's stage cache and the durable actions they cause, written
 // in one transaction, so a fact and the move it caused can't diverge and nothing outside happens for a write that
-// rolled back. Observed facts carry a dedupe key, unique per card and kind, so two Hives observing one workspace write
+// rolled back. Observed facts carry a dedupe key, unique per card and kind, so two Combworks observing one workspace write
 // each transition once (§16.17).
 //
 // In the workspace's combwork.db since #1215 (Darren, #1118: "the fact store replaced by combwork.db tables written inside
@@ -8,7 +8,7 @@
 // is one project's: its cards, its lanes, its queue's pauses and its values. It reaches the database one of two ways
 // (HR4's #1215 round 1): on the board's (`forBoard`), its writes are part of the caller's boardWrite only, through the
 // board's own guarded write path, and its reads are the board's, on one snapshot; on a connection of its own (`open`:
-// another Hive, a restart, the runtime's tests), its writes are its own transactions and its reads one snapshot each.
+// another Combwork, a restart, the runtime's tests), its writes are its own transactions and its reads one snapshot each.
 
 import { AsyncLocalStorage } from 'async_hooks'
 import type { DatabaseSync } from 'node:sqlite'
@@ -78,7 +78,7 @@ export interface QueuePause {
   reason: string
   card: string
   files?: string[]
-  /** A process Hive couldn't end (a dead runner's, at a takeover: #1360). */
+  /** A process Combwork couldn't end (a dead runner's, at a takeover: #1360). */
   pid?: number
   /** What git (or a signer) said, for a pause it caused (#1350): its message, in its own words. */
   message?: string
@@ -213,7 +213,7 @@ const lostTx = (): Error => new Error("The fact store's write was undone part wa
 
 /**
  * A connection of the store's own (nothing else uses it): a write is a transaction of its own (BEGIN IMMEDIATE: another
- * Hive's write waits for it), and what the store does inside it (synchronously: nothing else runs meanwhile) is part of
+ * Combwork's write waits for it), and what the store does inside it (synchronously: nothing else runs meanwhile) is part of
  * it; a read outside one is a read transaction of its own, one snapshot.
  */
 class OwnConn implements Conn {
@@ -309,7 +309,7 @@ export class FactStore {
     return new FactStore(boardConn(ws), scope)
   }
 
-  /** A store on a connection of its own to a workspace database's file, opened as the board opens it (another Hive on it; a restart). */
+  /** A store on a connection of its own to a workspace database's file, opened as the board opens it (another Combwork on it; a restart). */
   static open(file: string, scope: Scope): FactStore {
     return new FactStore(new OwnConn(openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: 'workflow' }), true), scope)
   }
@@ -465,7 +465,7 @@ export class FactStore {
     })
   }
 
-  /** None: the paths Hive saw a card's agents edit (its pre-fill, §16.3.3), in the order seen. */
+  /** None: the paths Combwork saw a card's agents edit (its pre-fill, §16.3.3), in the order seen. */
   prefill(id: number): string[] {
     return this.conn.read((db) => (db.prepare("SELECT path FROM card_paths WHERE card = ? AND kind = 'prefill' ORDER BY ord").all(id) as { path: string }[]).map((r) => r.path))
   }
@@ -604,7 +604,7 @@ export class FactStore {
 
   /**
    * The runtime starts a lane of this project (tests/workflow until #1270 wires the app's): lanes.ts's lane of that id,
-   * its cards and reviewer (if given) set, or a new one by Hive when there is none; with the ruleset in force now.
+   * its cards and reviewer (if given) set, or a new one by Combwork when there is none; with the ruleset in force now.
    */
   startLane(id: string, cards: number[], ruleset: string, reviewer?: string, rounds = LOOP_ROUNDS): LaneList {
     this.conn.write((db) => {
@@ -672,7 +672,7 @@ export class FactStore {
 
   /**
    * Pauses a target's queue (`pause`), or resumes it (null). `keep`: only when it isn't paused already, decided in the same
-   * write (HR4's #1351 round 1: Hive's pause never replaces one saved meanwhile, the user's Pause queue say); whether it
+   * write (HR4's #1351 round 1: Combwork's pause never replaces one saved meanwhile, the user's Pause queue say); whether it
    * was written.
    */
   setQueuePause(target: string, pause: QueuePause | null, keep = false): boolean {

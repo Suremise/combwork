@@ -7,7 +7,7 @@ import { overlayTemplateWorkflow, TEMPLATE_PLATFORMS, type TemplateOptions, type
 import { nameTaken, suggestTemplateAgentName } from '../shared/agentNames'
 import { workspaceAgents } from './agentNames'
 import { noteChange } from './assistantChanges'
-import { HiveError } from './hiveError'
+import { CombworkError } from './combworkError'
 import { agentField } from '../shared/advanced'
 import { projectKeyOf } from './projectKeys'
 import { applyConnections, connectionsPlan, listAllTemplates, listTemplates, loadTemplateWith, templatePlanEnglish } from './templates'
@@ -18,14 +18,14 @@ import { checkWorkflowChange, setWorkflowOptions, workflowForm, WorkflowRefused,
 import { workspaceOf } from './workspace'
 
 /**
- * The Hive Assistant's template load through the Agent API (HI-1502, SPEC §16.10.6): its templates listed, a load
+ * The Combwork Assistant's template load through the Agent API (HI-1502, SPEC §16.10.6): its templates listed, a load
  * planned, and loaded with the window's load (templates.ts `loadTemplateWith`: its plan, checks, lock and fence), names
  * given for some of its agents, and its workflow (HI-1910) saved as the project's options, never Git set up. What it
  * changes is recorded for undo (assistantUndo.ts' `undoLoaded`). Its replies and refusals are English: agents read them.
  */
 
 /** A refusal of the Agent API's, in English: its text said where it is made, in the caller's scope. */
-const refused = (text: string, kind: 'invalid' | 'notFound' | 'conflict'): HiveError => new HiveError({ lines: [text] }, { kind })
+const refused = (text: string, kind: 'invalid' | 'notFound' | 'conflict'): CombworkError => new CombworkError({ lines: [text] }, { kind })
 
 /** The template routes' agent text (dialects, HI-2447): refusals and what a load or Choose Connections couldn't do. */
 const T = {
@@ -84,7 +84,7 @@ const rowOf = (e: TemplateEntry): TemplateRow => ({
   ...(e.problem ? { problem: agentField(e.problem, e.problemText) } : {})
 })
 
-/** The templates a project can use (Hive's own, the workspace's and its own), as rows. */
+/** The templates a project can use (Combwork's own, the workspace's and its own), as rows. */
 export async function templateRows(projectPath: string): Promise<TemplateRow[]> {
   return (await listTemplates(projectPath)).map(rowOf)
 }
@@ -229,7 +229,7 @@ async function suggestions(projectPath: string, taken: readonly { name: string; 
 }
 
 /** A load refused for names another project's agent has: each with a free one to give in names. */
-async function takenRefusal(projectPath: string, taken: readonly { name: string; project: string }[], chosen: readonly string[]): Promise<HiveError> {
+async function takenRefusal(projectPath: string, taken: readonly { name: string; project: string }[], chosen: readonly string[]): Promise<CombworkError> {
   const free = await suggestions(projectPath, taken, chosen)
   return refused(say(T.taken, { taken: free.map((t) => say(T.takenOne, { name: t.name, project: t.project, suggestion: t.suggestion })).join('; ') }), 'conflict')
 }
@@ -368,7 +368,7 @@ interface Recorded {
 const kept = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
 /**
- * Loads a template into the project as the Hive Assistant asked (the route's assistantChange holds it): refused first
+ * Loads a template into the project as the Combwork Assistant asked (the route's assistantChange holds it): refused first
  * with a free name for each taken one, and, with `applyWorkflow`, when its workflow needs Git or can't be saved here.
  * The load itself checks its workflow again inside its guard (`check`), on the plan it stages, so the agents and the
  * options saved are one read of the template; the options are saved once the agents are published, against the
@@ -438,7 +438,7 @@ export interface ConnectionsApplyReply {
 const SKIPPED = { running: T.skippedRunning, gone: T.skippedGone } as const
 
 /**
- * Choose Connections… for the Hive Assistant (HI-2109): the project's existing agents given connections by `connections`
+ * Choose Connections… for the Combwork Assistant (HI-2109): the project's existing agents given connections by `connections`
  * (`*`, a role or an agent's name → a connection's id or name), nothing loaded or replaced, each change recorded for undo
  * (as Agent Settings' are) and the guard checked in each agent's write. Every answer is checked first; none given lists
  * the agents and options without changing anything.

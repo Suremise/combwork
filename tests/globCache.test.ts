@@ -42,7 +42,7 @@ describe("import.meta.glob's users and Vitest's module cache", () => {
   })
 
   it('HI-2478: the next cached run sees added and removed matches without changing the glob module', async () => {
-    const dir = tempDir('hive-glob-cache-')
+    const dir = tempDir('cw-glob-cache-')
     const areas = join(dir, 'areas')
     const cache = join(dir, 'module-cache')
     mkdirSync(areas)

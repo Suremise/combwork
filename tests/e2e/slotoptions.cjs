@@ -48,7 +48,7 @@ function board(sql, ...args) {
   lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
   const marker = 'setup-marker.txt'
-  let h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   let { page, inv, app } = h
   const shot = async (name, target) => {
     while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
@@ -241,7 +241,7 @@ function board(sql, ...args) {
     const speak = async (code) => {
       const dir = path.join(lib.ROOT, 'locales', code)
       const messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: messages ? { ...lang, code, locale: code, messages } : lang })
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...lang, code, locale: code, messages } : lang })
       return messages
     }
     await openWorkflow(fx.alpha)
@@ -259,7 +259,7 @@ function board(sql, ...args) {
     fs.writeFileSync(path.join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: 'pair', options: { ...stored, slotsUpToDate: false } } }))
     await h.app.close()
     board("DELETE FROM board_meta WHERE key = 'workflow.slotsUpToDateFromBeforeP7'")
-    h = await q.startHive(fx, { port: PORT, keepOptions: true })
+    h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
     ;({ page, inv, app } = h)
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     check('after the next start, the P6 project’s Pair has G15 On', !!(await until(() => projectJson(beta).workflow.options.slotsUpToDate === true, HUNG_MS)), JSON.stringify(projectJson(beta).workflow))

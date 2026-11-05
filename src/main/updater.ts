@@ -15,7 +15,7 @@ import { testQuiet } from './testQuiet'
 import { installedCopy, runningIdentity } from './buildIdentity'
 import { installDecision, updateDecision, type BuildIdentity } from '../shared/updates'
 import { RELEASES_REPO } from '../shared/defaults'
-import { HiveGitHubProvider } from './updateFeed'
+import { CombworkGitHubProvider } from './updateFeed'
 
 const log = createLogger('updates')
 
@@ -35,7 +35,7 @@ let offered: string | null = null
 
 let state: UpdateState = { status: 'idle', current: app.getVersion() }
 let timer: ReturnType<typeof setInterval> | null = null
-/** The first automatic check, 30 s after Hive starts: cancelled when automatic checks are turned off before it (HI-2324). */
+/** The first automatic check, 30 s after Combwork starts: cancelled when automatic checks are turned off before it (HI-2324). */
 let firstCheck: ReturnType<typeof setTimeout> | null = null
 /** An automatic check (the first one, the 6-hourly one), which runs only while automatic checks are on (HI-2324). */
 const autoCheck = (): void => {
@@ -70,7 +70,7 @@ const testCache = (): string => {
 }
 
 /**
- * A packaged Hive a test started (CW_TEST_QUIET=1, testQuiet: the packaged suites, the Sandbox checks) never checks
+ * A packaged Combwork a test started (CW_TEST_QUIET=1, testQuiet: the packaged suites, the Sandbox checks) never checks
  * GitHub for updates (#1332): each check fetches the release's latest.yml, which counts as a download there. The
  * installed app is never started with it.
  */
@@ -88,7 +88,7 @@ function applySettings(): void {
   // Downloads are started here rather than by electron-updater, so skipped versions and the
   // "download automatically" setting are honoured.
   autoUpdater.autoDownload = false
-  // Hive installs on its own quit (installsOnQuit, at the end of index.ts' quit flow), only once the copy on disk is read
+  // Combwork installs on its own quit (installsOnQuit, at the end of index.ts' quit flow), only once the copy on disk is read
   // and older (#1647): electron-updater's own install on quit never runs.
   autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.allowPrerelease = s.prerelease
@@ -212,7 +212,7 @@ export function restartAndInstall(version?: string): void {
     toast('warning', tr(msg({ id: 'main.update.notInstalled', defaultMessage: "{app} {version} wasn't installed", description: "A notice: the user chose Restart and Update, and Combwork didn't install the downloaded update. {app} is Combwork's name." }), { app: APP_NAME, version: state.version ?? '' }), notInstalledText())
     return
   }
-  // Its notice keeps its button until the quit goes ahead (HI-2425): the quit may still ask, and Cancel leaves Hive
+  // Its notice keeps its button until the quit goes ahead (HI-2425): the quit may still ask, and Cancel leaves Combwork
   // and the offer as they were. markInstalling() says Installing once it does.
   restartForUpdate()
 }
@@ -229,15 +229,15 @@ function notInstalledText(): string {
     : tr(msg({ id: 'main.update.notInstalledNotNewer', defaultMessage: 'The copy installed on this computer is the same version or newer (a local build, say).', description: 'Why Combwork did not install a downloaded update: what is installed is not older than it.' }))
 }
 
-/** Whether Hive's quit installs the downloaded update: Install is automatic, and it may be installed now (mayInstall). */
+/** Whether Combwork's quit installs the downloaded update: Install is automatic, and it may be installed now (mayInstall). */
 export function installsOnQuit(): boolean {
   return state.status === 'ready' && config.settings.updates.install === 'auto' && mayInstall()
 }
 
 /**
  * Called at the very end of quitting (index.ts' quit flow, so never for a quit the user cancelled): Restart and Update
- * (`restart`) installs and opens Hive again; Install automatically, without. Checked again first (mayInstall): the copy
- * on disk read now, and Hive quits without installing when it may not.
+ * (`restart`) installs and opens Combwork again; Install automatically, without. Checked again first (mayInstall): the copy
+ * on disk read now, and Combwork quits without installing when it may not.
  */
 export function installNow(restart = true): void {
   if (!mayInstall()) {
@@ -261,15 +261,15 @@ export function initUpdater(opts: { restart: () => void }): void {
 
   const feed = testFeed()
   if (feed) {
-    // Tests: a generic feed, with its own download cache so the installed Hive's is never touched.
+    // Tests: a generic feed, with its own download cache so the installed Combwork's is never touched.
     const file = join(app.getPath('userData'), 'test-app-update.yml')
     writeFileSync(file, `provider: generic\nurl: ${feed}\nupdaterCacheDirName: ${testCache()}\n`) // i18n-ignore: a file's content, not text
     autoUpdater.updateConfigPath = file
     autoUpdater.forceDevUpdateConfig = true
   } else if (app.isPackaged) {
-    // GitHub's releases through Hive's provider (HI-2311): with pre-releases on, a pre-release install is offered the
+    // GitHub's releases through Combwork's provider (HI-2311): with pre-releases on, a pre-release install is offered the
     // newest version newer by semver (beta, RC or release), not only a later one of its own pre-release name.
-    autoUpdater.setFeedURL({ provider: 'custom', updateProvider: HiveGitHubProvider, ...RELEASES_REPO })
+    autoUpdater.setFeedURL({ provider: 'custom', updateProvider: CombworkGitHubProvider, ...RELEASES_REPO })
   }
 
   autoUpdater.on('update-available', (info: UpdateInfo) => {

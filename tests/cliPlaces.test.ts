@@ -25,7 +25,7 @@ afterEach(() => {
 
 /** A folder with a long name, a junction to it, and its 8.3 name where the volume has one. */
 function place(): { base: string; real: string; via: string; short: string | null } {
-  const base = tempDir('hive-cliplaces-')
+  const base = tempDir('cw-cliplaces-')
   const real = join(base, 'RealFolderWithLongName')
   mkdirSync(real)
   return { base, real, via: junction(real, join(base, 'via-junction')), short: shortPath(real) }

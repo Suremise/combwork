@@ -2,7 +2,7 @@ import type { Account, Connection, ConnectionDefaults, LaunchValues, ProviderId,
 import { permissionLabel, providerDescriptor } from './providers'
 
 /**
- * Hive's accounts (HI-980) and connections (HI-2106): what an account's state is from its two identities, which accounts
+ * Combwork's accounts (HI-980) and connections (HI-2106): what an account's state is from its two identities, which accounts
  * share a login, a workspace's choice of them per provider, and the connections on them that agents choose. Pure, for
  * main and the window alike.
  */
@@ -103,7 +103,7 @@ export interface ConnectionsView {
   /** `key`: a server connection's key is set (HI-1772), its last 4 characters and when; never the key. */
   /** `setUp` (HI-1870): its CLI's first-run setup done in its folder, as last read; null, can't be told; absent, not read yet. */
   /**
-   * The accounts (HI-2106; Hive's folders only, not the CLI's own homes), as today's screens show them until HI-2107:
+   * The accounts (HI-2106; Combwork's folders only, not the CLI's own homes), as today's screens show them until HI-2107:
    * `defaults`, its base connection's model, effort and context.
    */
   connections: (Account & { defaults?: ConnectionDefaults; defaultsFrom?: 'cli'; signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
@@ -123,7 +123,7 @@ export interface ConnectionsView {
   masking?: { state: 'none' | 'pending' | 'ready' | 'unavailable'; gap: boolean; gapSince?: string; full: boolean }
   /**
    * Every account in the one order (HI-2107, decision A), the CLI's own homes too (Copilot's sign-in: decision C), by
-   * id; `connections` has Hive's folders only, and `homes` the rest.
+   * id; `connections` has Combwork's folders only, and `homes` the rest.
    */
   order: string[]
   homes: Account[]
@@ -146,7 +146,7 @@ export function connectionsApply<V extends Pick<ConnectionsView, 'providers' | '
 /**
  * An account's state, from `accepted` (who the user took it on as) and `observed` (the latest check), never merged: a
  * check can't clear a change the user hasn't answered.
- * - `missing`: its folder isn't there (or was replaced by something Hive didn't make).
+ * - `missing`: its folder isn't there (or was replaced by something Combwork didn't make).
  * - `unchecked`: never checked yet.
  * - `failed`: the latest check couldn't tell (a timeout, output it couldn't read): never counted as signed out.
  * - `signedOut`: the CLI said it is signed out.
@@ -296,7 +296,7 @@ export function connectionRef(ref: string, connections: readonly Pick<Account | 
 
 /**
  * What the Agent API shows of a connection (HI-1771), by who asks: never a token, a key, where its login is kept (its
- * folder), its settings or its defaults. `wide` (the user's token, the Hive Assistant): with whether it is on and the
+ * folder), its settings or its defaults. `wide` (the user's token, the Combwork Assistant): with whether it is on and the
  * default in the caller's workspace, and who it is signed in as; a project agent sees the four fields alone, and only
  * for those on in its workspace (connectionsFor).
  */

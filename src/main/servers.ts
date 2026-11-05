@@ -8,7 +8,7 @@ import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachme
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
-import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, CombworkEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { callsMade } from '../shared/activity'
 import { DEFAULT_API_PORT, CW_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
@@ -30,7 +30,7 @@ import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, 
 import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, isolatedRunEnded, takeStopped } from './copiesApp'
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
-import type { HandoverAuthor } from '../shared/hiveGuidance'
+import type { HandoverAuthor } from '../shared/combworkGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
 import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
@@ -55,7 +55,7 @@ import { journalSettingsOf, journalSuggestion } from './journalService'
 import { recordBuild } from './buildFacts'
 import { buildFactOf } from '../shared/buildFacts'
 import type { JournalSettings } from '../shared/journal'
-import { emit, onHiveEvent, toast } from './events'
+import { emit, onCombworkEvent, toast } from './events'
 import { msg, tr } from '../shared/i18n'
 import { addUsageToWatch, cancelWatch, encodeSince, onWatchPlacing, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
 import { USAGE_WATCH_MAX, type UsageWatch } from '../shared/usageWatch'
@@ -97,11 +97,11 @@ import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
-import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
+import { combworkSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { accountOnIn, connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
-import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, hiveAccounts, updateConnection } from './accounts'
+import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, combworkAccounts, updateConnection } from './accounts'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
@@ -127,12 +127,12 @@ import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
 import { hookTokenMatches, refusedHookNote } from './hookTokens'
 import { unusedWorktreeCounts } from './unusedWorktrees'
-import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
+import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
-import { agentError, HiveError, shownError } from './hiveError'
+import { agentError, CombworkError, shownError } from './combworkError'
 import { agentField, agentText, type TextPart } from '../shared/advanced'
 import { storedForAgents } from '../shared/taskHistory'
-import { CONSOLE_KINDS, hiveName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
+import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
 import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
 import { pauseTeam, resumeTeam } from './teamPause'
 import { scanWorkspace } from './teamParked'
@@ -170,15 +170,15 @@ class HttpError extends Error {
     message: string,
     /** More of the reply's body, beside `error` (a conflict's current revision). */
     public extra?: Record<string, unknown>,
-    /** The text of the HiveError it answers (httpFrom), said in the request's dialect (dialects, HI-2440). */
+    /** The text of the CombworkError it answers (httpFrom), said in the request's dialect (dialects, HI-2440). */
     public text?: TextPart
   ) {
     super(message)
   }
 }
 
-/** An error answered with another status: its message, and a HiveError's text, so the reply says it in the caller's dialect. */
-const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => new HttpError(status, (e as Error).message, extra, e instanceof HiveError ? e.text : undefined)
+/** An error answered with another status: its message, and a CombworkError's text, so the reply says it in the caller's dialect. */
+const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => new HttpError(status, (e as Error).message, extra, e instanceof CombworkError ? e.text : undefined)
 
 /** A reply's body as sent: its JSON as it is, whatever names its data uses (a console event's raw payload, #845). */
 export const replyText = (body: unknown): string => (body === undefined ? '' : JSON.stringify(body))
@@ -208,22 +208,22 @@ export async function startHookServer(): Promise<string> {
       // The developer console (#636): a hook refused (an ended launch's, or a wrong token), in every workspace watched.
       // agent-protocol: the developer console's record of a refused hook (a log line)
       devConsole.capture(devConsole.capturedLike('combwork:'), () => ({ kind: 'hook-server', name: 'refused', raw: { statusline: query.has('statusline'), run: !!run }, made: { status: 401 }, summary: `hook refused (${run ? "not this launch's token, or it has ended" : 'no launch named'})` }))
-      // In the log too, once a run (#711): a hook the CLI sent but Hive refused leaves a trace on Hive's side.
+      // In the log too, once a run (#711): a hook the CLI sent but Combwork refused leaves a trace on Combwork's side.
       const note = refusedHookNote(run)
       if (note) log.info(note)
       // agent-protocol: the hook server answers a CLI hook, not an agent
       return send(res, 401, { error: 'unauthorized' })
     }
-    // Tests lose every hook while the file CW_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Hive can't
-    // stop at its end, Copilot), answered as if Hive had taken them; unpackaged builds only.
+    // Tests lose every hook while the file CW_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Combwork can't
+    // stop at its end, Copilot), answered as if Combwork had taken them; unpackaged builds only.
     const drop = !app.isPackaged ? process.env.CW_TEST_DROP_HOOKS : undefined
     if (drop && existsSync(drop)) {
       await readBody(req).catch(() => '')
       return send(res, 200, {})
     }
     let done: (() => void) | null = null
-    // What Hive observes of it, for the launch's Hooks dialog (HI-982): from here, on its own authenticated route, so
-    // a body Hive can't read is recorded too.
+    // What Combwork observes of it, for the launch's Hooks dialog (HI-982): from here, on its own authenticated route, so
+    // a body Combwork can't read is recorded too.
     let obs: HookObservation | null = null
     let step = 'read'
     try {
@@ -249,7 +249,7 @@ export async function startHookServer(): Promise<string> {
         sessions.handleStatusLine(run, body)
         return
       }
-      // A hook about to edit files waits for Hive's file-lock decision (made at once, in the order hooks came); a tool's
+      // A hook about to edit files waits for Combwork's file-lock decision (made at once, in the order hooks came); a tool's
       // end and a Stop that may carry a notice wait for their place in the launch's hook order, where the turn ledger
       // decides whose turn they are (#650: a notice of what is unread, or the drain carrying the turn on); other hooks
       // are answered at once so they never slow the agent down. Each is handled in the launch's order from when it came,
@@ -295,8 +295,8 @@ let apiServer: http.Server | null = null
 let apiToken = ''
 
 /**
- * Who made a request: a caller with the Agent API's token (agents' hive tools, scripts), which Settings → Agent
- * API governs, or a workspace's Hive Assistant with its own token, which Settings → Assistant → Control governs.
+ * Who made a request: a caller with the Agent API's token (agents' Combwork tools, scripts), which Settings → Agent
+ * API governs, or a workspace's Combwork Assistant with its own token, which Settings → Assistant → Control governs.
  */
 /** Who is calling: a script with the workspace token, the Assistant, or a project agent (by its own token). */
 /** An Assistant caller keeps the token it came with: one launch's, which its later work is checked against (#186). */
@@ -353,7 +353,7 @@ interface ApiRequest {
   authenticated: boolean
   /** Answered with a wait (HI-1831: an error status whose body says to ask again): recorded as `waiting`, not a failure. */
   waiting: boolean
-  /** The request's workspace, as far as it was known (the developer console's Hive events). */
+  /** The request's workspace, as far as it was known (the developer console's Combwork events). */
   ws: string | null
 }
 const apiRequests = new WeakMap<ServerResponse, ApiRequest>()
@@ -389,7 +389,7 @@ function apiPort(): number {
 
 export function apiInfo(): AgentApiInfo {
   const s = config.settings.agentApi
-  // With the Agent API off, the server still runs for the Hive Assistant alone.
+  // With the Agent API off, the server still runs for the Combwork Assistant alone.
   const running = s.enabled && !!apiServer?.listening
   return {
     enabled: s.enabled,
@@ -401,13 +401,13 @@ export function apiInfo(): AgentApiInfo {
   }
 }
 
-/** The server's address for the Hive Assistant, which reaches it whether or not the Agent API is turned on. */
+/** The server's address for the Combwork Assistant, which reaches it whether or not the Agent API is turned on. */
 export function assistantApiUrl(): string | null {
   return apiServer?.listening ? `http://127.0.0.1:${apiPort()}` : null
 }
 
 /**
- * Environment passed to an agent's session so it (and its hive tools) can reach the API: the file holding the agent's
+ * Environment passed to an agent's session so it (and its Combwork tools) can reach the API: the file holding the agent's
  * own token for this launch (agentTokens.ts), never the workspace's, so the API knows which project's agent is calling.
  * Never the token itself (HI-2262, Darren's decision): an agent listing its environment printed it (HI-2259).
  */
@@ -415,7 +415,7 @@ export function apiEnv(projectPath: string, agentId: string): Record<string, str
   const info = apiInfo()
   const token = agentToken(projectPath, agentId)
   if (!info.running || !info.url || !token) return {}
-  // How long hive-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
+  // How long cw-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
   return { CW_API_URL: info.url, CW_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),CW_PROGRESS_REPLY_SECONDS: String(advanced.number('cw.progress.replySeconds')) }
 }
 
@@ -577,10 +577,10 @@ async function projectSummary(p: string) {
     // The workspace's MCP servers (HI-2059): all available to the project, those added to it running; `on` is `added`'s
     // old name, kept for 1.0 (deprecated).
     mcp: { available: servers.filter((m) => m.def).map((m) => m.name), added: mcpOn, on: mcpOn },
-    // Its version control, what Hive finds in its folder now, and the switch it offers when they differ (#1419): never
+    // Its version control, what Combwork finds in its folder now, and the switch it offers when they differ (#1419): never
     // switched silently; the user switches it (the Assistant within Control: project.workflow.platform).
     ...(info.platform ? { versionControl: versionControlOf(info.platform) } : {}),
-    // The workflow options in force (#1278), and which the project, the workspace or Hive's settings set.
+    // The workflow options in force (#1278), and which the project, the workspace or Combwork's settings set.
     workflow: await inWorkspace(workspaceOf(p), () => workflowSummary(workspaceOf(p), p)).catch(() => null),
     // The project's configuration; its workflow options are `workflow`'s, resolved (not again here, raw).
     // Its MCP list as what is added (HI-2059), never its stored form (a list not yet converted means something else).
@@ -638,7 +638,7 @@ async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * A change the Hive Assistant asks for: admitted by the Assistant's change boundary (control level, limit), run, and
+ * A change the Combwork Assistant asks for: admitted by the Assistant's change boundary (control level, limit), run, and
  * recorded (its panel's list and combwork.log) with `act`, its kind and targets (#763), and what `fn` adds to them once
  * known (`act`: a new card's number, a new agent). `fn` gets the boundary's guard, to run again as each write is made.
  * Other callers can't make these changes through the API.
@@ -652,7 +652,7 @@ async function assistantChange<T>(need: AssistantControl, what: Said, act: Activ
   const guard = await asRefused(async () => assistant.admit(ws, assistantCallerToken() ?? '', need, what, act))
   try {
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
-    // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
+    // `brief`: the line in Combwork's own words when `done` carries an error's text (#763: the stream never does).
     // Recorded for undo as it is made (#1282): a card's fields as the card is saved, the rest here once it is done.
     const changed = await recordingChanges(ws, act.kind, stored, async () => {
       const out = await fn(guard)
@@ -747,9 +747,9 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 13
+export const API_VERSION = 14
 
-/** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
+/** Who Combwork takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
   const own = assistantCaller()
   if (own) return { role: 'assistant', workspace: basename(own), control: assistant.controlLevel() }
@@ -767,10 +767,10 @@ async function callerInfo(): Promise<Record<string, unknown>> {
 }
 
 /**
- * The request's workspace's Hive skills (null without one), read once its open has brought them up to date, as a launch
+ * The request's workspace's Combwork skills (null without one), read once its open has brought them up to date, as a launch
  * reads them (HI-1781: during the update after an open, a list half copied).
  */
-async function hiveSkillsNow(): Promise<Awaited<ReturnType<typeof skillRevisions>> | null> {
+async function combworkSkillsNow(): Promise<Awaited<ReturnType<typeof skillRevisions>> | null> {
   const ws = contextWorkspace()
   if (!ws) return null
   await ws.itemsUpToDate()
@@ -782,14 +782,14 @@ route('GET', '/v1/status', async () => ({
   app: { name: 'Combwork', version: app.getVersion() },
   api: { version: API_VERSION },
   caller: await callerInfo(),
-  // The guidance this Hive gives sessions, and the request's workspace's Hive skills (null without one).
-  guidance: { revision: GUIDANCE_REVISION, skills: await hiveSkillsNow() },
-  // Hive's words in them in the caller's dialect (dialects, HI-2440).
+  // The guidance this Combwork gives sessions, and the request's workspace's Combwork skills (null without one).
+  guidance: { revision: GUIDANCE_REVISION, skills: await combworkSkillsNow() },
+  // Combwork's words in them in the caller's dialect (dialects, HI-2440).
   providers: Object.fromEntries(Object.entries(providerService.all()).map(([id, info]) => [id, agentInstallInfo(info)])),
   /** The request's workspace (or the only open one); `workspaces` lists every window's. */
   workspace: contextWorkspace()?.path ? { name: basename(contextWorkspace()!.path!), path: contextWorkspace()!.path } : null,
   workspaces: openWorkspaces().map((w) => ({ name: basename(w.path!), path: w.path })),
-  // The Hive Assistant belongs to its workspace, not a project; it sees its own workspace's sessions only.
+  // The Combwork Assistant belongs to its workspace, not a project; it sees its own workspace's sessions only.
   liveSessions: sessions.liveStates().filter((s) => !assistantCaller() || workspaceOf(s.projectPath).path?.toLowerCase() === assistantCaller()).map((s) => ({ workspace: basename(workspaceOf(s.projectPath).path ?? ''), project: workspace.isAssistantHome(s.projectPath) ? null : basename(s.projectPath), agent: s.agentName ?? null, provider: s.provider, sessionId: s.sessionId || null, status: s.status }))
 }))
 
@@ -944,7 +944,7 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
   const act: ActivityTarget = { kind: 'hand-over', project: basename(p), agent: { id: from, name: name(from) }, toAgent: { id: to, name: name(to) } }
   // `allowed`: the Assistant's guard, carried into the hand-over (HI-2420, HR1's round 1): checked before each of its steps.
   const start = async (allowed?: () => void): Promise<void> => {
-    // It can take minutes (the handover is written first): answer now, report failures in Hive.
+    // It can take minutes (the handover is written first): answer now, report failures in Combwork.
     void sessions.handOver(p, from, to, { handover, ...(allowed ? { allowed } : {}) }).catch((e) => {
       handOverFailedToast(p, name(to), e)
       if (own) assistant.record(own, act, sayStored([API.handover.failedLine, { project: basename(p) }]), (e as Error).message, { reason: publicReason(undefined) })
@@ -955,8 +955,8 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
     return { ok: true }
   }
   return assistantChange('agents', [API.change.handOver, { from: name(from), to: name(to), project: basename(p) }], act, async (guard) => {
-    // Known at once rather than minutes later: without Hive's tools agents can't write or read a handover.
-    if (!sessions.hiveMcp(p)) throw new HttpError(409, say(API.handover.noTools))
+    // Known at once rather than minutes later: without Combwork's tools agents can't write or read a handover.
+    if (!sessions.combworkMcp(p)) throw new HttpError(409, say(API.handover.noTools))
     for (const id of [from, to]) {
       if (sessions.userMayBeTyping(p, id)) throw new HttpError(409, say(API.handover.userTyping, { agent: name(id) }))
     }
@@ -972,12 +972,12 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
 })
 
 // ---------------------------------------------------------------------------
-// Agents and projects for the Hive Assistant (Settings → Assistant → Control). Reading is open to every caller.
+// Agents and projects for the Combwork Assistant (Settings → Assistant → Control). Reading is open to every caller.
 // ---------------------------------------------------------------------------
 
 /** The providers agents can run: whether each is on and installed, and its models, effort levels and modes. */
 route('GET', '/v1/providers', async () => {
-  // Installed or not is only known once Hive has looked for the CLIs (#506).
+  // Installed or not is only known once Combwork has looked for the CLIs (#506).
   await providerService.detected()
   const s = config.settings
   const here = contextWorkspace()
@@ -989,7 +989,7 @@ route('GET', '/v1/providers', async () => {
       enabled: isProviderEnabled(s, p.id),
       installed: info.found,
       version: info.version,
-      // The version this Hive release was tested with, and how the installed one compares (#365).
+      // The version this Combwork release was tested with, and how the installed one compares (#365).
       tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : say(API.provider.notInstalled) } : null,
       problem: agentInstallInfo(info).readiness?.find((r) => r.level === 'error')?.message ?? null,
       defaultModel: info.defaultModel ?? null,
@@ -1005,8 +1005,8 @@ route('GET', '/v1/providers', async () => {
   })
 })
 
-// --- Hive's settings (#186): anyone with a token reads them (the settings catalog's entries with their values); only
-// the Hive Assistant changes them, with Settings → Assistant → Control → Change settings on, and never a sensitive one.
+// --- Combwork's settings (#186): anyone with a token reads them (the settings catalog's entries with their values); only
+// the Combwork Assistant changes them, with Settings → Assistant → Control → Change settings on, and never a sensitive one.
 const SETTING_SCOPES: readonly SettingScope[] = ['app', 'provider', 'workspace', 'project']
 
 /** A settings call's project, by name (null without one). */
@@ -1043,7 +1043,7 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
 )
 
 /**
- * A setting the Hive Assistant changes: only with Change settings on, never a sensitive one (its own Control included),
+ * A setting the Combwork Assistant changes: only with Change settings on, never a sensitive one (its own Control included),
  * and listed in its panel with old → new for Revert. Other callers can't.
  */
 async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null) {
@@ -1077,7 +1077,7 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
     if (!assistant.isCurrentToken(ws, token)) throw new SettingRefused(409, say(API.settings.sessionEnded))
   }
   try {
-    // The value as sent (applySetting checks it again): a provider's prices take null, Hive's own, as more than {}.
+    // The value as sent (applySetting checks it again): a provider's prices take null, Combwork's own, as more than {}.
     const r = await applySetting(e, value, projectPath, stillAllowed)
     // What changed, as the list and the reply show it: a table's changed entries, not its size.
     const { oldText, newText } = settingChangeTexts(e, r.old, r.new, r.removed)
@@ -1180,7 +1180,7 @@ function agentMcpArg(body: any): { mcpServers?: string[] | null } {
 
 /** A workspace's connections per CLI, as they apply (dropping ids gone or another CLI's). */
 function workspaceConnections(ws: WorkspaceService): Partial<Record<ProviderId, WorkspaceConnections>> {
-  const all = hiveAccounts()
+  const all = combworkAccounts()
   return Object.fromEntries(PROVIDERS.flatMap((x) => (x.capabilities.connections ? [[x.id, workspaceAccounts(ws.config, x.id, all) ?? { on: [], default: null }]] : [])))
 }
 
@@ -1256,7 +1256,7 @@ function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record
 }
 
 /**
- * Hive's connections as the caller may see them (HI-2108): `connections`, the setups agents choose (a project agent only
+ * Combwork's connections as the caller may see them (HI-2108): `connections`, the setups agents choose (a project agent only
  * those usable in its workspace; the user's token and the Assistant every one, `usable: false` on the rest, with their
  * extra arguments); `accounts`, the sign-ins and servers they are on (a project agent only those on in its workspace: id,
  * name, CLI, kind, signed in; the others with on here and who each is signed in as). Never a token, a key or where a login
@@ -1266,7 +1266,7 @@ route('GET', '/v1/connections', async () => {
   const ws = requireWorkspace()
   const wide = !agentCaller()
   const here = new Set(connectionsHere(ws).map((c) => c.id))
-  const accounts = connectionsFor(hiveAccounts(), workspaceConnections(ws), wide)
+  const accounts = connectionsFor(combworkAccounts(), workspaceConnections(ws), wide)
   return { connections: allConnections().filter((c) => wide || here.has(c.id)).map((c) => connectionRow(c, here.has(c.id), wide)), accounts, usage: accountUsageRows(accounts.map((a) => a.id)) }
 })
 
@@ -1363,7 +1363,7 @@ async function connectionsCall<T>(fn: () => T | Promise<T>): Promise<T> {
     return await fn()
   } catch (e) {
     if (e instanceof HttpError) throw e
-    throw httpFrom(e instanceof HiveError && e.kind === 'notFound' ? 404 : 409, e)
+    throw httpFrom(e instanceof CombworkError && e.kind === 'notFound' ? 404 : 409, e)
   }
 }
 
@@ -1442,7 +1442,7 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
       }
     }
     const said = prompt && didStart ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined
-    // The stream's line is Hive's own words: never why it didn't start.
+    // The stream's line is Combwork's own words: never why it didn't start.
     const started = didStart === true ? 'yes' : didStart === false ? 'no' : 'notAsked'
     const brief: Said = [API.done.addedAgentBrief, { agent: def.name, project, started }]
     return { done: [API.done.addedAgent, { agent: def.name, project, started, error: startError }], said, brief, act: { agent: actAgent(def) }, ...(launched ? { started: { project, agentId: def.id, run: launched } } : {}), result: { agent: addedForAgents(def), project: await projectSummary(p) } }
@@ -1543,7 +1543,7 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
       throw new HttpError(409, say(API.agent.promptBackground, { agent: a.name, tasks: st.backgroundTasks ?? 0, total: String(st.backgroundTasks ?? 0) }))
     }
     if (sessions.userMayBeTyping(p, agentId)) throw new HttpError(409, say(API.agent.promptUserTyping, { agent: a.name }))
-    // A line Hive typed that its CLI hasn't taken (#430): more typing would be lost behind it, or clear it.
+    // A line Combwork typed that its CLI hasn't taken (#430): more typing would be lost behind it, or clear it.
     if (sessions.lineUntaken(p, agentId)) throw new HttpError(409, say(API.agent.promptNotTaken, { agent: a.name }))
     if (agentNowFor(p, agentId).pending) throw new HttpError(409, say(API.agent.promptPending, { agent: a.name }))
     if (fresh) {
@@ -1599,7 +1599,7 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
     if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, say(API.agent.messageNotTyped, { agent: a.name, why: r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}` }))
     const typed = r.fate === 'typed'
     const tied = r.round && card !== undefined ? { tied: 'yes', card: cardRef(card), round: String(r.round) } : { tied: 'no', card: '', round: '' }
-    // Queued: the ways Hive tells it, by the carrying-on switches on for it now (#1497: its project's own, else Settings').
+    // Queued: the ways Combwork tells it, by the carrying-on switches on for it now (#1497: its project's own, else Settings').
     const on = typed ? null : await Promise.all(INBOX_SWITCHES.map((s) => inboxSwitch(p, s)))
     const tells = on ? INBOX_SWITCHES.filter((_s, i) => on[i]) : null
     return { done: [API.done.messaged, { agent: a.name, project: basename(p), id: r.id, typed: typed ? 'yes' : 'no', ...tied }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(tells ? { tells } : {}), ...(r.round ? { round: r.round, ...(card !== undefined ? { card, ...withNames([card]) } : {}) } : {}) } }
@@ -1647,7 +1647,7 @@ const entryId = (raw: string): number => {
   return n
 }
 /**
- * A card link's ref as the journal keeps it (HI-1661): the card's number, as Hive's own facts link it, so an entry the
+ * A card link's ref as the journal keeps it (HI-1661): the card's number, as Combwork's own facts link it, so an entry the
  * Assistant links by key (`HI-12`, an old key, `#12`) is found by the same card's recall and shows its chip. A ref no card
  * has is kept as it was given.
  */
@@ -1694,8 +1694,8 @@ route('DELETE', '/v1/journal/:id', async ({ params }) => {
   return { id, deleted: true }
 })
 
-// A successful build of Hive itself (#1534): scripts/buildFact.mjs, from npm run dist or npm run release, with the
-// workspace token or the agent's own (an agent running the build). Hive writes it into the workspace's journal as its fact.
+// A successful build of Combwork itself (#1534): scripts/buildFact.mjs, from npm run dist or npm run release, with the
+// workspace token or the agent's own (an agent running the build). Combwork writes it into the workspace's journal as its fact.
 route('POST', '/v1/builds', async ({ body }) => {
   const f = buildFactOf(body)
   if ('error' in f) throw new HttpError(400, f.error)
@@ -1717,7 +1717,7 @@ function inboxOwner(): { host: string; agentId: string } {
 route('POST', '/v1/inbox', async ({ body }) => {
   const { host, agentId } = inboxOwner()
   if (body?.read !== undefined && typeof body.read !== 'boolean') throw new HttpError(400, say(API.inbox.readArg))
-  // Its rows name cards by key, for the hive tools' words (#1219).
+  // Its rows name cards by key, for the Combwork tools' words (#1219).
   const named = <T extends { items: InboxItem[] }>(inbox: T) => ({ ...inbox, ...withNames(inbox.items.flatMap((i) => (i.card ? [i.card] : []))) })
   if (body?.ack !== undefined) {
     if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, say(API.inbox.ackArg))
@@ -1775,7 +1775,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     const lastUser = items.map((x) => x.kind).lastIndexOf('user')
     const task = lastUser >= 0 ? items[lastUser] : null
     if (task?.kind === 'user') {
-      // Its last prompt Hive's doorbell (#650: ids only): the task it was last given is the newest one (or handover) delivered.
+      // Its last prompt Combwork's doorbell (#650: ids only): the task it was last given is the newest one (or handover) delivered.
       const given = isDoorbell(task.text) ? (await deliveriesOf(p, agentId)).findLast((r) => r.kind === 'task' || r.kind === 'handover')?.body : undefined
       const text = given ?? task.text
       currentTask = clip(text, lim.task)
@@ -1794,7 +1794,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
   // Where it is now and where a new conversation would start (#1451), each with why in a word.
   const place = await agentPlace(p, a, st ? { cwd: st.cwd } : null)
   const folder = place.now.path
-  // Only while the user may still be typing there (Settings → Assistant → Pause after you type), as Hive itself holds off
+  // Only while the user may still be typing there (Settings → Assistant → Pause after you type), as Combwork itself holds off
   // (HI-2261: kept after their Enter, it read as "the user just typed" and the Assistant wouldn't give the agent work).
   const typed = sessions.userMayBeTyping(p, agentId) ? sessions.userTypedAt(p, agentId) : 0
   const provider = st?.provider ?? agentProvider(a, config.settings)
@@ -1825,7 +1825,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     ...(place.now.slot ? { slot: place.now.slot } : {}),
     branch: place.branch,
     sessionId: sessionId || null,
-    // A long transcript slows the CLI and Hive; handing over to itself (a new conversation) makes it short again.
+    // A long transcript slows the CLI and Combwork; handing over to itself (a new conversation) makes it short again.
     transcriptMB: st?.transcriptBytes !== undefined ? Math.round((st.transcriptBytes / (1024 * 1024)) * 10) / 10 : null,
     transcriptWarnMB: transcriptWarnLimit(info.config, config.settings.sessions.transcriptWarnMB) || null,
     sessionName: st?.sessionName ?? null,
@@ -1852,7 +1852,7 @@ route('GET', '/v1/projects/:name/agents/:agent/activity', async ({ params, query
 /**
  * Whether a launch of an agent (its CW_RUN_ID) is still its running one (#1008): a test run started in an agent's
  * shell records it, and a run waiting for a test slot asks, to say when the holder was left over by a session that has
- * ended (Hive closed, the agent stopped or restarted). Status, as agents' is: open to every caller.
+ * ended (Combwork closed, the agent stopped or restarted). Status, as agents' is: open to every caller.
  */
 route('GET', '/v1/projects/:name/agents/:agent/launches/:run', async ({ params }) => {
   const p = projectByName(params[0])
@@ -1860,13 +1860,13 @@ route('GET', '/v1/projects/:name/agents/:agent/launches/:run', async ({ params }
   return { running: sessions.liveFor(p, id)?.runId === decodeURIComponent(params[2]) }
 })
 
-/** An agent as a wait reads it: a prompt Hive just typed that its CLI hasn't taken yet counts as working (#416). */
+/** An agent as a wait reads it: a prompt Combwork just typed that its CLI hasn't taken yet counts as working (#416). */
 const agentNowFor = (p: string, id: string): AgentNow => sessions.agentNow(p, id) ?? { status: 'stopped', runId: null, prompts: 0, pending: false }
 
 /**
  * Waits until agents stop working (or `timeoutSeconds`, at most 10 minutes): the ones named, else every agent
  * working in the workspace. Answers with each one's status, so the caller sees who finished and who needs the user.
- * `wake: true` (#416): the calling agent or Assistant registers an agent watch instead and ends its turn; Hive types one
+ * `wake: true` (#416): the calling agent or Assistant registers an agent watch instead and ends its turn; Combwork types one
  * line into it when one finishes, waits for the user or stops (main/watches.ts). `cancel: true` ends its watch. Agents'
  * status is open to every caller, as before; another project's agent's reply isn't in a project agent's line.
  */
@@ -1943,22 +1943,22 @@ async function slotAgent(p: string): Promise<SlotAgent> {
 }
 
 /**
- * A claim naming cards Hive merges (each card's own rules, #1354): refused before the slot is touched, as the card's
+ * A claim naming cards Combwork merges (each card's own rules, #1354): refused before the slot is touched, as the card's
  * report merge would be (`merge.combworkMerges`, recorded as Refused, saying where it is in the merge queue). A claim naming
  * no card, or cards the agent merges, is unchanged: the slot stays for agents' merges and the user's own.
  */
-async function refuseHiveMerges(projectPath: string, cards: number[]): Promise<void> {
+async function refuseCombworkMerges(projectPath: string, cards: number[]): Promise<void> {
   if (!cards.length) return
   const wf = await workflowFor(workspace, projectPath).catch(() => null)
   if (!wf) return
   const actor = actorOf(await taskActor())
   for (const n of cards) {
-    const refused = await wf.refuseHiveMerge(`#${n}`, actor, say(API.mergeSlot.moveName))
+    const refused = await wf.refuseCombworkMerge(`#${n}`, actor, say(API.mergeSlot.moveName))
     if (refused) throw new tasks.WorkflowRefusedError(refused)
   }
 }
 
-/** The branch a slot call names, or the one the project folder is on (what Hive's Merge dialog merges into). */
+/** The branch a slot call names, or the one the project folder is on (what Combwork's Merge dialog merges into). */
 async function slotBranchFor(p: string, v: unknown): Promise<string> {
   if (v !== undefined && v !== null) return slotBranch(v)
   const b = await workspace.branch(p)
@@ -1968,7 +1968,7 @@ async function slotBranchFor(p: string, v: unknown): Promise<string> {
 
 const slotCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
   try {
-    // The cards the slot's holders merge, named by key for the hive tools' words (#1219).
+    // The cards the slot's holders merge, named by key for the Combwork tools' words (#1219).
     return withCardsNamed(await fn())
   } catch (e) {
     throw e instanceof MergeSlotError ? httpFrom(e.status, e) : e
@@ -1989,7 +1989,7 @@ route('POST', '/v1/projects/:name/merge-slot/claim', async ({ params, body, sign
     const agent = await slotAgent(p)
     const branch = await slotBranchFor(p, body?.branch)
     const cards = slotCards(cardRefsIn(body?.cards))
-    await refuseHiveMerges(p, cards)
+    await refuseCombworkMerges(p, cards)
     const t = body?.timeoutSeconds
     if (t !== undefined && (typeof t !== 'number' || !Number.isFinite(t) || t < 0)) throw new HttpError(400, say(API.watch.timeoutSeconds))
     const waitMs = t === undefined ? DEFAULT_WAIT_MS : Math.min(MAX_WAIT_MS, t * 1000)
@@ -2026,7 +2026,7 @@ const laneCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
 
 /**
  * A lane reply with `names` for its cards (#1219 round 2, finding 1): on each lane (a list, an ended lane) or on the
- * change (started, joined), for the hive MCP server that words it.
+ * change (started, joined), for the combwork MCP server that words it.
  */
 function lanesNamed<T>(r: T): T {
   const numbersOf = (l: LaneInfo | null | undefined): number[] => (l ? [...l.cards.map((c) => c.number), ...(l.current !== null ? [l.current] : []), ...(l.pausedOn !== null ? [l.pausedOn] : []), ...(l.queued ?? []), ...(l.status?.card != null ? [l.status.card] : [])] : [])
@@ -2093,7 +2093,7 @@ route('GET', '/v1/lanes/next', async () =>
     const a = agentCaller()
     if (!a) throw new HttpError(400, say(API.lane.nextIsAgents))
     const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
-    // Its passed cards Hive merges, each with where it is in the merge queue (#1354): the next waits for them.
+    // Its passed cards Combwork merges, each with where it is in the merge queue (#1354): the next waits for them.
     const queue: { card: number; line: string }[] = []
     for (const c of r.lane.cards.filter((x) => x.column === 'passed')) {
       const line = await queueLineFor(r.lane.project, c.number)
@@ -2128,7 +2128,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   // A project agent registers its own lane: it is the builder.
   const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
   if (!builder) throw new HttpError(403, say(API.lane.agentStartsOwn))
-  // A reviewer Hive doesn't know isn't a reason to refuse a new lane: it starts without one, and its reviewer can join it.
+  // A reviewer Combwork doesn't know isn't a reason to refuse a new lane: it starts without one, and its reviewer can join it.
   // A running lane's start naming one is refused, naming its reviewer (HI-2273: startLane, under its lock).
   let reviewer: string | null | undefined
   let unknownReviewer: string | undefined
@@ -2153,7 +2153,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   if (pool) await checkLanePool(ws, p, builder)
   // `commit`: the Assistant's guard, checked again in the lanes' save (HI-2420).
   const start = async (commit?: () => void) => {
-    // Hive's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
+    // Combwork's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
     // own loop is at work already.
     const release = a ? null : lanes.holdLaneStart(ws, basename(p), builder)
     try {
@@ -2232,7 +2232,7 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     const a = agentCaller()
     const commit = body?.mergeCommit
     if (commit !== undefined && commit !== null && (typeof commit !== 'string' || !/^[0-9a-zA-Z._/-]{4,64}$/.test(commit))) throw new HttpError(400, say(API.lane.mergeCommitArg))
-    // With rules enforced Hive records the merge from the cards' facts (#1270, §16.8.2): an agent's commit is ignored, said.
+    // With rules enforced Combwork records the merge from the cards' facts (#1270, §16.8.2): an agent's commit is ignored, said.
     const ignored = commit && a && (await lanes.lanesEnforced()) ? { note: say(API.lane.mergeCommitIgnored) } : {}
     const end = async (guard?: () => void) => ({ ...(await lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}), ...(guard ? { commit: guard } : {}) })), ...ignored })
     if (!assistantCaller()) return end()
@@ -2393,8 +2393,8 @@ route('POST', '/v1/team/resume', async () => {
   })
 })
 
-/** A held writer as the Agent API lists it (#1561): who holds it, its run and Hive, and the processes Hive lists of it. */
-const publicHeld = (w: HeldRow) => ({ slot: w.slot, agent: w.agentName, run: w.run, hive: w.hive.self ? say(API.slot.heldThisHive) : say(API.slot.heldGone, { pid: String(w.hive.pid) }), processes: w.processes ? { list: w.processes.list.map((p) => ({ pid: p.pid, label: p.label })), more: w.processes.more } : null })
+/** A held writer as the Agent API lists it (#1561): who holds it, its run and Combwork, and the processes Combwork lists of it. */
+const publicHeld = (w: HeldRow) => ({ slot: w.slot, agent: w.agentName, run: w.run, combwork: w.combwork.self ? say(API.slot.heldThisCombwork) : say(API.slot.heldGone, { pid: String(w.combwork.pid) }), processes: w.processes ? { list: w.processes.list.map((p) => ({ pid: p.pid, label: p.label })), more: w.processes.more } : null })
 
 /** Release Slot's refusals (#1561) as the Agent API answers them. */
 const slotRefusal = (e: unknown): unknown => (e instanceof SlotReleaseRefused ? httpFrom(e.status, e) : e)
@@ -2435,7 +2435,7 @@ function workflowArg(body: any): boolean {
   return body?.workflow !== false
 }
 
-// The templates a project can use (HI-1502): Hive's own, the workspace's and its own, a row each.
+// The templates a project can use (HI-1502): Combwork's own, the workspace's and its own, a row each.
 route('GET', '/v1/projects/:name/templates', async ({ params }) => {
   assistantTemplates([API.change.listTemplates])
   const p = projectByName(params[0])
@@ -2615,7 +2615,7 @@ route('GET', '/v1/docs/section', async ({ query }) => {
 })
 
 /**
- * Who is writing a handover, for its header: the Assistant (its own token), or the agent whose hive tools sent
+ * Who is writing a handover, for its header: the Assistant (its own token), or the agent whose Combwork tools sent
  * it (they pass its id and project). Others (scripts, the user) leave no author.
  */
 async function handoverAuthor(body: any): Promise<HandoverAuthor | null> {
@@ -2685,7 +2685,7 @@ async function taskActor(): Promise<tasks.TaskActor> {
  * A card with what its agent is doing now (and its name now), for callers deciding what to do next. `agents` keeps
  * each project's agents for a whole list, so a long board reads each project.json once.
  */
-/** A card's merge-queue line (#1354, queueState.ts), when its project has a workflow and its rules say Hive merges it. */
+/** A card's merge-queue line (#1354, queueState.ts), when its project has a workflow and its rules say Combwork merges it. */
 async function queueLineFor(project: string, n: number): Promise<string | null> {
   try {
     const wf = await workflowFor(workspace, projectByName(project))
@@ -2748,7 +2748,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   // Nobody working on a Doing card: the Assistant reports these and suggests who could take them.
   // Entry ids are the card watches' (#224): left out, so replies stay as lean as before.
   // Its decisions first (#357): what the user decided, which agents follow over the description. Its holds (#602) are
-  // for its cost in Hive's window: left out.
+  // for its cost in Combwork's window: left out.
   const { number, title, decisions, held: _held, ...rest } = c
   // Its running lane, for a card waiting in Review: its lane may be deadlocked (#1410).
   const lane = c.column === 'review' && c.project ? (await lanes.listLanes(workspace, { project: c.project }).catch(() => [])).find((l) => (l.state === 'active' || l.state === 'paused') && l.cards.some((x) => x.number === c.number)) : undefined
@@ -2774,7 +2774,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
     stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
   }
-  // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
+  // A review whose reviewer has gone or isn't running (Combwork ends those, but one can show while that happens).
   if (c.review && c.project) {
     try {
       const p = projectByName(c.project)
@@ -2796,7 +2796,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const k = cardKind(workspace, c.number)
   // Whether it skips review (#1625), and an agent's proposal of it not answered yet: additive, only when there is one.
   const rs = cardReviewSkip(workspace, c.number)
-  // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Hive merges it.
+  // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Combwork merges it.
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
   // A code card's checks before review and how to run one (HI-2276): additive, only when its rules name some.
   const checks = c.project && !c.archived ? await checksFor(c.project, c.number) : null
@@ -2858,7 +2858,7 @@ async function withAttachments<T>(paths: string[] | null, project: string | null
 /** A change's lines for the files it attached (HI-1700): stored, or already kept with the card (the same bytes). */
 const attachedLines = (c: TaskCard & { attached?: { name: string; path: string; added: boolean }[] }): string[] => (c.attached ?? []).map((a) => `${a.added ? say(API.attachment.attached) : say(API.attachment.alreadyAttached)}: ${a.name} (${a.path})`)
 
-/** The short reply a hive tool asks for (reply: "short") instead of the whole card or column. */
+/** The short reply a Combwork tool asks for (reply: "short") instead of the whole card or column. */
 const shortReply = (body: any): boolean => body?.reply === 'short'
 
 /**
@@ -2923,7 +2923,7 @@ function withCardsNamed<T>(reply: T): T {
   return reply && typeof reply === 'object' && !Array.isArray(reply) && found.length ? { ...reply, ...withNames(found) } : reply
 }
 
-/** How a reply's text names these cards (#1219), for the hive MCP server that words it: `names`, or nothing. */
+/** How a reply's text names these cards (#1219), for the combwork MCP server that words it: `names`, or nothing. */
 const withNames = (numbers: number[]): { names?: Record<string, string> } => {
   const names = namesOf(numbers)
   return names ? { names } : {}
@@ -3345,7 +3345,7 @@ const taskWaits = new Map<string, number>()
 const WAITS_PER_CALLER = 2
 
 /**
- * Waiting on cards (#128). `wake: true`: the calling agent (or the Assistant) registers a watch and ends its turn; Hive
+ * Waiting on cards (#128). `wake: true`: the calling agent (or the Assistant) registers a watch and ends its turn; Combwork
  * types one line into it when a watched card changes (main/watches.ts). `cancel: true`: ends its watch. Otherwise the
  * call waits itself, up to its longest (Settings → Advanced, #367), for a change since `since` (or since the call), driven by the board's
  * change events (no polling). A project agent waits only on its own project's cards.
@@ -3358,7 +3358,7 @@ function readUsageWatch(v: unknown, ws: WorkspaceService): UsageWatch[] {
   const shape = say(API.watch.usageShape)
   if (!Array.isArray(v) || !v.length) throw new HttpError(400, shape)
   if (v.length > USAGE_WATCH_MAX) throw new HttpError(400, say(API.watch.usageMax, { max: String(USAGE_WATCH_MAX) }))
-  const seen = agentCaller() ? hiveAccounts().filter((a) => accountOnIn(ws.config, a, allAccounts())) : hiveAccounts()
+  const seen = agentCaller() ? combworkAccounts().filter((a) => accountOnIn(ws.config, a, allAccounts())) : combworkAccounts()
   return v.map((x: { account?: unknown; percent?: unknown; limit?: unknown }) => {
     if (!x || typeof x !== 'object' || typeof x.account !== 'string') throw new HttpError(400, shape)
     const percent = Number(x.percent)
@@ -3562,7 +3562,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
           })
       }
       const timer = setTimeout(() => void check().then(done, () => (life.aborted ? onClose() : done({ changes: [], now: start }))), limitMs)
-      const off = onHiveEvent((e) => {
+      const off = onCombworkEvent((e) => {
         if (e.type === 'tasks-changed' && e.workspacePath.toLowerCase() === wsPath.toLowerCase()) run()
       })
       life.addEventListener('abort', onClose, { once: true })
@@ -3780,7 +3780,7 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
 
-// An agent asks the Hive Assistant on a card (HI-1866): its comment, and the Assistant's inbox. An agent's alone: the
+// An agent asks the Combwork Assistant on a card (HI-1866): its comment, and the Assistant's inbox. An agent's alone: the
 // Assistant has its own tools, and the user acts on the board.
 route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
   const ws = requireWorkspace()
@@ -3851,7 +3851,7 @@ route('GET', '/v1/skills', async ({ query }) => {
     const p = projectByName(project)
     // A project's own skills are its agents' business (like its sessions).
     ownProjectOnly(p, [API.own.listingSkills])
-    // What the project's agents are given: not the Hive skills for the Assistant alone (as its Skills tab).
+    // What the project's agents are given: not the Combwork skills for the Assistant alone (as its Skills tab).
     return (await inWorkspace(workspaceOf(p), () => listSkills(p))).filter((s) => !(s.level === 'combwork' && s.audience === 'assistant')).map(skillRow)
   }
   return (await inWorkspace(requireWorkspace(), () => listSkills())).map(skillRow)
@@ -3860,10 +3860,10 @@ route('GET', '/v1/skills', async ({ query }) => {
 /** Largest skill file the API returns; skills are instructions, not data. */
 const SKILL_FILE_MAX = 512 * 1024
 
-// One of the workspace's Hive skills: its SKILL.md and the files beside it, or (?file=) one of those files.
+// One of the workspace's Combwork skills: its SKILL.md and the files beside it, or (?file=) one of those files.
 route('GET', '/v1/skills/:name', async ({ params, query }) => inWorkspace(requireWorkspace(), async () => {
   const name = decodeURIComponent(params[0])
-  const skill = validSkillName(name) ? (await hiveSkills()).find((s) => s.name.toLowerCase() === name.toLowerCase()) : undefined
+  const skill = validSkillName(name) ? (await combworkSkills()).find((s) => s.name.toLowerCase() === name.toLowerCase()) : undefined
   if (!skill) throw new HttpError(404, say(API.skill.unknown, { name }))
   const file = query.get('file') ?? 'SKILL.md'
   // The whole path is checked before anything is read: relative, inside the skill's folder as written and as it
@@ -3885,7 +3885,7 @@ route('GET', '/v1/skills/:name', async ({ params, query }) => inWorkspace(requir
   return { ...out, files: list.files, ...(list.truncated ? { filesTruncated: true } : {}) }
 }))
 
-// This Hive's own API reference (docs/AGENT_API.md as it shipped), for clients that need more than the status.
+// This Combwork's own API reference (docs/AGENT_API.md as it shipped), for clients that need more than the status.
 route('GET', '/v1/docs/agent-api', async () => ({ version: app.getVersion(), api: API_VERSION, content: agentApiDoc }))
 
 /**
@@ -3933,19 +3933,19 @@ route('POST', '/v1/metrics/mcp', async ({ body }) => {
 })
 
 /**
- * The hive MCP bridge says its CLI has connected it (#865): the launch whose token it calls with may be given Hive's
- * lines now (sessions.hiveToolsConnected). An agent's or the Assistant's own token only, for its own launch: a token
+ * The hive MCP bridge says its CLI has connected it (#865): the launch whose token it calls with may be given Combwork's
+ * lines now (sessions.combworkToolsConnected). An agent's or the Assistant's own token only, for its own launch: a token
  * names one launch, so a bridge left from an earlier one is refused (its token has stopped working).
  */
 route('POST', '/v1/launch/connected', async () => {
   const agent = agentCaller()
-  if (agent) return { ok: sessions.hiveToolsConnected(agent.projectPath, agent.agentId, agentCallerRun() ?? undefined) }
+  if (agent) return { ok: sessions.combworkToolsConnected(agent.projectPath, agent.agentId, agentCallerRun() ?? undefined) }
   const ws = assistantCaller()
   const token = assistantCallerToken()
   if (!ws || !token) throw new HttpError(403, say(API.mcp.connectedOnlyBridge))
   // The Assistant's token is its running launch's (a new one each start): an earlier launch's no longer matches.
   if (!assistant.isCurrentToken(ws, token)) throw new HttpError(403, say(API.mcp.earlierLaunch))
-  return { ok: sessions.hiveToolsConnected(assistant.assistantHome(ws), ASSISTANT_AGENT_ID) }
+  return { ok: sessions.combworkToolsConnected(assistant.assistantHome(ws), ASSISTANT_AGENT_ID) }
 })
 
 // Where each server is added (HI-2059) is the workspace's to read: a project agent sees only whether its own project has
@@ -4090,7 +4090,7 @@ async function consoleSource(query: URLSearchParams): Promise<string> {
   const me = agentCaller()
   let id: string
   try {
-    if (which === 'combwork') id = hiveSourceId(requireWorkspace().path!)
+    if (which === 'combwork') id = combworkSourceId(requireWorkspace().path!)
     else if (which === 'assistant') id = sessionSourceId(requireWorkspace().assistantHome, ASSISTANT_AGENT_ID)
     else if (which) throw new HttpError(400, say(API.console.sourceArg))
     else if (!project && !agent) {
@@ -4117,7 +4117,7 @@ function consoleRow(s: ConsoleSource | undefined, id: string) {
   // label, which is cut and masked: following a listing always reads the source it lists.
   const select = kind === 'combwork' ? { source: 'combwork' } : kind === 'assistant' ? { source: 'assistant' } : s?.agentId && s.project ? { agent: s.agentId, project: s.project } : undefined
   // agent-protocol: the app's name, as a source's label
-  return { label: hiveName(s?.label ?? (kind === 'combwork' ? 'Combwork' : say(API.console.anAgent)), 80), kind, ...(select ? { select } : {}), ...(s?.provider ? { provider: s.provider } : {}), capturing: devConsole.capturing(id), events: devConsole.count(id) }
+  return { label: combworkName(s?.label ?? (kind === 'combwork' ? 'Combwork' : say(API.console.anAgent)), 80), kind, ...(select ? { select } : {}), ...(s?.provider ? { provider: s.provider } : {}), capturing: devConsole.capturing(id), events: devConsole.count(id) }
 }
 
 const consoleRowOf = (e: ConsoleEvent) => ({ seq: e.seq, at: e.at, kind: e.kind, name: e.name, summary: e.summary, ...(e.truncated ? { truncated: true } : {}) })
@@ -4224,7 +4224,7 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
   if (iso) link = { ...link, folder: iso.folder, testedCheckout: link.revision, copy: iso.copy, isolated: true }
   const id = issuedLinks.issue(linkOwner(caller), link)
   if (iso) await isolatedLinked(ws, iso.project, iso.lease, id)
-  // What a run for a card is checked against (#1222), read now: hive-progress starts its command after this reply, and
+  // What a run for a card is checked against (#1222), read now: cw-progress starts its command after this reply, and
   // reports its start up to 2 s later. Its start takes it with the link.
   const bracket = await bracketFor(ws, link).catch((e) => (log.warn('could not read what a run is checked against', e), null))
   if (bracket) bracketResolved(id, bracket)
@@ -4312,7 +4312,7 @@ route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
   })
 )
 
-/** How long a finish waits for its run's record as a check, to say how it counted (#1654): hive-progress waits a little longer. */
+/** How long a finish waits for its run's record as a check, to say how it counted (#1654): cw-progress waits a little longer. */
 const CHECK_REPLY_MS = 8000
 
 route('POST', '/v1/progress/:id/finish', async ({ params, body }) => {
@@ -4326,7 +4326,7 @@ route('POST', '/v1/progress/:id/finish', async ({ params, body }) => {
     void recording.check.then(() => isolatedRunEnded(requireWorkspace(), run.id)).catch((e) => log.warn('returning a check copy', e))
     return { ok: true }
   })
-  // How it counted as a check, once recorded (within CHECK_REPLY_MS): hive-progress says why one didn't (#1654).
+  // How it counted as a check, once recorded (within CHECK_REPLY_MS): cw-progress says why one didn't (#1654).
   const c = recording.check ? await within(recording.check, CHECK_REPLY_MS) : null
   return c ? { ...r, check: { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.changes ? { changes: c.changes } : {}), platform: c.platform } } : r
 })
@@ -4420,7 +4420,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
       return null
     }
   })
-  const apiDir = apiWs?.path ? apiWs.hiveDir : null
+  const apiDir = apiWs?.path ? apiWs.combworkDir : null
   if (apiDir) await apiChainReady(apiDir)
   return callerStore.run(caller, () => inApiWorkspace(apiDir, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, CW_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url))))
 }
@@ -4486,7 +4486,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
       }
     }
     const params = url.pathname.match(r.pattern)!.slice(1)
-    // With several Hive windows, a request is for one workspace: the one it names, or the only one open.
+    // With several Combwork windows, a request is for one workspace: the one it names, or the only one open.
     const ws = requestWorkspace(req, url)
     const gone = new AbortController()
     res.on('close', () => {
@@ -4495,7 +4495,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     // Its replies name cards by key (#1219: "HI-12 (#40)"), its workspace's.
     const run = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
     // A project agent's replies say when a card it works on or reviews has a new decision (#357), whatever it called:
-    // the hive tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
+    // the Combwork tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
     // cards as they were when the call began count too, so the call that moves a card on (to Review, say) still hears
     // of a decision it hasn't read, unless the call read it.
     const flagged = r.template !== '/v1/metrics/mcp' && r.template !== '/v1/launch/connected'
@@ -4514,12 +4514,12 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
 }
 
 /**
- * The developer console (#636): an Agent API call as it ended, in its workspace's Hive events and in the calling agent's
+ * The developer console (#636): an Agent API call as it ended, in its workspace's Combwork events and in the calling agent's
  * (or Assistant's) own session. Its route and how it went, never its body or the reply: the query's names only.
  */
 function captureApiCall(req: IncomingMessage, res: ServerResponse, url: URL, m: ApiRequest, who: Caller | null, ms: number): void {
   const own = who?.kind === 'agent' ? sessionSourceId(who.projectPath, who.agentId) : who?.kind === 'assistant' ? sessionSourceId(join(who.workspace, CW_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID) : null
-  devConsole.capture([m.ws && hiveSourceId(m.ws), own], () => {
+  devConsole.capture([m.ws && combworkSourceId(m.ws), own], () => {
     const name = `${req.method ?? ''} ${m.route}`
     const outcome = outcomeOf(res, m)
     // agent-protocol: the developer console's record of a call (a log line)
@@ -4564,17 +4564,17 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
 }
 
 /**
- * The Agent API's answer to an error: its status, and its text whatever language Hive shows (#845), in the caller's
- * dialect (dialects, HI-2440: a HiveError's text, also one answered with another status, said in the request's scope).
+ * The Agent API's answer to an error: its status, and its text whatever language Combwork shows (#845), in the caller's
+ * dialect (dialects, HI-2440: a CombworkError's text, also one answered with another status, said in the request's scope).
  */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
-  // agent-protocol: a HiveError's text, carried by httpFrom: its messages are found where it was thrown
+  // agent-protocol: a CombworkError's text, carried by httpFrom: its messages are found where it was thrown
   const error = e instanceof HttpError && e.text !== undefined ? agentText(e.text) : agentError(e)
   return { status: errorStatus(e), body: { error, ...(e instanceof HttpError ? e.extra : undefined), ...(e instanceof tasks.WorkflowRefusedError ? refusalBody(e.refusal) : undefined) } }
 }
 
 /**
- * Hive's own text as data beside an English field (#845, `WindowTextField` in types.ts) is the window's: agents read
+ * Combwork's own text as data beside an English field (#845, `WindowTextField` in types.ts) is the window's: agents read
  * the English. Replies are built field by field (sessions' status, skills, MCP servers, events); where a whole object
  * goes out, these leave its companions behind, and only them: the rest of the object, whatever it holds, as it is.
  */
@@ -4610,15 +4610,15 @@ export function addedForAgents<A extends { reuse?: { notReused?: string; notReus
   return { ...a, reuse: { ...reuse, ...(reuse.notReused !== undefined ? { notReused: agentField(reuse.notReused, notReusedText) } : {}) } }
 }
 
-/** What a HiveError's kind answers with (#845). */
+/** What a CombworkError's kind answers with (#845). */
 const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409 } as const
 
 /**
  * The status the Agent API answers an error with. The session and workspace services don't know about HTTP: a
- * HiveError's kind says it, else its English message does (statusFor).
+ * CombworkError's kind says it, else its English message does (statusFor).
  */
 function errorStatus(e: unknown): number {
-  if (e instanceof HiveError && e.kind) return KIND_STATUS[e.kind]
+  if (e instanceof CombworkError && e.kind) return KIND_STATUS[e.kind]
   return e instanceof HttpError ? e.status : e instanceof tasks.TaskPermissionError ? 403 : e instanceof tasks.TaskConflictError ? 409 : statusFor(e as Error)
 }
 
@@ -4639,7 +4639,7 @@ function statusFor(e: Error): number {
  * stream was opened for while it is open (`open`, .combwork folders in lower case; closed, or none named: the Default). One
  * line per agent, and per such workspace.
  */
-function streamLines(event: HiveEvent, open: ReadonlySet<string>): (client: { agent: AgentIdentity | null; apiDir: string | null }) => string | null {
+function streamLines(event: CombworkEvent, open: ReadonlySet<string>): (client: { agent: AgentIdentity | null; apiDir: string | null }) => string | null {
   const lines = new Map<AgentIdentity | string, string | null>()
   return ({ agent, apiDir }) => {
     const dir = !agent && apiDir && open.has(apiDir.toLowerCase()) ? apiDir : null
@@ -4652,13 +4652,13 @@ function streamLines(event: HiveEvent, open: ReadonlySet<string>): (client: { ag
   }
 }
 
-function broadcast(event: HiveEvent): void {
+function broadcast(event: CombworkEvent): void {
   if (!sseClients.size || !(API_EVENTS as readonly string[]).includes(event.type)) return
-  const lineFor = streamLines(event, new Set(openWorkspaces().map((w) => w.hiveDir.toLowerCase())))
+  const lineFor = streamLines(event, new Set(openWorkspaces().map((w) => w.combworkDir.toLowerCase())))
   for (const [c, client] of sseClients) {
     const line = lineFor(client)
     if (line === null) continue
-    // A client that stopped reading would make Hive hold every event for it: it is disconnected instead.
+    // A client that stopped reading would make Combwork hold every event for it: it is disconnected instead.
     if (c.writableLength > SSE_MAX_BUFFERED) {
       sseClients.delete(c)
       c.destroy()
@@ -4698,7 +4698,7 @@ async function startApiServerNow(retryInUse: boolean): Promise<AgentApiInfo> {
   const listening = new AbortController()
   apiListening = listening
   try {
-    // Runs with the Agent API off too, for the Hive Assistant's token alone (see handleApi).
+    // Runs with the Agent API off too, for the Combwork Assistant's token alone (see handleApi).
     const got = await listenWithRetry(() => http.createServer((req, res) => void handleApi(req, res)), port, '127.0.0.1', {
       retry: retryInUse,
       signal: listening.signal,
@@ -4721,7 +4721,7 @@ async function startApiServerNow(retryInUse: boolean): Promise<AgentApiInfo> {
   } finally {
     if (apiListening === listening) apiListening = null
   }
-  // Another app finds a running Hive's API by the discovery file (#620): there while the Agent API listens.
+  // Another app finds a running Combwork's API by the discovery file (#620): there while the Agent API listens.
   const info = apiInfo()
   if (info.running && info.url) await writeDiscovery({ url: info.url, port: apiPort(), version: app.getVersion(), api: API_VERSION })
   else await clearDiscovery()
@@ -4768,9 +4768,9 @@ function endLaunchStreams(ended: EndedLaunch): void {
   }
 }
 
-onHiveEvent(broadcast)
+onCombworkEvent(broadcast)
 onAgentTokenEnded(endLaunchStreams)
-// A project agent's watch refused, under the watches' lock, while Hive is giving it a card in a slot (HI-2197).
+// A project agent's watch refused, under the watches' lock, while Combwork is giving it a card in a slot (HI-2197).
 onWatchPlacing(watchWhilePlaced)
 
 /** For unit tests: request parts whose refusals tests say through the canary (tests/agentTextApi.test.ts, HI-2436). */

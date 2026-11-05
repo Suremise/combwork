@@ -1,4 +1,4 @@
-// What a progress run ran for (#1220, SPEC §16.13): the card, the revision and the check that `hive-progress --card
+// What a progress run ran for (#1220, SPEC §16.13): the card, the revision and the check that `cw-progress --card
 // --revision --check` and `/v1/progress` name, or their defaults: the reporting agent's card in Doing, and the head of
 // the folder it runs in, at the start. hive-progress asks for it before it starts the command
 // (`POST /v1/progress/resolve`), so a revision that isn't what's checked out is refused before anything runs.
@@ -17,7 +17,7 @@ import { cardRefText, shortRevision } from '../../shared/progress'
 import { focusedCheckName, validTestId } from '../../shared/workflow/focused'
 import { agentMsg, say } from '../../shared/agentText'
 
-/** hive-progress's refusals of what a run names (agent text, HI-2065): said in the request's scope, as the run is resolved. */
+/** cw-progress's refusals of what a run names (agent text, HI-2065): said in the request's scope, as the run is resolved. */
 const A = {
   cardForm: agentMsg({
     id: 'check.link.cardForm',

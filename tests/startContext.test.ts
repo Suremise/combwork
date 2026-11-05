@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { ProviderAdapter } from '../src/main/providers/types'
 
-const base = tempDir('hive-start-context-')
+const base = tempDir('cw-start-context-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

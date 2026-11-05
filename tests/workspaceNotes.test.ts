@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { LaunchContext } from '../src/main/providers/types'
 
-const base = tempDir('hive-workspace-notes-')
+const base = tempDir('cw-workspace-notes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 
@@ -182,7 +182,7 @@ describe('delivered at launch, on every CLI, after Combwork\'s guidance', () => 
     const file = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'combwork.instructions.md'), 'utf8')
     const agent = context({ notes: NOTES })
     await copilot.prepareLaunch(agent)
-    // The guidance comes as the hive server's instructions (the switch on): the file has the tools' names and the notes.
+    // The guidance comes as the combwork server's instructions (the switch on): the file has the tools' names and the notes.
     expect(file(agent)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n\n${NOTES}\n`)
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', agent).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(agent.privateDir, 'instructions'))
     const assistant = context({ notes: NOTES, instructions: 'You are in Planner mode.' })

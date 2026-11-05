@@ -8,7 +8,7 @@ import { config } from './config'
 import { samePlace } from './fsutil'
 import { git } from './git'
 import { msg } from '../shared/i18n'
-import { HiveError, hiveError } from './hiveError'
+import { CombworkError, combworkError } from './combworkError'
 import { withValues } from '../shared/advanced'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -30,7 +30,7 @@ import { slotCopyOf } from '../shared/slotDefaults'
 
 const log = createLogger('worktrees')
 
-/** Recreating or unlinking a missing worktree (#848): refusals the window reads in its language, as HiveErrors. */
+/** Recreating or unlinking a missing worktree (#848): refusals the window reads in its language, as CombworkErrors. */
 const M = {
   noAgent: msg({ id: 'worktrees.missing.noAgent', defaultMessage: 'That agent no longer exists.', description: 'An error: the agent whose missing worktree was to be recreated or unlinked was removed meanwhile.' }),
   noTree: msg({ id: 'worktrees.missing.noTree', defaultMessage: "{agent} doesn't work in a worktree.", description: 'An error: the agent {agent} (its name) works in the project folder, so it has no worktree to recreate or unlink.' })
@@ -115,7 +115,7 @@ async function usableParent(p: string): Promise<boolean> {
  * Recreating refused: git's prune would also forget the worktrees in `blockers` (missing too, as git lists them: a folder,
  * or "(name)" for a registration whose folder git doesn't record). Repair's report names them (#1313).
  */
-export class PruneBlocked extends HiveError {
+export class PruneBlocked extends CombworkError {
   constructor(
     m: Parameters<typeof withValues>[0],
     readonly blockers: string[]
@@ -136,26 +136,26 @@ export class PruneBlocked extends HiveError {
 export async function recreateWorktree(projectPath: string, agentId: string, opts: { prefer?: string; alsoRecreating?: string[] } = {}): Promise<AgentDef> {
   const cfg = await workspace.projectConfig(projectPath)
   const a = projectAgents(cfg).find((x) => x.id === agentId)
-  if (!a) throw hiveError(M.noAgent, undefined, { kind: 'notFound' })
+  if (!a) throw combworkError(M.noAgent, undefined, { kind: 'notFound' })
   // A gone slot it holds (#1447): made again where it was, on its line, by its pool; its lease kept.
   if (!(legacyWorktree(a) && !(await slotsMigrated(projectPath, agentId)))) {
     const f = await goneSlotOf(projectPath, agentId)
-    if (!f) throw hiveError(M.noTree, { agent: a.name })
-    if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
+    if (!f) throw combworkError(M.noTree, { agent: a.name })
+    if (sessions.liveFor(projectPath, agentId)) throw combworkError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
     const why = await recreateSlot(workspaceOf(projectPath), projectPath, f, f.folder)
-    if (why) throw hiveError(msg({ id: 'worktrees.missing.slotFailed', defaultMessage: "Slot {slot} of agent {agent} couldn't be made again: {why}", description: "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English). A noun before the name (glossary §1 rule 4)." }), { agent: a.name, slot: f.name, why })
+    if (why) throw combworkError(msg({ id: 'worktrees.missing.slotFailed', defaultMessage: "Slot {slot} of agent {agent} couldn't be made again: {why}", description: "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English). A noun before the name (glossary §1 rule 4)." }), { agent: a.name, slot: f.name, why })
     return a
   }
   const old = legacyWorktree(a)
-  if (!old) throw hiveError(M.noTree, { agent: a.name })
-  if (existsSync(old.path)) throw hiveError(msg({ id: 'worktrees.missing.thereRecreate', defaultMessage: "{agent}'s worktree folder is there ({folder}): there's nothing to recreate.", description: "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so it isn't missing." }), { agent: a.name, folder: old.path })
-  if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
+  if (!old) throw combworkError(M.noTree, { agent: a.name })
+  if (existsSync(old.path)) throw combworkError(msg({ id: 'worktrees.missing.thereRecreate', defaultMessage: "{agent}'s worktree folder is there ({folder}): there's nothing to recreate.", description: "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so it isn't missing." }), { agent: a.name, folder: old.path })
+  if (sessions.liveFor(projectPath, agentId)) throw combworkError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
   const others = (await prunable(projectPath)).filter((p) => !samePlace(p, old.path) && !(opts.alsoRecreating ?? []).some((q) => samePlace(p, q)))
   if (others.length) {
     throw new PruneBlocked(msg({ id: 'worktrees.missing.wouldPrune', defaultMessage: "Recreating runs git worktree prune, which would also drop git's link to {folders} (missing too). Locate, recreate or remove {n, plural, one {that worktree} other {those worktrees}} first.", description: "An error: recreating a missing worktree runs git worktree prune (a git command: keep it), which would also forget the other missing worktrees {folders} (a list of folders); {n} is how many." }), others)
   }
   await git(projectPath, ['worktree', 'prune'])
-  if ((await listWorktrees(projectPath)).some((l) => samePlace(l.path, old.path))) throw hiveError(msg({ id: 'worktrees.missing.stillListed', defaultMessage: 'git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.', description: "An error: git still has the missing worktree {folder} on its list, so it can't be recreated there. git worktree prune is a git command: keep it." }), { folder: old.path })
+  if ((await listWorktrees(projectPath)).some((l) => samePlace(l.path, old.path))) throw combworkError(msg({ id: 'worktrees.missing.stillListed', defaultMessage: 'git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.', description: "An error: git still has the missing worktree {folder} on its list, so it can't be recreated there. git worktree prune is a git command: keep it." }), { folder: old.path })
   const fallback = (): string => uniqueFolder(join(workspaceOf(projectPath).worktreesRoot, basename(projectPath), slugify(a.name)))
   let dest = opts.prefer ?? old.path
   if (existsSync(dest) || !(await usableParent(dest))) dest = fallback()
@@ -163,10 +163,10 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   let base = old.base
   if (onBranch) {
     const r = await git(projectPath, ['worktree', 'add', dest, old.branch])
-    if (!r.ok) throw r.err.trim() ? new Error(r.err.trim()) : hiveError(GIT_FAILED, { command: 'git worktree add' }) // i18n-ignore: a git command, as it is
+    if (!r.ok) throw r.err.trim() ? new Error(r.err.trim()) : combworkError(GIT_FAILED, { command: 'git worktree add' }) // i18n-ignore: a git command, as it is
   } else {
     const from = (await branchExists(projectPath, old.base)) ? old.base : await currentBranch(projectPath)
-    if (!from) throw hiveError(msg({ id: 'worktrees.missing.noBranch', defaultMessage: "{agent}'s branch {branch} is gone, and the project folder isn't on a branch to start a new one from.", description: "An error: the missing worktree of the agent {agent} (its name) can't be recreated: its branch {branch} is gone too, and there's no branch to make a new one from." }), { agent: a.name, branch: old.branch })
+    if (!from) throw combworkError(msg({ id: 'worktrees.missing.noBranch', defaultMessage: "{agent}'s branch {branch} is gone, and the project folder isn't on a branch to start a new one from.", description: "An error: the missing worktree of the agent {agent} (its name) can't be recreated: its branch {branch} is gone too, and there's no branch to make a new one from." }), { agent: a.name, branch: old.branch })
     await createWorktree(projectPath, dest, old.branch, from)
     base = from
   }
@@ -191,7 +191,7 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
     const pending = (now.pendingCopies ?? []).filter((x) => !(samePath(x.from, m.from) && samePath(x.to, m.to)))
     return { agents, ...(moved ? { pendingCopies: [...pending, m] } : {}) }
   })
-  if (!next) throw hiveError(M.noAgent, undefined, { kind: 'notFound' })
+  if (!next) throw combworkError(M.noAgent, undefined, { kind: 'notFound' })
   return next
 }
 
@@ -203,7 +203,7 @@ export async function unlinkMissingWorktree(projectPath: string, agentId: string
   const now = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === agentId)
   if (now && !(legacyWorktree(now) && !(await slotsMigrated(projectPath, agentId)))) {
     const f = await goneSlotOf(projectPath, agentId)
-    if (!f) throw hiveError(M.noTree, { agent: now.name })
+    if (!f) throw combworkError(M.noTree, { agent: now.name })
     await releaseSlotLease(workspaceOf(projectPath), projectPath, f)
     return now
   }
@@ -212,8 +212,8 @@ export async function unlinkMissingWorktree(projectPath: string, agentId: string
     const agents = projectAgents(cfg).map((x) => {
       if (x.id !== agentId) return x
       const w = legacyWorktree(x)
-      if (!w) throw hiveError(M.noTree, { agent: x.name })
-      if (existsSync(w.path)) throw hiveError(msg({ id: 'worktrees.missing.thereUnlink', defaultMessage: "{agent}'s worktree folder is there ({folder}): remove the agent to remove its worktree.", description: "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so its link can't be dropped as a missing one." }), { agent: x.name, folder: w.path })
+      if (!w) throw combworkError(M.noTree, { agent: x.name })
+      if (existsSync(w.path)) throw combworkError(msg({ id: 'worktrees.missing.thereUnlink', defaultMessage: "{agent}'s worktree folder is there ({folder}): remove the agent to remove its worktree.", description: "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so its link can't be dropped as a missing one." }), { agent: x.name, folder: w.path })
       // Written as undefined, so the save carries no stored one back (carryLegacyAgentFields).
       next = { ...x, worktree: undefined, needsSetup: undefined }
       log.info(`Removed ${userText(x.name)}'s link to its missing worktree ${userText(w.path)}`)
@@ -221,6 +221,6 @@ export async function unlinkMissingWorktree(projectPath: string, agentId: string
     })
     return { agents }
   })
-  if (!next) throw hiveError(M.noAgent, undefined, { kind: 'notFound' })
+  if (!next) throw combworkError(M.noAgent, undefined, { kind: 'notFound' })
   return next
 }

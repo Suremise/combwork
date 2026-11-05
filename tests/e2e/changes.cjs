@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(alpha, 'b.ts'), 'export const b = 2 // BBB\n')
   lib.enableProviders(userData)
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_TEST_SLOW_IPC: 'git:diff=3000*1', CW_TEST_FAIL_IPC: 'git:status*1' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_SLOW_IPC: 'git:diff=3000*1', CW_TEST_FAIL_IPC: 'git:status*1' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

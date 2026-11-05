@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -291,8 +291,8 @@ const check = (name, ok, extra = '') => {
     await dc.locator('.dc-record').click()
     await dc.locator('.dc-record-start').click()
     const switched = await lib.until(async () => (await recordingText()).trim().match(/^Recording \d+ events to (console-\S+\.jsonl)/)?.[1] ?? null, HUNG_MS)
-    const hiveOption = (await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).find((v) => v.startsWith('combwork:'))
-    await dc.locator('.dc-source').selectOption(hiveOption)
+    const combworkOption = (await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).find((v) => v.startsWith('combwork:'))
+    await dc.locator('.dc-source').selectOption(combworkOption)
     // The file's end line is written before the window hears it ended: wait for both.
     const switchedEnd = await lib.until(async () => {
       const end = readRecording(switched).find((l) => l.type === 'end')
@@ -314,8 +314,8 @@ const check = (name, ok, extra = '') => {
     check('…the shortcut and Help open the same window, not another', consoles().length === 1)
 
     // --- Closing it while a recording's start is still on its way (#638 round 2): nothing records, nothing captures.
-    const hiveLog = path.join(userData, 'logs', 'combwork.log')
-    const notStarted = () => (fs.readFileSync(hiveLog, 'utf8').match(/recording not started/g) ?? []).length
+    const combworkLog = path.join(userData, 'logs', 'combwork.log')
+    const notStarted = () => (fs.readFileSync(combworkLog, 'utf8').match(/recording not started/g) ?? []).length
     const refusedBefore = notStarted()
     const filesBefore = new Set(fs.readdirSync(recordingsDir))
     await app.evaluate(() => {
@@ -363,12 +363,12 @@ const check = (name, ok, extra = '') => {
         return null
       }, HUNG_MS)
     const dc2 = await consoleOn('consolewindow-ws2')
-    const hive2 = (await inv2('console:sources')).find((x) => x.kind === 'combwork')
-    await lib.until(async () => (await dc2.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).includes(hive2.id), HUNG_MS)
-    await dc2.locator('.dc-source').selectOption(hive2.id)
-    const hive2Live = async () => !!(await inv2('console:sources')).find((x) => x.kind === 'combwork')?.capturing && (await dc2.locator('.dc-live').textContent()).includes('Live')
-    await lib.until(hive2Live, HUNG_MS)
-    check("a second window's console watches its own workspace", await hive2Live())
+    const combwork2 = (await inv2('console:sources')).find((x) => x.kind === 'combwork')
+    await lib.until(async () => (await dc2.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).includes(combwork2.id), HUNG_MS)
+    await dc2.locator('.dc-source').selectOption(combwork2.id)
+    const combwork2Live = async () => !!(await inv2('console:sources')).find((x) => x.kind === 'combwork')?.capturing && (await dc2.locator('.dc-live').textContent()).includes('Live')
+    await lib.until(combwork2Live, HUNG_MS)
+    check("a second window's console watches its own workspace", await combwork2Live())
 
     await inv('session:stop', alpha, b1.id)
     await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status !== 'ready', HUNG_MS)
@@ -377,7 +377,7 @@ const check = (name, ok, extra = '') => {
     check('another workspace opened in its window closes its console', !consoles().includes(again))
     const leftEnd = await lib.until(() => readRecording(leftRecording).find((l) => l.type === 'end') ?? null, HUNG_MS)
     check('…ending its recording', ['closed', 'workspace'].includes(leftEnd?.reason), JSON.stringify(leftEnd))
-    check("…and the other window's console carries on", consoles().includes(dc2) && (await hive2Live()))
+    check("…and the other window's console carries on", consoles().includes(dc2) && (await combwork2Live()))
     await inv('console:open')
     const dc3 = await consoleOn('consolewindow-ws3')
     const ws3Sources = await dc3.evaluate(() => window.combwork.invoke('console:sources'))
@@ -385,13 +385,13 @@ const check = (name, ok, extra = '') => {
     const oldWatch = await dc3.evaluate((id) => window.combwork.invoke('console:subscribe', [id]), b1Option)
     const oldRead = await dc3.evaluate((id) => window.combwork.invoke('console:snapshot', id, 0), b1Option)
     check("…and can't watch or read the old workspace's sources", JSON.stringify(oldWatch) === '{}' && oldRead.length === 0, `${JSON.stringify(oldWatch)} ${oldRead.length}`)
-    const hive3 = ws3Sources.find((x) => x.kind === 'combwork')
-    await dc3.locator('.dc-source').selectOption(hive3.id)
+    const combwork3 = ws3Sources.find((x) => x.kind === 'combwork')
+    await dc3.locator('.dc-source').selectOption(combwork3.id)
     await lib.until(async () => (await inv('console:sources')).find((x) => x.kind === 'combwork')?.capturing, HUNG_MS)
     await inv('workspace:close')
     await lib.until(() => !consoles().includes(dc3), HUNG_MS)
     check('closing the workspace closes its console', !consoles().includes(dc3))
-    check("…the other window's still carrying on", await hive2Live())
+    check("…the other window's still carrying on", await combwork2Live())
     await lib.openWorkspace(inv, page, ws)
     const back = await inv('console:sources')
     check('back in the first workspace, nothing of the old watch is captured or kept', back.length > 0 && back.every((x) => !x.capturing && x.events === 0), JSON.stringify(back))

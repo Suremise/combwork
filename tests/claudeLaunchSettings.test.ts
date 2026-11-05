@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { mergeLaunchSettings, userSettings, withoutSettingsArgs } from '../src/main/providers/claude/launchSettings'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-launch-settings-')
+const base = tempDir('cw-launch-settings-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
 const hive = () => ({

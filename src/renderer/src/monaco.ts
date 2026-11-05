@@ -23,7 +23,7 @@ if (tsDefaults) {
   }
 }
 
-monaco.editor.defineTheme('hive-dark', {
+monaco.editor.defineTheme('cw-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [],
@@ -38,7 +38,7 @@ monaco.editor.defineTheme('hive-dark', {
   }
 })
 
-monaco.editor.defineTheme('hive-light', {
+monaco.editor.defineTheme('cw-light', {
   base: 'vs',
   inherit: true,
   rules: [],

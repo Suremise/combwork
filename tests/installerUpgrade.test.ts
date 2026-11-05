@@ -91,7 +91,7 @@ const record = (folder: string) => JSON.parse(readFileSync(join(folder, 'profile
 
 describe('the installer upgrades from Hive Desktop (hiveUpgrade.ps1, HI-2460)', () => {
   beforeAll(() => {
-    dir = tempDir('hive-installer-upgrade-')
+    dir = tempDir('cw-installer-upgrade-')
   })
   afterAll(() => {
     for (const c of started) if (c.exitCode === null) c.kill()
@@ -155,7 +155,7 @@ describe('the installer upgrades from Hive Desktop (hiveUpgrade.ps1, HI-2460)', 
     expect(readdirSync(f.local)).toEqual(['Hive'])
   })
 
-  it('a file held open in the local folder: not moved, both left, the record waiting in Hive\'s folder; the next run moves it with that record', async () => {
+  it('a file held open in the local folder: not moved, both left, the record waiting in Combwork\'s folder; the next run moves it with that record', async () => {
     const f = fixture('locked')
     const local = profile(f.local)
     const held = join(local, 'held.bin')
@@ -181,7 +181,7 @@ describe('the installer upgrades from Hive Desktop (hiveUpgrade.ps1, HI-2460)', 
     expect(record(join(f.local, 'Combwork'))).toEqual(waiting)
   })
 
-  it("a record already in Hive's folder that isn't the installer's: kept byte for byte, moved without one", () => {
+  it("a record already in Combwork's folder that isn't the installer's: kept byte for byte, moved without one", () => {
     const f = fixture('foreign')
     const local = profile(f.local)
     writeFileSync(join(local, 'profile-move.json'), '{"mine":1')

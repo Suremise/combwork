@@ -1,7 +1,7 @@
 /**
  * Agents' temp folder (HI-2496): Settings → Advanced → Agents' temp folder, empty by default. When set, each agent and
  * the Assistant launch with TEMP, TMP and TMPDIR pointing at a folder of their own in it, `<root>\<host>\<agent>`, made at
- * launch and kept (resumed sessions read their scratchpads again): Hive never deletes in it. Empty, the launch's
+ * launch and kept (resumed sessions read their scratchpads again): Combwork never deletes in it. Empty, the launch's
  * environment is as before. Provider-specific variables (Claude Code's CLAUDE_CODE_TMPDIR) are their adapters'.
  *
  * It never points inside a workspace's folder, a project, a slot, review copies, the Assistant's home or a workspace's
@@ -15,7 +15,7 @@ import { AGENT_TEMP_FOLDER_ID } from '../shared/advanced'
 import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { takesTestSeams } from './testQuiet'
 import type { WorkspaceService } from './workspace'
 
@@ -28,7 +28,7 @@ const M = {
 /** The variables a launch's temp folder is given in (Windows' two, and POSIX shells' such as Git Bash's). */
 export const TEMP_VARS = ['TEMP', 'TMP', 'TMPDIR'] as const
 
-/** The folder as set (the workspace's own over Hive's), or null: empty, the system Temp. */
+/** The folder as set (the workspace's own over Combwork's), or null: empty, the system Temp. */
 export function agentTempSetting(ws: WorkspaceService | null): string | null {
   const own = ws ? advanced.get<string[]>(AGENT_TEMP_FOLDER_ID, ws.config?.advanced ?? null) : null
   const listed = Array.isArray(own) && own.length ? own : advanced.get<string[]>(AGENT_TEMP_FOLDER_ID, null)
@@ -126,20 +126,20 @@ export interface AgentTempLaunch {
 export async function prepareAgentTemp(o: AgentTempLaunch): Promise<string | null> {
   if (!o.setting?.trim()) return null
   const root = expandRoot(o.setting.trim(), o.env ?? process.env)
-  if (!root) throw hiveError(M.unset, { folder: o.setting }, { kind: 'conflict' })
+  if (!root) throw combworkError(M.unset, { folder: o.setting }, { kind: 'conflict' })
   const dir = agentTempFolder(root, o.host, o.agentId, o.assistant)
   const before = await protectedHit(dir, o.protect)
-  if (before) throw hiveError(M.inside, { folder: dir, inside: before }, { kind: 'conflict' })
+  if (before) throw combworkError(M.inside, { folder: dir, inside: before }, { kind: 'conflict' })
   try {
     await mkdir(dir, { recursive: true })
     if (!(await stat(dir)).isDirectory()) throw new Error('not a folder') // i18n-ignore: the system's reason, in English
   } catch (e) {
-    throw hiveError(M.notMade, { folder: dir, why: (e as Error).message }, { kind: 'conflict' })
+    throw combworkError(M.notMade, { folder: dir, why: (e as Error).message }, { kind: 'conflict' })
   }
   await testHold()
   // Made: where it really is now (a junction made meanwhile, or one inside the root) must still be outside them.
   const after = await protectedHit(dir, o.protect)
-  if (after) throw hiveError(M.inside, { folder: dir, inside: after }, { kind: 'conflict' })
+  if (after) throw combworkError(M.inside, { folder: dir, inside: after }, { kind: 'conflict' })
   return dir
 }
 

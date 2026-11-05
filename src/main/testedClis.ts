@@ -8,7 +8,7 @@ import { resourcesDir } from './paths'
 const log = createLogger('providers')
 
 /**
- * The CLI versions this Hive release was tested with (#365): resources/tested-clis.json, made from the real tier's run
+ * The CLI versions this Combwork release was tested with (#365): resources/tested-clis.json, made from the real tier's run
  * record before a release (`npm run tested-clis`, RELEASING.md), never by hand. Keyed by provider id: `{ "<id>":
  * { "version", "testedAt", "record" } }`. Unpackaged builds can be given another file (CW_TEST_TESTED_CLIS) for tests.
  * Read on every provider refresh (Check again), since it is small.
@@ -31,9 +31,9 @@ export async function testedVersion(id: ProviderId): Promise<{ version: string; 
 
 /**
  * A test copy of Hive (unpackaged, with a test profile) notes the CLI it selected, a JSON line per check, in
- * CW_TEST_CLI_LOG (the e2e runner gives each suite one): the run record's real CLIs are what Hive itself chose, the
+ * CW_TEST_CLI_LOG (the e2e runner gives each suite one): the run record's real CLIs are what Combwork itself chose, the
  * standalone CLI its detection accepted, never a copy it rejected (#365), and the home it runs in (its sign-in and
- * config, #368: the record names each real suite's). Never in an installed Hive.
+ * config, #368: the record names each real suite's). Never in an installed Combwork.
  */
 export async function noteSelectedCli(info: AgentInstallInfo, home: string | null = null): Promise<void> {
   const file = !app.isPackaged && process.env.CW_USER_DATA ? process.env.CW_TEST_CLI_LOG : undefined

@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { B1, commit, moved, R1, setup } from './workflow/harness'
 
-const base = tempDir('hive-vcswitch-')
+const base = tempDir('cw-vcswitch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

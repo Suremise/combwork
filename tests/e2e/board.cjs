@@ -1,4 +1,4 @@
-// The task board: cards added in the Board view and through the Agent API (as an agent's hive tools would), Done kept
+// The task board: cards added in the Board view and through the Agent API (as an agent's Combwork tools would), Done kept
 // for the user, dragging between columns, column colours (Settings → Board), Start on a new agent (the fake Claude Code gets the card as its prompt),
 // a project's Tasks tab, archiving; and Project → Remove Project… (Hide, restored from Settings → Workspace, and
 // Delete). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR. Delete sends a small test folder to the
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

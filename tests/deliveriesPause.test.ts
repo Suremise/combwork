@@ -18,7 +18,7 @@ const pause = vi.hoisted(() => ({ on: false }))
 vi.mock('../src/main/teamPause', async (orig) => ({ ...(await orig<object>()), pausedFor: () => (pause.on ? { pauseId: 'p1', since: new Date().toISOString(), by: 'user' } : null) }))
 
 describe("the team pause's hold on deliveries (HI-2081)", async () => {
-  const base = tempDir('hive-deliveries-pause-')
+  const base = tempDir('cw-deliveries-pause-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const dismiss = admitted(base)
   afterAll(async () => {

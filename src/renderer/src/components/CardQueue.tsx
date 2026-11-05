@@ -83,7 +83,7 @@ const M = {
 }
 
 /** The window event For you's "Show the files and commands" sends: the card dialog's Work section shows its queue part. */
-export const SHOW_QUEUE_WORK = 'hive:show-queue-work'
+export const SHOW_QUEUE_WORK = 'cw:show-queue-work'
 
 /** The card's place in its target's queue, counting the one testing (1: next), or null when not known here. */
 function placeOf(v: QueueView | null, entry: string): number | null {
@@ -260,7 +260,7 @@ const C = {
   filesLeft: msg({ id: 'board.conflicts.filesLeft', defaultMessage: '{n, plural, one {# more file in conflict, not read} other {# more files in conflict, not read}}', description: "Under the files in conflict in the card dialog's Work section (HI-1181): git named {n} more conflicting files than Combwork reads for one return." })
 }
 
-/** What Hive knows of a file's conflicts, in a few words: never "no conflict" for a file it didn't read whole. */
+/** What Combwork knows of a file's conflicts, in a few words: never "no conflict" for a file it didn't read whole. */
 function conflictSummary(f: ConflictFile): string {
   if (f.notRead) return tr(C.notRead, { why: f.notRead })
   if (!f.hunks.length && !f.partial) return tr(C.noText)
@@ -383,7 +383,7 @@ function Paused({ queue, projectPath }: { queue: QueueView; projectPath: string 
 
 /**
  * The OK an update of a checked-out target waits for (Ask each time): the same answer as For you's. Approve takes an
- * optional note, a comment on the card (HI-2286: Hive's own gate, never a decision); Decline asks why, as For you's does.
+ * optional note, a comment on the card (HI-2286: Combwork's own gate, never a decision); Decline asks why, as For you's does.
  */
 function Advance({ card, request, target }: { card: TaskCard; request: string; target: string }) {
   const [note, setNote] = useState('')
@@ -411,7 +411,7 @@ function Advance({ card, request, target }: { card: TaskCard; request: string; t
   )
 }
 
-/** An advance stopped part way (§16.9.2's terminal state): the state as Hive found it, each file's side, the commands. */
+/** An advance stopped part way (§16.9.2's terminal state): the state as Combwork found it, each file's side, the commands. */
 function Stuck({ stuck: st, target, short, projectPath }: { stuck: QueueStuck; target: string; short: (id: string) => string; projectPath: string }) {
   // Where each command runs, named one way (the Assistant's #1357 review): the folder's name, its full path on hover.
   const where = (place: 'project' | 'folder'): string => (place === 'project' ? projectPath : st.folder)

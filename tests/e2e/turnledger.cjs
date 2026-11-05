@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: API_PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_SILENT_MS: String(SILENT_MS) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: API_PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_SILENT_MS: String(SILENT_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     return s?.status === status && (!state || s.turn?.state === state) && s
   }, HUNG_MS)
   const hooksLog = () => fs.readFileSync(path.join(userData, 'logs', 'hooks.log'), 'utf8')
-  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
+  const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   const journal = (a, re) => until(() => fs.existsSync(path.join(userData, 'logs', 'hooks.log')) && hooksLog().split('\n').some((l) => l.includes(`run=${a.runId} `) && re.test(l)), HUNG_MS)
 
   for (const [a, name] of [[claude, 'Claude Code'], [codex, 'Codex']]) {
@@ -137,12 +137,12 @@ const check = (name, ok, extra = '') => {
   // Codex: its Stop never reaches Combwork; its rollout records the turn's end (task_complete).
   await turn(codex, 'loststop')
   check("Codex: a turn whose Stop is lost ends from Codex's own record of it", !!(await is(codex, 'finished', 'over')))
-  check('the log says so', !!(await until(() => /Codex recorded the end of turn [\w-]+ at .*, and Combwork saw no Stop: its turn is over/.test(hiveLog()), HUNG_MS)))
+  check('the log says so', !!(await until(() => /Codex recorded the end of turn [\w-]+ at .*, and Combwork saw no Stop: its turn is over/.test(combworkLog()), HUNG_MS)))
 
   // Claude Code: its Stop is lost and nothing records it; after a silence, its screen shows it idle at its prompt.
   await turn(claude, 'loststop')
   check('Claude Code: a turn whose Stop is lost ends once its screen shows it idle at its prompt', !!(await is(claude, 'finished', 'over')))
-  check('the log says so', !!(await until(() => /Claude Code is idle at its prompt on screen after \d+ (s|min) of silence, and Combwork saw no Stop/.test(hiveLog()), HUNG_MS)))
+  check('the log says so', !!(await until(() => /Claude Code is idle at its prompt on screen after \d+ (s|min) of silence, and Combwork saw no Stop/.test(combworkLog()), HUNG_MS)))
 
   // Codex 0.160.0 (no screen check for it): no Stop, nothing recorded. Unknown, never idle; Mark idle.
   await turn(codex, 'silent')
@@ -152,7 +152,7 @@ const check = (name, ok, extra = '') => {
   const label = await until(async () => /^Silent \d+ min · state unknown$/.test((await header.locator('.unknown-state .pane-status').innerText().catch(() => '')).trim()) && header, HUNG_MS)
   check('its pane says how long it has been silent, with Mark idle', !!label && (await header.getByRole('button', { name: 'Mark idle' }).isVisible()))
   await page.screenshot({ path: path.join(lib.WORK, 'turnledger-unknown.png') })
-  check('the log says the state is unknown', !!(await until(() => /silent for \d+ (s|min) with no sign of its turn's end: state unknown \(turn [\w-]+ running/.test(hiveLog()), HUNG_MS)))
+  check('the log says the state is unknown', !!(await until(() => /silent for \d+ (s|min) with no sign of its turn's end: state unknown \(turn [\w-]+ running/.test(combworkLog()), HUNG_MS)))
   await header.getByRole('button', { name: 'Mark idle' }).click()
   check('Mark idle makes it idle', !!(await is(codex, 'ready', 'over')))
   check('and it takes a task', !!(await turn(codex, 'work 1')) && !!(await is(codex, 'finished', 'over')))
@@ -169,7 +169,7 @@ const check = (name, ok, extra = '') => {
   const shown = await until(async () => /^Rate-limited \(429\) · retrying at .+ \(1 of 5\)$/.test((await retryText()).trim()), HUNG_MS)
   check('its pane says it was rate-limited and when it retries, not Working…', !!shown, await retryText())
   await page.screenshot({ path: path.join(lib.WORK, 'turnledger-retrying.png') })
-  check('the log says it waits to retry', !!(await until(() => /Codex is waiting to retry its model request \(429, try 1\/5\) until \d{4}-/.test(hiveLog()), HUNG_MS)))
+  check('the log says it waits to retry', !!(await until(() => /Codex is waiting to retry its model request \(429, try 1\/5\) until \d{4}-/.test(combworkLog()), HUNG_MS)))
   // Its retry goes through: it carries on, and its next hook clears the wait.
   fs.writeFileSync(path.join(codexHome, 'fake-retried-Codex'), '')
   const over = await is(codex, 'finished', 'over')

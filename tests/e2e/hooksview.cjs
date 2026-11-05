@@ -49,7 +49,7 @@ const check = (name, ok, extra = '') => {
 
   // Each app server the fake Codex runs, by its pid (HI-982: none left after a listing times out).
   const appServers = path.join(userData, 'fake-appservers.txt')
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claude, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', FAKE_CODEX_APPSERVER_LOG: appServers })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claude, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', FAKE_CODEX_APPSERVER_LOG: appServers })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

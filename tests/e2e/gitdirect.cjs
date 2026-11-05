@@ -29,7 +29,7 @@ function launcherOf() {
 
 /** The run context's PATH for a test copy with Git's launcher folder and no other folder that holds git. */
 function pathWithLauncher(launcher) {
-  const env = lib.hiveEnv({ CW_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   const rest = (env[key] ?? '').split(path.delimiter).filter((d) => d && !['git.exe', 'git.com'].some((g) => fs.existsSync(path.join(d.replace(/^"|"$/g, ''), g))))
   return [path.dirname(launcher), ...rest].join(path.delimiter)
@@ -61,9 +61,9 @@ function traced(before = new Set()) {
   fs.mkdirSync(trace, { recursive: true })
   lib.gitProject(repo)
   // An alias through sh, and a hook (sh) that runs it and says what its PATH starts with.
-  lib.git(repo, ['config', 'alias.hivedirect', '!echo alias-through-sh'])
+  lib.git(repo, ['config', 'alias.cwdirect', '!echo alias-through-sh'])
   const hook = path.join(repo, '.git', 'hooks', 'post-checkout')
-  fs.writeFileSync(hook, `#!/bin/sh\n{ echo "first=$PATH"; echo "sed=$(command -v sed)"; git hivedirect; } > "${hookOut.replace(/\\/g, '/')}"\n`)
+  fs.writeFileSync(hook, `#!/bin/sh\n{ echo "first=$PATH"; echo "sed=$(command -v sed)"; git cwdirect; } > "${hookOut.replace(/\\/g, '/')}"\n`)
   lib.enableProviders(userData)
 
   const { app, page, inv } = await lib.launch({ userData, env: { PATH: pathWithLauncher(found.launcher), GIT_TRACE2_EVENT: trace } })

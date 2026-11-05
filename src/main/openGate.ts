@@ -1,6 +1,6 @@
 // HI-1954 (design HI-1954/s19 §1, s21 §3): a workspace's open point holds its agents back while its commands run. The
 // gate is reserved as the workspace opens, before anything hears of the open (WorkspaceService.open), when its open
-// point has commands; every start of an agent is refused while it is held (sessions.ts assertStartsAllowed), and Hive's
+// point has commands; every start of an agent is refused while it is held (sessions.ts assertStartsAllowed), and Combwork's
 // own starts at an open (restartResume.ts) wait for it. It settles once: the list ended, the user didn't wait or chose
 // Stop here, or the workspace closed or switched (its lifetime ended), when nothing it held starts.
 

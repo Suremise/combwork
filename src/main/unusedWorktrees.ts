@@ -27,7 +27,7 @@ const log = createLogger('worktrees')
 
 /**
  * Unused worktrees (#353): the git worktrees of a project that no agent of it works in, kept when their agent was
- * removed with "Keep worktree and branch" (or made outside Hive). Each is checked with #291's `worktreeCheck` (merged
+ * removed with "Keep worktree and branch" (or made outside Combwork). Each is checked with #291's `worktreeCheck` (merged
  * into the repository's main branch and clean; anything git can't say counts as not removable, #346). Only folders git
  * lists as the project's worktrees, that exist, aren't the project, don't contain it or the workspace and aren't another
  * project. Removal is the user's alone (no Agent API route or tool): Remove deletes a merged, clean one and its branch
@@ -39,11 +39,11 @@ const key = placeKey
 const contains = containsPlace
 
 /**
- * Which of Hive's own pools a worktree folder is in (HI-1710): a review copy (the project's copies folder), the merge
- * queue's folder (named as the queue names them, beside the slots), else null. Branches & remotes lists them as Hive's,
+ * Which of Combwork's own pools a worktree folder is in (HI-1710): a review copy (the project's copies folder), the merge
+ * queue's folder (named as the queue names them, beside the slots), else null. Branches & remotes lists them as Combwork's,
  * never as unused worktrees.
  */
-export function hiveWorktreeOf(projectPath: string, path: string): 'copy' | 'queue' | null {
+export function combworkWorktreeOf(projectPath: string, path: string): 'copy' | 'queue' | null {
   const ws = workspaceOf(projectPath)
   if (!ws.path) return null
   const root = join(ws.worktreesRoot, basename(projectPath))
@@ -51,7 +51,7 @@ export function hiveWorktreeOf(projectPath: string, path: string): 'copy' | 'que
   return isQueueFolder(root, path) ? 'queue' : null
 }
 
-/** Why Hive won't touch a listed worktree folder (null: it may), whoever uses it. */
+/** Why Combwork won't touch a listed worktree folder (null: it may), whoever uses it. */
 async function unsafe(projectPath: string, path: string): Promise<string | null> {
   const ws = workspaceOf(projectPath)
   if (contains(path, projectPath) || (ws.path && contains(path, ws.path))) return tr(msg({ id: 'main.unused.why.contains', defaultMessage: 'it contains the project or the workspace', description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." }))
@@ -73,7 +73,7 @@ export function setQueueNeed(fn: QueueNeed | null): void {
 
 /**
  * The merge queue's folders (#1360, #1644), by the queue's records: `used`, those its queue uses (a running runner holds
- * it, whoever's Hive runs it, or the queue still needs it: a released runner keeps it warm for the next merge), never
+ * it, whoever's Combwork runs it, or the queue still needs it: a released runner keeps it warm for the next merge), never
  * listed; `leftover`, recorded ones it no longer needs, listed as the queue's. Null when the records can't be read: then
  * no folder named as the queue names them is listed.
  */
@@ -153,7 +153,7 @@ const running = (pid: number): boolean => {
   }
 }
 
-/** A listed worktree before its check: its folder and branch, and what it is to Hive's pools (#1450). */
+/** A listed worktree before its check: its folder and branch, and what it is to Combwork's pools (#1450). */
 interface Candidate {
   path: string
   branch: string | null
@@ -162,7 +162,7 @@ interface Candidate {
 }
 
 /**
- * What Hive's pools hold among a project's worktrees (#1450), read from #1429's `slots` and `slot_leases`, #1435's
+ * What Combwork's pools hold among a project's worktrees (#1450), read from #1429's `slots` and `slot_leases`, #1435's
  * copies and #1434's folder facts: each slot by its folder, with how it is listed (null: never, lent, protected by a
  * carried lease, or busy); the copies' folder (never listed: the pool tidies them); each retired home, listed or not.
  */
@@ -218,7 +218,7 @@ async function placesOf(projectPath: string): Promise<Places> {
 }
 
 /**
- * The worktrees git lists for the project that no agent works in, as they are now (no check yet): of Hive's pools,
+ * The worktrees git lists for the project that no agent works in, as they are now (no check yet): of Combwork's pools,
  * only the slots and homes `placesOf` lists, never a copy; never an agent's 0.9 worktree (`legacyWorktree`) or a queue
  * folder with a living lease.
  */
@@ -265,7 +265,7 @@ const SESSION_IN = msg({ id: 'main.unused.why.session', defaultMessage: 'a sessi
 /** Why a folder an agent's 0.9 worktree is isn't removed or merged from here. */
 const OWNED = msg({ id: 'main.unused.why.owned', defaultMessage: 'an agent works in it now', description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })
 
-/** Whether a session of this Hive runs in a folder (or one inside it) now. */
+/** Whether a session of this Combwork runs in a folder (or one inside it) now. */
 const sessionIn = (folder: string): boolean => liveSessions.liveStates().some((s) => !!s.cwd && contains(folder, s.cwd))
 
 /**
@@ -291,7 +291,7 @@ export async function unusedBranchOf(projectPath: string, path: string): Promise
   return listed.find((w) => key(w.path) === key(path))?.branch ?? null
 }
 
-/** Why the pool or Hive couldn't check a slot or folder (#1450), a clause. */
+/** Why the pool or Combwork couldn't check a slot or folder (#1450), a clause. */
 const CANT_CHECK = msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Combwork couldn't check it ({detail})", description: "Why Combwork won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause." })
 
 /** Why a slot has no Remove anyway (#1450): only the pool's guarded clean-up removes it. */
@@ -348,13 +348,13 @@ async function unreferencedCommits(path: string, except?: string): Promise<numbe
 }
 
 /**
- * Who made an unused worktree (#476): the Hive agent whose session last ran in it (sessions.json keeps each session's
- * folder and its agent's name), else Hive when it is in Hive's worktrees folder for the project, else not Hive.
+ * Who made an unused worktree (#476): the Combwork agent whose session last ran in it (sessions.json keeps each session's
+ * folder and its agent's name), else Combwork when it is in Combwork's worktrees folder for the project, else not Combwork.
  */
-export function worktreeOrigin(path: string, sessions: readonly Pick<SessionRecord, 'cwd' | 'agentName' | 'agentId' | 'lastActiveAt'>[], hiveFolder: string | null): UnusedWorktreeOrigin {
+export function worktreeOrigin(path: string, sessions: readonly Pick<SessionRecord, 'cwd' | 'agentName' | 'agentId' | 'lastActiveAt'>[], combworkFolder: string | null): UnusedWorktreeOrigin {
   const ran = sessions.filter((s) => s.cwd && key(s.cwd) === key(path) && (s.agentId || s.agentName)).sort((a, b) => (a.lastActiveAt < b.lastActiveAt ? 1 : -1))[0]
   if (ran) return ran.agentName ? { madeBy: 'combwork', agentName: ran.agentName } : { madeBy: 'combwork' }
-  return hiveFolder && contains(hiveFolder, path) ? { madeBy: 'combwork' } : { madeBy: 'other' }
+  return combworkFolder && contains(combworkFolder, path) ? { madeBy: 'combwork' } : { madeBy: 'other' }
 }
 
 async function describe(projectPath: string, w: Candidate, origin: UnusedWorktreeOrigin, reads: wt.RepoReads, pool: SlotPool | null): Promise<UnusedWorktree> {
@@ -402,9 +402,9 @@ export async function unusedWorktrees(projectPath: string): Promise<UnusedWorktr
   const ws = workspaceOf(projectPath)
   // Without them each worktree is only "made by Hive" or not, never by whom: said in the log rather than hidden (#1149).
   const sessions = (await workspace.sessionsFile(projectPath).catch((e) => void log.warn(`reading ${userText(basename(projectPath))}'s session records for its unused worktrees`, e)))?.sessions ?? []
-  // Where Hive makes the project's agent worktrees (projectAgents.ts).
-  const hiveFolder = ws.path ? join(ws.worktreesRoot, basename(projectPath)) : null
-  for (const w of listed) worktrees.push(await describe(projectPath, w, worktreeOrigin(w.path, sessions, hiveFolder), reads, places?.pool ?? null))
+  // Where Combwork makes the project's agent worktrees (projectAgents.ts).
+  const combworkFolder = ws.path ? join(ws.worktreesRoot, basename(projectPath)) : null
+  for (const w of listed) worktrees.push(await describe(projectPath, w, worktreeOrigin(w.path, sessions, combworkFolder), reads, places?.pool ?? null))
   // The Changes tab may read these (and only these) now (#400).
   workspaceOf(projectPath).noteUnusedWorktrees(projectPath, worktrees.map((w) => w.path))
   return { worktrees }
@@ -412,7 +412,7 @@ export async function unusedWorktrees(projectPath: string): Promise<UnusedWorktr
 
 /**
  * One of the project's unused worktrees, by its folder, as a worktree to show and merge in Changes (#400): only one git
- * lists as the project's that no agent uses and Hive may touch, on a branch (a detached one has nothing to merge), with
+ * lists as the project's that no agent uses and Combwork may touch, on a branch (a detached one has nothing to merge), with
  * the branch it would merge into as its base. Throws otherwise.
  */
 async function unusedWorktree(projectPath: string, path: string): Promise<wt.WorktreeRef> {
@@ -635,7 +635,7 @@ const SNAPSHOT_FIELD: Record<keyof Snapshot, Msg> = {
 /**
  * Removes an unused worktree (#353), the user's choice from the Overview. Reserved first, so no agent can be given it
  * meanwhile (`reserveForRemoval`, which addAgent and template loads check under the project file's lock), then refused
- * if git no longer lists it, an agent works in it, or it is a folder Hive never deletes. Without `force` (Remove), only
+ * if git no longer lists it, an agent works in it, or it is a folder Combwork never deletes. Without `force` (Remove), only
  * a merged, clean one, checked now (`worktreeCheck`, then `removeCheckedWorktree`: never --force, its branch deleted only
  * from the commit checked, and only while the main branch the user was shown, `expectInto`, still holds it). With
  * `force` (Remove anyway), the token of the preview the user confirmed (used once, and only within PREVIEW_MS of it,

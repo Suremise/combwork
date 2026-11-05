@@ -27,7 +27,7 @@ const input = (a: Agent): HookStatusInput => ({ status: a.status, statusMessage:
 
 /** One hook through the ledger and the status rules; `continued`: Combwork answered this Stop with a continuation. */
 function feed(a: Agent, ev: HookEvent, i: HookIds, continued = false): Agent {
-  const took = admit(a.ledger, ev, i, { hiveContinued: continued, now: a.ledger.seq })
+  const took = admit(a.ledger, ev, i, { combworkContinued: continued, now: a.ledger.seq })
   if (took.verdict === 'apply') applyStep(a, hookStep(took.event, input(a)))
   else a.stale.push(took.verdict === 'stale' ? took.why : 'continued')
   return a
@@ -490,7 +490,7 @@ describe('the turn ledger', () => {
     // Carried on by Combwork once, then its final Stop missed: the second answer is one Combwork never got.
     const e = newLedger(0)
     admit(e, { kind: 'prompt' }, ids(null), { now: 1000 })
-    admit(e, { kind: 'stop', lastMessage: null }, ids(null), { hiveContinued: true, now: 1100 })
+    admit(e, { kind: 'stop', lastMessage: null }, ids(null), { combworkContinued: true, now: 1100 })
     expect(unheardStop(e, [900, 1101])).toBe(false)
     expect(unheardStop(e, [900, 1101, 1500])).toBe(true)
     // A CLI whose records name turns isn't read this way.

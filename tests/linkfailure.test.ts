@@ -22,7 +22,7 @@ const { contentHash, copySkillTree } = await import('../src/main/fsutil')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { syncAgentsSkills } = await import('../src/main/providers/common')
 
-const base = tempDir('hive-link-failure-')
+const base = tempDir('cw-link-failure-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 const target = join(base, 'target')
 mkdirSync(target, { recursive: true })

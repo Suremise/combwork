@@ -68,7 +68,7 @@ function commits(wt, n) {
   cfg.settings.appearance = { ...cfg.settings.appearance, terminalFontSize: 8 }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47908), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47908), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -355,7 +355,7 @@ function commits(wt, n) {
   // An unknown state (#648), with both shields (an automatic review, #606's safeguard switch), sent to the window as
   // Combwork sends a status: at every width Stop and ⋯ stay whole and the shields give way with the status; Mark idle is
   // beside the status from 300 px, and below only in ⋯ (with the safeguard's note), whose dot then says so.
-  const sendStatus = (state) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state })
+  const sendStatus = (state) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state })
   const known = await live(long.id)
   await sendStatus({ ...known, status: 'working', turn: { ...known.turn, state: 'unknown', silentSince: new Date(Date.now() - 6 * 60000).toISOString() }, review: 'a long command under review', safeguard: { at: new Date().toISOString(), model: 'claude-fake', tools: [], stops: 1, switched: { from: 'claude-fake', to: 'claude-other', at: new Date().toISOString() } } })
   check('an unknown state shows in the header, with both shields', !!(await until(async () => (await header(long).locator('.unknown-state').count()) === 1 && (await header(long).locator('.review-mark, .safeguard-mark').count()) === 2, HUNG_MS)))

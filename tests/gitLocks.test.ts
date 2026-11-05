@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { GIT_PREFIX, git, gitStatus } from '../src/main/git'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-gitlocks-')
+const base = tempDir('cw-gitlocks-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 

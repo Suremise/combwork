@@ -72,7 +72,7 @@ export async function adoptionInputs(project: string, platform: PlatformId, colu
 /**
  * Writes a card's adoption (inside the board's transaction): `Adopted`, a Review card's adopted `Submitted`, and the move
  * to the stage its column stands for. Once per card (the dedupe `adopted`): false when it already was, by a rerun or
- * another Hive, and nothing is written.
+ * another Combwork, and nothing is written.
  */
 export function writeAdoption(tx: Tx, card: CardRecord, ruleset: Ruleset, column: InFlight, at: AdoptionAt, inp: AdoptionInputs, move: (to: StageId) => void): boolean {
   const data: FactData['Adopted'] = { folder: at.worktree ? join(at.worktree) : 'project', line: inp.line, base: inp.base, head: inp.head, target: at.target, builder: at.agent, cardKind: card.kind, adoptedFrom: column, ...(column === 'passed' ? { passedBefore1_0: true } : {}) }

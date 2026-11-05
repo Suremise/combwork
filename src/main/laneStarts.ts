@@ -5,7 +5,7 @@ import { cardRef } from '../shared/projectKeys'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { agentNowOf } from './cardStall'
 import { coalesced } from './coalesce'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { LANES_FRESH_START_WAIT_MINUTES, withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
@@ -22,7 +22,7 @@ import { teamPauseOf } from './teamPause'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
 /**
- * Hive starts a lane's next card (HI-1990, Darren's decision of 29 Oct 2026: plumbing, not guidance). With workflow
+ * Combwork starts a lane's next card (HI-1990, Darren's decision of 29 Oct 2026: plumbing, not guidance). With workflow
  * rules on, once the card before it is Done, a running lane's next card (its own, in Todo, not blocked, every card
  * before it Done or another lane's) is started on the lane's builder as the Assistant's Start gives one (`startTask`,
  * through the start's rules): its slot lent and the builder placed there, typed into it idle, or started with it when
@@ -35,7 +35,7 @@ import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from
 
 const log = createLogger('laneStarts')
 
-/** What the builder's prompt says as Hive starts its lane's card (dialects, HI-2438). */
+/** What the builder's prompt says as Combwork starts its lane's card (dialects, HI-2438). */
 const A = {
   first: agentMsg({
     id: 'brief.start.firstCard',
@@ -77,16 +77,16 @@ const builderKey = (wsPath: string, project: string, agentId: string): string =>
 
 /**
  * Why the builder can't be given a card now (HI-2029: the lane says so, LaneStatus `startWait`), or null: free. Free is
- * idle with a line of Hive's free to go in (its turn over, nobody typing there, no line being typed or waiting: a start
+ * idle with a line of Combwork's free to go in (its turn over, nobody typing there, no line being typed or waiting: a start
  * whose card can't then be typed in is undone, and that undoing raced the builder's own start, HR1's round 2 run, and no
- * line of Hive's queued for it lately), or not running and not starting.
+ * line of Combwork's queued for it lately), or not running and not starting.
  */
 async function builderWait(projectPath: string, b: { id: string; name: string }): Promise<LaneStartWhy | null> {
   const st = sessions.liveFor(projectPath, b.id)
   if (st) {
     if (st.status === 'watching') return 'watching'
     if (!(st.status === 'ready' || st.status === 'finished') || whyNoLine(projectPath, b.id, 'free') !== null) return 'busy'
-    // Nor while a line of Hive's is on its way to it (queued, not typed yet: the Done wake): it would start typing as the
+    // Nor while a line of Combwork's is on its way to it (queued, not typed yet: the Done wake): it would start typing as the
     // card's own does, and the start would be undone (HI-1995's linecarried run). One offered and not read doesn't hold
     // it. A queued one is offered first, by the delivery service under its own rules (HR1 on HI-2029: time alone never
     // lets the card overlap it): given, cancelled as no longer due, or still held, which the lane then says.
@@ -170,7 +170,7 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
     // pause's end changes the lanes (team-pause-changed), which looks again.
     if (teamPauseOf(ws)) return
     // An agent owed its new conversation is launched with the rules off too (HR1 on HI-2034: Start Lane owes it either
-    // way); only Hive's own card starts need them.
+    // way); only Combwork's own card starts need them.
     await freshPass(ws, path)
     if (await lanesEnforced()) await lookAt(ws, path)
   } finally {
@@ -187,7 +187,7 @@ async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
     const next = laneStartDue(lane)
     // A lane waiting for a slot (none was free as it started) has its stopped agents started once one is lent (slotCards'
     // pass), which keeps the wait until they are launched (HR1 on HI-2029: a `stoppedOnly` one too): its status says it
-    // waits for a slot, and Hive's start comes after.
+    // waits for a slot, and Combwork's start comes after.
     if (!next || laneWaitsForSlot(ws, lane.id) || builderOwed(ws, lane.id)) continue
     const projectPath = join(path, lane.project)
     waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
@@ -266,7 +266,7 @@ async function freshPass(ws: WorkspaceService, path: string): Promise<void> {
         if (blocked) tellBlocked(projectPath, name, 'timeout', wait, '')
         continue
       }
-      // Free (as a card's start needs it: idle with a line free, nothing of Hive's queued for it), or a crash's launch to reconcile.
+      // Free (as a card's start needs it: idle with a line free, nothing of Combwork's queued for it), or a crash's launch to reconcile.
       if (!f.launching && (await builderWait(projectPath, { id: f.agent, name }))) continue
       launchingNow.add(f.id)
       try {
@@ -313,7 +313,7 @@ function agentChanged(projectPath: string, agentId: string): void {
   const project = projectPath.slice(ws.path.length).replace(/^[\\/]+/, '')
   const k = builderKey(ws.path, project, agentId)
   if (!waiting.has(k) && !owed.has(k)) return
-  // Its status changed (a line Hive was typing into it went in, its turn ended): a start refused for that is tried again
+  // Its status changed (a line Combwork was typing into it went in, its turn ended): a start refused for that is tried again
   // now, not after RETRY_MS.
   for (const [key, t] of tried) if (t.builder === k) tried.delete(key)
   soon(ws)
@@ -330,7 +330,7 @@ let started = false
 export function startLaneStarts(): void {
   if (started) return
   started = true
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'lanes-changed') {
       const ws = openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())
       if (ws) soon(ws)

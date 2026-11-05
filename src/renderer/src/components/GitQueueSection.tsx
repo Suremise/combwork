@@ -110,7 +110,7 @@ export function GitQueueSection({ project }: { project: ProjectInfo }) {
  * with its detail (the merge commit, why it was returned or taken out) as its tooltip.
  */
 function historyColumns(v: QueueView, runs: readonly ProgressRun[], short: (id: string) => string): DataColumn<QueueRecent>[] {
-  // A red check named by its run, as the panel names it (when Hive still keeps the run).
+  // A red check named by its run, as the panel names it (when Combwork still keeps the run).
   const why = (r: QueueRecent): string => {
     const run = returnRun(v, r, runs)
     return returnWhy(r, returnCheck(r, run), v.target, tr, list)

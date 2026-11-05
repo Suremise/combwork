@@ -30,7 +30,7 @@ function transcript(path: string, at: number, n: number): void {
 type Timelines = (StoredSession & { timeline: UsageTimeline | null; summary: UsageSummary; firstActivity: string | null; lastActivity: string | null })[]
 
 async function setup(advanced: Record<string, unknown> = {}) {
-  const dir = tempDir('hive-usage-rollup-')
+  const dir = tempDir('cw-usage-rollup-')
   const file = join(dir, '.combwork', 'usage.db')
   await call({ type: 'config', advanced, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.9-test' })
   const session = async (name: string, at: number, n: number): Promise<void> => {

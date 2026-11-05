@@ -9,7 +9,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-finish-')
+const base = tempDir('cw-finish-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -94,7 +94,7 @@ describe("a finish's handler (HI-2014)", () => {
     const { parent, dependent, finish } = await overridden(w)
     // The effects as the first run made them, then the crash: no FinishStep written.
     const key = wf.store.cardByKey(`#${parent}`)!.key
-    await inWorkspace(w, () => tasks.commentAsHive(dependent, storedText(HISTORY.startsWithout, { card: key, reason: 'merged elsewhere' }), w, () => true, dependentNoteId(key, finish)))
+    await inWorkspace(w, () => tasks.commentAsCombwork(dependent, storedText(HISTORY.startsWithout, { card: key, reason: 'merged elsewhere' }), w, () => true, dependentNoteId(key, finish)))
     expect(facts(w).facts(parent).some((f) => f.kind === 'FinishStep')).toBe(false)
     await runFinish(w, wf, repo, parent, finish)
     const notes = (await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.appText?.id === 'tasks.history.startsWithout')

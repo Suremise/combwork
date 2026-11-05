@@ -36,7 +36,7 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
   // cw/hb3: an agent's branch from before slots, at integration's commit (merged). A tag named as integration.
   git(fx.alpha, 'branch', 'cw/hb3', 'integration')
   git(fx.alpha, 'tag', 'integration', 'main')
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

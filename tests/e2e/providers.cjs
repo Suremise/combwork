@@ -13,7 +13,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(path.join(ws, 'demo'), { recursive: true })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47893) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47893) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
@@ -49,7 +49,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   await page.locator('.activitybar .activity, .activity-bar .activity').first().click().catch(() => undefined)
   await sleep(300)
-  await page.evaluate(() => (window).__hiveRun?.('help.agentSetup'))
+  await page.evaluate(() => (window).__cwRun?.('help.agentSetup'))
   // Open Provider Setup through the command palette.
   await page.keyboard.press('Control+Shift+P')
   await sleep(300)

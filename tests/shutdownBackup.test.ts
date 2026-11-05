@@ -26,7 +26,7 @@ const SID2 = '0f5c2a8e-1111-4222-8333-944455557777'
 describe('sessions.backupAllNow', () => {
   async function hive() {
     vi.resetModules()
-    const profile = tempDir('hive-shutdown-')
+    const profile = tempDir('cw-shutdown-')
     const electron = await import('electron')
     ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
     const { sessions } = await import('../src/main/sessions')
@@ -109,7 +109,7 @@ describe('power: Windows ending the session', () => {
       sessions: { liveStates: () => [], backupAllNow: (budget: number) => (saves.push(budget), { saved: 1, skipped: 0, failed: 0 }) }
     }))
     vi.doMock('../src/main/config', () => ({ config: { settings: { general: { keepAwake: 'plugged-in' } }, onSettingsChanged: () => undefined } }))
-    vi.doMock('../src/main/events', () => ({ emit: () => undefined, onHiveEvent: () => undefined }))
+    vi.doMock('../src/main/events', () => ({ emit: () => undefined, onCombworkEvent: () => undefined }))
     vi.doMock('../src/main/workspace', () => ({ openWorkspaces: () => [] }))
     vi.doMock('../src/main/logger', () => ({ createLogger: () => ({ info: () => undefined, warn: () => undefined }) }))
     const mod = await import('../src/main/power')

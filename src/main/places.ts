@@ -47,7 +47,7 @@ export async function realPathAsync(p: string): Promise<string> {
 
 /**
  * A path's key for telling whether two paths are the same place: its real location (`realPath`), lower-cased. Git lists
- * worktrees by their real, long names, so a path Hive was given or saved as an 8.3 short name (C:\Users\RUNNER~1\…),
+ * worktrees by their real, long names, so a path Combwork was given or saved as an 8.3 short name (C:\Users\RUNNER~1\…),
  * through a junction or a symlink only matches git's by this (#389). One that can't be resolved keys as written.
  */
 export const placeKey = (p: string): string => realPath(p).toLowerCase()
@@ -59,7 +59,7 @@ export const placeKey = (p: string): string => realPath(p).toLowerCase()
 export const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase() || placeKey(a) === placeKey(b)
 
 /**
- * A test for whether a path is the place `folder` is, for matching the cwd a CLI recorded with Hive's spelling of a
+ * A test for whether a path is the place `folder` is, for matching the cwd a CLI recorded with Combwork's spelling of a
  * folder (#493): the same spelling, or else the same real location (`placeKey`), each other spelling resolved once.
  */
 export function placeMatcher(folder: string): (p: string) => boolean {

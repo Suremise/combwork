@@ -49,7 +49,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.showDeveloperFeatures': true, 'cw.console.showText': true } }))
 
   const api = await startFakeCopilotApi({ log: apiLog })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47823), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47823), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
   // Path-only access to each sibling, as Copilot saves it in its (test) home when a path is allowed: never write access.
   const locations = Object.fromEntries([[proj, sibling], [proj2, sibling2]].map(([p, s]) => [p, { allowed_directories: [s], tool_approvals: [] }]))
   fs.writeFileSync(path.join(copilotHome, 'permissions-config.json'), JSON.stringify({ locations }, null, 2))
@@ -157,11 +157,11 @@ const check = (name, ok, extra = '') => {
     check('a.ts edited by A', fs.readFileSync(path.join(proj, 'a.ts'), 'utf8').includes('probed'))
     check('A: lets a.ts go at the end of its turn', !((await live(a.id))?.lockedFiles ?? []).length, JSON.stringify((await live(a.id))?.lockedFiles))
 
-    // B: a hive tool, with no prompt in any mode (--allow-tool=hive, #468): it reaches Combwork's Agent API.
+    // B: a Combwork tool, with no prompt in any mode (--allow-tool=hive, #468): it reaches Combwork's Agent API.
     check('B: starts in Accept edits, Copilot’s default', (await live(b.id))?.permissionMode === 'accept-edits', (await live(b.id))?.permissionMode)
     await send(b.id, 'cw cw_list_projects then say Listed.', ['working', 'waiting'])
-    const hiveTurn = await timeline(b.id)
-    check('B: a hive tool runs without asking, and the turn finishes', hiveTurn.finished && !hiveTurn.asked, hiveTurn.seen.join(' → '))
+    const combworkTurn = await timeline(b.id)
+    check('B: a hive tool runs without asking, and the turn finishes', combworkTurn.finished && !combworkTurn.asked, combworkTurn.seen.join(' → '))
     check('B: …no tool dialog on its screen', !/Do you want to use this tool\?/.test(await screen(b.id)))
     const listed = fs.readFileSync(apiLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
     check('Copilot offered the Combwork tools, named combwork-<tool>', listed.some((r) => (r.tools ?? []).includes('combwork-cw_list_projects')), JSON.stringify(listed[0]?.tools ?? []))

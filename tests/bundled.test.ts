@@ -69,7 +69,7 @@ describe('recorded versions', () => {
   })
 
   it('counts a link by where it points, without following it', async () => {
-    const dir = tempDir('hive-hash-link-')
+    const dir = tempDir('cw-hash-link-')
     const plain = join(dir, 'plain')
     const linked = join(dir, 'linked')
     const target = join(dir, 'target')
@@ -89,7 +89,7 @@ describe('recorded versions', () => {
   })
 
   it("ignores line endings, so a checkout's CRLF is the same version", async () => {
-    const dir = tempDir('hive-hash-')
+    const dir = tempDir('cw-hash-')
     mkdirSync(join(dir, 'a', 'ref'), { recursive: true })
     mkdirSync(join(dir, 'b', 'ref'), { recursive: true })
     writeFileSync(join(dir, 'a', 'SKILL.md'), 'one\ntwo\n')
@@ -106,7 +106,7 @@ describe('recorded versions', () => {
 })
 
 describe('swapping a folder in', () => {
-  const dir = tempDir('hive-swap-')
+  const dir = tempDir('cw-swap-')
   const src = join(dir, 'src')
   mkdirSync(join(src, 'references'), { recursive: true })
   writeFileSync(join(src, 'SKILL.md'), 'new')
@@ -140,11 +140,11 @@ describe('swapping a folder in', () => {
 
   it('tidies what a crash between the steps leaves', async () => {
     const parent = join(dir, 'crash')
-    mkdirSync(join(parent, '.x.hive-old-1-1'), { recursive: true })
-    writeFileSync(join(parent, '.x.hive-old-1-1', 'SKILL.md'), 'kept')
-    mkdirSync(join(parent, '.y.hive-new-1-2'), { recursive: true })
+    mkdirSync(join(parent, '.x.cw-old-1-1'), { recursive: true })
+    writeFileSync(join(parent, '.x.cw-old-1-1', 'SKILL.md'), 'kept')
+    mkdirSync(join(parent, '.y.cw-new-1-2'), { recursive: true })
     mkdirSync(join(parent, 'z'), { recursive: true })
-    mkdirSync(join(parent, '.z.hive-old-1-3'), { recursive: true })
+    mkdirSync(join(parent, '.z.cw-old-1-3'), { recursive: true })
     await cleanSwaps(parent)
     // x's place was empty: the old copy comes back. A copy not yet in place goes, as does an old one replaced.
     expect(readdirSync(parent).sort()).toEqual(['x', 'z'])
@@ -153,7 +153,7 @@ describe('swapping a folder in', () => {
 })
 
 describe('a workspace', () => {
-  const base = tempDir('hive-bundled-')
+  const base = tempDir('cw-bundled-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   // Trash is the Recycle Bin in Combwork; here it deletes.
   ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })
@@ -261,7 +261,7 @@ describe('a workspace', () => {
       expect(readdirSync(join(ws, '.combwork', 'modes')).length).toBe(readdirSync(join(RES, 'modes')).length)
 
       // The views: the edited copy is "changed", the deleted one "missing" (Restore), the rest Combwork's.
-      const listed = await wsMod.inWorkspace(w, () => skills.hiveSkills(true))
+      const listed = await wsMod.inWorkspace(w, () => skills.combworkSkills(true))
       const state = Object.fromEntries(listed.map((s) => [s.name, s.bundled]))
       expect(state).toMatchObject({ handover: 'same', 'merge-ready': 'changed', 'pick-up': 'missing', 'work-on-card': 'same' })
 
@@ -274,7 +274,7 @@ describe('a workspace', () => {
 
       // Restore puts one back as Combwork's, and later updates follow it again.
       await wsMod.inWorkspace(w, () => skills.restoreBundledSkill('pick-up'))
-      expect((await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((s) => s.name === 'pick-up')?.bundled).toBe('same')
+      expect((await wsMod.inWorkspace(w, () => skills.combworkSkills(true))).find((s) => s.name === 'pick-up')?.bundled).toBe('same')
     } finally {
       await wsMod.disposeWorkspaceService(w)
     }
@@ -399,7 +399,7 @@ describe('a workspace', () => {
       m.skills.handover.from = oldHash
       writeFileSync(join(ws, '.combwork', 'bundled.json'), JSON.stringify(m))
       await wsMod.inWorkspace(w, () => mod.syncBundled())
-      const h = (await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((s) => s.name === 'handover')!
+      const h = (await wsMod.inWorkspace(w, () => skills.combworkSkills(true))).find((s) => s.name === 'handover')!
       expect(h.bundled).toBe('changed')
       expect(h.updateAvailable).toBe(true)
       expect(readFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), 'utf8')).toContain('My addition.')
@@ -421,7 +421,7 @@ describe('a workspace', () => {
       await wsMod.inWorkspace(w, () => mod.syncBundled())
       expect(readFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), 'utf8')).toBe(OLD_HANDOVER)
       expect(readFileSync(join(skillsDir(ws), 'handover', 'references', 'custom.md'), 'utf8')).toBe('My own reference.')
-      expect((await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((x) => x.name === 'handover')?.bundled).toBe('changed')
+      expect((await wsMod.inWorkspace(w, () => skills.combworkSkills(true))).find((x) => x.name === 'handover')?.bundled).toBe('changed')
     } finally {
       await wsMod.disposeWorkspaceService(w)
     }
@@ -442,7 +442,7 @@ describe('a workspace', () => {
       writeFileSync(join(ws, '.combwork', 'bundled.json'), JSON.stringify(m))
       await wsMod.inWorkspace(w, () => mod.syncBundled())
       expect(readFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), 'utf8')).toBe('A newer handover.\n')
-      const h = (await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((x) => x.name === 'handover')!
+      const h = (await wsMod.inWorkspace(w, () => skills.combworkSkills(true))).find((x) => x.name === 'handover')!
       expect([h.bundled, h.updateAvailable]).toEqual(['changed', undefined])
       const status = await wsMod.inWorkspace(w, () => mod.bundledStatus('modes', 'planner', join(ws, '.combwork', 'modes', 'planner.md')))
       expect(status).toEqual({ bundled: 'changed' })
@@ -461,13 +461,13 @@ describe('a workspace', () => {
     writeFileSync(join(skillsDir(ws), 'my-own', 'SKILL.md'), '---\nname: my-own\ndescription: A user skill.\n---\n')
     const w = await opened(ws)
     try {
-      const names = async (role: 'agent' | 'assistant') => (await wsMod.inWorkspace(w, () => skills.hiveSkills(false, role))).map((s) => s.name)
+      const names = async (role: 'agent' | 'assistant') => (await wsMod.inWorkspace(w, () => skills.combworkSkills(false, role))).map((s) => s.name)
       const forAgents = await names('agent')
       const forAssistant = await names('assistant')
       expect(forAgents).toEqual(expect.arrayContaining(['my-own', 'work-on-card', 'review-agent-work', 'merge-ready', 'handover', 'split-work']))
       expect(forAgents).not.toContain('coordinate-agents')
       expect(forAssistant).toEqual(expect.arrayContaining(['coordinate-agents', 'split-work', 'handover', 'pick-up', 'workspace-note']))
-      // use-cw-api is for both (HI-2012): its tools.md has the hive tools' cases.
+      // use-cw-api is for both (HI-2012): its tools.md has the Combwork tools' cases.
       expect(forAgents).toContain('use-cw-api')
       expect(forAssistant).toContain('use-cw-api')
       for (const n of ['my-own', 'work-on-card', 'review-agent-work', 'merge-ready']) expect(forAssistant).not.toContain(n)
@@ -478,7 +478,7 @@ describe('a workspace', () => {
 })
 
 describe("Codex's copies of a session's skills", () => {
-  const base = tempDir('hive-codex-skills-')
+  const base = tempDir('cw-codex-skills-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const source = (name: string, text: string) => {
     const d = join(base, 'workspace-skills', name)
@@ -497,14 +497,14 @@ describe("Codex's copies of a session's skills", () => {
     const dir = join(cwd, '.agents', 'skills')
     const example = source('example', 'v2')
     // A crash after the old copy was renamed aside: its place is empty, the new copy half-made beside it.
-    mkdirSync(join(dir, '.cw-example.hive-old-1-1', 'references'), { recursive: true })
-    writeFileSync(join(dir, '.cw-example.hive-old-1-1', 'SKILL.md'), 'v1')
-    writeFileSync(join(dir, '.cw-example.hive-old-1-1', '.combwork-copy'), JSON.stringify({ hash: 'old' }))
-    mkdirSync(join(dir, '.cw-example.hive-new-1-1'), { recursive: true })
+    mkdirSync(join(dir, '.cw-example.cw-old-1-1', 'references'), { recursive: true })
+    writeFileSync(join(dir, '.cw-example.cw-old-1-1', 'SKILL.md'), 'v1')
+    writeFileSync(join(dir, '.cw-example.cw-old-1-1', '.combwork-copy'), JSON.stringify({ hash: 'old' }))
+    mkdirSync(join(dir, '.cw-example.cw-new-1-1'), { recursive: true })
     // And one for a skill the session no longer gets: it comes back as Combwork's copy, then goes like any such copy (its
     // content still its marker's hash: unchanged since Combwork made it, #1431).
-    mkdirSync(join(dir, '.cw-gone.hive-old-1-2'), { recursive: true })
-    writeFileSync(join(dir, '.cw-gone.hive-old-1-2', '.combwork-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.cw-gone.hive-old-1-2')) }))
+    mkdirSync(join(dir, '.cw-gone.cw-old-1-2'), { recursive: true })
+    writeFileSync(join(dir, '.cw-gone.cw-old-1-2', '.combwork-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.cw-gone.cw-old-1-2')) }))
     const out = await sync(cwd, [{ name: 'example', sourcePath: example }])
     expect(readdirSync(dir).sort()).toEqual(['cw-example'])
     expect(readFileSync(join(dir, 'cw-example', 'SKILL.md'), 'utf8')).toBe('v2')
@@ -542,7 +542,7 @@ describe("Codex's copies of a session's skills", () => {
 })
 
 describe('links in skills Combwork copies', () => {
-  const base = tempDir('hive-skill-links-')
+  const base = tempDir('cw-skill-links-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const target = join(base, 'my-references')
   mkdirSync(target, { recursive: true })

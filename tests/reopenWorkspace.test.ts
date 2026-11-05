@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { junction } from './pathAliases'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-reopen-')
+const base = tempDir('cw-reopen-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')

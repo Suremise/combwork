@@ -109,8 +109,8 @@ export const justMerged = (v: QueueView, now: number): QueueRecent[] => v.recent
 /**
  * Whether a target's queue shows (#1356 item 0, round 2 of #1338): from its actual state, never the project's current
  * options alone. It shows while it has an entry testing or queued, a pause, a return not seen yet (or seen just now), a
- * merge of the last few seconds, a Hive running it (a lease), or a card in flight whose own ruleset has Hive merge into
- * it; and, empty, while the current options have Hive merge into it. So after a switch to "The agent merges" (or Git →
+ * merge of the last few seconds, a Combwork running it (a lease), or a card in flight whose own ruleset has Combwork merge into
+ * it; and, empty, while the current options have Combwork merge into it. So after a switch to "The agent merges" (or Git →
  * None with an old Git ruleset's cards in flight) the old queue stays, controllable, until its last outcome is seen.
  */
 export function queueShown(v: QueueView, now: number): boolean {
@@ -127,7 +127,7 @@ export const BUSY_MERGE_MS = 60 * 60_000
 
 /**
  * Whether a queue is doing something now (HI-2165): an entry testing or queued, a pause, a return not seen yet (or seen
- * just now), or a merge in the last hour. An idle queue that only shows because Hive merges into it (or runs it) isn't.
+ * just now), or a merge in the last hour. An idle queue that only shows because Combwork merges into it (or runs it) isn't.
  */
 export function queueBusy(v: QueueView, now: number): boolean {
   return !!v.testing || v.queued.length > 0 || !!v.paused || shownReturns(v, now).length > 0 || v.recent.some((r) => r.outcome === 'merged' && now - at(r.at) < BUSY_MERGE_MS)
@@ -146,8 +146,8 @@ export const onPulseLine = (v: QueueView): boolean => !!v.testing || !!v.paused
 export const queuedCount = (views: readonly QueueView[]): number => views.reduce((n, v) => n + v.queued.length, 0)
 
 /**
- * The estimate for the entry testing now (#1356 item 1): the median time of this target's last merge checks, from Hive's
- * runs (#1349). A merge's checks are Hive's runs in the project on its result revision (the test merge's, which the
+ * The estimate for the entry testing now (#1356 item 1): the median time of this target's last merge checks, from Combwork's
+ * runs (#1349). A merge's checks are Combwork's runs in the project on its result revision (the test merge's, which the
  * checks ran on); only merges whose runs all passed count, the newest ESTIMATE_OF of them. Null when there are none.
  */
 export function queueEstimate(v: QueueView, runs: readonly ProgressRun[]): number | null {
@@ -172,7 +172,7 @@ export function queueEstimate(v: QueueView, runs: readonly ProgressRun[]): numbe
 }
 
 /**
- * The Hive run of a returned entry's failed check (its log is Show log's, #1349): the card's Hive run in the project
+ * The Combwork run of a returned entry's failed check (its log is Show log's, #1349): the card's Combwork run in the project
  * whose log the outcome recorded, never another attempt's found by time (HI-1924, HR1's round 1). Null for a return no
  * check made (a conflict, a hook), an outcome that kept no log, or a run not kept.
  */
@@ -186,7 +186,7 @@ export function returnRun(v: QueueView, r: QueueRecent, runs: readonly ProgressR
 /** The check a return names: the one its outcome recorded, else its run's (null: none known). */
 export const returnCheck = (r: QueueRecent, run: ProgressRun | null): string | null => r.check ?? (run ? runCheckName(run) : null)
 
-/** A Hive run's check as its title names it ("HI-12 · unit · a3f2c1d": unit), or its counted check's name. */
+/** A Combwork run's check as its title names it ("HI-12 · unit · a3f2c1d": unit), or its counted check's name. */
 export function runCheckName(r: ProgressRun): string {
   if (r.counts?.name) return r.counts.name
   const parts = r.title.split(' · ')
@@ -241,7 +241,7 @@ export function returnWhy(r: QueueRecent, check: string | null, target: string, 
   return r.transient ? tr(msg({ id: 'board.queue.transient', defaultMessage: '{why} (temporary)', description: "A merge queue return that was the environment's failure, not the work's (a check that couldn't start, a network error): its reason ({why}) and that it was temporary." }), { why }) : why
 }
 
-/** A return: "HI-108 returned to HB1: conflict in tasks.ts" (`builder` null: to no one Hive knows). */
+/** A return: "HI-108 returned to HB1: conflict in tasks.ts" (`builder` null: to no one Combwork knows). */
 export function returnedText(r: QueueRecent, why: string, builder: string | null, tr: Tr): string {
   if (!builder) return tr(msg({ id: 'board.queue.returned', defaultMessage: '{card} returned: {why}', description: "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned (glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…)." }), { card: r.key, why })
   return tr(msg({ id: 'board.queue.returnedTo', defaultMessage: '{card} returned to builder {builder}: {why}', description: "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned to its builder ({builder}: an agent's name; glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…). A noun before the name (glossary §1 rule 4)." }), { card: r.key, builder, why })

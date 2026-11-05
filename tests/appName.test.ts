@@ -30,8 +30,8 @@ describe('the app name (#443, HI-2458)', () => {
     expect(builder.nsis.artifactName).toBe('Combwork-Setup-${version}.${ext}')
     expect(builder.publish).toMatchObject({ owner: 'Suremise', repo: 'combwork' })
     expect(builder.publish).toMatchObject(RELEASES_REPO) // the updater's feed (HI-2311)
-    // electron-updater's download cache (%LOCALAPPDATA%\hive-updater) is named after package.json's name.
-    expect(pkg.name).toBe('hive')
+    // electron-updater's download cache (%LOCALAPPDATA%\combwork-updater) is named after package.json's name.
+    expect(pkg.name).toBe('combwork')
   })
 
   it("names the profile folders Combwork and Combwork-Dev (HI-2461), set in main rather than taken from productName; Hive's and Hive-Dev's only the names upgrade's input (HI-2594)", () => {

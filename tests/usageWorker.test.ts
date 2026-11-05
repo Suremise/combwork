@@ -47,7 +47,7 @@ async function hold(file: string): Promise<ChildProcess> {
 const call = (m: Record<string, unknown>): Promise<unknown> => handleRequest({ id: ++id, ...m } as never)
 
 async function setup() {
-  const dir = tempDir('hive-usage-worker-')
+  const dir = tempDir('cw-usage-worker-')
   const file = join(dir, '.combwork', 'usage.db')
   const transcript = join(dir, 'abc.jsonl')
   await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.9-test' })
@@ -565,7 +565,7 @@ describe('the usage worker reading a transcript for main', () => {
 
 describe('the usage worker as main starts it (HI-1729)', () => {
   it('loads in a worker thread, where Electron has no `app`, and answers a job (since HI-1684 its logger threw there and ended it on every start)', async () => {
-    const base = tempDir('hive-usage-worker-thread-')
+    const base = tempDir('cw-usage-worker-thread-')
     // What `electron` is in a worker of Electron's main process: the npm package's export, a path, with no `app`.
     const stub = join(base, 'electron-in-worker.cjs')
     writeFileSync(stub, "module.exports = 'C:\\\\electron\\\\electron.exe'\n")

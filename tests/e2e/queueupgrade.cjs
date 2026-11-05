@@ -94,7 +94,7 @@ const log = () => {
   fs.mkdirSync(path.join(fx.alpha, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(fx.alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // Opened as the user opens it: the ask shows, nothing is pre-answered (no CW_TEST_BOARD_UPGRADE), options kept for after.
-  let h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const ask = h.page.locator('.dialog', { hasText: ASK })
@@ -192,7 +192,7 @@ const log = () => {
       await startAgain(crash ? { CW_TEST_MERGE_CHOICE_CRASH: crash } : {})
     }
     const startAgain = async (env = {}) => {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env })
       reviewer = await q.rejoin(fx, h, reviewer)
       builder = await q.rejoin(fx, h, builder)
     }
@@ -261,7 +261,7 @@ const log = () => {
     const answer = (await h.facts(five.n)).find((x) => x.kind === 'Approval' && x.data?.request === five.request)
     check("…the answer, in German, as Version Control → Workflow names the options (HI-1733)", answer?.data?.note === german, JSON.stringify(answer?.data))
     // The board by its command, as the menu runs it (its button's name is German now).
-    if (!(await h.page.locator('.board').isVisible())) await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: 'view.board', args: [] })
+    if (!(await h.page.locator('.board').isVisible())) await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: 'view.board', args: [] })
     await until(async () => (await h.page.locator(`.task-card[data-task="${five.n}"]`).count()) === 1, HUNG_MS)
     await q.openByTitle(h.page, five.n)
     const comment = h.page.locator('.task-comment', { hasText: de['workflow.value.style.squash'] }).last()

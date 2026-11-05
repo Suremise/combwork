@@ -10,7 +10,7 @@ import { DEFAULT_JOURNAL } from '../src/shared/journal'
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 
-const base = tempDir('hive-journal-service-')
+const base = tempDir('cw-journal-service-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

@@ -121,7 +121,7 @@ const PSEUDO = 'en-XA'
 
 /** Tells the window its language changed, as Settings → General → Language does (the language-changed event). */
 const sendLanguage = (ctx, language) =>
-  ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'language-changed', language: l }), language)
+  ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language: l }), language)
 
 /**
  * The notices closed. Putting .git back (closeInit) raises "Version control changed in alpha" at the window's bottom
@@ -234,7 +234,7 @@ async function statusBar(ctx) {
 }
 
 /** The .combwork notice in Project Settings: a file in .combwork committed to git. */
-async function hiveNotice(ctx) {
+async function combworkNotice(ctx) {
   const { page, inv, project } = ctx
   await page.mouse.move(5, 5)
   fs.mkdirSync(path.join(project, '.combwork'), { recursive: true })
@@ -243,12 +243,12 @@ async function hiveNotice(ctx) {
   git(ctx, 'commit', '-qm', 'Commit a file in .combwork')
   await inv('workspace:refresh')
   await ctx.command('project.tab.settings')
-  return shown(ctx, page.locator('.hive-vcs-notice').first(), 'the .combwork notice')
+  return shown(ctx, page.locator('.cw-vcs-notice').first(), 'the .combwork notice')
 }
 
 /** Its Untrack… asks first, listing the files. */
 async function untrackDialog(ctx) {
-  await ctx.page.locator('.hive-vcs-notice button.primary').first().click()
+  await ctx.page.locator('.cw-vcs-notice button.primary').first().click()
   return shown(ctx, ctx.page.locator('.dialog').last(), 'the Untrack dialog')
 }
 
@@ -272,7 +272,7 @@ module.exports = {
     { name: 'add-remote-form', open: addRemote, close: cancelDialog },
     { name: 'identity-form', open: identityForm, close: cancelDialog },
     { name: 'status-bar', open: statusBar },
-    { name: 'hive-notice', open: hiveNotice },
+    { name: 'hive-notice', open: combworkNotice },
     { name: 'untrack-dialog', open: untrackDialog, close: closeLast }
   ]
 }

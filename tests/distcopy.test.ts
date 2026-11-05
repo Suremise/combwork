@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 type Info = { version: string; code: string; head: string; branch: string | null; builtAt: string }
 
 describe('installers built in a worktree (scripts/distCopy.mjs)', () => {
-  const base = tempDir('hive-distcopy-')
+  const base = tempDir('cw-distcopy-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const main = join(base, 'main')
   const wt = join(base, 'wt')
@@ -230,7 +230,7 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
 // npm run release builds in its own checkout's dist (scripts/release.mjs) by npm run dist's rules (HI-2411): makeRelease,
 // with the build, the app's stamp and the upload faked; and npm run dist's own claim on its dist (makeDist, HI-2417).
 describe('a release build in dist (makeRelease)', () => {
-  const base = tempDir('hive-release-')
+  const base = tempDir('cw-release-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   let n = 0
   type Ident = { version: string; code: string; head: string; branch: string | null }

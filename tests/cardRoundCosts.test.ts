@@ -12,7 +12,7 @@ import type { Fact, FactKind } from '../src/shared/workflow/facts'
 import { preset } from '../src/shared/workflow/options'
 import { B1, R1, R2, commit, moved, setup, type Env } from './workflow/harness'
 
-const base = tempDir('hive-round-costs-')
+const base = tempDir('cw-round-costs-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')

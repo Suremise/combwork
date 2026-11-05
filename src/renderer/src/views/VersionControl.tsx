@@ -118,7 +118,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
   // Git's page shown before the repository (HI-1905): this component's alone, never saved, gone with the project or the
   // tab. It stays through an init that stopped part way (a repository with no commit yet) until the project is Git, and
   // ends once the folder has a repository of its own with a commit (made here, the switch then cancelled, or elsewhere):
-  // None's page then, with Hive's offer to switch.
+  // None's page then, with Combwork's offer to switch.
   const [previewFor, setPreviewFor] = useState<string | null>(null)
   const [initError, setInitError] = useState<{ path: string; error: string } | null>(null)
   const preview = platform === 'none' && previewFor === project.path && (noRepo || (!!s?.isRepo && !s.head))

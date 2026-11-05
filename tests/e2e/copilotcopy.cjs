@@ -44,16 +44,16 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const api = await startFakeCopilotApi({ log: apiLog })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47831), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47831), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
   // The folder is trusted already (as "Yes, and remember this folder" saves it): Copilot goes straight to its prompt.
   fs.writeFileSync(path.join(copilotHome, 'config.json'), JSON.stringify({ trustedFolders: [proj] }, null, 2))
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
-  const hiveLog = path.join(userData, 'logs', 'combwork.log')
+  const combworkLog = path.join(userData, 'logs', 'combwork.log')
   const logged = (re) => {
     try {
-      return re.test(fs.readFileSync(hiveLog, 'utf8'))
+      return re.test(fs.readFileSync(combworkLog, 'utf8'))
     } catch {
       return false
     }
@@ -85,11 +85,11 @@ const check = (name, ok, extra = '') => {
     const status = async () => (await live())?.status
     const screen = async () => lib.plainText(await inv('pty:buffer', key).catch(() => ''))
     // What the terminal shows now (the pty's history keeps text since rubbed out).
-    const onScreen = async () => ((await page.evaluate((k) => window.__hiveTerminalLines(k), key)) ?? []).join('\n')
-    const textAt = (text) => page.evaluate(([k, t]) => window.__hiveTerminalTextAt(k, t), [key, text])
-    const output = (data) => page.evaluate(([k, d]) => window.__hiveTerminalOutput(k, d), [key, data])
-    const hiveSelection = () => page.evaluate((k) => window.__hiveTerminalSelection(k), key)
-    const mouse = () => page.evaluate((k) => window.__hiveTerminalState(k)?.mouse, key)
+    const onScreen = async () => ((await page.evaluate((k) => window.__cwTerminalLines(k), key)) ?? []).join('\n')
+    const textAt = (text) => page.evaluate(([k, t]) => window.__cwTerminalTextAt(k, t), [key, text])
+    const output = (data) => page.evaluate(([k, d]) => window.__cwTerminalOutput(k, d), [key, data])
+    const combworkSelection = () => page.evaluate((k) => window.__cwTerminalSelection(k), key)
+    const mouse = () => page.evaluate((k) => window.__cwTerminalState(k)?.mouse, key)
     const rightClickGoesTo = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-right-click'), key)
 
     await inv('session:start', proj, { agentId: a.id })
@@ -108,7 +108,7 @@ const check = (name, ok, extra = '') => {
     }, HUNG_MS, 200)
     check('the reply is on screen', !!at, JSON.stringify(at))
     // Copilot's own selection as it draws it (on a background colour): the whole text, as a user sees it before copying.
-    const copilotSelected = async () => ((await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)) ?? []).some((r) => r.trimEnd() === TEXT)
+    const copilotSelected = async () => ((await page.evaluate((k) => window.__cwTerminalHighlighted(k), key)) ?? []).some((r) => r.trimEnd() === TEXT)
     // A drag over the text. Without Shift it's Copilot's, which takes its last moves a moment after a key that follows at
     // once (#1299: Ctrl+C straight after the drag copied "SELE" while the whole text was drawn selected after it), so
     // it is over once Copilot draws the whole text selected, from none drawn before: true then.
@@ -128,8 +128,8 @@ const check = (name, ok, extra = '') => {
     // 1. Copilot's own selection: a drag (reported to Copilot, which tracks the mouse), then Ctrl+C. Copilot copies with
     // an OSC 52 write; the terminal is in use (focused, a key just now), so the text reaches the clipboard.
     const copiedOnScreen = (await screen()).split('copied to clipboard').length
-    check('Copilot draws the drag as its selection, over the whole text', await drag(false), JSON.stringify(await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)))
-    check("the drag makes Copilot's selection, not Combwork's", (await hiveSelection()) === '', JSON.stringify(await hiveSelection()))
+    check('Copilot draws the drag as its selection, over the whole text', await drag(false), JSON.stringify(await page.evaluate((k) => window.__cwTerminalHighlighted(k), key)))
+    check("the drag makes Copilot's selection, not Combwork's", (await combworkSelection()) === '', JSON.stringify(await combworkSelection()))
     await page.keyboard.press('Control+c')
     const got = await lib.until(async () => ((await copied()).length ? await copied() : null), HUNG_MS, 100)
     check("Ctrl+C on Copilot's selection puts its text on the clipboard (OSC 52)", JSON.stringify(got) === JSON.stringify([TEXT]), JSON.stringify(got))
@@ -197,7 +197,7 @@ const check = (name, ok, extra = '') => {
     // policy, refused without a new log line (one per reason a minute).
     const setPolicy = async (v) => {
       await inv('advanced:set', POLICY, v)
-      await lib.until(() => page.evaluate(([id, want]) => window.__hiveAdvancedValue(id) === want, [POLICY, v]), HUNG_MS, 100)
+      await lib.until(() => page.evaluate(([id, want]) => window.__cwAdvancedValue(id) === want, [POLICY, v]), HUNG_MS, 100)
     }
     await setPolicy('block')
     await clickBelow()
@@ -225,8 +225,8 @@ const check = (name, ok, extra = '') => {
     const before = (await screen()).split('copied to clipboard').length
     const n = (await copied()).length
     await drag(true)
-    const selected = await lib.until(async () => ((await hiveSelection())?.includes(TEXT) ? await hiveSelection() : null), HUNG_MS, 100)
-    check("Shift+drag makes Combwork's selection", !!selected, JSON.stringify(await hiveSelection()))
+    const selected = await lib.until(async () => ((await combworkSelection())?.includes(TEXT) ? await combworkSelection() : null), HUNG_MS, 100)
+    check("Shift+drag makes Combwork's selection", !!selected, JSON.stringify(await combworkSelection()))
     await page.keyboard.press('Control+c')
     const hive = await lib.until(async () => ((await copied()).length > n ? await copied() : null), HUNG_MS, 100)
     check("Ctrl+C copies Combwork's selection", !!hive && hive[n].includes(TEXT), JSON.stringify(hive))
@@ -242,17 +242,17 @@ const check = (name, ok, extra = '') => {
     const m6 = (await copied()).length
     const reads6 = await reads()
     await drag(true)
-    check("Shift+drag makes Combwork's selection again", !!(await lib.until(async () => (await hiveSelection())?.includes(TEXT), HUNG_MS, 100)), JSON.stringify(await hiveSelection()))
+    check("Shift+drag makes Combwork's selection again", !!(await lib.until(async () => (await combworkSelection())?.includes(TEXT), HUNG_MS, 100)), JSON.stringify(await combworkSelection()))
     // Moving the mouse to right-click keeps it: a move over a program tracking the mouse counts as input, which xterm
     // clears a selection on, so Combwork doesn't report moves while there is one. The move is settled once the next
     // evaluation runs (Playwright waits for the page to take it).
     await page.mouse.move(at.s.x + at.w, at.s.y + at.w)
     await page.mouse.move(at.s.x + at.w, at.s.y)
-    check('…and moving the mouse keeps it', (await hiveSelection())?.includes(TEXT), JSON.stringify(await hiveSelection()))
+    check('…and moving the mouse keeps it', (await combworkSelection())?.includes(TEXT), JSON.stringify(await combworkSelection()))
     await rightClick()
     const rc = await lib.until(async () => ((await copied()).length > m6 ? await copied() : null), HUNG_MS, 100)
     check('right-click copies it', !!rc && rc[m6].includes(TEXT), JSON.stringify(rc))
-    check('…clears it, and pastes nothing', (await hiveSelection()) === '' && (await reads()) === reads6, `${JSON.stringify(await hiveSelection())}, ${(await reads()) - reads6} read(s)`)
+    check('…clears it, and pastes nothing', (await combworkSelection()) === '' && (await reads()) === reads6, `${JSON.stringify(await combworkSelection())}, ${(await reads()) - reads6} read(s)`)
     check('…without interrupting Copilot', (await status()) === 'finished', await status())
 
     // 7. Pass right-click to Copilot (at once, no restart): the button goes to Copilot, which copies its own selection
@@ -261,8 +261,8 @@ const check = (name, ok, extra = '') => {
     check('right-click now goes to Copilot', !!(await lib.until(async () => (await rightClickGoesTo()) === 'cli', HUNG_MS, 100)), await rightClickGoesTo())
     const m7 = (await copied()).length
     const reads7 = await reads()
-    check('Copilot draws the drag as its selection again', await drag(false), JSON.stringify(await page.evaluate((k) => window.__hiveTerminalHighlighted(k), key)))
-    check("the drag makes Copilot's selection", (await hiveSelection()) === '', JSON.stringify(await hiveSelection()))
+    check('Copilot draws the drag as its selection again', await drag(false), JSON.stringify(await page.evaluate((k) => window.__cwTerminalHighlighted(k), key)))
+    check("the drag makes Copilot's selection", (await combworkSelection()) === '', JSON.stringify(await combworkSelection()))
     await rightClick()
     const viaCopilot = await lib.until(async () => ((await copied()).length > m7 ? await copied() : null), HUNG_MS, 100)
     check("right-click over Copilot's selection: Copilot copies it", !!viaCopilot && viaCopilot[m7] === TEXT, JSON.stringify(viaCopilot))

@@ -32,13 +32,13 @@ export interface LedgerRow {
   compactions: number
   /** The cost known as an amount: the provider's charges' share, or a kept usage's cost as it was priced when kept. */
   fixedUsd: number
-  /** That amount is Hive's estimate (a kept usage's estimate). */
+  /** That amount is Combwork's estimate (a kept usage's estimate). */
   fixedEstimated: boolean
-  /** The tokens `fixedUsd` covers: the rest get Hive's estimate when priced. */
+  /** The tokens `fixedUsd` covers: the rest get Combwork's estimate when priced. */
   covered: UsageTokens
   /** Requests whose tokens aren't known yet (Copilot's, until its launch exits). */
   tokensUnknown: number
-  /** Its tokens are Hive's share of a total (spread over requests; a part of a step, a card held with others): ≈. */
+  /** Its tokens are Combwork's share of a total (spread over requests; a part of a step, a card held with others): ≈. */
   shared: boolean
 }
 
@@ -175,7 +175,7 @@ export function ledgerRows(raw: SessionUsage, holds: SessionHold[], settings?: P
     }
     out.push(...rows)
   }
-  // No timeline (a result from before #602): each charge shared between the days it covers, by Hive's estimate (else tokens).
+  // No timeline (a result from before #602): each charge shared between the days it covers, by Combwork's estimate (else tokens).
   if (!t?.rows.length && raw.costReports?.length) {
     const byDay = new Map(out.filter((r) => r.card === 0).map((r) => [r.day, r]))
     for (const rep of raw.costReports) {
@@ -321,7 +321,7 @@ export interface BaselineDay {
 
 /**
  * Rows without the CLI's reported charges (HI-1772: a session that ran on a server connection): their counts kept, each
- * priced by Hive's estimate from its model when shown. A charge Hive estimated is kept as it is (it follows the prices).
+ * priced by Combwork's estimate from its model when shown. A charge Combwork estimated is kept as it is (it follows the prices).
  */
 export function rowsWithoutReports(rows: LedgerRow[]): LedgerRow[] {
   return rows.map((r) => (r.fixedEstimated || (r.fixedUsd === 0 && tokenSum(r.covered) === 0) ? r : { ...r, fixedUsd: 0, fixedEstimated: false, covered: ZERO() }))
@@ -355,7 +355,7 @@ export function baselineOfUsage(usage: SessionUsage): BaselineDay[] {
   return days.filter(([day]) => !!day).map(([day, d]) => ({ day, model, inputTokens: d.inputTokens, outputTokens: d.outputTokens, cacheWriteTokens: d.cacheWriteTokens, cacheReadTokens: d.cacheReadTokens, requests: d.requests, prompts: d.prompts, compactions: d.compactions, costUsd: d.costUsd, costEstimated: d.costEstimated, covered: d.costUsd === null ? ZERO() : { inputTokens: d.inputTokens, outputTokens: d.outputTokens, cacheWriteTokens: d.cacheWriteTokens, cacheReadTokens: d.cacheReadTokens } }))
 }
 
-/** What of a row's cost the provider reported (a charge it was given; never Hive's estimate, which follows the prices). */
+/** What of a row's cost the provider reported (a charge it was given; never Combwork's estimate, which follows the prices). */
 const reported = (r: LedgerRow): number => (r.fixedEstimated ? 0 : r.fixedUsd)
 
 /**
@@ -426,7 +426,7 @@ export function applyBaseline(all: LedgerRow[], baseline: BaselineDay[], provide
       // A reported charge and the tokens it paid for, as one record (round 5): what the rows' own reported charges lack of
       // it, with the tokens they lack coverage for. Those are marked covered on the day's rows first (the same tokens,
       // read again without their report: not estimated a second time), the rest on the `kept` row's own tokens; and the
-      // amount goes with them (round 7), shared between the rows that took them as any charge is (by Hive's estimate for
+      // amount goes with them (round 7), shared between the rows that took them as any charge is (by Combwork's estimate for
       // the tokens each took, else their number), so a card has the charge for its tokens, never them for free. Only an
       // amount no row's tokens took stays on the `kept` row (card 0).
       const has = day.reduce((n, x) => n + reported(x), 0)
@@ -489,13 +489,13 @@ export function dominates(rows: LedgerRow[], before: LedgerRow[]): boolean {
   return true
 }
 
-/** A row's cost with today's prices: its known amount, and Hive's estimate for the tokens it doesn't cover (null: none known). */
+/** A row's cost with today's prices: its known amount, and Combwork's estimate for the tokens it doesn't cover (null: none known). */
 export function rowCost(r: LedgerRow, provider: ProviderId, settings?: Pick<AppSettings, 'providers'> | null): { usd: number | null; estimated: boolean } {
   const model = r.model || null
   const est = (t: UsageTokens): number | null => estimateCost({ provider, model, ...t }, settings)
   const all: UsageTokens = { inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheWriteTokens: r.cacheWriteTokens, cacheReadTokens: r.cacheReadTokens }
   const fixed = r.fixedUsd > 0 || tokenSum(r.covered) > 0
-  // The user's own prices (#436): Hive's estimate for all of it, where it has a price.
+  // The user's own prices (#436): Combwork's estimate for all of it, where it has a price.
   if (usesOwnPrices(provider, settings)) {
     const e = est(all)
     if (e !== null) return { usd: e, estimated: true }

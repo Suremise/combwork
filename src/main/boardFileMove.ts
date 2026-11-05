@@ -2,7 +2,7 @@ import { readdir, rename, rm, stat } from 'original-fs/promises'
 import { join } from 'path'
 import { msg, tr } from '../shared/i18n'
 import { toast } from './events'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { ifAbsent, present } from './fsPresence'
 
@@ -87,7 +87,7 @@ async function leftovers(dir: string): Promise<string[]> {
 
 /**
  * Moves the board's file in `dir` (a workspace's `.combwork`) to its new name, as the header says. `checkpoint` folds
- * the old file's log in and closes it (in a worker: combworkMove.ts's). Throws a HiveError when it can't, nothing lost.
+ * the old file's log in and closes it (in a worker: combworkMove.ts's). Throws a CombworkError when it can't, nothing lost.
  */
 export async function moveBoardFile(dir: string, checkpoint: (file: string) => Promise<{ ok: boolean; error?: string }>): Promise<void> {
   const oldFile = join(dir, OLD_DB_FILE)
@@ -104,17 +104,17 @@ export async function moveBoardFile(dir: string, checkpoint: (file: string) => P
     await boardMoveTestHooks.after?.('checkpointed')
     for (const s of ['-wal', '-journal'] as const) {
       const size = await sizeOf(oldFile + s)
-      if (size) throw hiveError(M.notFolded, { file: oldFile, log: oldFile + s }, { kind: 'conflict' })
+      if (size) throw combworkError(M.notFolded, { file: oldFile, log: oldFile + s }, { kind: 'conflict' })
     }
     // Never onto a file that is there (Node's rename replaces it on Windows): looked at again, under the move's lock.
-    if (present(newFile)) throw hiveError(M.notFolded, { file: oldFile, log: newFile }, { kind: 'conflict' })
+    if (present(newFile)) throw combworkError(M.notFolded, { file: oldFile, log: newFile }, { kind: 'conflict' })
     await rename(oldFile, newFile)
     log.info(`Renamed ${userText(oldFile)} to ${NEW_DB_FILE}`)
     await boardMoveTestHooks.after?.('renamed')
   }
   const kept = await leftovers(dir)
   if (kept.length) {
-    if (!present(newFile)) throw hiveError(M.orphan, { file: kept[0] }, { kind: 'conflict' })
+    if (!present(newFile)) throw combworkError(M.orphan, { file: kept[0] }, { kind: 'conflict' })
     for (const f of kept) {
       log.warn(`${userText(f)} holds data beside ${NEW_DB_FILE}: left as it is`)
       warnOnce(`left:${f.toLowerCase()}`, tr(M.leftTitle, { file: f }), tr(M.leftBody))

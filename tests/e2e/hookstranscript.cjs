@@ -65,7 +65,7 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.hooks.missingSeconds': 3 } }, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47846), ...cenv, CODEX_HOME: codexHome, FAKE_CODEX_VERSION: '0.162.1', CW_TEST_TIPS: 'off', CW_TEST_HOOKS_HOLD: hold })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47846), ...cenv, CODEX_HOME: codexHome, FAKE_CODEX_VERSION: '0.162.1', CW_TEST_TIPS: 'off', CW_TEST_HOOKS_HOLD: hold })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

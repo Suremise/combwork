@@ -8,7 +8,7 @@ import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, agentSetting, checkSettingValue, effortTakes, settingDefault, settingEntry, settingHelps, settingKind, settingOptions, settingPatch, settingPath, settingReadOnly, settingValue, settingValueText, shownSettingPath, workflowTakes, PLATFORM_SETTING_KEY, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
 import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platformSwitch'
-import { agentError, HiveError } from './hiveError'
+import { agentError, CombworkError } from './combworkError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
 import { setSlotDefault } from './slotSettings'
 import { workflowWrite } from './workflow/writes'
@@ -26,7 +26,7 @@ import { workspace } from './workspace'
 import { advanced, updateSettingsChecked } from './advanced'
 
 /**
- * Hive's settings for the Agent API and the Hive Assistant's settings tools (#186): the catalog's entries with their
+ * Combwork's settings for the Agent API and the Combwork Assistant's settings tools (#186): the catalog's entries with their
  * values, and a change made the way Settings and Project Settings make it (config.updateSettings and the table setters,
  * or the project's config under its lock). Who may change what is decided by the caller (settingsChange in
  * servers.ts), and checked again by its guard at the moment of the change.
@@ -59,7 +59,7 @@ const T = {
   // When a change applies.
   restartSessions: agentMsg({ id: 'settings.agent.tool.restart.sessions', text: 'to sessions started afterwards (running agents show Restart session)', note: 'When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it.' }),
   restartAssistant: agentMsg({ id: 'settings.agent.tool.restart.assistant', text: 'to the Assistant after it restarts', note: 'When a change applies: to the Assistant once it restarts (#676).' }),
-  restartHive: agentMsg({ id: 'settings.agent.tool.restart.cw', text: 'when Combwork restarts (Settings → Advanced offers Restart Combwork)', note: 'When a change applies: once Combwork restarts (#676). Restart Combwork is the name of the button.' }),
+  restartCombwork: agentMsg({ id: 'settings.agent.tool.restart.cw', text: 'when Combwork restarts (Settings → Advanced offers Restart Combwork)', note: 'When a change applies: once Combwork restarts (#676). Restart Combwork is the name of the button.' }),
   // The rows a plain listing sums up.
   workflowMoreTitle: agentMsg({ id: 'settings.agent.tool.more.workflowTitle', text: 'query "workflow" lists them', note: "cw_list_settings: the row that stands for the workflow defaults left out of a plain listing (#1422). query is the tool's argument." }),
   workflowMoreDesc: agentMsg({ id: 'settings.agent.tool.more.workflowDesc', text: "Combwork defaults and the workspace's (Settings → Version Control), per version control (inherit).", note: 'cw_list_settings: what the workflow defaults left out are (#1422).' }),
@@ -136,7 +136,7 @@ function takesText(e: SettingEntry, project: ProjectConfig | null): string {
   }
 }
 
-const RESTART_TEXT = { sessions: T.restartSessions, assistant: T.restartAssistant, combwork: T.restartHive } as const
+const RESTART_TEXT = { sessions: T.restartSessions, assistant: T.restartAssistant, combwork: T.restartCombwork } as const
 
 // A listing row's gist (#1312): its first sentence, cut at a word within 60 characters, so a query's rows stay lean.
 const firstSentence = (s: string): string => {
@@ -155,7 +155,7 @@ export async function projectOf(projectPath: string | null): Promise<{ path: str
 }
 
 /**
- * The settings as rows: Hive's and the providers', and with a project its settings too (only then: their values are a
+ * The settings as rows: Combwork's and the providers', and with a project its settings too (only then: their values are a
  * project's). `query` keeps those whose id, title, path or text has every word; `scope` one scope.
  */
 export function settingRows(opts: { query?: string; scope?: SettingScope; project?: { config: ProjectConfig } | null }): SettingRow[] {
@@ -174,7 +174,7 @@ export function settingRows(opts: { query?: string; scope?: SettingScope; projec
       const said = agentSetting(e)
       return { row: { id: e.id, title: said.title, value: settingValueText(e, value), ...(changed ? { default: settingValueText(e, def) } : {}), desc: firstSentence(said.desc), ...(e.readOnly ? { readOnly: true as const } : {}) }, advanced: !!e.advanced, level: !!e.workflowLevel || (!!e.slotLevel && e.slotLevel !== 'project'), changed }
     })
-  // Advanced settings (#367) and the workflow defaults at Hive's and the workspace's level (#1422) only when a query asks
+  // Advanced settings (#367) and the workflow defaults at Combwork's and the workspace's level (#1422) only when a query asks
   // or one was changed: the rest are one line each, so a plain listing stays lean.
   if (words.length) return rows.map((r) => r.row)
   const atDefault = rows.filter((r) => r.advanced && !r.changed).length
@@ -187,7 +187,7 @@ export function settingRows(opts: { query?: string; scope?: SettingScope; projec
 }
 
 /**
- * Where the user sees a setting, in the language Hive shows them (#767), when that isn't English: the tools speak
+ * Where the user sees a setting, in the language Combwork shows them (#767), when that isn't English: the tools speak
  * English, so the Assistant can name it as the user reads it ("Ustawienia → Sesje → …"). undefined in English.
  */
 function shownAs(e: SettingEntry): string | undefined {
@@ -242,10 +242,10 @@ export const removedPrices = (provider: ProviderId): string[] => [...(providerSe
 /**
  * Sets a setting to a value as Settings or Project Settings would, and returns what it was and is now. `guard` runs at
  * the moment of the change, with the value as it is then (under the project's lock for a project's setting, or with no
- * wait before Hive's own settings change): it throws to refuse, so a permission withdrawn, or a value changed by
+ * wait before Combwork's own settings change): it throws to refuse, so a permission withdrawn, or a value changed by
  * someone else, while the call waited is noticed. Never a sensitive setting: those stay the user's.
  *
- * A provider's prices: null puts back Hive's, as Settings' Reset to defaults does, the removed shipped models too;
+ * A provider's prices: null puts back Combwork's, as Settings' Reset to defaults does, the removed shipped models too;
  * a table keeps them removed, unless `removed` (Revert's) says which. `removed` in the result is set when they changed.
  */
 export async function applySetting(
@@ -315,7 +315,7 @@ export async function applySetting(
     return { old, new: settingValue(e, config.settings, null, workspace.config) }
   }
   if ('slotLevel' in change) {
-    // A level's slot default (HI-1765), saved as Settings saves it: Hive's at once, the workspace's in its save queue,
+    // A level's slot default (HI-1765), saved as Settings saves it: Combwork's at once, the workspace's in its save queue,
     // the guard in the change's own turn, against the level's value it replaces (HR5's round 1).
     const { level, key, value: v } = change.slotLevel
     const at = (d: SlotDefaults | undefined): unknown => (level === 'global' ? settingValue(e, { ...config.settings, slotDefaults: d }) : settingValue(e, config.settings, null, { ...workspace.config, slotDefaults: d }))
@@ -326,7 +326,7 @@ export async function applySetting(
     })
     return { old, new: at(saved) }
   }
-  // Hive's own settings change at once, with nothing awaited between the guard and the change.
+  // Combwork's own settings change at once, with nothing awaited between the guard and the change.
   const current = (): unknown => settingValue(e, config.settings, null, null, advanced.overrides())
   if ('settings' in change) {
     // Show developer features is kept in advanced.json too: written there first, or refused, with the guard and the
@@ -360,7 +360,7 @@ async function switchSetting(value: unknown, projectPath: string | null, guard?:
     const r = await setPlatform(workspace, projectPath, value, { ...(guard ? { guard } : {}) })
     return { old: r.from, new: r.to, ...(note && r.from !== r.to ? { note } : {}) }
   } catch (err) {
-    throw err instanceof HiveError ? new SettingRefused(409, say(T.switchRefused, { error: agentError(err) })) : err
+    throw err instanceof CombworkError ? new SettingRefused(409, say(T.switchRefused, { error: agentError(err) })) : err
   }
 }
 

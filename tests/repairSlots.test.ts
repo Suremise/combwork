@@ -414,7 +414,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
   })
 
   // Another Combwork on the same workspace (HR1's round 2): its own connection to combwork.db, its own holder.
-  const otherHive = { pid: 990_001, started: 1 }
+  const otherCombwork = { pid: 990_001, started: 1 }
   const dbFile = (): string => join(ws.path!, '.combwork', 'combwork.db')
   const reservation = (id: string): string | undefined => boardRead(ws, (db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(deleteKey(id)) as { value: string } | undefined)?.value)
   const opsOf = (id: string): (string | null)[] => boardRead(ws, (db) => [...(db.prepare('SELECT op FROM slots WHERE project = ?').all(id) as { op: string | null }[]), ...(db.prepare('SELECT op FROM copies WHERE project = ?').all(id) as { op: string | null }[])].map((r) => r.op))
@@ -437,8 +437,8 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     try {
       const slots = new SlotStore(conn, id)
       const slot = checked.find((f) => f.of.kind === 'slot' && f.folder.toLowerCase() === g.dirty.toLowerCase())!
-      expect(await slots.startWarm(slot.name, slot.lease!.id, 'o-other', otherHive)).toBe(true)
-      expect(await reserveDelete(ws, id, checked, 'd-test4', otherHive)).toEqual({ busy: [slot.name], deleting: false })
+      expect(await slots.startWarm(slot.name, slot.lease!.id, 'o-other', otherCombwork)).toBe(true)
+      expect(await reserveDelete(ws, id, checked, 'd-test4', otherCombwork)).toEqual({ busy: [slot.name], deleting: false })
       expect(reservation(id)).toBeUndefined()
       expect(opsOf(id).filter((o) => o === 'd-test4')).toEqual([])
       // Through Delete itself: refused, nothing deleted, the other Combwork's operation untouched.
@@ -448,9 +448,9 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
       await conn.write((db) => db.prepare("UPDATE slots SET op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE op = 'o-other'").run())
       // A copy the other Combwork leased after the plan refuses it the same way.
       const copies = new CopyStore(conn, id)
-      const leased = await copies.take({ kind: 'review', card: 533, revision: 'HEAD' }, { size: 2, dir: join(copy, '..'), token: 'o-copy', holder: otherHive, profile: 'test' })
+      const leased = await copies.take({ kind: 'review', card: 533, revision: 'HEAD' }, { size: 2, dir: join(copy, '..'), token: 'o-copy', holder: otherCombwork, profile: 'test' })
       expect(leased.ok).toBe(true)
-      expect(await reserveDelete(ws, id, checked, 'd-test4b', otherHive)).toEqual({ busy: ['copy-1'], deleting: false })
+      expect(await reserveDelete(ws, id, checked, 'd-test4b', otherCombwork)).toEqual({ busy: ['copy-1'], deleting: false })
       for (const f of [g.p, g.dirty, g.unmerged, g.home, copy]) expect(existsSync(f)).toBe(true)
       expect(reservation(id)).toBeUndefined()
     } finally {
@@ -470,7 +470,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
       const outside = join(base, 'outside-gamma7')
       sh(g.p, 'worktree', 'move', g.unmerged, outside)
       expect(await slots.relocate(slot.name, outside)).toBe(true)
-      expect(await reserveDelete(ws, id, checked, 'd-test7', otherHive)).toEqual({ busy: [slot.name], deleting: false })
+      expect(await reserveDelete(ws, id, checked, 'd-test7', otherCombwork)).toEqual({ busy: [slot.name], deleting: false })
       expect(reservation(id)).toBeUndefined()
       expect(opsOf(id).filter((o) => o === 'd-test7')).toEqual([])
       // Delete itself, its check now seeing the outside folder: refused before anything.
@@ -482,7 +482,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
       const inside = join(`${ws.path!}.worktrees`, 'gamma7', 'moved-in')
       sh(g.p, 'worktree', 'move', outside, inside)
       expect(await slots.relocate(slot.name, inside)).toBe(true)
-      expect(await reserveDelete(ws, id, checked, 'd-test7b', otherHive)).toEqual({ busy: [slot.name], deleting: false })
+      expect(await reserveDelete(ws, id, checked, 'd-test7b', otherCombwork)).toEqual({ busy: [slot.name], deleting: false })
       for (const f of [g.p, g.dirty, g.home, inside]) expect(existsSync(f)).toBe(true)
       expect(reservation(id)).toBeUndefined()
       expect(sh(inside, 'log', '-1', '--format=%s')).toBe('unmerged')
@@ -506,12 +506,12 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
       bin.during = async (p) => {
         if (p.toLowerCase() !== g.p.toLowerCase()) return
         tried.held = reservation(id) !== undefined
-        tried.take = (await slots.take({ card: 549, agent: 'g9' }, { size: 9, root: trees, target: 'main', token: 'o-take', holder: otherHive })).ok
-        tried.named = (await slots.take({ card: 548, agent: 'g8', slot: 'slot-z' }, { size: 9, root: trees, target: 'main', token: 'o-named', holder: otherHive })).ok
-        tried.warm = await slots.startWarm(dirty.name, lease.id, 'o-warm', otherHive)
-        tried.prepare = await slots.startPrepare(dirty.name, lease.id, 'o-prep', otherHive)
+        tried.take = (await slots.take({ card: 549, agent: 'g9' }, { size: 9, root: trees, target: 'main', token: 'o-take', holder: otherCombwork })).ok
+        tried.named = (await slots.take({ card: 548, agent: 'g8', slot: 'slot-z' }, { size: 9, root: trees, target: 'main', token: 'o-named', holder: otherCombwork })).ok
+        tried.warm = await slots.startWarm(dirty.name, lease.id, 'o-warm', otherCombwork)
+        tried.prepare = await slots.startPrepare(dirty.name, lease.id, 'o-prep', otherCombwork)
         tried.carry = await slots.carry('g7', { name: 'carried-z', folder: join(trees, 'carried-z'), target: 'main' })
-        tried.copy = (await copies.take({ kind: 'review', card: 547, revision: 'HEAD' }, { size: 3, dir: join(copy, '..'), token: 'o-copy', holder: otherHive, profile: 'test' })).ok
+        tried.copy = (await copies.take({ kind: 'review', card: 547, revision: 'HEAD' }, { size: 3, dir: join(copy, '..'), token: 'o-copy', holder: otherCombwork, profile: 'test' })).ok
       }
       const { removeProject } = await removal()
       const done = await run(() => removeProject(g.p, 'delete'))

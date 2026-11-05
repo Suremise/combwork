@@ -3,7 +3,7 @@ import { msg, tr } from '@shared/i18n'
 import { call, errorMessage } from './api'
 import { findProject, get, notify } from './store'
 
-/** The templates a project can use (Hive's own, the workspace's and its own), or null after saying why they couldn't be listed. */
+/** The templates a project can use (Combwork's own, the workspace's and its own), or null after saying why they couldn't be listed. */
 export const templateList = (path: string): Promise<TemplateEntry[] | null> =>
   call('templates:list', path).catch((e) => {
     notify('error', tr(msg({ id: 'panes.template.listFailed', defaultMessage: 'Could not list the templates', description: "An error's title: Combwork couldn't read the templates (+ Add ▾ → Templates, Add Agent from Template)." })), errorMessage(e))

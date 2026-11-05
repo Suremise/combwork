@@ -26,7 +26,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
 
 ;(async () => {
   const claude = lib.fakeClaude(userData, path.join(scratch, 'resume-claude-home'), [proj])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))

@@ -19,14 +19,14 @@ const T = {
 }
 
 /**
- * The card watch Hive arms for an agent in a running lane after its handoff (#1639): a builder that submits its lane's
+ * The card watch Combwork arms for an agent in a running lane after its handoff (#1639): a builder that submits its lane's
  * card watches it for the review (its verdict, a move on, a comment such as the reviewer's request), and a reviewer that
  * fails it watches for its next round in Review, each for the lane's wait. Twice on 25 Oct builders submitted and ended
- * their turn with no watch, and their lanes showed as stalled (loopCheck.ts): the step is Hive's, not the skill's.
+ * their turn with no watch, and their lanes showed as stalled (loopCheck.ts): the step is Combwork's, not the skill's.
  *
  * Armed only where the agent has no watch of its own: one that already includes the card is kept as it is (a watch
  * started before the step), and one on other cards, an agent or lane watch, isn't replaced (it keeps the agent from
- * showing as stalled, and Hive's loop wakes tell it of the verdict). The watch starts from the card as the intent left it,
+ * showing as stalled, and Combwork's loop wakes tell it of the verdict). The watch starts from the card as the intent left it,
  * so a verdict given before it is armed still wakes the agent. Never refusing what was done: a failure is logged.
  *
  * Returns what the intent's reply says of it (agent-facing), or null when the intent arms none.

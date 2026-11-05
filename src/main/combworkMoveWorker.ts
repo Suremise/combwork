@@ -1,6 +1,6 @@
 import { parentPort, workerData } from 'worker_threads'
 import { DatabaseSync } from 'node:sqlite'
-import { movedContextRef, rewriteMovedPaths, type FolderMove } from '../shared/hiveFolderMove'
+import { movedContextRef, rewriteMovedPaths, type FolderMove } from '../shared/combworkFolderMove'
 
 /**
  * The folder move's card rewrite (HI-2462), in a thread of its own: a connection of its own to the workspace's board

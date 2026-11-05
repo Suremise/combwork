@@ -1,6 +1,6 @@
 // Generated from locales/en/shell.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'shell.about.blurb': { providers: string | number }
   'shell.about.cli': { version: string | number; source: string | number }
   'shell.about.copied': undefined

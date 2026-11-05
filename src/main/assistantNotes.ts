@@ -6,7 +6,7 @@ import { workspaceOf } from './workspace'
 import { CW_DIR } from '../shared/defaults'
 
 /**
- * Hive's notes to a workspace's Assistant about its agents (HI-1612's resumes, HI-1973's retry waits): lines gathered for
+ * Combwork's notes to a workspace's Assistant about its agents (HI-1612's resumes, HI-1973's retry waits): lines gathered for
  * a few seconds, so agents in the same trouble come in one control delivery, then what the user can change about it. Its
  * inbox is agent-facing: English. Nothing is sent where the workspace has no Assistant set up yet.
  */

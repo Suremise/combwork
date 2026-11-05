@@ -44,7 +44,7 @@ const commit = (cwd: string, file: string): void => {
 
 /** A repository on main, a worktree cw/wt merged into main, and the project folder on `dest` (which lacks cw/wt's commit). */
 async function project(): Promise<{ p: string; wt: { path: string; branch: string; base: string } }> {
-  root = tempDir('hive-failsafe-')
+  root = tempDir('cw-failsafe-')
   const p = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', p)
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
@@ -90,7 +90,7 @@ describe('the checked-out branch', () => {
 
 describe('the Changes tab', () => {
   it('a folder git says is no repository is one', async () => {
-    root = tempDir('hive-failsafe-')
+    root = tempDir('cw-failsafe-')
     const plain = join(root, 'plain')
     mkdirSync(plain)
     // Above it, no repository either (a temp folder); git says so in its own words.

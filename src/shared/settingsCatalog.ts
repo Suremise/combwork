@@ -1,6 +1,6 @@
 /**
- * Hive's settings catalog (#186): every setting described once, for Settings and Project Settings (which render these
- * rows) and for the Hive Assistant's tools (cw_list_settings, cw_read_setting, cw_update_setting), so what the
+ * Combwork's settings catalog (#186): every setting described once, for Settings and Project Settings (which render these
+ * rows) and for the Combwork Assistant's tools (cw_list_settings, cw_read_setting, cw_update_setting), so what the
  * user reads and what the Assistant explains never drift apart. Each entry says where the setting is, what it does,
  * when it helps, the values it takes and its default, whether it needs a restart, and whether the Assistant may change
  * it: sensitive settings (permission modes, the Agent API, what runs, the Assistant's own Control) are read-only to it.
@@ -32,9 +32,9 @@ import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { PROVIDERS, dangerModes, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
-import { EMPTY_HIVE, EMPTY_WORKSPACE, resolvePoint } from './commands'
+import { EMPTY_CW, EMPTY_WORKSPACE, resolvePoint } from './commands'
 
-/** Where a setting lives: Hive's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
+/** Where a setting lives: Combwork's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
 export type SettingScope = 'app' | 'provider' | 'workspace' | 'project'
 
 /** The control Settings shows for it; custom ones are drawn by the view (by id). */
@@ -86,9 +86,9 @@ interface Row {
   advanced?: { id: string; scope: 'app' | 'workspace' }
   /** A workflow option of the project's (#1278): project.json's `workflow.options[<this>]`, checked with the others in main. */
   workflow?: OptionKey
-  /** A workflow option's default at a level (#1422): Hive's (`global`) or the workspace's, for a platform. */
+  /** A workflow option's default at a level (#1422): Combwork's (`global`) or the workspace's, for a platform. */
   workflowLevel?: { level: WorkflowLevel; platform: PlatformId }
-  /** A slot default (HI-1765): the copied files at Hive's level, the workspace's, or the project's own (`slots.copy`). */
+  /** A slot default (HI-1765): the copied files at Combwork's level, the workspace's, or the project's own (`slots.copy`). */
   slotLevel?: WorkflowLevel | 'project'
 }
 
@@ -99,7 +99,7 @@ function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
 
 /** Advanced's values (#367) as catalog rows, drawn by Settings → Advanced's list: one each, and a workspace's own where it takes one. */
 function advancedRows(): Row[] {
-  // One of Hive's settings (Show developer features) keeps its own entry, under its settings key.
+  // One of Combwork's settings (Show developer features) keeps its own entry, under its settings key.
   return ADVANCED_DEFS.filter((d) => !d.setting).flatMap((d): Row[] => {
     const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Combwork or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
     const tip = withValues(
@@ -135,7 +135,7 @@ export interface SettingOption {
 }
 
 export interface SettingEntry extends Omit<Row, 'title' | 'desc' | 'tip' | 'options' | 'off' | 'confirmOn'> {
-  /** Stable: "<section>.<key>" for Hive's settings, "<provider>.<key>" for a provider's page, "project.<key>" (and "project.<provider>.<key>") for a project's. */
+  /** Stable: "<section>.<key>" for Combwork's settings, "<provider>.<key>" for a provider's page, "project.<key>" (and "project.<provider>.<key>") for a project's. */
   id: string
   scope: SettingScope
   /** Its title, description and tip in English: the Assistant's tools, and searching in English. `text` has them as Settings shows them. */
@@ -155,15 +155,15 @@ export interface SettingEntry extends Omit<Row, 'title' | 'desc' | 'tip' | 'opti
   action?: boolean
   /** What the tools take for a custom control (a model is any text); without it, a custom setting is read-only to them. */
   value?: 'text' | 'boolean' | 'select' | 'effort' | 'table'
-  /** Read-only to the Hive Assistant, and why (it can still read and explain it): settingReadOnly() says it, with its {path}. */
+  /** Read-only to the Combwork Assistant, and why (it can still read and explain it): settingReadOnly() says it, with its {path}. */
   readOnly?: AgentMsg
   /** Sensitive: permissions, what runs, the Agent API, the Assistant's own settings (readOnly says which). */
   sensitive?: boolean
-  /** Who takes a change only when restarted: running agents' sessions, the Assistant, or Hive itself (#676). */
+  /** Who takes a change only when restarted: running agents' sessions, the Assistant, or Combwork itself (#676). */
   restart?: 'sessions' | 'assistant' | 'combwork'
   /** The id of the user guide's heading about it (Help → User Guide; #1535). */
   docs: string
-  /** A project setting that can inherit Hive's (null, or the 'inherit' option). */
+  /** A project setting that can inherit Combwork's (null, or the 'inherit' option). */
   inherits?: boolean
 }
 
@@ -525,7 +525,7 @@ const APP_ROWS: Row[] = [
     desc: advancedDef('cw.showDeveloperFeatures')!.text.desc,
     tip: msg({ id: 'settings.advanced.showDeveloperFeatures.tip', defaultMessage: 'For power users and for developing Combwork. The console opens in a window of its own; Combwork captures a source only while it is open on it, redacted. Turning this off closes it.', description: 'The info tip of the setting this (Settings → Advanced): more on what it does and when it applies.' }),
     type: 'boolean',
-    // Drawn in the list below, first among Hive's own (#367): kept in Hive's settings under this key, and in
+    // Drawn in the list below, first among Combwork's own (#367): kept in Combwork's settings under this key, and in
     // advanced.json as cw.showDeveloperFeatures (the two are one value).
     hidden: true
   },
@@ -732,7 +732,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
 }
 
 /**
- * Hive's and the workspace's workflow defaults (#1422): each option for each platform a hidden row of the Assistant's
+ * Combwork's and the workspace's workflow defaults (#1422): each option for each platform a hidden row of the Assistant's
  * settings tool, `workflow.<platform>.<option>` (Settings → Workflow defaults) and `workspace.workflow.<platform>.<option>`
  * (Settings → Workspace), set as the editor saves them: checked against the level and the projects inheriting it.
  */
@@ -948,7 +948,7 @@ const HELPS: Record<string, AgentMsg> = {
 /** The id of the user guide's heading for each section (Help → User Guide). */
 const DOCS: Record<string, string> = {
   general: 'getting-started', // i18n-ignore: a user guide heading's id (#1535)
-  updates: 'updating-hive', // i18n-ignore: a user guide heading's id (#1535)
+  updates: 'updating-combwork', // i18n-ignore: a user guide heading's id (#1535)
   appearance: 'getting-started', // i18n-ignore: a user guide heading's id (#1535)
   providers: 'coding-agents-claude-code-codex-and-github-copilot', // i18n-ignore: a user guide heading's id (#1535)
   notifications: 'notifications', // i18n-ignore: a user guide heading's id (#1535)
@@ -959,7 +959,7 @@ const DOCS: Record<string, string> = {
   agents: 'several-agents-in-one-project', // i18n-ignore: a user guide heading's id (#1535)
   keybindings: 'keyboard-shortcuts', // i18n-ignore: a user guide heading's id (#1535)
   mcpCatalogs: 'installing-servers-from-a-catalogue', // i18n-ignore: a user guide heading's id (#1535)
-  agentApi: 'the-built-in-hive-server', // i18n-ignore: a user guide heading's id (#1535)
+  agentApi: 'the-built-in-combwork-server', // i18n-ignore: a user guide heading's id (#1535)
   advanced: 'troubleshooting' // i18n-ignore: a user guide heading's id (#1535)
 }
 const DOCS_BY_ID: Record<string, string> = {
@@ -987,7 +987,7 @@ const DOCS_BY_ID: Record<string, string> = {
   'sessions.backupTranscripts': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.backupRetention': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.recordPerformance': 'performance-metrics', // i18n-ignore: a user guide heading's id (#1535)
-  'sessions.resumeAfterUnexpectedClose': 'when-hive-closed-unexpectedly', // i18n-ignore: a user guide heading's id (#1535)
+  'sessions.resumeAfterUnexpectedClose': 'when-combwork-closed-unexpectedly', // i18n-ignore: a user guide heading's id (#1535)
   'agents.backgroundTaskMinutes': 'sessions', // i18n-ignore: a user guide heading's id (#1535)
   'agents.leftoverProcesses': 'processes-agents-leave-running' // i18n-ignore: a user guide heading's id (#1535)
 }
@@ -1001,7 +1001,7 @@ function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel
   const title = format(e.text.title)
   // A project's workflow options are its Version Control tab's (HI-1766), not a section of Project Settings.
   if (scope === 'project' && e.section === 'workflow') return format(withValues(PATHS.versionControl, { title }))
-  // A level's default (HI-1768): Settings → Version Control, its part (Hive defaults or Workspace defaults).
+  // A level's default (HI-1768): Settings → Version Control, its part (Combwork defaults or Workspace defaults).
   const level = e.workflowLevel?.level ?? (e.slotLevel === 'global' || e.slotLevel === 'workspace' ? e.slotLevel : null)
   if (level) return format(withValues(PATHS.level, { section: format(SETTINGS_SECTIONS.find((x) => x.id === 'workflow')!.text.label), part: format(level === 'global' ? LEVEL_PART.global : LEVEL_PART.workspace), title }))
   if (scope === 'project') return format(withValues(PATHS.project, { section: where(PROJECT_SETTINGS_SECTIONS), title }))
@@ -1081,10 +1081,10 @@ export const settingReadOnly = (e: SettingEntry): string | undefined => (e.readO
 /** When it is worth suggesting (undefined: no signal recorded). */
 export const settingHelps = (e: SettingEntry): string | undefined => (e.helps ? say(e.helps) : undefined)
 
-/** Where the user finds it, as the user sees it, in the language Hive shows: "Ustawienia → Sesje → …". */
+/** Where the user finds it, as the user sees it, in the language Combwork shows: "Ustawienia → Sesje → …". */
 export const shownSettingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, shownText)
 
-/** Settings' entries (Hive's and the providers' pages), in their order. */
+/** Settings' entries (Combwork's and the providers' pages), in their order. */
 export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_ROWS, ...levelRows()].map((r) =>
   r.provider ? entry(r, `${r.provider}.${r.key}`, 'provider', 'coding-agents-claude-code-codex-and-github-copilot') : entry(r, `${r.section}.${r.key}`, r.section === 'workspace' ? 'workspace' : 'app', DOCS[r.section] ?? 'getting-started') // i18n-ignore: a user guide heading's id (#1535)
 )
@@ -1104,7 +1104,7 @@ export function settingEntry(id: string): SettingEntry | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * A setting's value now: in Hive's settings, or in a project's config ('inherit' or null for one that inherits). An
+ * A setting's value now: in Combwork's settings, or in a project's config ('inherit' or null for one that inherits). An
  * advanced value (#367) is advanced.json's override (`advanced`: its values) or the default, or the workspace's own (null:
  * Settings → Advanced's).
  */
@@ -1122,7 +1122,7 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   if (e.slotLevel === 'project') return project ? (project.slots?.copy ?? project.worktreeCopy ?? 'inherit') : undefined
   if (e.scope === 'project') {
     if (!project) return undefined
-    // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Hive's, then all-off).
+    // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Combwork's, then all-off).
     // With no options yet, its card loops and file locks from before HI-1766, as the form and the runtime read them.
     if (e.workflow) return ownOrLegacy(project as ProjectConfig & Record<string, unknown>)[e.workflow] ?? 'inherit'
     if (e.key === PLATFORM_SETTING_KEY) return project.platform ?? project.workflow?.platform ?? null
@@ -1130,7 +1130,7 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   }
   if (e.provider) {
     const v = (providerSettings(settings, e.provider) as unknown as Record<string, unknown>)[e.key]
-    // A fallback list nobody edited is Hive's own (an empty list).
+    // A fallback list nobody edited is Combwork's own (an empty list).
     return (e.key === 'modelFallback' || e.key === 'effortFallback') && v === undefined ? [] : e.key === 'prices' ? (v ?? {}) : v
   }
   return (settings[e.section as keyof AppSettings] as unknown as Record<string, unknown> | undefined)?.[e.key]
@@ -1138,18 +1138,18 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
 
 /** The user's commands as the settings tools read them (HI-1954): the lists' names, each point's names in order. */
 function commandsSettingValue(id: string, settings: AppSettings, ws?: Pick<WorkspaceConfig, 'commands'> | null): string[] | undefined {
-  const hive = settings.commands ?? EMPTY_HIVE
+  const combwork = settings.commands ?? EMPTY_CW
   const own = ws?.commands ?? EMPTY_WORKSPACE
-  const names = (point: CommandPoint, workspace?: CustomCommand[]): string[] => resolvePoint(point, { hive: hive.list, workspace }).map((r) => r.command?.name ?? '(deleted)') // i18n-ignore: the tools' text
-  if (id === 'general.commands') return hive.list.map((c) => c.name)
-  if (id === 'general.onQuit') return names(hive.onQuit)
+  const names = (point: CommandPoint, workspace?: CustomCommand[]): string[] => resolvePoint(point, { combwork: combwork.list, workspace }).map((r) => r.command?.name ?? '(deleted)') // i18n-ignore: the tools' text
+  if (id === 'general.commands') return combwork.list.map((c) => c.name)
+  if (id === 'general.onQuit') return names(combwork.onQuit)
   if (id === 'workspace.commands') return own.list.map((c) => c.name)
   if (id === 'workspace.onOpen') return names(own.onOpen, own.list)
   if (id === 'workspace.onClose') return names(own.onClose, own.list)
   return undefined
 }
 
-/** A setting's default: Hive's, or for a project's, Inherit. */
+/** A setting's default: Combwork's, or for a project's, Inherit. */
 export function settingDefault(e: SettingEntry): unknown {
   if (e.action) return undefined
   if (/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/.test(e.id)) return []
@@ -1214,10 +1214,10 @@ const AGENT = {
   offValue: agentMsg({ id: 'settings.agent.value.off', text: '0 ({off})', note: 'A number setting at 0, which turns it off. {off} is what 0 stands for (Never).' }),
   empty: agentMsg({ id: 'settings.agent.value.empty', text: '(empty)', note: 'A text setting with no text.' }),
   size: agentMsg({ id: 'settings.agent.value.size', text: '({n} {kind, select, list {entries} other {keys}})', note: "A table's size in a listing: {n} is a number as written (the word stays plural, as the tools always said it); kind is list or object." }),
-  hiveList: agentMsg({ id: 'settings.agent.value.combworkList', text: "(Combwork's list)", note: "A fallback list left empty: Combwork's own list applies." }),
+  combworkList: agentMsg({ id: 'settings.agent.value.combworkList', text: "(Combwork's list)", note: "A fallback list left empty: Combwork's own list applies." }),
   none: agentMsg({ id: 'settings.agent.value.none', text: '(none)', note: 'A table with nothing in it, or an entry one side of a change has not got.' }),
   removed: agentMsg({ id: 'settings.agent.value.removed', text: 'removed', note: "A change to a provider's prices: a shipped model removed from its table." }),
-  hivePrice: agentMsg({ id: 'settings.agent.value.combworkPrice', text: "Combwork's price", note: "A change to a provider's prices: a shipped model at Combwork's own price (not removed)." }),
+  combworkPrice: agentMsg({ id: 'settings.agent.value.combworkPrice', text: "Combwork's price", note: "A change to a provider's prices: a shipped model at Combwork's own price (not removed)." }),
   older: agentMsg({ id: 'settings.agent.value.older', text: '{label} (older)', note: "A model fallback list's entry marked older, in a change: {label} is its label." })
 }
 
@@ -1253,7 +1253,7 @@ const COLUMNS = ['hold', 'todo', 'doing', 'review', 'passed', 'done']
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const price = (n: unknown): boolean => typeof n === 'number' && Number.isFinite(n) && n >= 0
 
-/** A table's value checked: column colours, a provider's prices, or one of its fallback lists; null puts back Hive's. */
+/** A table's value checked: column colours, a provider's prices, or one of its fallback lists; null puts back Combwork's. */
 function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error: string } {
   if (e.id === 'board.colors') {
     if (raw === null) return { value: { ...DEFAULT_SETTINGS.board.colors } }
@@ -1270,7 +1270,7 @@ function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error
     }
     return { value: Object.fromEntries(Object.entries(raw).map(([m, p]) => [m.trim(), { input: (p as Record<string, number>).input, cachedInput: (p as Record<string, number>).cachedInput, output: (p as Record<string, number>).output, ...((p as Record<string, number>).cacheWrite !== undefined ? { cacheWrite: (p as Record<string, number>).cacheWrite } : {}) }])) }
   }
-  // A fallback list: [{ value, label, older? }]; [] or null puts back Hive's own.
+  // A fallback list: [{ value, label, older? }]; [] or null puts back Combwork's own.
   if (raw === null) return { value: [] }
   if (!Array.isArray(raw)) return { error: say(AGENT.fallbackShape, { title: agentTitle(e), shape: `{value, label${e.key === 'modelFallback' ? ', older?' : ''}}` }) } // agent-protocol: an entry's JSON fields
   const seen = new Set<string>()
@@ -1288,7 +1288,7 @@ function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error
 /**
  * A value as the setting takes it, or why not: the type, the range (0 where Never turns it off), the options, an effort
  * level the pickers offer, plain text of a sensible length, a table's shape. A project's number or list takes null (or
- * "inherit") to inherit Hive's.
+ * "inherit") to inherit Combwork's.
  */
 export function checkSettingValue(e: SettingEntry, raw: unknown, ctx: SettingContext = {}): { value: unknown } | { error: string } {
   const kind = settingKind(e)
@@ -1407,7 +1407,7 @@ export function effortTakes(e: SettingEntry, levels: { value: string }[]): strin
 }
 
 /**
- * The change that sets a checked value: a patch for Hive's settings, one for a project's config (from its current one),
+ * The change that sets a checked value: a patch for Combwork's settings, one for a project's config (from its current one),
  * or a table replaced whole (a provider's prices or fallback list: a deep merge can't remove an entry).
  */
 export function settingPatch(
@@ -1465,7 +1465,7 @@ export function settingValueText(e: SettingEntry, v: unknown, full = false): str
   if (typeof v === 'string') return v === '' ? say(AGENT.empty) : v
   if (!full) {
     const n = Array.isArray(v) ? v.length : Object.keys(v as object).length
-    return n ? say(AGENT.size, { n: String(n), kind: Array.isArray(v) ? 'list' : 'object' }) : Array.isArray(v) ? say(AGENT.hiveList) : say(AGENT.none)
+    return n ? say(AGENT.size, { n: String(n), kind: Array.isArray(v) ? 'list' : 'object' }) : Array.isArray(v) ? say(AGENT.combworkList) : say(AGENT.none)
   }
   const json = JSON.stringify(v)
   return json.length > 3000 ? `${json.slice(0, 2999)}…` : json
@@ -1476,14 +1476,14 @@ export function settingValueText(e: SettingEntry, v: unknown, full = false): str
  * a table by what changed in it (the entries of an object whose values differ, "doing: #3b82f6"; a list's values), each
  * side cut at 200 characters, so changing one colour reads as that colour, not as "(6 keys) → (6 keys)". A provider's
  * prices with `removed` (the shipped models removed from its table, before and after) show those too: "m: removed" on
- * the side that removed it, "m: Hive's price" on the other.
+ * the side that removed it, "m: Combwork's price" on the other.
  */
 export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, removed?: { old: string[]; new: string[] }): { oldText: string; newText: string } {
   if (removed) {
     const shown = (prices: unknown, gone: string[], other: string[]): Record<string, unknown> => {
       const own = isObject(prices) ? prices : {}
       const out: Record<string, unknown> = { ...own }
-      for (const m of other) if (!(m in own) && !gone.includes(m)) out[m] = say(AGENT.hivePrice)
+      for (const m of other) if (!(m in own) && !gone.includes(m)) out[m] = say(AGENT.combworkPrice)
       for (const m of gone) if (!(m in own)) out[m] = say(AGENT.removed)
       return out
     }
@@ -1492,10 +1492,10 @@ export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, 
   const cut = (s: string): string => (s.length > 200 ? `${s.slice(0, 199)}…` : s)
   if (Array.isArray(old) || Array.isArray(now)) {
     const valueOf = (x: unknown): string => (isObject(x) && typeof x.value === 'string' ? x.value : JSON.stringify(x))
-    const values = (v: unknown): string => (Array.isArray(v) && v.length ? v.map(valueOf).join(', ') : say(AGENT.hiveList))
+    const values = (v: unknown): string => (Array.isArray(v) && v.length ? v.map(valueOf).join(', ') : say(AGENT.combworkList))
     const a = Array.isArray(old) ? old : []
     const b = Array.isArray(now) ? now : []
-    // From or back to Hive's list: the whole list. Otherwise the entries that changed, by value, as an object's are
+    // From or back to Combwork's list: the whole list. Otherwise the entries that changed, by value, as an object's are
     // ("gpt-7: GPT 7 (older)", "(none)" where one side hasn't it), so a label or older flag that changed shows.
     if (a.length && b.length) {
       const byValue = (l: unknown[]): Map<string, unknown> => new Map(l.map((x) => [valueOf(x), x]))

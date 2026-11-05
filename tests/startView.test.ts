@@ -13,7 +13,7 @@ import { utf8Bytes } from '../src/shared/metrics'
 import { START_VIEW_MAX_BYTES, startView, type StartViewInput, type ViewCard, type ViewEntry } from '../src/shared/startView'
 import type { LiveSessionState } from '../src/shared/types'
 
-const base = tempDir('hive-start-view-')
+const base = tempDir('cw-start-view-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

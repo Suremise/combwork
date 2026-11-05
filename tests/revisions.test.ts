@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-revisions-')
+const base = tempDir('cw-revisions-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -109,16 +109,16 @@ describe('status polls', () => {
     const ws = join(base, 'headers')
     const w = await open(ws)
     addSkill(ws, 'long-body', 'Words.\n'.repeat(2 * 1024 * 1024))
-    const { hiveSkills } = await import('../src/main/skills')
-    const r = await reads(() => inWorkspace(w, () => hiveSkills()))
+    const { combworkSkills } = await import('../src/main/skills')
+    const r = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(r.value.find((s) => s.name === 'long-body')?.description).toBe('Skill long-body')
     // The 12 MB skill isn't bundled, so nothing of it is hashed, and only 64 KB of its SKILL.md is read.
     expect(r.metaBytes).toBeLessThan(r.value.length * 64 * 1024 + 1)
-    const again = await reads(() => inWorkspace(w, () => hiveSkills()))
+    const again = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(again.metaBytes).toBe(0)
     // An edit is read again.
     appendFileSync(join(ws, '.combwork', 'skills', 'long-body', 'SKILL.md'), 'more')
-    const edited = await reads(() => inWorkspace(w, () => hiveSkills()))
+    const edited = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(edited.metaBytes).toBe(64 * 1024)
     await disposeWorkspaceService(w)
   })

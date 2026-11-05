@@ -8,8 +8,8 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 
-const userData = path.join(lib.WORK, 'hivevcs-profile')
-const ws = path.join(lib.WORK, 'hivevcs-ws')
+const userData = path.join(lib.WORK, 'combworkvcs-profile')
+const ws = path.join(lib.WORK, 'combworkvcs-ws')
 const plain = path.join(ws, 'plain')
 const repo = path.join(ws, 'repo')
 const committed = path.join(ws, 'committed')
@@ -39,8 +39,8 @@ const excludeOf = (p) => {
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1300, height: 800 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
-  const state = async (p) => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.hiveVcs
-  const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `hivevcs-${name}.png`) })
+  const state = async (p) => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.combworkVcs
+  const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `combworkvcs-${name}.png`) })
 
   // --- A repository from the start: excluded at once, and no notice.
   check("a repository's own .combwork is in its info/exclude", /^\/\.combwork\/$/m.test(excludeOf(repo)), excludeOf(repo))
@@ -51,7 +51,7 @@ const excludeOf = (p) => {
   check('a project with no repository: reported as none', plainState?.state === 'none', JSON.stringify(plainState))
   await page.getByText('plain', { exact: true }).first().click()
   await page.locator('.tabs .tab', { hasText: 'Overview' }).click()
-  const notice = page.locator('.hive-vcs-notice')
+  const notice = page.locator('.cw-vcs-notice')
   check("the Overview says .combwork isn't excluded", !!(await lib.until(async () => (await notice.count()) === 1, 10000)) && (await notice.innerText()).includes(".combwork isn't excluded from version control"), await notice.innerText().catch(() => ''))
   check('…why it matters, with Learn more and no Exclude (no repository to add it to)', /sessions, transcript backups and launch settings/.test(await notice.innerText()) && (await notice.locator('button', { hasText: 'Learn more' }).count()) === 1 && (await notice.locator('button', { hasText: 'Exclude' }).count()) === 0)
   await shot('overview-dark')
@@ -63,18 +63,18 @@ const excludeOf = (p) => {
   await notice.locator('button[aria-label^="Don\'t show this here again"]').click()
   check('✕ dismisses it in the Overview', !!(await lib.until(async () => (await notice.count()) === 0, 5000)))
   await lib.openProjectSettings(page)
-  check('Project Settings still shows it', !!(await lib.until(async () => (await page.locator('.settings .hive-vcs-notice').count()) === 1, 5000)))
+  check('Project Settings still shows it', !!(await lib.until(async () => (await page.locator('.settings .cw-vcs-notice').count()) === 1, 5000)))
   await shot('settings')
   // Exclude refuses where no git repository holds the project.
-  const refused = await inv('project:excludeHive', plain).then(() => null, (e) => String(e?.message ?? e))
+  const refused = await inv('project:excludeCombwork', plain).then(() => null, (e) => String(e?.message ?? e))
   check('Exclude refuses with no repository, saying what to do', !!refused && refused.includes('No git repository holds this project'), refused ?? 'no error')
 
   // --- git init later: excluded at the next refresh, and the notice goes.
   lib.git(plain, 'init -q')
   check('after git init, the next refresh excludes it', (await state(plain))?.state === 'excluded' && /^\/\.combwork\/$/m.test(excludeOf(plain)), excludeOf(plain))
-  check('…and Project Settings no longer shows the notice', !!(await lib.until(async () => (await page.locator('.settings .hive-vcs-notice').count()) === 0, 5000)))
+  check('…and Project Settings no longer shows the notice', !!(await lib.until(async () => (await page.locator('.settings .cw-vcs-notice').count()) === 0, 5000)))
   // Exclude on a repository: nothing to add, nothing repeated.
-  await inv('project:excludeHive', plain)
+  await inv('project:excludeCombwork', plain)
   check('Exclude on an excluded repository adds nothing more', (excludeOf(plain).match(/\/\.combwork\//g) ?? []).length === 1, excludeOf(plain))
 
   // --- Committed before it was excluded (#364).
@@ -82,7 +82,7 @@ const excludeOf = (p) => {
   check('a committed .combwork: excluded, and its tracked files counted', tracked?.state === 'excluded' && tracked.tracked === 1, JSON.stringify(tracked))
   await page.getByText('committed', { exact: true }).first().click()
   await page.locator('.tabs .tab', { hasText: 'Overview' }).click()
-  const trackedNotice = page.locator('.hive-vcs-notice', { hasText: 'committed to git' })
+  const trackedNotice = page.locator('.cw-vcs-notice', { hasText: 'committed to git' })
   check('the Overview says it is committed, with the command and Untrack…', !!(await lib.until(async () => (await trackedNotice.count()) === 1, 10000)) && (await trackedNotice.innerText()).includes('git rm -r --cached .combwork') && (await trackedNotice.getByRole('button', { name: 'Untrack…' }).count()) === 1, await trackedNotice.innerText().catch(() => ''))
   await shot('tracked-dark')
   await inv('settings:update', { appearance: { theme: 'light' } })

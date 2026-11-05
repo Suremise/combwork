@@ -94,7 +94,7 @@ export function chooseProfile(parent: string, legacy: string, current: string, o
       try {
         fs.remove(rec)
       } catch {
-        // Left in Hive's folder: it is the move's own, and read only once the folder has moved.
+        // Left in Combwork's folder: it is the move's own, and read only once the folder has moved.
       }
     }
     throw new ProfileMoveRefused(old, now, `it couldn't be renamed (${(e as NodeJS.ErrnoException).code ?? (e as Error).message})`) // i18n-ignore: the reason's detail, in English (the error box's {reason} says so)

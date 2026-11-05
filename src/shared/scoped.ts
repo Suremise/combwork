@@ -22,7 +22,7 @@ export function settle<T>(prev: Scoped<T>, scope: string, r: { data: T } | { err
 /**
  * A view's numbered loads (useScopedLoad's, apart from React): `load(scope, loader, early)` starts one for `scope`. A load
  * that finishes after a newer one started, or after the view moved to another scope (`current()`), is dropped. `early`
- * (HI-1681): part of the results, shown while the load runs (Hive's own sessions before the rest): taken only until the
+ * (HI-1681): part of the results, shown while the load runs (Combwork's own sessions before the rest): taken only until the
  * load has finished and while it is the newest, and its failure is ignored, so the load alone says how it ended, its
  * time limit included.
  */

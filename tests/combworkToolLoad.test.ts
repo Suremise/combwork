@@ -2,7 +2,7 @@
 // tools that role is offered at every control level; and a refused call that guessed its arguments is told the tool's.
 import { describe, expect, it } from 'vitest'
 import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, assistantTools } from '../src/shared/assistantTools'
-import { AGENT_ALWAYS_LOAD, ASSISTANT_ALWAYS_LOAD, alwaysLoaded, argumentHint } from '../src/shared/hiveToolLoad'
+import { AGENT_ALWAYS_LOAD, ASSISTANT_ALWAYS_LOAD, alwaysLoaded, argumentHint } from '../src/shared/combworkToolLoad'
 
 describe('the tools sent in full (HI-2229)', () => {
   it('are Combwork tools, a few per role', () => {

@@ -18,7 +18,7 @@ import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 import { API } from '../src/main/apiText'
 import { SESSION } from '../src/main/sessionText'
 
-const base = tempDir('hive-agenttext-api-')
+const base = tempDir('cw-agenttext-api-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

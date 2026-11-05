@@ -22,13 +22,13 @@ export interface QueueTesting {
   entry: string
   /** The approved revision being merged. */
   revision: string
-  /** The target's head it is tested on (null: not read yet, or another Hive runs the queue). */
+  /** The target's head it is tested on (null: not read yet, or another Combwork runs the queue). */
   expected: string | null
-  /** Null when not known here: another Hive runs the queue, or the advance began before a restart (its recovery finishes it). */
+  /** Null when not known here: another Combwork runs the queue, or the advance began before a restart (its recovery finishes it). */
   step: QueueStep | null
   /** When the queue took it (ISO), as far as known here. */
   started: string | null
-  /** The progress run of the check running now (its id), when Hive keeps runs. */
+  /** The progress run of the check running now (its id), when Combwork keeps runs. */
   run: string | null
 }
 
@@ -55,7 +55,7 @@ export interface QueueRecent {
   revision?: string
   /** merged: the target's new head. */
   result?: string
-  /** merged: Hive's merge or one seen done outside it. */
+  /** merged: Combwork's merge or one seen done outside it. */
   by?: FactData['Integrated']['by']
   /** returned: why (conflict, checks, hook…); cancelled: why (removed, stale, …). */
   reason?: string
@@ -82,7 +82,7 @@ export interface QueueRecent {
 
 /**
  * A merge's push (G18, HI-1924): pushed; owed and not yet (`pending`); not pushed because pushing was turned off
- * (`off`) or the target no longer had it (`reset`); `unknown`: none recorded (a merge before Hive recorded pushes),
+ * (`off`) or the target no longer had it (`reset`); `unknown`: none recorded (a merge before Combwork recorded pushes),
  * said while the project pushes now.
  */
 export type QueuePushState = 'pushed' | 'pending' | 'off' | 'reset' | 'unknown'
@@ -128,7 +128,7 @@ export function shellLine(args: string[]): string {
 
 /**
  * The state an advance into a checked-out target was left in (§16.9.2's terminal state, #1351): the folder, the branch
- * its HEAD named (null: none, a detached HEAD) and the target's ref (null: unreadable) as Hive found them, the advance's
+ * its HEAD named (null: none, a detached HEAD) and the target's ref (null: unreadable) as Combwork found them, the advance's
  * revisions, the journal's last phase (`done`: the ref moved, but the folder was on another branch by then, so the merged
  * files are in that branch's working copy), each listed file's side, and the commands that finish or undo it.
  */
@@ -143,16 +143,16 @@ export interface QueueStuck {
   commands: QueueCommand[]
 }
 
-/** Why a queue is paused: `user` (Pause queue), or Hive's own reason (needsYou, checkedOut, rulesOff, …: mergeQueue.ts). */
+/** Why a queue is paused: `user` (Pause queue), or Combwork's own reason (needsYou, checkedOut, rulesOff, …: mergeQueue.ts). */
 export interface QueuePauseInfo {
   reason: string
   /** The card it paused on (null: none, a pause of the queue itself). */
   card: string | null
   files: string[]
-  /** Who paused it: the user or the Assistant (null: Hive, for its reason). */
+  /** Who paused it: the user or the Assistant (null: Combwork, for its reason). */
   by: 'user' | 'assistant' | null
   at: string | null
-  /** Git's own message, for a pause Hive made on its output (signing, needs you: #1350). */
+  /** Git's own message, for a pause Combwork made on its output (signing, needs you: #1350). */
   message?: string
   /** An advance into a checked-out target left part way (needsYou, #1351): the state it is in and how to settle it. */
   stuck?: QueueStuck
@@ -167,7 +167,7 @@ export interface QueueView {
   paused: QueuePauseInfo | null
   /** The profile of the Hive running this queue now ("Hive-Dev"; null: none runs it now). */
   runBy: string | null
-  /** Whether this Hive is the one running it now. */
+  /** Whether this Combwork is the one running it now. */
   runHere: boolean
   testing: QueueTesting | null
   queued: QueueQueued[]
@@ -183,10 +183,10 @@ export interface QueueView {
   returnsMore: number
   /** Its latest pauses, newest first, at most QUEUE_LOG_MAX (HI-1924; the window's model only). */
   pauses: QueuePauseLogged[]
-  /** The project's current options have Hive merge into this target (#1356; the window's model only). */
+  /** The project's current options have Combwork merge into this target (#1356; the window's model only). */
   combworkMerges: boolean
   /**
-   * The project's cards in flight (started, not Done) whose own ruleset has Hive merge into this target, by number
+   * The project's cards in flight (started, not Done) whose own ruleset has Combwork merge into this target, by number
    * (#1356; the window's model only): an old ruleset's queue stays shown while they are.
    */
   inFlight: number[]
@@ -207,7 +207,7 @@ export const RECENT_MAX = 20
 export const HISTORY_MAX = 50
 
 /**
- * The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog): its key and title, its
+ * The card an agent's worktree branch is for, when Combwork merges it (#1357, the Merge dialog): its key and title, its
  * target, and where it stands: testing now, queued (its place, counting the one testing), or not in the queue yet (in
  * review, say); whether the target's queue is paused.
  */

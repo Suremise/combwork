@@ -12,7 +12,7 @@ import type { ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { legacyWorktree } from '../src/shared/agentFolders'
 
-const base = tempDir('hive-worktreeroots-')
+const base = tempDir('cw-worktreeroots-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -61,8 +61,8 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
   }
 
   beforeEach(async () => {
-    wsPath = tempDir('hive-worktreeroots-ws-')
-    trees = tempDir('hive-worktreeroots-trees-')
+    wsPath = tempDir('cw-worktreeroots-ws-')
+    trees = tempDir('cw-worktreeroots-trees-')
     project(wsPath, 'alpha', tree('old'))
     project(wsPath, 'gamma', tree('gamma'))
     w = createWorkspaceService()
@@ -130,7 +130,7 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
   })
 
   it("a refresh of a workspace switched meanwhile records none of its worktrees in the next one, read or yet to read", async () => {
-    const next = tempDir('hive-worktreeroots-next-')
+    const next = tempDir('cw-worktreeroots-next-')
     project(next, 'delta', tree('delta'))
     const hold = holdOlderRead(alpha())
     let first: Promise<unknown> = Promise.resolve()

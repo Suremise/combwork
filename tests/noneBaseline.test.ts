@@ -20,7 +20,7 @@ import { tempDir } from './tempDir'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30_000
 
-const tmp = tempDir('hive-none-baseline-')
+const tmp = tempDir('cw-none-baseline-')
 const bundle = join(tmp, 'none-baseline-worker.cjs')
 
 beforeAll(async () => {
@@ -31,7 +31,7 @@ afterAll(() => void useBaselineWorker(null))
 let n = 0
 /** A project of `files` files (each `size` bytes) under assets/, and a node_modules file left out. */
 function project(files: number, size = 16): string {
-  const root = tempDir(`hive-none-baseline-${++n}-`)
+  const root = tempDir(`cw-none-baseline-${++n}-`)
   for (let i = 0; i < files; i++) {
     const d = join(root, 'assets', String(i % 20))
     mkdirSync(d, { recursive: true })

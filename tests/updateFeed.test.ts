@@ -7,7 +7,7 @@ import { createRequire } from 'module'
 import { describe, expect, it } from 'vitest'
 import type { AppUpdater } from 'electron-updater'
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider'
-import { HiveGitHubProvider, pickTag, withFirst } from '../src/main/updateFeed'
+import { CombworkGitHubProvider, pickTag, withFirst } from '../src/main/updateFeed'
 
 // The updater's version is a SemVer of electron-updater's own semver (a copy of its own, nested): another copy's isn't
 // recognised as one, and reads as a stable version.
@@ -44,7 +44,7 @@ async function check(running: string, tags: string[], opts: { prerelease?: boole
   }
   const updater = { allowPrerelease: opts.prerelease ?? true, currentVersion: new SemVer(running), channel: null, fullChangelog: false } as unknown as AppUpdater
   const runtime = { isUseMultipleRangeRequest: false, platform: 'win32', executor } as never
-  const provider = opts.upstream ? new GitHubProvider({ provider: 'github', owner: 'Suremise', repo: 'combwork' }, updater, runtime) : new HiveGitHubProvider({ provider: 'custom', owner: 'Suremise', repo: 'combwork' } as never, updater, runtime)
+  const provider = opts.upstream ? new GitHubProvider({ provider: 'github', owner: 'Suremise', repo: 'combwork' }, updater, runtime) : new CombworkGitHubProvider({ provider: 'custom', owner: 'Suremise', repo: 'combwork' } as never, updater, runtime)
   try {
     const info = await provider.getLatestVersion()
     return { version: info.version, tag: info.tag, notes: info.releaseNotes, asked, unexpected }

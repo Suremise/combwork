@@ -58,8 +58,8 @@ const check = (name, ok, extra = '') => {
       await page.locator(`.page-switch button[aria-label="Agent page ${n}"]`).click()
       return lib.until(async () => (await page.locator('.page-switch button.active').innerText().catch(() => '')).trim() === String(n), HUNG_MS)
     }
-    const lines = (key) => page.evaluate((k) => window.__hiveTerminalLines(k)?.join('\n') ?? '', key)
-    const print = (key, text) => page.evaluate(([k, t]) => window.__hiveTerminalOutput(k, t), [key, text])
+    const lines = (key) => page.evaluate((k) => window.__cwTerminalLines(k)?.join('\n') ?? '', key)
+    const print = (key, text) => page.evaluate(([k, t]) => window.__cwTerminalOutput(k, t), [key, text])
 
     // Page 1: six shown, each with WebGL.
     const first = await lib.until(async () => {
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
     const out = await lib.until(async () => {
       const t = await terminals()
       const away = t.filter((x) => page1.includes(x.key) && !x.inPage)
-      return t.filter((x) => x.shown && x.webgl).length === 3 && (await page.evaluate(() => window.__hiveWebglCount())) <= 8 && away.length > 0 && away
+      return t.filter((x) => x.shown && x.webgl).length === 3 && (await page.evaluate(() => window.__cwWebglCount())) <= 8 && away.length > 0 && away
     }, HUNG_MS)
     check('page 2 draws with WebGL, and a terminal of page 1 that gave its context back is out of the page', !!out, JSON.stringify(await terminals()))
     const parked = out ? out[0].key : page1[0]
@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
     check('page 1 shows again', !!(await go(1)))
     const back = await lib.until(async () => {
       const t = (await terminals()).find((x) => x.key === parked)
-      return t?.shown && t.inPage && t.webgl && (await page.evaluate(() => window.__hiveTerminalsFitted() && window.__hiveTerminalsInside()))
+      return t?.shown && t.inPage && t.webgl && (await page.evaluate(() => window.__cwTerminalsFitted() && window.__cwTerminalsInside()))
     }, HUNG_MS)
     check('…the terminal is back in its pane, drawing with WebGL, fitted', !!back, JSON.stringify(await terminals()))
     check('…with what was printed while it was out', (await lines(parked)).includes('printed while out of the page'), await lines(parked))
@@ -117,7 +117,7 @@ const check = (name, ok, extra = '') => {
         const xterm = document.querySelector(`.terminal-host[data-pty=${JSON.stringify(k)}] .xterm`)
         const screen = xterm?.querySelector('.xterm-screen')
         const row = [...(xterm?.querySelectorAll('.xterm-rows > div') ?? [])].find((r) => r.textContent.includes(mark))
-        const state = window.__hiveTerminalState(k)
+        const state = window.__cwTerminalState(k)
         if (!screen || !row || !state) return null
         // Drawn in one style, the mark is one run of text (characters drawn at a width not their own are split apart).
         const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT)
@@ -132,7 +132,7 @@ const check = (name, ok, extra = '') => {
       }, [parked2, MARK])
     const shownWithDom = await lib.until(async () => {
       const t = (await terminals()).find((x) => x.key === parked2)
-      return t?.shown && t.inPage && !t.webgl && (await page.evaluate(() => window.__hiveTerminalsFitted()))
+      return t?.shown && t.inPage && !t.webgl && (await page.evaluate(() => window.__cwTerminalsFitted()))
     }, HUNG_MS)
     check('…the terminal is back in its pane, drawing with the DOM renderer, fitted', !!shownWithDom, JSON.stringify(await terminals()))
     // The mark printed now, once the pane has settled (its CLI redraws its screen as the DOM renderer's cells fit it anew).

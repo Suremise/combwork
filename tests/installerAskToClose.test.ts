@@ -1,4 +1,4 @@
-// The installer's request to a running Combwork to close for the install (HI-1707, build/hiveAskToClose.ps1, run by
+// The installer's request to a running Combwork to close for the install (HI-1707, build/askToClose.ps1, run by
 // installer.nsh's customInit), against a stand-in Hive: a copy of Node named Hive.exe in its own install folder, running
 // a script that answers as Combwork does (or doesn't). Only this test's own processes are found, asked and ended.
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
@@ -9,7 +9,7 @@ import { powershellEnv } from './powershellEnv'
 import { tempDir } from './tempDir'
 
 const HUNG_MS = 30_000
-const SCRIPT = join(__dirname, '..', 'build', 'hiveAskToClose.ps1')
+const SCRIPT = join(__dirname, '..', 'build', 'askToClose.ps1')
 const root = join(process.env.SystemRoot ?? 'C:\\Windows')
 const ps = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 /** PowerShell's environment: what it has on any machine (its module-analysis cache too, HI-2401), nothing else of the test's shell. */
@@ -58,9 +58,9 @@ async function standIn(folder: string, profile: string, mode: 'ack-exit' | 'ack-
 const ask = (install: string, profile: string, waits = { ack: 3000, exit: 3000 }): number | null =>
   spawnSync(ps, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', SCRIPT, '-InstallDir', install, '-Profile', profile, '-AckMs', String(waits.ack), '-ExitMs', String(waits.exit)], { env: psEnv, windowsHide: true, timeout: HUNG_MS }).status
 
-describe("the installer asks a running Combwork to close (hiveAskToClose.ps1, HI-1707)", () => {
+describe("the installer asks a running Combwork to close (askToClose.ps1, HI-1707)", () => {
   beforeAll(() => {
-    dir = tempDir('hive-ask-to-close-')
+    dir = tempDir('cw-ask-to-close-')
     writeFileSync(join(dir, 'stand-in.cjs'), STAND_IN)
   })
   afterAll(() => {

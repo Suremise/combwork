@@ -1,8 +1,8 @@
-// What a packaged Hive says it is (#1647): out/identity/build-identity.json, packaged beside its resources
+// What a packaged Combwork says it is (#1647): out/identity/build-identity.json, packaged beside its resources
 // (electron-builder.yml extraResources), and read by src/main/buildIdentity.ts. `npm run dist` writes it with
 // local: true (distCopy.mjs makeDist), the release workflow with local: false (release.mjs), each just before
 // electron-builder runs, and sets CW_LOCAL_BUILD for the installer's script (build/installer.nsh): only a local
-// build's installer waits for another Hive installer to finish before it installs.
+// build's installer waits for another Combwork installer to finish before it installs.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 

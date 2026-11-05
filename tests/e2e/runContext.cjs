@@ -1,7 +1,7 @@
 // The run context (#203): everything a test run, and each suite in it, has of its own, so runs never assume they are
 // alone on the machine or inherit whatever environment they were started from.
 //
-// - The environment, here: every child a test starts (a suite, a test copy of Combwork, the hive MCP server, the
+// - The environment, here: every child a test starts (a suite, a test copy of Combwork, the combwork MCP server, the
 //   cw-progress wrapper) gets an environment built from an allowlist (ALLOW: Windows' own variables, the user's
 //   folders, the network's proxy and certificates) plus what the context sets itself (a profile, quiet, ports, the
 //   suite's folders, CLI homes). Nothing else from the parent: not the variables of the Combwork session it was started
@@ -116,7 +116,7 @@ function apply(env, vars) {
  * a test's `cw-progress` would start another Combwork than its own, and report to the user's. A test Combwork puts its own
  * shims on its sessions' PATH.
  */
-function withoutHiveShims(env, parent) {
+function withoutCombworkShims(env, parent) {
   if (!parent.APPDATA) return env
   const shims = ['Hive', 'Hive-Dev', 'Combwork', 'Combwork-Dev'].map((p) => path.win32.join(parent.APPDATA, p, 'bin').toLowerCase())
   const same = (d) => path.win32.normalize(d).replace(/[\\/]+$/, '').toLowerCase()
@@ -128,18 +128,18 @@ function withoutHiveShims(env, parent) {
 
 /** The allowlisted environment, and nothing else: for a child that isn't Combwork (git, a test server). */
 function baseEnv(parent = process.env) {
-  return withoutHiveShims(pick(parent, ALLOW), parent)
+  return withoutCombworkShims(pick(parent, ALLOW), parent)
 }
 
 /**
- * A child that is part of Combwork but not a copy of it (the hive MCP server, the cw-progress wrapper, a bridge): the
+ * A child that is part of Combwork but not a copy of it (the combwork MCP server, the cw-progress wrapper, a bridge): the
  * allowlist and `vars` (the Agent API URL and token it should use, ELECTRON_RUN_AS_NODE where Electron runs it as Node).
  */
 function childEnv(vars = {}, parent = process.env) {
   return apply(baseEnv(parent), vars)
 }
 
-/** The environments hiveEnv built: lib.cjs's _electron.launch refuses any other (so no suite starts Combwork with its own). */
+/** The environments combworkEnv built: lib.cjs's _electron.launch refuses any other (so no suite starts Combwork with its own). */
 const built = new WeakSet()
 
 /** Where the test copies of Combwork a suite starts put what they delete (#414): its work folder's `trash`. */
@@ -150,7 +150,7 @@ const trashDir = (parent = process.env) => path.join(parent.CW_E2E_DIR || WORK, 
  * `cli-homes`, so Combwork's look for the CLIs when it starts (`claude auth status`, `codex login status`, Copilot's
  * config.json and `gh auth status`, #452) reads them, never the user's ~/.claude, ~/.codex, ~/.copilot or GitHub CLI
  * login (an empty GH_CONFIG_DIR hides it: Copilot falls back to it). A suite passes a test home instead (the fake
- * Claude Code's, its own, the Codex test home) in hiveEnv's vars.
+ * Claude Code's, its own, the Codex test home) in combworkEnv's vars.
  */
 function cliHomes(parent = process.env) {
   const base = path.join(parent.CW_E2E_DIR || WORK, 'cli-homes')
@@ -226,7 +226,7 @@ function isUserCliHome(dir, parent = process.env) {
  * (CW_E2E_PORT), and the CARRIED variables; then `vars` (its profile, CW_USER_DATA, always; a port, test CLI homes,
  * test hooks), where undefined removes one (lib.cjs refuses to start a test Combwork without each home or a global git config).
  */
-function hiveEnv(vars = {}, parent = process.env) {
+function combworkEnv(vars = {}, parent = process.env) {
   const env = baseEnv(parent)
   env.CW_TEST_QUIET = parent.CW_TEST_QUIET === '0' ? '0' : '1'
   env.CW_TEST_TIPS = 'off'
@@ -245,8 +245,8 @@ function hiveEnv(vars = {}, parent = process.env) {
   return env
 }
 
-/** Whether env was built by hiveEnv (and so holds nothing from the parent but the allowlist). */
-const isHiveEnv = (env) => !!env && built.has(env)
+/** Whether env was built by combworkEnv (and so holds nothing from the parent but the allowlist). */
+const isCombworkEnv = (env) => !!env && built.has(env)
 
 /**
  * A suite's environment, from its runner: the allowlist, the PASS_ENV settings, and its run context: its folder
@@ -270,4 +270,4 @@ function suiteEnv({ name, port = null, work = null, runDir, cliLog = null, slots
   return env
 }
 
-module.exports = { TEST_ROOT, MACHINE_LANES_DIR, LANES_DIR, OWN_LANES, HEAVY_DIR, WORK, CODEX_HOME, CLAUDE_TEST_HOME, ALLOW, PASS_ENV, CARRIED, baseEnv, childEnv, hiveEnv, isHiveEnv, suiteEnv, trashDir, cliHomes, isUserCliHome, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv, isUserGitConfig }
+module.exports = { TEST_ROOT, MACHINE_LANES_DIR, LANES_DIR, OWN_LANES, HEAVY_DIR, WORK, CODEX_HOME, CLAUDE_TEST_HOME, ALLOW, PASS_ENV, CARRIED, baseEnv, childEnv, combworkEnv, isCombworkEnv, suiteEnv, trashDir, cliHomes, isUserCliHome, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv, isUserGitConfig }

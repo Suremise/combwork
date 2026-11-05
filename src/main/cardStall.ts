@@ -122,7 +122,7 @@ export const LANE_NEXT_STALL_MS = 15 * 60_000
  */
 export function laneNextWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked'>, lane: LaneOrderView | null | undefined, builder: { name: string; status: string | null }, now = Date.now()): string | null {
   if (!lane || lane.state === 'paused' || c.archived || c.blocked || c.column !== 'todo') return null
-  // Waiting for a card it depends on to be Done (HI-2129): Hive starts it then, so its builder has nothing to do yet.
+  // Waiting for a card it depends on to be Done (HI-2129): Combwork starts it then, so its builder has nothing to do yet.
   if (lane.waitsForDependency?.card === c.number) return null
   const at = lane.cards.findIndex((x) => x.number === c.number)
   if (at < 0 || lane.cards.slice(0, at).some((x) => x.column !== 'done')) return null
@@ -268,7 +268,7 @@ function laneNext(c: TaskCard, lane: LaneOrderView | null | undefined, live: Ret
 }
 
 /**
- * A lane's next card held by its builder's new conversation that Hive stopped trying to start (HI-2034, the lane's status
+ * A lane's next card held by its builder's new conversation that Combwork stopped trying to start (HI-2034, the lane's status
  * `startWait` `fresh` with `freshBlocked`): stalled at once, as only the user's Retry or ending the lane moves it (the
  * lane watch's `stalled`). Its card, in Todo with every card before it Done; null otherwise.
  */
@@ -287,7 +287,7 @@ export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: stri
   ...(l.startedAt ? { startedAt: l.startedAt } : {}),
   // Its agent's new conversation no more tried (HI-2034), said as the lane's status says it.
   ...(l.status?.reason === 'startWait' && l.status.why === 'fresh' && l.status.freshBlocked ? { freshBlocked: laneStatusText(l.status) } : {}),
-  // Its next card waiting for a card it depends on (HI-2129): Hive starts it once that one is Done.
+  // Its next card waiting for a card it depends on (HI-2129): Combwork starts it once that one is Done.
   ...(l.status?.reason === 'startWait' && l.status.why === 'dependencies' && l.status.card !== null ? { waitsForDependency: { card: l.status.card, on: l.status.waitsFor ?? '' } } : {}),
   cards: l.cards.map((c) => {
     const t = card(c.number)

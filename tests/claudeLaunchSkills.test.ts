@@ -10,7 +10,7 @@ const { contentHash } = await import('../src/main/fsutil')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
 
 type Delivery = { revision: string | null; problem?: string }
-const base = tempDir('hive-claude-launch-skills-')
+const base = tempDir('cw-claude-launch-skills-')
 
 function source(name: string, text: string): string {
   const d = join(base, 'sources', name)

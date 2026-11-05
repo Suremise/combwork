@@ -441,7 +441,7 @@ function groupByDay(rows: JournalRow[]): { day: string; label: string; rows: Jou
   return out
 }
 
-/** Who wrote an entry, as a small mark: the Assistant's own, or Hive's. */
+/** Who wrote an entry, as a small mark: the Assistant's own, or Combwork's. */
 function SourceMark({ source }: { source: JournalSource }) {
   const name = tr(SOURCE[source])
   return source === 'assistant' ? <AssistantMark className="journal-source-mark" title={name} /> : (

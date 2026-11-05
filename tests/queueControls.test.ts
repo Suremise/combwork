@@ -21,7 +21,7 @@ vi.mock('../src/main/workflow/queueHost', () => ({
   profileName: () => 'test'
 }))
 
-const base = tempDir('hive-queuecontrols-')
+const base = tempDir('cw-queuecontrols-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

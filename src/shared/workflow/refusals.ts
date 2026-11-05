@@ -398,7 +398,7 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   // Who reads it: the format's, never a value the refusal recorded.
   vals.reader = f.reader ?? 'you'
   // A stage by its name (stages.ts), as the board shows it, to agents too (#1604: "Active", never the id "active"): the
-  // project's own, else its message; an id this Hive doesn't know as it is.
+  // project's own, else its message; an id this Combwork doesn't know as it is.
   const stage = (x: string): string => f.stageNames?.[x as keyof StageNames] || (isStageId(x) ? f.one(STAGE_TEXT[x]) : x)
   if (typeof vals.stage === 'string') vals.stage = stage(vals.stage)
   // A list of stages (`move.noStage`'s), each by its stage name.

@@ -5,7 +5,7 @@ import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
 import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
-import { capturedText, errorText, hiveError, HiveError, shownError } from './hiveError'
+import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
 import { overridesNow } from './advancedValues'
@@ -81,7 +81,7 @@ import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
-import { emit, emitTo, onHiveEvent, toast } from './events'
+import { emit, emitTo, onCombworkEvent, toast } from './events'
 import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
@@ -98,7 +98,7 @@ import { HAND_OVER_TEXT, handOverNow } from '../shared/handOver'
 import { NOTICE_PREFIX } from '../shared/doorbell'
 import { FinishBatcher, finishedApiTitle, finishedApiTitleText, finishedNotice } from '../shared/bursts'
 import { notifyRoute, type NotifyRoute } from '../shared/notify'
-import { askOffer, focusedHive, notifyPending, offerOpen, resolveOffer, resolveOffers, tell } from './notify'
+import { askOffer, focusedCombwork, notifyPending, offerOpen, resolveOffer, resolveOffers, tell } from './notify'
 import { OUTCOME } from './outcomes'
 import type { SlotNote } from './mergeSlots'
 import { commentOnDoingCards, recordCards } from './cardSessions'
@@ -113,7 +113,7 @@ import { TerminalScreen } from './terminalScreen'
 import { heldLineLost } from './heldLine'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { withBinOnPath } from './progressReporters/shims'
-import { hiveSkills, parseSkillFrontmatter, skillFor } from './skills'
+import { combworkSkills, parseSkillFrontmatter, skillFor } from './skills'
 import { copyBook, sessionEnded } from './skillCopies'
 import { workspaceNotesFor } from './workspaceNotes'
 import { skillOff } from '../shared/skillDelivery'
@@ -156,7 +156,7 @@ import { projectPreferences } from './workflow/preferences'
 import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 import { movedFolders, movedPath } from './combworkMove'
 import { freshReasonOf, SESSION_NAMES, type FreshReason } from '../shared/sessionFresh'
-import type { FolderMove } from '../shared/hiveFolderMove'
+import type { FolderMove } from '../shared/combworkFolderMove'
 
 const log = createLogger('sessions')
 
@@ -179,9 +179,9 @@ const EXIT_IN_TURN: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starti
 const BUSY: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
 
 /**
- * Hive's own words for sessions (#847, E10c of #677): errors (HiveErrors, in the window's language through IPC and in
+ * Combwork's own words for sessions (#847, E10c of #677): errors (CombworkErrors, in the window's language through IPC and in
  * English for the Agent API), statuses (LiveSessionState.statusText beside the English statusMessage), notices (a
- * translated title with its English for the Agent API's stream) and toasts. Text agents read (prompts Hive types, lock
+ * translated title with its English for the Agent API's stream) and toasts. Text agents read (prompts Combwork types, lock
  * replies, deliveries), the log and the developer console stay English.
  */
 const M = {
@@ -206,7 +206,7 @@ const M = {
 }
 
 /**
- * Sets an agent's status message (#845): Hive's own as text (its English in `statusMessage`, which agents read and Hive
+ * Sets an agent's status message (#845): Combwork's own as text (its English in `statusMessage`, which agents read and Combwork
  * compares, and `statusText`, which the window shows in its language), the CLI's words as they came, or null to clear it.
  */
 function setStatus(st: LiveSessionState, text: TextPart | null): void {
@@ -238,8 +238,8 @@ export interface HandoverRef {
   session: string | null
 }
 
-export interface HiveMcpProvider {
-  /** The hive MCP server for a project's sessions; with agentId, that agent's (its tools then say who is calling). */
+export interface CombworkMcpProvider {
+  /** The combwork MCP server for a project's sessions; with agentId, that agent's (its tools then say who is calling). */
   (projectPath: string, agentId?: string): McpServerDef | null
 }
 
@@ -268,7 +268,7 @@ interface HookBlock {
 }
 
 /**
- * A hook Hive is handling (HI-982), as it observes it: made when it arrives (observeHook) for its launch, filled in by
+ * A hook Combwork is handling (HI-982), as it observes it: made when it arrives (observeHook) for its launch, filled in by
  * its lock decision and the turn ledger, recorded in the launch's history once it is handled (hookHandled).
  */
 export interface HookObservation {
@@ -285,7 +285,7 @@ const MOVES_INPUT: ReadonlySet<HookEvent['kind']> = new Set<HookEvent['kind']>([
 /** How many stops seen only on screen a session's record keeps (SessionRecord.screenStops). */
 const MAX_SCREEN_STOPS = 200
 /**
- * How long a turn may run with nothing heard of it (no hook, no transcript growth, no tool call under way) before Hive
+ * How long a turn may run with nothing heard of it (no hook, no transcript growth, no tool call under way) before Combwork
  * looks for its end on the CLI's screen, and failing that says its state is unknown (#648). Never an end in itself.
  * Unpackaged test builds can shorten it (CW_TEST_SILENT_MS).
  */
@@ -356,7 +356,7 @@ interface LiveSession {
   defaultEffort?: { model: string | null }
   /** How the CLI compacts by itself for a model it runs as (#242), read again when the session reports another model. */
   autoCompactFor?: (running?: string) => AutoCompactSetting
-  /** Set while a compaction Hive asked for runs. */
+  /** Set while a compaction Combwork asked for runs. */
   compacting?: Compaction
   /** The user stopped it (e.g. during its worktree setup), so an early exit isn't reported as a failure. */
   stopRequested?: boolean
@@ -366,7 +366,7 @@ interface LiveSession {
   ending?: boolean
   /** Terminal output tail, to see the CLI ready or asking something at the start. */
   modeTail: string
-  /** What Hive recognised on its screen this launch, whatever its status (the developer console's contract markers, #638). */
+  /** What Combwork recognised on its screen this launch, whatever its status (the developer console's contract markers, #638). */
   recognition: ScreenRecognition
   /** The mode it was launched in. */
   launchMode: PermissionMode | null
@@ -412,7 +412,7 @@ interface LiveSession {
   turnsRead?: TurnsReading
   /** Its transcript's turns were read for this launch already: a later file or conversation is read from its end. */
   turnsBegun?: boolean
-  /** For the check's why: where its CLI's settings turn hooks off now, and whether it is newer than Hive was tested with. */
+  /** For the check's why: where its CLI's settings turn hooks off now, and whether it is newer than Combwork was tested with. */
   hooksOffIn?: () => string | null
   newerThanTested?: boolean
   /** When the cost estimate was last worked out (providers that don't report cost, or the user's prices: #436). */
@@ -428,11 +428,11 @@ interface LiveSession {
   /** When such a launch first became ready (or watching), in ms: its task is pending at most PENDING_MS from then (#721). */
   launchReadyAt?: number
   /**
-   * This launch was given Hive's tools (the hive MCP server, #865): `connecting` until its server says the CLI has
-   * connected (POST /v1/launch/connected), and no line of Hive's is typed meanwhile, at most cw.mcp.connectSeconds
+   * This launch was given Combwork's tools (the hive MCP server, #865): `connecting` until its server says the CLI has
+   * connected (POST /v1/launch/connected), and no line of Combwork's is typed meanwhile, at most cw.mcp.connectSeconds
    * from when it first became ready (readyAt), for a CLI that never connects it.
    */
-  hiveTools?: 'connecting' | 'connected'
+  combworkTools?: 'connecting' | 'connected'
   /** This launch's side of the workflow, as its metrics count it (HI-2049): taken once, as it launched. */
   workflow?: LaunchWorkflow
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
@@ -502,30 +502,30 @@ interface LiveSession {
   guardChecking?: boolean
   /** The conversation already warned about for its transcript's size (once each). */
   sizeWarned?: string
-  /** When its latest turns began (as Hive saw each start), newest last: what a hand-over to itself checks (#1057). */
+  /** When its latest turns began (as Combwork saw each start), newest last: what a hand-over to itself checks (#1057). */
   turnStarts?: number[]
   /** The ledger's turn last seen, to tell a new one. */
   turnSeen?: object
   /** This launch resumes a conversation (a failed start's Retry resumes it again). */
   resumed?: boolean
-  /** The Hive Assistant's mode (its id) its conversation was last given, started in or told: recorded with it. */
+  /** The Combwork Assistant's mode (its id) its conversation was last given, started in or told: recorded with it. */
   mode?: string
-  /** This launch gave its conversation instructions of Hive's own (SessionRecord.promptAdded): recorded with it. */
+  /** This launch gave its conversation instructions of Combwork's own (SessionRecord.promptAdded): recorded with it. */
   promptAdded?: true
   /** Prompts the CLI has reported submitted in this launch (UserPromptSubmit), for sendPrompt's confirm and a wake's (#376). */
   prompts?: number
   /**
-   * Hive's latest typed prompt (sendPrompt): when (`at`, its Enter; `from`, when its typing reserved the composer), and the
+   * Combwork's latest typed prompt (sendPrompt): when (`at`, its Enter; `from`, when its typing reserved the composer), and the
    * prompts taken then. Until the CLI takes it, it is pending (#416).
    */
   typed?: { at: number; prompts: number; from: number }
   /**
-   * When Hive last pressed Enter for a line of its own (HI-2218), at the key press: a prompt its CLI takes after it, the
-   * user's Enter before it, is Hive's, even while sendPrompt still waits for it to be taken (`typed` is recorded after).
+   * When Combwork last pressed Enter for a line of its own (HI-2218), at the key press: a prompt its CLI takes after it, the
+   * user's Enter before it, is Combwork's, even while sendPrompt still waits for it to be taken (`typed` is recorded after).
    */
-  hiveEnterAt?: number
+  combworkEnterAt?: number
   /**
-   * A line of Hive's the user typed into before its CLI took it (#652 round 1 finding 2): the prompt is their draft now, so
+   * A line of Combwork's the user typed into before its CLI took it (#652 round 1 finding 2): the prompt is their draft now, so
    * nothing more is typed into the agent until a prompt is submitted (the CLI's count passes this).
    */
   draftOver?: { prompts: number }
@@ -533,15 +533,15 @@ interface LiveSession {
   lastReply?: string
   /** Its latest hooks (what they were, when, and the status they left), for the log when the CLI turns out idle (#612). */
   recentHooks?: { kind: HookEvent['kind']; at: number; status: SessionStatus }[]
-  /** Its hooks for its Hooks dialog (HI-982): what its launch has (adapter.launchHooks), and what Hive received, newest last. */
+  /** Its hooks for its Hooks dialog (HI-982): what its launch has (adapter.launchHooks), and what Combwork received, newest last. */
   hooks?: LaunchHooks
   hookHistory?: HookFired[]
   /**
-   * Its edit Hive's file lock blocked (or asked the user about) and whose decision stands (HI-982, Activity): the latest
+   * Its edit Combwork's file lock blocked (or asked the user about) and whose decision stands (HI-982, Activity): the latest
    * one only, by the tool call, the file and the holder's launch; dropped by what ends that decision (hookBlockNow).
    */
   hookBlock?: HookBlock
-  /** Its CLI's turns as Hive knows them (#648): which runs and which are over, by the CLI's ids, and when it was last heard. */
+  /** Its CLI's turns as Combwork knows them (#648): which runs and which are over, by the CLI's ids, and when it was last heard. */
   ledger?: TurnLedger
   /** The CLI's own latest record of a turn's end read from its transcript (LiveDetails.turnEnded). */
   turnRecord?: { turn: string; at: string } | null
@@ -577,7 +577,7 @@ interface LiveSession {
   /**
    * The deliveries the line marked not taken (`state.untakenLine`) rang for (#1514 round 1 finding): only one of them read
    * shows that line was taken; another's read (an older line's, taken long ago) leaves the mark. Empty: a line that rang
-   * for none Hive knows.
+   * for none Combwork knows.
    */
   untakenFor?: readonly string[]
   /** The line marked not taken, whole (`state.untakenLine` keeps 160 characters): told to the user if it is lost (HI-1959). */
@@ -590,7 +590,7 @@ interface LiveSession {
   unanswered?: number
   /**
    * Its input box taking no keys (HI-2191): INPUT_BLOCKED_AFTER clears in a row refused so, something else on its screen
-   * takes them (a dialog Hive doesn't know). The agent waits for the user with `ask`, and Hive presses no key there until
+   * takes them (a dialog Combwork doesn't know). The agent waits for the user with `ask`, and Combwork presses no key there until
    * it is seen to take keys again (inputBlockedDrawn, a hook, Try again), in this run (`runId`). `box`: its box as read
    * then; `since`: when (ms); `retrying` while Try again's clear runs.
    */
@@ -608,7 +608,7 @@ export interface EffectiveSettings {
   provider: ProviderId
   skills: LaunchSkill[]
   skillHashes: Record<string, string>
-  /** Hive skills nobody gets because their header can't be read (name → why): in the launch's problems. */
+  /** Combwork skills nobody gets because their header can't be read (name → why): in the launch's problems. */
   skillProblems: Record<string, string>
   mcpServers: Record<string, McpServerDef>
   model: string | null
@@ -678,7 +678,7 @@ function lockKey(abs: string): string {
   }
 }
 
-/** What Hive types to tell an agent it may make the locked edits the user allowed. */
+/** What Combwork types to tell an agent it may make the locked edits the user allowed. */
 /** A go-ahead waiting for an agent's turn to end: the user's Allow, or the claim it waited on having ended (HI-2386). */
 interface GoAhead {
   path: string
@@ -731,7 +731,7 @@ export const serverMarksForTests = (): ServerMarks => serverMarks
 const MAX_USAGE_SEEN = 200
 /** A session listing this slow is logged with where its time went (#1646). */
 const SLOW_LIST_MS = 1000
-/** How many of Hive's sessions a listing looks at at once (#1649): enough to overlap their file checks, not to flood the disk's threads. */
+/** How many of Combwork's sessions a listing looks at at once (#1649): enough to overlap their file checks, not to flood the disk's threads. */
 const LIST_AT_ONCE = 8
 /** Folders (each CLI's) whose other sessions a listing reads at once (HI-1681). */
 const OTHER_FOLDERS_AT_ONCE = 4
@@ -806,18 +806,18 @@ async function typeInto(key: string, text: string, still: () => boolean = () => 
   const CHUNK = 8
   for (let i = 0; i < text.length; i += CHUNK) {
     // The agent stopped or restarted meanwhile: the rest mustn't reach the new process.
-    if (!still()) throw hiveError(M.stoppedBeforePrompt)
+    if (!still()) throw combworkError(M.stoppedBeforePrompt)
     writePty(key, text.slice(i, i + CHUNK))
     if (i + CHUNK < text.length) await new Promise((r) => setTimeout(r, 10))
   }
 }
 
-/** A typed prompt's pieces (HI-1327): its text, and the keys Hive presses for its line breaks. */
+/** A typed prompt's pieces (HI-1327): its text, and the keys Combwork presses for its line breaks. */
 export type TypedSegment = { text: string } | { key: string }
 
 /**
  * A prompt typed as written into a CLI whose input box takes a key as a new line (HI-1327): its line breaks (CRLF, CR
- * or LF) as that key, `newline` (a fixed sequence of Hive's, TYPED_NEWLINE_KEYS), and each line as promptInput types it
+ * or LF) as that key, `newline` (a fixed sequence of Combwork's, TYPED_NEWLINE_KEYS), and each line as promptInput types it
  * (a tab a space, the other control characters, escapes included, left out). The key is its own piece, written whole,
  * so nothing in the text can be taken for one, and no chunk can split it.
  */
@@ -841,14 +841,14 @@ async function typeSegments(key: string, segments: readonly TypedSegment[], stil
     if ('text' in s) {
       const CHUNK = 8
       for (let i = 0; i < s.text.length; i += CHUNK) {
-        if (!still()) throw hiveError(M.stoppedBeforePrompt)
+        if (!still()) throw combworkError(M.stoppedBeforePrompt)
         const part = s.text.slice(i, i + CHUNK)
         writePty(key, part)
         typed[typed.length - 1] += part.length
         if (i + CHUNK < s.text.length) await new Promise((r) => setTimeout(r, 10))
       }
     } else {
-      if (!still()) throw hiveError(M.stoppedBeforePrompt)
+      if (!still()) throw combworkError(M.stoppedBeforePrompt)
       writePty(key, s.key)
       typed.push(0)
       await new Promise((r) => setTimeout(r, 10))
@@ -860,16 +860,16 @@ async function typeSegments(key: string, segments: readonly TypedSegment[], stil
  * How many Ctrl+U take back what typeSegments typed (`typed`: the characters on each of its lines, the cursor after
  * the last), in an input box where Ctrl+U deletes to the line's start, or the line break before it at a line's start
  * (Codex 0.164's kill_line_start: HR6's round 1 of HI-1327): one for each line with text, and one for each line break.
- * Never more, so nothing before Hive's own text is touched.
+ * Never more, so nothing before Combwork's own text is touched.
  */
 export function rollbackKeys(typed: readonly number[]): number {
   return typed.reduce((n, chars, i) => n + (chars > 0 ? 1 : 0) + (i > 0 ? 1 : 0), 0)
 }
 
 /**
- * How many Backspaces take back a prompt Hive stopped part-way in an input box whose Ctrl+U deletes only the row the
+ * How many Backspaces take back a prompt Combwork stopped part-way in an input box whose Ctrl+U deletes only the row the
  * cursor is on (capabilities.ctrlUClearsRow, HI-1974: Claude Code 2.1.312 kept a stopped wake's first rows, and the
- * next wake was sent after them): one for each code point Hive wrote (`written`: the one-line prompt, or what
+ * next wake was sent after them): one for each code point Combwork wrote (`written`: the one-line prompt, or what
  * typeSegments recorded, each line's UTF-16 units and a key between lines). A Backspace deletes characters, however
  * wide they are drawn or wherever its rows wrapped (tried on 2.1.312 with CJK text, an emoji sequence and long words).
  * It never stops short; a character made of several code points can make it press a few more, which delete only a
@@ -880,7 +880,7 @@ export function backspaceKeys(written: string | readonly number[]): number {
 }
 
 /**
- * For the wakeputoff suite (unpackaged builds only, HI-1974): a line Hive has typed waits before its Enter while
+ * For the wakeputoff suite (unpackaged builds only, HI-1974): a line Combwork has typed waits before its Enter while
  * CW_TEST_HOLD_TYPED's file exists, checked as it waits, so what stops a line part-way can stop it there.
  */
 async function heldTyped(label: string, check: () => void): Promise<void> {
@@ -894,7 +894,7 @@ async function heldTyped(label: string, check: () => void): Promise<void> {
 }
 
 /**
- * What Hive writes for a prompt's line (sendPrompt), without control characters, pasted (bracketed) or typed, so
+ * What Combwork writes for a prompt's line (sendPrompt), without control characters, pasted (bracketed) or typed, so
  * nothing in it can end the paste or press a key (HI-1920: typed, a Ctrl+C in it reached Codex as Ctrl+C). Kept as
  * written (`asTyped`, #1286), its line breaks go into a paste as the Enter a terminal pastes them with, and typed, each
  * line break or tab becomes a space (typed, a line break would send the prompt early and a tab complete a word); its
@@ -942,7 +942,7 @@ export function withoutInvisible(line: string): string {
 }
 
 /**
- * Whether a line Hive is typing has been drawn on an agent's screen (#600): its end (spaces left out, as a CLI wraps
+ * Whether a line Combwork is typing has been drawn on an agent's screen (#600): its end (spaces left out, as a CLI wraps
  * it) shows more often than when this was called, before it was typed (a doorbell's end is in its earlier ones too).
  */
 export function drawnLine(screen: Pick<TerminalScreen, 'text'>, line: string): () => boolean {
@@ -1055,15 +1055,15 @@ export class LaunchReads {
   private dialectSets = new Map<string, Promise<DialectSet | null>>()
 
   /** A workspace's dialect files, checked against the schema (dialects, HI-2443); null when they can't be read. */
-  dialects(hiveDir: string): Promise<DialectSet | null> {
-    const key = hiveDir.toLowerCase()
+  dialects(combworkDir: string): Promise<DialectSet | null> {
+    const key = combworkDir.toLowerCase()
     let d = this.dialectSets.get(key)
-    if (!d) this.dialectSets.set(key, (d = loadDialects(dialectsDir(hiveDir), agentTextSchema()).catch(() => null)))
+    if (!d) this.dialectSets.set(key, (d = loadDialects(dialectsDir(combworkDir), agentTextSchema()).catch(() => null)))
     return d
   }
 
   skills(): Promise<SkillInfo[]> {
-    return (this.skillList ??= hiveSkills())
+    return (this.skillList ??= combworkSkills())
   }
 
   servers(): Promise<McpServerInfo[]> {
@@ -1091,7 +1091,7 @@ function launchReadsOf(scope: object): LaunchReads {
 const SESSION_WRITING_MS = 5000
 
 /** A session left alone by archive or delete, and why (SessionBulkResult's reasons). */
-export class SessionInUse extends HiveError {
+export class SessionInUse extends CombworkError {
   constructor(
     readonly reason: SessionSkipReason,
     text: Text
@@ -1101,7 +1101,7 @@ export class SessionInUse extends HiveError {
 }
 
 
-/** Runs a move of Hive's copies; a copy another program holds fails it as SessionInUse. */
+/** Runs a move of Combwork's copies; a copy another program holds fails it as SessionInUse. */
 async function inUseOnFail(fn: () => Promise<void>): Promise<void> {
   try {
     await fn()
@@ -1157,7 +1157,7 @@ const pinProvider = (agent: AgentDef, provider: ProviderId | '' | undefined): Ag
 
 /**
  * The delivered skills' sizes, for metrics, measured on each copy its CLI reads: its catalog entry (its SKILL.md's name
- * and description, from the header Hive reads anyway) and its bytes on disk (the bounded stat walk, no file read). A
+ * and description, from the header Combwork reads anyway) and its bytes on disk (the bounded stat walk, no file read). A
  * copy that can't be measured (gone, unreadable, no header) is counted as unmeasured and left out of both sums, never
  * guessed as zero. Measuring never fails a launch.
  */
@@ -1185,7 +1185,7 @@ export async function deliveredSkillSizes(adapter: ProviderAdapter, ctx: LaunchC
 /** How soon after the user's Enter in an agent's pane its CLI must take a prompt for it to count as theirs (#418). */
 const USER_REPLY_MS = 15_000
 
-/** How long a prompt Hive typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
+/** How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
 const PENDING_MS = 30_000
 
 /** Settings → Advanced: how long a Ctrl+U clearing Claude Code's input has to be answered on its screen (HI-1979). */
@@ -1196,7 +1196,7 @@ const CLEAR_KEY_WAIT = 'claude-code.prompt.clearKeySeconds'
  */
 const CLEAR_KEYS_MOST = 200
 /**
- * The letter Hive types into an input it reads as empty, and takes back (HI-1979, HR6's round 1): shown alone, the input
+ * The letter Combwork types into an input it reads as empty, and takes back (HI-1979, HR6's round 1): shown alone, the input
  * was empty when it came. A plain letter: in an empty Claude Code input `/`, `?`, `!`, `#` and `@` each open something.
  */
 const CLEAR_PROBE = 'x'
@@ -1227,7 +1227,7 @@ const SIGN_IN_RECHECK_MS = 60_000
 /** The status message of an agent stopped by a refused sign-in once its CLI is signed in again (#309). */
 const SIGNED_IN_AGAIN = msg({ id: 'session.status.signedInAgain', defaultMessage: 'Stopped while signed out', description: "An agent's status once its CLI is signed in again: its turn stopped while the CLI's sign-in had expired, and Resume carries it on." })
 /** What Resume (n) types into such an agent. */
-/** Hive's own deliveries come from it (#649). */
+/** Combwork's own deliveries come from it (#649). */
 // agent-protocol: the app's name, as a delivery's sender
 const CW_SENDER = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the sender's name in deliveries, which agents read
 const CARRY_ON_PROMPT = SESSION.carryOn
@@ -1283,28 +1283,28 @@ class SessionManager {
     carry: (host: string, agentId: string, from: string) => Promise<number>
   } | null = null
   private delivery(): NonNullable<SessionManager['deliveries']> {
-    if (!this.deliveries) throw hiveError(msg({ id: 'session.error.noDeliveries', defaultMessage: "Combwork's delivery service isn't running.", description: "Giving an agent a message failed: the part of Combwork that delivers them hasn't started (or has stopped)." }), undefined, { kind: 'conflict' })
+    if (!this.deliveries) throw combworkError(msg({ id: 'session.error.noDeliveries', defaultMessage: "Combwork's delivery service isn't running.", description: "Giving an agent a message failed: the part of Combwork that delivers them hasn't started (or has stopped)." }), undefined, { kind: 'conflict' })
     return this.deliveries
   }
   hookUrl = ''
   apiEnv: (projectPath: string, agentId: string) => Record<string, string> = () => ({})
-  /** Hive's bin folder (hive-progress), first on each session's PATH; null until written, or when it couldn't be. */
+  /** Combwork's bin folder (hive-progress), first on each session's PATH; null until written, or when it couldn't be. */
   binDir: string | null = null
-  hiveMcp: HiveMcpProvider = () => null
-  /** Hive's guidance for agents (the hive MCP server's instructions), for providers that need it at launch. */
-  hiveGuidance: (projectPath: string) => Promise<string> = async () => ''
-  /** Before each Hive Assistant launch (its workspace gets a new Agent API token). */
+  combworkMcp: CombworkMcpProvider = () => null
+  /** Combwork's guidance for agents (the combwork MCP server's instructions), for providers that need it at launch. */
+  combworkGuidance: (projectPath: string) => Promise<string> = async () => ''
+  /** Before each Combwork Assistant launch (its workspace gets a new Agent API token). */
   onAssistantLaunch: (projectPath: string) => Promise<void> = async () => undefined
-  /** The user sent the Hive Assistant a message (a new turn). */
+  /** The user sent the Combwork Assistant a message (a new turn). */
   onAssistantPrompt: (projectPath: string) => void = () => undefined
-  /** The Hive Assistant's process ended (its token is revoked, its questions withdrawn). */
+  /** The Combwork Assistant's process ended (its token is revoked, its questions withdrawn). */
   onAssistantExit: (projectPath: string) => void = () => undefined
   /** When the user last typed in each terminal (by pty key), so nothing else types over them. */
   private userInput = new Map<string, { at: number; enter: boolean }>()
-  /** The Hive Assistant's instructions for a launch (who it is, and its mode's), and the mode's name and id. */
+  /** The Combwork Assistant's instructions for a launch (who it is, and its mode's), and the mode's name and id. */
   assistantInstructions: (projectPath: string, agent: AgentDef) => Promise<{ text: string; mode: string; modeId: string; modeText: string }> = async () => ({ text: '', mode: '', modeId: '', modeText: '' })
   /**
-   * A Hive Assistant conversation was resumed in the mode `modeId`: main/assistantMode.ts tells it that mode
+   * A Combwork Assistant conversation was resumed in the mode `modeId`: main/assistantMode.ts tells it that mode
    * once it is idle, if the conversation was last given another (#334).
    */
   onAssistantResumed: (projectPath: string, runId: string, sessionId: string, modeId: string) => void = () => undefined
@@ -1320,7 +1320,7 @@ class SessionManager {
   }
 
   /**
-   * A running agent as an agent watch reads it (#416), or null when it isn't running. A prompt Hive typed within the last
+   * A running agent as an agent watch reads it (#416), or null when it isn't running. A prompt Combwork typed within the last
    * PENDING_MS that its CLI hasn't taken yet is pending: the agent was just given a task, and counts as working. So is a
    * launch's task on its command line (#712): the CLI is ready at its SessionStart and takes the task only after, so it
    * is pending until its first prompt, at most PENDING_MS after it became ready.
@@ -1335,7 +1335,7 @@ class SessionManager {
   }
 
   /**
-   * Whether an agent's CLI hasn't taken its launch's task yet (#712), as agentNow counts it (#721): nothing of Hive's is
+   * Whether an agent's CLI hasn't taken its launch's task yet (#712), as agentNow counts it (#721): nothing of Combwork's is
    * typed into it meanwhile, or its CLI's first prompt, the task's, would be taken for that line's and the line would go
    * first.
    */
@@ -1345,38 +1345,38 @@ class SessionManager {
   }
 
   /**
-   * Whether an agent's launch was given Hive's tools and its CLI hasn't connected them yet (#865): a resumed Claude Code
+   * Whether an agent's launch was given Combwork's tools and its CLI hasn't connected them yet (#865): a resumed Claude Code
    * is ready at its SessionStart before its hive server has connected, and a doorbell typed then is a turn that can't
    * call cw_inbox. At most cw.mcp.connectSeconds from when it first became ready, for a CLI that never connects it
    * (its server failed to start, or MCP is off in it).
    */
-  hiveToolsWaiting(projectPath: string, agentId: string): boolean {
+  combworkToolsWaiting(projectPath: string, agentId: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
-    if (l?.hiveTools !== 'connecting') return false
+    if (l?.combworkTools !== 'connecting') return false
     return l.readyAt === undefined || Date.now() - l.readyAt < advanced.number('cw.mcp.connectSeconds') * 1000
   }
 
   /**
-   * The hive server of an agent's launch `runId` says its CLI has connected (#865): Hive's lines may go to it now, and
+   * The combwork server of an agent's launch `runId` says its CLI has connected (#865): Combwork's lines may go to it now, and
    * what waited is offered at once (its status is sent again, which deliveries follow). Whether it was that launch's.
    */
-  /** Who waits for a launch's hive tools (hiveToolsSettled), by agent: each looks at the gate again when told. */
+  /** Who waits for a launch's Combwork tools (combworkToolsSettled), by agent: each looks at the gate again when told. */
   private toolsWaiters = new Map<string, Set<() => void>>()
   /** The waits look again when Settings → Advanced changes (the bound applies at once), once one has waited. */
   private toolsSettingsHook: (() => void) | null = null
 
-  /** The waits for an agent's hive tools look at the gate again (it connected, its launch changed or ended). */
+  /** The waits for an agent's Combwork tools look at the gate again (it connected, its launch changed or ended). */
   private recheckTools(key: string): void {
     for (const look of [...(this.toolsWaiters.get(key) ?? [])]) look()
   }
 
   /**
-   * Resolves once an agent's hive tools no longer hold its lines (#865 rounds 3 and 4): once hiveToolsWaiting, the gate
+   * Resolves once an agent's hive tools no longer hold its lines (#865 rounds 3 and 4): once combworkToolsWaiting, the gate
    * itself, is false. It is looked at again when the tools connect, the launch's state changes or it ends, the bound is
    * changed in Settings → Advanced, and when what is left of the bound from its ready runs out; never a frozen deadline.
    */
-  hiveToolsSettled(projectPath: string, agentId: string): Promise<void> {
-    if (!this.hiveToolsWaiting(projectPath, agentId)) return Promise.resolve()
+  combworkToolsSettled(projectPath: string, agentId: string): Promise<void> {
+    if (!this.combworkToolsWaiting(projectPath, agentId)) return Promise.resolve()
     const key = liveId(projectPath, agentId)
     this.toolsSettingsHook ??= advanced.onChange(() => {
       for (const k of [...this.toolsWaiters.keys()]) this.recheckTools(k)
@@ -1387,7 +1387,7 @@ class SessionManager {
       let timer: NodeJS.Timeout | undefined
       const look = (): void => {
         clearTimeout(timer)
-        if (this.hiveToolsWaiting(projectPath, agentId)) {
+        if (this.combworkToolsWaiting(projectPath, agentId)) {
           const l = this.live.get(key)!
           const bound = advanced.number('cw.mcp.connectSeconds') * 1000
           timer = setTimeout(look, (l.readyAt === undefined ? bound : Math.max(0, bound - (Date.now() - l.readyAt))) + 50)
@@ -1402,11 +1402,11 @@ class SessionManager {
     })
   }
 
-  hiveToolsConnected(projectPath: string, agentId: string, runId?: string): boolean {
+  combworkToolsConnected(projectPath: string, agentId: string, runId?: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || (runId !== undefined && l.state.runId !== runId)) return false
-    if (l.hiveTools !== 'connecting') return true
-    l.hiveTools = 'connected'
+    if (l.combworkTools !== 'connecting') return true
+    l.combworkTools = 'connected'
     this.recheckTools(liveId(projectPath, agentId))
     log.info(`${userText(agentId)}'s Combwork tools connected${l.readyAt === undefined ? '' : ` ${Date.now() - l.readyAt} ms after it became ready`}`)
     this.emitState(l.state)
@@ -1416,28 +1416,28 @@ class SessionManager {
   /**
    * Presses Enter again in an agent whose typed line wasn't taken (#376: a CLI dropped the Enter, and the line stayed in
    * its prompt). Only in the same launch, while it is idle (watching too: a watch lasts until its wake is received, #649),
-   * and not while the user types there or Hive types into it.
+   * and not while the user types there or Combwork types into it.
    */
   submitAgain(projectPath: string, agentId: string, runId: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
     const key = this.key(projectPath, agentId)
     // Nor while its folder is being changed (#646 round 1: the Enter would start a turn under a Git switch or pull).
     if (!l || l.state.runId !== runId || !readyFor(l.state) || this.userMayBeTyping(projectPath, agentId) || this.delivering.has(key) || folderChanging(l.state.cwd)) return false
-    // The prompt is the user's draft once they have typed in it (#652 round 1 finding 2): never sent by Hive's Enter.
+    // The prompt is the user's draft once they have typed in it (#652 round 1 finding 2): never sent by Combwork's Enter.
     if (this.userTypedOverLine(projectPath, agentId)) return false
     // Nor while its CLI's own question shows (HI-1959): Enter would answer it (HB4's wake answered Claude Code's offer).
     if (this.cliAsks(projectPath, agentId)) return false
     // Nor while something on its screen takes its keys (HI-2191).
     if (this.inputBlocked(projectPath, agentId)) return false
-    l.hiveEnterAt = Date.now()
+    l.combworkEnterAt = Date.now()
     writePty(key, '\r')
     return true
   }
 
   /**
-   * Whether the user has typed in an agent's terminal since Hive's line still waiting there began to be typed (#530, #652
+   * Whether the user has typed in an agent's terminal since Combwork's line still waiting there began to be typed (#530, #652
    * round 1 finding 2): the prompt holds their input too, whatever the typing pause says (0 included), and is theirs, not
-   * Hive's to submit. False when no line of Hive's waits.
+   * Combwork's to submit. False when no line of Combwork's waits.
    */
   userTypedOverLine(projectPath: string, agentId: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
@@ -1445,7 +1445,7 @@ class SessionManager {
   }
 
   /**
-   * Leaves Hive's untaken line to the user, who typed into it (#652 round 1 finding 2): never submitted or cleared by Hive,
+   * Leaves Combwork's untaken line to the user, who typed into it (#652 round 1 finding 2): never submitted or cleared by Combwork,
    * and nothing more typed into the agent until a prompt is submitted there (its CLI's count goes up). Only for this launch.
    */
   leaveToUser(projectPath: string, agentId: string, runId: string): void {
@@ -1538,7 +1538,7 @@ class SessionManager {
    * process (setup or its CLI), and its claim's tracked work, ended once it has (or once its start is given up).
    */
   private writers = new Map<string, { projectPath: string; agentId: string; spawned: boolean; done: () => void }>()
-  /** Hive is quitting: no new agent starts. */
+  /** Combwork is quitting: no new agent starts. */
   private shuttingDown = false
   /** The window showing a project (several windows each show one workspace). */
   private getWindow: (projectPath?: string) => BrowserWindow | null = () => null
@@ -1555,8 +1555,8 @@ class SessionManager {
   async soleAgent(projectPath: string): Promise<string> {
     const agents = projectAgents(await workspace.projectConfig(projectPath))
     if (agents.length === 1) return agents[0].id
-    if (agents.length) throw hiveError(msg({ id: 'session.error.severalAgents', defaultMessage: 'This project has several agents: choose which one.', description: "An action that names no agent is refused: the project has more than one." }), undefined, { kind: 'invalid' })
-    throw hiveError(msg({ id: 'session.error.noAgents', defaultMessage: 'This project has no agents yet. Add one first.', description: 'An action on an agent is refused: the project has none.' }), undefined, { kind: 'conflict' })
+    if (agents.length) throw combworkError(msg({ id: 'session.error.severalAgents', defaultMessage: 'This project has several agents: choose which one.', description: "An action that names no agent is refused: the project has more than one." }), undefined, { kind: 'invalid' })
+    throw combworkError(msg({ id: 'session.error.noAgents', defaultMessage: 'This project has no agents yet. Add one first.', description: 'An action on an agent is refused: the project has none.' }), undefined, { kind: 'conflict' })
   }
 
   liveCount(provider?: ProviderId): number {
@@ -1598,7 +1598,7 @@ class SessionManager {
     return out
   }
 
-  /** Whether a session of Hive's runs, or is starting, in a folder (#1431: its skill copies stay while one does). */
+  /** Whether a session of Combwork's runs, or is starting, in a folder (#1431: its skill copies stay while one does). */
   runningIn(folder: string): boolean {
     return [...this.live.values()].some((l) => samePath(l.state.cwd, folder))
   }
@@ -1640,7 +1640,7 @@ class SessionManager {
     const cfg = await workspace.projectConfig(projectPath)
     const agents = projectAgents(cfg)
     const agent = agents.find((a) => a.id === agentId)
-    if (!agent) throw hiveError(msg({ id: 'session.error.agentGone', defaultMessage: 'That agent no longer exists.', description: 'An action on an agent is refused: it was removed meanwhile.' }), undefined, { kind: 'notFound' })
+    if (!agent) throw combworkError(msg({ id: 'session.error.agentGone', defaultMessage: 'That agent no longer exists.', description: 'An action on an agent is refused: it was removed meanwhile.' }), undefined, { kind: 'notFound' })
     return { agent, cfg, count: agents.length }
   }
 
@@ -1665,7 +1665,7 @@ class SessionManager {
       try {
         await ensureMigrated(projectPath)
       } catch (e) {
-        throw hiveError(M.moveFailed, { project: basename(projectPath), error: errorText(e) })
+        throw combworkError(M.moveFailed, { project: basename(projectPath), error: errorText(e) })
       }
       pc = await workspace.projectConfig(projectPath)
     }
@@ -1674,7 +1674,7 @@ class SessionManager {
     const was = agent
     const fresh = was && projectAgents(pc).find((a) => a.id === was.id)
     if (was && fresh) agent = { ...fresh, provider: was.provider ?? fresh.provider }
-    // Every Hive skill for its audience (SKILL.md's metadata.audience) reaches the session: project agents get those for
+    // Every Combwork skill for its audience (SKILL.md's metadata.audience) reaches the session: project agents get those for
     // agents, unless the workspace or the project switched one off (#1431, Skills → Delivered to agents); the Assistant
     // gets those for it.
     // A skill whose header is broken or whose audience is unknown reaches nobody: the launch says why (its problems).
@@ -1694,7 +1694,7 @@ class SessionManager {
       }
     }
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
-    // it names some. Never one named as Hive's own (a hand-made .combwork/mcp/hive.json): the CLIs pre-approve that one's tools.
+    // it names some. Never one named as Combwork's own (a hand-made .combwork/mcp/hive.json): the CLIs pre-approve that one's tools.
     const forAgent = agent ?? projectAgents(pc)[0]
     // The Assistant gets the workspace's servers added for it (HI-1472, HI-2059: its view's MCP Servers, as a project's
     // MCP tab); never a project's.
@@ -1704,9 +1704,9 @@ class SessionManager {
       const on = assistant ? !!m.def && assistantMcpAdded(workspace.config.mcp).includes(m.name) : serverOnIn(m, pc.mcp, workspace.config.mcp.enabled)
       if (on && m.def && agentGetsMcp(forAgent, m.name) && !isReservedServerName(m.name)) mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
-    const hive = this.hiveMcp(projectPath, agent?.id)
+    const combwork = this.combworkMcp(projectPath, agent?.id)
     // Its instructions name only the skills the session gets (#1431).
-    if (hive) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...hive, env: { ...hive.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
+    if (combwork) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...combwork, env: { ...combwork.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : combwork
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
@@ -1808,7 +1808,7 @@ class SessionManager {
     log.info('usage cache cleared')
   }
 
-  /** Removes usage-cache.json, which the usage history replaced (#1106), if a Hive from before it left one. */
+  /** Removes usage-cache.json, which the usage history replaced (#1106), if a Combwork from before it left one. */
   async retireUsageCacheFile(): Promise<void> {
     if (!existsSync(usageCacheFile())) return
     await removePath(usageCacheFile())
@@ -1816,7 +1816,7 @@ class SessionManager {
   }
 
   /**
-   * A result with costs from the current prices: the provider's report, else (or on top) Hive's estimate, and each day's
+   * A result with costs from the current prices: the provider's report, else (or on top) Combwork's estimate, and each day's
    * share. Without its timeline (usageTimeline has it): it stays in the cache, never in the usage passed on.
    */
   private priced(raw: SessionUsage, costFree = false): SessionUsage {
@@ -1895,10 +1895,10 @@ class SessionManager {
     const id = liveId(projectPath, agentId)
     // Checked and reserved before anything is awaited: a double click, or the UI and the Agent API at
     // once, must not start the agent twice (the second start would orphan the first process).
-    if (this.live.has(id) || this.starting.has(id)) throw hiveError(msg({ id: 'session.start.alreadyRunning', defaultMessage: 'This agent is already running or starting. Stop it first.', description: 'Starting an agent is refused: it runs, or is starting, already.' }), undefined, { kind: 'conflict' })
+    if (this.live.has(id) || this.starting.has(id)) throw combworkError(msg({ id: 'session.start.alreadyRunning', defaultMessage: 'This agent is already running or starting. Stop it first.', description: 'Starting an agent is refused: it runs, or is starting, already.' }), undefined, { kind: 'conflict' })
     // Two terminals on one conversation would both append to its transcript.
-    if (opts.resumeId && [...this.starting.values()].some((p) => p.resumeId === opts.resumeId)) throw hiveError(msg({ id: 'session.start.beingOpened', defaultMessage: 'This conversation is already being opened in another agent.', description: 'Resuming a conversation is refused: another agent is starting on it now.' }), undefined, { kind: 'conflict' })
-    if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Combwork is moving or removing its files." }), undefined, { kind: 'conflict' })
+    if (opts.resumeId && [...this.starting.values()].some((p) => p.resumeId === opts.resumeId)) throw combworkError(msg({ id: 'session.start.beingOpened', defaultMessage: 'This conversation is already being opened in another agent.', description: 'Resuming a conversation is refused: another agent is starting on it now.' }), undefined, { kind: 'conflict' })
+    if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw combworkError(msg({ id: 'session.start.cleaning', defaultMessage: "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Combwork is moving or removing its files." }), undefined, { kind: 'conflict' })
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
     // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
@@ -1975,19 +1975,19 @@ class SessionManager {
   }
 
   /**
-   * Refuses a start while Hive quits, while the project's workspace is closing or switching, or while a fence holds the
+   * Refuses a start while Combwork quits, while the project's workspace is closing or switching, or while a fence holds the
    * project (it is being removed, or a template is replacing its agents), while its workspace's move is being repaired,
    * or while its workspace's upgrade to 1.0 waits.
    */
   private assertStartsAllowed(projectPath: string): void {
-    if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(msg({ id: 'session.start.closing', defaultMessage: "Combwork is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Combwork is quitting, or its workspace is closing.' }), undefined, { kind: 'conflict' })
+    if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw combworkError(msg({ id: 'session.start.closing', defaultMessage: "Combwork is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Combwork is quitting, or its workspace is closing.' }), undefined, { kind: 'conflict' })
     // Its workspace's upgrade to 1.0 waits (#1207): combwork.db takes no writes, so the session couldn't be recorded.
     const ws = workspaceFor(projectPath)?.path
     if (ws) assertUpgraded(ws)
-    if (workspaceFor(projectPath)?.openGate?.held) throw hiveError(msg({ id: 'session.start.openCommands', defaultMessage: "This workspace's open commands are still running: agents start once they're done or you move on.", description: "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait." }), undefined, { kind: 'conflict' })
-    if (workspaceFor(projectPath)?.repairingMove) throw hiveError(msg({ id: 'session.start.repairing', defaultMessage: 'Combwork is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }), undefined, { kind: 'conflict' })
+    if (workspaceFor(projectPath)?.openGate?.held) throw combworkError(msg({ id: 'session.start.openCommands', defaultMessage: "This workspace's open commands are still running: agents start once they're done or you move on.", description: "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait." }), undefined, { kind: 'conflict' })
+    if (workspaceFor(projectPath)?.repairingMove) throw combworkError(msg({ id: 'session.start.repairing', defaultMessage: 'Combwork is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }), undefined, { kind: 'conflict' })
     const why = this.fenced.get(resolve(projectPath).toLowerCase())?.at(-1)
-    if (why) throw hiveError(msg({ id: 'session.start.fenced', defaultMessage: "{why}, so its agents can't start now.", description: "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")." }), { why }, { kind: 'conflict' })
+    if (why) throw combworkError(msg({ id: 'session.start.fenced', defaultMessage: "{why}, so its agents can't start now.", description: "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")." }), { why }, { kind: 'conflict' })
   }
 
   /** Projects (lower-cased paths) whose agents may not start, and why (one entry for each fence on it). */
@@ -2043,12 +2043,12 @@ class SessionManager {
     } catch (e) {
       if (!(e instanceof ClaimRefused)) throw e
       const w = e.why
-      if (w.is === 'hold') throw new HiveError(holdText(w.hold, agent.name), { kind: 'conflict' })
-      if (w.is === 'closing') throw hiveError(M.stoppedBeforeStart)
-      if (w.is === 'setup') throw hiveError(msg({ id: 'session.start.slotSetup', defaultMessage: '{slot} is still being set up. {agent} can start there once it is ready.', description: "Starting or resuming an agent in a slot (a worktree Combwork lends to a card) is refused (#1434): Combwork is still setting the slot up (its setup or install command runs), or a command of it hasn't ended yet. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
+      if (w.is === 'hold') throw new CombworkError(holdText(w.hold, agent.name), { kind: 'conflict' })
+      if (w.is === 'closing') throw combworkError(M.stoppedBeforeStart)
+      if (w.is === 'setup') throw combworkError(msg({ id: 'session.start.slotSetup', defaultMessage: '{slot} is still being set up. {agent} can start there once it is ready.', description: "Starting or resuming an agent in a slot (a worktree Combwork lends to a card) is refused (#1434): Combwork is still setting the slot up (its setup or install command runs), or a command of it hasn't ended yet. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
       // Its slot named (HI-2304): a connection switch's resume waits for that slot to be freed.
-      if (w.is === 'busy') throw Object.assign(hiveError(msg({ id: 'session.start.slotBusy', defaultMessage: '{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.', description: "Starting or resuming an agent in a slot (a worktree Combwork lends to a card) is refused (#1434): another session (of a card that has ended, or of another Combwork) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' }), { busySlot: w.slot })
-      throw hiveError(msg({ id: 'session.start.slotChanged', defaultMessage: "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.", description: "Starting or resuming an agent in a slot (a worktree Combwork lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
+      if (w.is === 'busy') throw Object.assign(combworkError(msg({ id: 'session.start.slotBusy', defaultMessage: '{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.', description: "Starting or resuming an agent in a slot (a worktree Combwork lends to a card) is refused (#1434): another session (of a card that has ended, or of another Combwork) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' }), { busySlot: w.slot })
+      throw combworkError(msg({ id: 'session.start.slotChanged', defaultMessage: "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.", description: "Starting or resuming an agent in a slot (a worktree Combwork lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
     }
   }
 
@@ -2081,7 +2081,7 @@ class SessionManager {
    * Once the agent's runs that have ended have their slot writers released (or found held), at most `timeoutMs`
    * (HI-1867): a lane's start of its builder just after its last run ended (stopped by the start, or exited by itself
    * moments before) found the slot still written by that run, its release waiting for its processes to be known to have
-   * ended, and was refused. None under way: at once. Another agent's or Hive's writer, or one held (its processes kept
+   * ended, and was refused. None under way: at once. Another agent's or Combwork's writer, or one held (its processes kept
    * running, or not known to have ended), isn't waited for: the claim refuses it as before.
    */
   private async earlierWritersSettled(projectPath: string, agentId: string, timeoutMs: number): Promise<void> {
@@ -2094,9 +2094,9 @@ class SessionManager {
   }
 
   /**
-   * Once the slot writers of the runs that have ended are released (or found held), at most `timeoutMs` (HI-1801: Hive
+   * Once the slot writers of the runs that have ended are released (or found held), at most `timeoutMs` (HI-1801: Combwork
    * quitting closed the workspace before a stopped run's release was written, its outcome known only after the
-   * leftovers' look, so the next start found the slot held by a Hive that had gone). Hive's quit, after the leftovers;
+   * leftovers' look, so the next start found the slot held by a Combwork that had gone). Combwork's quit, after the leftovers;
    * a window's workspace closing, for its own projects' (`which`, HI-2299: closed first, its releases failed).
    */
   async writersSettled(timeoutMs: number, which?: (projectPath: string) => boolean): Promise<void> {
@@ -2145,7 +2145,7 @@ class SessionManager {
   }
 
   /**
-   * A resume of `sessionId` refused because the agent is running or starting (HI-1746: Resume All while Hive resumes
+   * A resume of `sessionId` refused because the agent is running or starting (HI-1746: Resume All while Combwork resumes
    * that same conversation for a card): 'running' when the agent runs that conversation now, or once a start of it
    * under way has finished (its failure or cancellation thrown); 'other' when it runs or starts anything else, or nothing.
    */
@@ -2188,7 +2188,7 @@ class SessionManager {
 
   /** Throws if the start was cancelled while it awaited something (the agent stopped, its workspace closed). */
   private assertStarting(id: string): void {
-    if (this.starting.get(id)?.cancelled) throw hiveError(M.stoppedBeforeStart)
+    if (this.starting.get(id)?.cancelled) throw combworkError(M.stoppedBeforeStart)
   }
 
   private async startReserved(projectPath: string, agentId: string, id: string, opts: StartOptions, times: StepTimes): Promise<LiveSessionState> {
@@ -2197,36 +2197,36 @@ class SessionManager {
     this.assertStarting(id)
     if (this.live.has(id))
       throw count > 1
-        ? hiveError(msg({ id: 'session.start.agentRunning', defaultMessage: '{agent} is already running. Stop it first.', description: "Starting an agent is refused: it runs already. {agent} is the agent's name." }), { agent: agent.name }, { kind: 'conflict' })
-        : hiveError(msg({ id: 'session.start.projectRunning', defaultMessage: 'A session is already running for this project. Stop it first.', description: "Starting a project's only agent is refused: it runs already." }), undefined, { kind: 'conflict' })
+        ? combworkError(msg({ id: 'session.start.agentRunning', defaultMessage: '{agent} is already running. Stop it first.', description: "Starting an agent is refused: it runs already. {agent} is the agent's name." }), { agent: agent.name }, { kind: 'conflict' })
+        : combworkError(msg({ id: 'session.start.projectRunning', defaultMessage: 'A session is already running for this project. Stop it first.', description: "Starting a project's only agent is refused: it runs already." }), undefined, { kind: 'conflict' })
     const holder = opts.resumeId ? this.projectStates(projectPath).find((s) => s.sessionId === opts.resumeId) : undefined
-    if (holder) throw hiveError(msg({ id: 'session.start.openIn', defaultMessage: 'This conversation is already open in {agent}. An agent can only resume a session no other agent is running.', description: "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name." }), { agent: holder.agentName ?? msg({ id: 'session.start.anotherAgent', defaultMessage: 'another agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"This conversation is already open in another agent.\")." }) }, { kind: 'conflict' })
+    if (holder) throw combworkError(msg({ id: 'session.start.openIn', defaultMessage: 'This conversation is already open in {agent}. An agent can only resume a session no other agent is running.', description: "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name." }), { agent: holder.agentName ?? msg({ id: 'session.start.anotherAgent', defaultMessage: 'another agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"This conversation is already open in another agent.\")." }) }, { kind: 'conflict' })
     const assistant = workspace.isAssistantHome(projectPath)
     const existing = opts.resumeId ? (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === opts.resumeId) : undefined
     times.mark('sessionsFile')
     this.assertStarting(id)
     // A resume runs the provider its conversation ran in (#506), whatever the agent's provider is now: neither a default
     // nor a change of the agent's own re-points one. A new conversation of an agent with no CLI of its own (a new
-    // workspace's Assistant) follows Automatic: it waits until Hive knows what is installed.
+    // workspace's Assistant) follows Automatic: it waits until Combwork knows what is installed.
     const recorded = opts.resumeId ? await this.resumeProvider(projectPath, opts.resumeId, existing) : null
     times.mark('resumeProvider')
     this.assertStarting(id)
     if (!recorded && !agent.provider && autoProviderPending(config.settings)) await providerService.settle()
     this.assertStarting(id)
     const providerId = recorded ?? agentProvider(agent, config.settings)
-    // At start, Hive may still be looking for that CLI.
+    // At start, Combwork may still be looking for that CLI.
     await providerService.settle(providerId)
     times.mark('providerSettle')
-    // The PATH a new process gets now, with what was installed since Hive started (#821).
+    // The PATH a new process gets now, with what was installed since Combwork started (#821).
     await refreshPathBeforeStart()
     times.mark('refreshPath')
     this.assertStarting(id)
     const adapter = providerAdapter(providerId)
     const name = adapter.descriptor.name
     const resuming = opts.resumeId ? 'yes' : 'no'
-    if (!isProviderEnabled(config.settings, providerId)) throw hiveError(msg({ id: 'session.start.providerOff', defaultMessage: '{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}', description: "Starting an agent is refused: its coding agent is turned off in Settings → Providers. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
+    if (!isProviderEnabled(config.settings, providerId)) throw combworkError(msg({ id: 'session.start.providerOff', defaultMessage: '{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}', description: "Starting an agent is refused: its coding agent is turned off in Settings → Providers. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
     const info = providerService.info(providerId)
-    if (!info.found || !info.path) throw hiveError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
+    if (!info.found || !info.path) throw combworkError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
     await workspace.ensureProject(projectPath)
     times.mark('ensureProject')
     // Where it runs (#1434, agentFolders.ts): the Assistant in the workspace folder, where it can read every project; a
@@ -2236,17 +2236,17 @@ class SessionManager {
     times.mark('folder')
     this.assertStarting(id)
     const cwd = place.cwd
-    if (!existsSync(cwd)) throw hiveError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd }, { kind: 'conflict' })
+    if (!existsSync(cwd)) throw combworkError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd }, { kind: 'conflict' })
 
-    if (existing?.archived) throw hiveError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
+    if (existing?.archived) throw combworkError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
     // A sub-session (a Codex guardian review, say) is not a conversation: never resumed (#239).
     const sub = opts.resumeId ? (existing ? await this.recordSub(projectPath, existing) : (await adapter.listSessions(cwd).catch(() => [])).find((e) => e.id === opts.resumeId)?.sub) : undefined
     times.mark('recordSub')
-    if (sub) throw hiveError(msg({ id: 'session.start.subSession', defaultMessage: "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.", description: "Resuming a session is refused: the coding agent ran it for another session (a guardian review). {kind} is the coding agent's name for it, as it came; {provider} the coding agent's name (Codex)." }), { kind: sub.kind, provider: name }, { kind: 'conflict' })
+    if (sub) throw combworkError(msg({ id: 'session.start.subSession', defaultMessage: "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.", description: "Resuming a session is refused: the coding agent ran it for another session (a guardian review). {kind} is the coding agent's name for it, as it came; {provider} the coding agent's name (Codex)." }), { kind: sub.kind, provider: name }, { kind: 'conflict' })
     this.assertStarting(id)
     // By real paths (#455): the worktree's stored path may have changed form (an 8.3 short name, a junction) since.
     if (opts.resumeId && existing && place.foreign) {
-      throw hiveError(msg({ id: 'session.start.otherFolder', defaultMessage: 'This session ran in {folder}. Resume it with the agent that works in that folder.', description: "Resuming a session is refused: it ran in another folder (another agent's worktree). {folder} is that folder's path." }), { folder: existing.cwd ?? projectPath }, { kind: 'conflict' })
+      throw combworkError(msg({ id: 'session.start.otherFolder', defaultMessage: 'This session ran in {folder}. Resume it with the agent that works in that folder.', description: "Resuming a session is refused: it ran in another folder (another agent's worktree). {folder} is that folder's path." }), { folder: existing.cwd ?? projectPath }, { kind: 'conflict' })
     }
     // Providers that choose their own session id report it once started (see the start hook).
     const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.fixedSessionId ? randomUUID() : '')
@@ -2301,7 +2301,7 @@ class SessionManager {
       try {
         const tracked = await this.trackingReady()
         // The same last check as before an agent's own launch.
-        if (this.starting.get(id)?.cancelled || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
+        if (this.starting.get(id)?.cancelled || this.shuttingDown || workspaceFor(projectPath)?.closing) throw combworkError(M.stoppedBeforeStart)
         opts.allowed?.()
         spawnPty(key, {
           file: sh.file,
@@ -2417,7 +2417,7 @@ class SessionManager {
   /** Calls fn with a project's folder each time a slot of it may have come free (HI-2304: slotsApp.ts sets it as it loads). */
   slotFreedWatch: (fn: (projectPath: string) => void) => () => void = () => () => undefined
 
-  /** What holds a slot of the project now, in English (HI-2304, slotHeldWords), or null once nothing of this Hive's does. */
+  /** What holds a slot of the project now, in English (HI-2304, slotHeldWords), or null once nothing of this Combwork's does. */
   private async slotHeldWhy(projectPath: string, slot: string): Promise<string | null> {
     const cfg = await workspaceOf(projectPath).projectConfig(projectPath).catch(() => null)
     const agents = cfg ? projectAgents(cfg) : []
@@ -2491,7 +2491,7 @@ class SessionManager {
       told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Combwork can't resume it yet because its slot (a worktree Combwork lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Combwork resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath, agentTarget(projectPath, l.state.agentId, l.state.agentName ?? this.label(l.state))),
       // A slot of its project freed (HI-2304): what its resume waits for, when it does.
       watch: (look) => {
-        const offEvents = onHiveEvent((e) => {
+        const offEvents = onCombworkEvent((e) => {
           if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId)) look()
         })
         const offFreed = this.slotFreedWatch((p) => {
@@ -2582,7 +2582,7 @@ class SessionManager {
 
   /** The session's dialect chain, resolved for a launch from its workspace's files (null: they can't be read). */
   private async launchDialect(projectPath: string, input: SessionDialect, reads = new LaunchReads()): Promise<PinnedDialect | null> {
-    const set = await reads.dialects(workspaceOf(projectPath).hiveDir)
+    const set = await reads.dialects(workspaceOf(projectPath).combworkDir)
     if (!set) return null
     const chain = sessionChainOf(set, input)
     return { chain, input, key: chainKey(chain) }
@@ -2644,13 +2644,13 @@ class SessionManager {
     const metrics = metricsHandle(workspaceOf(projectPath))
     const { sessionId } = opts
     const info = providerService.info(adapter.id)
-    if (!info.path) throw hiveError(msg({ id: 'session.start.cliRequired', defaultMessage: '{provider} is required to run sessions.', description: "Starting an agent failed: its coding agent's CLI wasn't found. {provider} is the coding agent's name." }), { provider: adapter.descriptor.name }, { kind: 'conflict' })
+    if (!info.path) throw combworkError(msg({ id: 'session.start.cliRequired', defaultMessage: '{provider} is required to run sessions.', description: "Starting an agent failed: its coding agent's CLI wasn't found. {provider} is the coding agent's name." }), { provider: adapter.descriptor.name }, { kind: 'conflict' })
 
     let resume = opts.resume
     if (resume) {
       const recorded = l.transcriptPath
       if (!(await adapter.transcriptPath(cwd, sessionId, recorded))) {
-        // The provider has deleted it: put Hive's backup back where the provider looks for it (a compressed one
+        // The provider has deleted it: put Combwork's backup back where the provider looks for it (a compressed one
         // decompressed, #1110: the only time it is).
         const backup = this.backupCopy(projectPath, sessionId)
         const dest = adapter.restorePath(cwd, sessionId, recorded)
@@ -2689,14 +2689,14 @@ class SessionManager {
     // Extra arguments saved before Settings refused a bare "--" (#523) stop the launch before anything changes.
     const argsProblem = capturedText((t) => extraArgsProblem(eff.extraArgs, t))
     if (argsProblem)
-      throw hiveError(msg({ id: 'session.start.args', defaultMessage: '{problem} Fix it in its connection, {connection}, in Settings → Accounts & Connections.', description: "Starting an agent or the Assistant is refused: its connection's extra arguments are wrong (HI-2140). {problem} says why, as a sentence; {connection} is the connection's name, as in Settings → Accounts & Connections." }), { problem: argsProblem, connection: eff.connectionName ?? '' }, { kind: 'conflict' })
+      throw combworkError(msg({ id: 'session.start.args', defaultMessage: '{problem} Fix it in its connection, {connection}, in Settings → Accounts & Connections.', description: "Starting an agent or the Assistant is refused: its connection's extra arguments are wrong (HI-2140). {problem} says why, as a sentence; {connection} is the connection's name, as in Settings → Accounts & Connections." }), { problem: argsProblem, connection: eff.connectionName ?? '' }, { kind: 'conflict' })
     l.configuredMode = eff.permissionMode
     let mode = eff.permissionMode
     if (l.modeOverride && modeAllowed(adapter.id, l.modeOverride, config.settings) && !(workspace.isAssistantHome(projectPath) && isCliOwnMode(l.modeOverride))) mode = l.modeOverride
     l.launchMode = mode
     state.permissionMode = mode ?? undefined
-    // Given Hive's tools, it takes no line of Hive's until they have connected (#865).
-    l.hiveTools = eff.mcpServers[TOOLS_SERVER] ? 'connecting' : undefined
+    // Given Combwork's tools, it takes no line of Combwork's until they have connected (#865).
+    l.combworkTools = eff.mcpServers[TOOLS_SERVER] ? 'connecting' : undefined
     // Its own Agent API token for this launch, which confines its board calls to its project (the Assistant has its own).
     if (!workspace.isAssistantHome(projectPath)) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
     const assistantText = workspace.isAssistantHome(projectPath) ? await this.assistantInstructions(projectPath, agent).catch(() => null) : null
@@ -2704,7 +2704,7 @@ class SessionManager {
     l.mode = !resume ? assistantText?.modeId || undefined : undefined
     // This launch's own hook token (#345): in its environment for HTTP hooks, in a file outside the project for hook commands.
     const hookAuth = await newHookToken(state.runId)
-    // Its chain's texts for hive-mcp.js and hive-progress.js (HI-2443), in the same private folder: a chain that
+    // Its chain's texts for cw-mcp.js and cw-progress.js (HI-2443), in the same private folder: a chain that
     // overrides nothing writes nothing, and they speak the Default as before.
     const pinned = l.dialect?.chain
     const dialectEnv: Record<string, string> = pinned?.hash
@@ -2714,10 +2714,10 @@ class SessionManager {
         }))?.env ?? {})
       : {}
     times?.mark('tokens')
-    const guidance = await this.hiveGuidance(projectPath).catch(() => '')
+    const guidance = await this.combworkGuidance(projectPath).catch(() => '')
     // The Workspace notes note as it is now (#1433): every agent, whatever its tools or folder; a running one keeps its own.
     const notes = await workspaceNotesFor(projectPath).catch(() => '')
-    // Instructions of Hive's own given to this conversation at an earlier launch, by any agent (SessionRecord.promptAdded).
+    // Instructions of Combwork's own given to this conversation at an earlier launch, by any agent (SessionRecord.promptAdded).
     const promptAddedBefore = resume && (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions.find((s) => s.id === sessionId)?.promptAdded === true
     if (assistantText?.text.trim() || notes.trim()) l.promptAdded = true
     // A reviewer's grant of the project's review copies (#1439): one fixed folder, made if new, so it never changes
@@ -2766,7 +2766,7 @@ class SessionManager {
       notes,
       promptAddedBefore,
       overrides: overridesNow(adapter.id),
-      trustedHiveTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
+      trustedCombworkTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
       initialPrompt: l.initialPrompt,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
       ...(conn ? { connectionHome: conn.folder } : {}),
@@ -2783,13 +2783,13 @@ class SessionManager {
         ...(state.sessionId ? { CW_SESSION_ID: state.sessionId } : {}),
         CW_AGENT: agent.name,
         CW_PROVIDER: adapter.id,
-        // Its dialect's file (HI-2443), for hive-progress run in its shell; none while it speaks the Default.
+        // Its dialect's file (HI-2443), for cw-progress run in its shell; none while it speaks the Default.
         ...dialectEnv,
         // Its slot's name and port block (#1429's slotEnv), while it runs in one.
         ...l.slotEnv,
         // Its connection's folder as the CLI's home (HI-1755): its login, settings and memory, its transcripts shared.
         ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
-        // Not for the Assistant: it reaches the API through its hive tools, with its own token.
+        // Not for the Assistant: it reaches the API through its Combwork tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) ? {} : this.apiEnv(projectPath, agent.id))
       }))), this.binDir), tempDir)
     }
@@ -2813,7 +2813,7 @@ class SessionManager {
     await lastLook()
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
-    if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
+    if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw combworkError(M.stoppedBeforeStart)
     // The model and effort it was given (HI-1996), and whether that model was chosen (its connection's) or its CLI's.
     state.launchedWith = launchedWithOf(ctx.model, ctx.effort)
     // Its account (conn), and the connection on it whose values it launched with (HI-2397), which the window names.
@@ -2822,10 +2822,10 @@ class SessionManager {
     if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
     // Decision H (HI-2108): its connection is off here or gone, so it runs on its CLI's first usable one: said once a launch.
     if (conn?.note === 'offFallback' || conn?.note === 'missing') toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), tr(M.connectionFallback, { why: conn.note, wanted: getConnection(agent.connection)?.name ?? '', name: conn.name }), undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state))) // i18n-ignore: select keys, never shown
-    if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
+    if (!isProviderEnabled(config.settings, adapter.id)) throw combworkError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
-    // What the user should know about this launch: once per agent, folder and notice while Hive runs.
+    // What the user should know about this launch: once per agent, folder and notice while Combwork runs.
     const notice = adapter.launchNotice?.(ctx)
     const noticeKey = notice ? `${id}\n${ctx.cwd}\n${notice.title}` : ''
     if (notice && !this.launchNotices.has(noticeKey)) {
@@ -2853,7 +2853,7 @@ class SessionManager {
     l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook, adapter.transcriptTurns ? (adapter.turnsJoin ?? 'id') : null)
     l.hooksOffIn = adapter.hooksOffIn ? () => adapter.hooksOffIn!(ctx) : undefined
     l.newerThanTested = info.tested?.installed === 'newer'
-    // What it was given: Hive's guidance revision and each skill as delivered (the Agent API's project status shows
+    // What it was given: Combwork's guidance revision and each skill as delivered (the Agent API's project status shows
     // them). A skill not delivered as asked (kept old copy, failed copy) leaves it needing a restart.
     // Stored with the launch record, for any reader: said in the Default (as guidance.ts's "it was not delivered").
     const notGiven = Object.fromEntries(Object.entries(eff.skillProblems).map(([name, why]) => [name, { revision: null, problem: inDefaultDialect(() => say(SESSION.skillNotGiven, { why })), lasting: true as const }]))
@@ -2864,7 +2864,7 @@ class SessionManager {
     // "model unknown" (decision Q4), said compactly: the status every agent reads carries it (replysize).
     const dialect = !l.dialect ? undefined : l.dialect.chain.hash || l.dialect.input.pick !== 'auto' ? launchDialectOf(l.dialect, chainGuidanceRevision()) : l.dialect.chain.modelUnknown ? { modelUnknown: true as const } : undefined
     state.launched = { guidance: GUIDANCE_REVISION, skills: record.skills, ...(record.problems ? { problems: record.problems } : {}), ...(dialect ? { dialect } : {}) }
-    // Performance metrics: what Hive gave this session, exact sizes. The session contract once (whichever way the
+    // Performance metrics: what Combwork gave this session, exact sizes. The session contract once (whichever way the
     // provider gets it); the skills that reached it, measured on their copies; the ones asked for that didn't.
     const given = Object.keys(record.skills)
     const parts = launchParts(ctx.guidance, workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent', basename(projectPath), assistantText, ctx.notes)
@@ -2885,7 +2885,7 @@ class SessionManager {
     l.defaultEffort = eff.effort ? undefined : { model: eff.model }
 
     // The footer is read from the rendered screen: a CLI may redraw only the characters that changed. So is a mode
-    // menu, whose entries Hive picks by what they say (#396).
+    // menu, whose entries Combwork picks by what they say (#396).
     const key = this.key(projectPath, agent.id)
     const size = startSize(key)
     const caps = l.adapter.descriptor.capabilities
@@ -2904,7 +2904,7 @@ class SessionManager {
       continueBuffer: true,
       onData: (data) => {
         if (l.switchTail !== undefined) l.switchTail = (l.switchTail + data.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ').replace(/\x1b\][^\x07]*\x07/g, ' ')).replace(/\s+/g, ' ').slice(-2000)
-        // The CLI refusing or failing a compaction Hive asked for sends no hook ("Not enough messages to compact.").
+        // The CLI refusing or failing a compaction Combwork asked for sends no hook ("Not enough messages to compact.").
         this.live.get(id)?.compacting?.terminal(data)
         screen?.write(data, () => {
           this.readFooterMode(l, screen)
@@ -3004,7 +3004,7 @@ class SessionManager {
       agentName: agent.name,
       // The Assistant's mode its conversation was last given (a resumed one's is unknown until it is told: assistantMode.ts).
       ...(l.mode ? { mode: l.mode } : {}),
-      // Hive's own instructions were given it (#1433): kept, never cleared, so later resumes refresh its prompt.
+      // Combwork's own instructions were given it (#1433): kept, never cleared, so later resumes refresh its prompt.
       ...(l.promptAdded ? { promptAdded: true as const } : {}),
       // Providers that choose their own ids file transcripts by date, not folder: remember where.
       ...(l.transcriptPath && !l.adapter.descriptor.capabilities.fixedSessionId ? { transcriptPath: l.transcriptPath } : {}),
@@ -3077,7 +3077,7 @@ class SessionManager {
 
   /**
    * Whether an agent's run `runId` is in a turn as its hooks tell it (HI-1706): the turn ledger's turn still running. A
-   * Stop Hive answered with a continuation (the inbox drain) leaves it running, whatever the status said meanwhile.
+   * Stop Combwork answered with a continuation (the inbox drain) leaves it running, whatever the status said meanwhile.
    */
   turnOpen(projectPath: string, agentId: string, runId: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
@@ -3085,7 +3085,7 @@ class SessionManager {
   }
 
   /**
-   * Why nothing may be typed into an agent's prompt now (HI-1706's quit), or null: Hive typing into it, a line of Hive's
+   * Why nothing may be typed into an agent's prompt now (HI-1706's quit), or null: Combwork typing into it, a line of Combwork's
    * not taken yet (#430: or confirming, or the user's draft over it), the user typing within the pause, or what the user
    * typed last not sent (a draft of theirs in its prompt).
    */
@@ -3246,7 +3246,7 @@ class SessionManager {
     )
     for (const [, l] of chosen) {
       l.stopRequested = true
-      // Who asked, as its caller says (HI-1881: a workspace closing says closed); Hive quitting says so itself (endReason).
+      // Who asked, as its caller says (HI-1881: a workspace closing says closed); Combwork quitting says so itself (endReason).
       if (cause) l.stopCause ??= cause
       this.endProcess(l)
     }
@@ -3265,14 +3265,14 @@ class SessionManager {
     const id = liveId(projectPath, agentId)
     const key = this.key(projectPath, agentId)
     const check = (l: LiveSession | undefined): LiveSession => {
-      if (!l || l.state.settingUp) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
-      if (l.compacting) throw hiveError(msg({ id: 'session.compact.already', defaultMessage: 'This session is already compacting.', description: 'Compact is refused: the conversation is being compacted already.' }), undefined, { kind: 'conflict' })
-      if (this.delivering.has(key)) throw hiveError(M.typingBusy, undefined, { kind: 'conflict' })
+      if (!l || l.state.settingUp) throw combworkError(M.noSession, undefined, { kind: 'conflict' })
+      if (l.compacting) throw combworkError(msg({ id: 'session.compact.already', defaultMessage: 'This session is already compacting.', description: 'Compact is refused: the conversation is being compacted already.' }), undefined, { kind: 'conflict' })
+      if (this.delivering.has(key)) throw combworkError(M.typingBusy, undefined, { kind: 'conflict' })
       // Watching its cards (its turn has ended) may compact: the watch stays.
       if (l.state.status !== 'ready' && l.state.status !== 'finished' && l.state.status !== 'watching') {
         throw l.state.status === 'waiting'
-          ? hiveError(msg({ id: 'session.compact.waiting', defaultMessage: 'The agent is waiting for your answer. Compact after it has finished.', description: 'Compact is refused: the agent waits for the user.' }), undefined, { kind: 'conflict' })
-          : hiveError(msg({ id: 'session.compact.busy', defaultMessage: 'The agent is busy. Compact once it has finished.', description: 'Compact is refused: the agent is working.' }), undefined, { kind: 'conflict' })
+          ? combworkError(msg({ id: 'session.compact.waiting', defaultMessage: 'The agent is waiting for your answer. Compact after it has finished.', description: 'Compact is refused: the agent waits for the user.' }), undefined, { kind: 'conflict' })
+          : combworkError(msg({ id: 'session.compact.busy', defaultMessage: 'The agent is busy. Compact once it has finished.', description: 'Compact is refused: the agent is working.' }), undefined, { kind: 'conflict' })
       }
       return l
     }
@@ -3280,9 +3280,9 @@ class SessionManager {
     const src = await this.liveTranscript(l)
     const before = src ? ((await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider, this.costPolicy(l)))?.compactions.length ?? 0) : 0
     // Again: a second Compact or a prompt may have come meanwhile (one at a time, only while idle).
-    if (this.live.get(id) !== l) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
+    if (this.live.get(id) !== l) throw combworkError(M.noSession, undefined, { kind: 'conflict' })
     check(l)
-    // Reserved while Hive types the command (a long focus takes a while), so nothing else is typed or compacted
+    // Reserved while Combwork types the command (a long focus takes a while), so nothing else is typed or compacted
     // meanwhile; Compaction's limits run from its submission.
     const c: Compaction = new Compaction(before, l.adapter.compactFailure, () => this.compactionDone(id, l, c))
     l.compacting = c
@@ -3299,8 +3299,8 @@ class SessionManager {
     // theirs, and Compact isn't sent.
     const since = Date.now()
     const stillSame = (): void => {
-      if (!same()) throw hiveError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Combwork typed the command.' }), undefined, { kind: 'conflict' })
-      if (this.userTypedAt(projectPath, agentId) >= since) throw hiveError(msg({ id: 'session.compact.userTyped', defaultMessage: "You typed in the agent's terminal while Combwork was sending Compact, so it wasn't sent: what you typed stays.", description: "Compact failed: the user typed in the agent's terminal while Combwork was clearing its input or typing the command, so Combwork stopped." }), undefined, { kind: 'conflict' })
+      if (!same()) throw combworkError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Combwork typed the command.' }), undefined, { kind: 'conflict' })
+      if (this.userTypedAt(projectPath, agentId) >= since) throw combworkError(msg({ id: 'session.compact.userTyped', defaultMessage: "You typed in the agent's terminal while Combwork was sending Compact, so it wasn't sent: what you typed stays.", description: "Compact failed: the user typed in the agent's terminal while Combwork was clearing its input or typing the command, so Combwork stopped." }), undefined, { kind: 'conflict' })
     }
     const pause = async (ms: number): Promise<void> => {
       await new Promise((r) => setTimeout(r, ms))
@@ -3330,7 +3330,7 @@ class SessionManager {
     }
   }
 
-  /** A compaction Hive watches is over with no hook saying so (Compaction's `over`): an agent still showing it is idle again. */
+  /** A compaction Combwork watches is over with no hook saying so (Compaction's `over`): an agent still showing it is idle again. */
   private compactionDone(id: string, l: LiveSession, c: Compaction): void {
     if (l.compacting !== c) return
     l.compacting = undefined
@@ -3343,7 +3343,7 @@ class SessionManager {
   /**
    * A compaction the CLI began by itself while the agent was idle (#1115): Claude Code precomputes one in the background,
    * idle too, sending PreCompact at once and PostCompact only once it uses it, so it may never say this one is over.
-   * Watched as Hive's own from now (begun): over at PostCompact or a prompt, a compaction recorded in the transcript
+   * Watched as Combwork's own from now (begun): over at PostCompact or a prompt, a compaction recorded in the transcript
    * since its PreCompact (the CLI writes it once the model has summarised, well after the hook), or LIMIT_MS.
    */
   private watchAutoCompaction(id: string, l: LiveSession): void {
@@ -3432,7 +3432,7 @@ class SessionManager {
   }
 
   /**
-   * Sets facts of an agent's runtime where Hive learns them (LiveSessionState.runtime, #648), never from its status word.
+   * Sets facts of an agent's runtime where Combwork learns them (LiveSessionState.runtime, #648), never from its status word.
    * True when one changed (the state needs sending; the caller sends it).
    */
   private fact(st: LiveSessionState, patch: Partial<RuntimeFacts>): boolean {
@@ -3446,14 +3446,14 @@ class SessionManager {
     return changed
   }
 
-  /** Whether Hive holds an agent's input (RuntimeFacts.composer): typing into it, or a line it typed not taken yet. */
+  /** Whether Combwork holds an agent's input (RuntimeFacts.composer): typing into it, or a line it typed not taken yet. */
   private composerOf(l: LiveSession, key = this.key(l.state.projectPath, l.state.agentId)): RuntimeFacts['composer'] {
     return this.delivering.has(key) || this.lineBlocked(l) ? 'held' : 'free'
   }
 
   /**
-   * The agent's input may be held or freed now (Hive typing, confirming, a line taken or given up): sent when it changed.
-   * Only a report: it never stops what Hive is typing (`key`: the terminal's, when the caller has it).
+   * The agent's input may be held or freed now (Combwork typing, confirming, a line taken or given up): sent when it changed.
+   * Only a report: it never stops what Combwork is typing (`key`: the terminal's, when the caller has it).
    */
   private noteComposer(l: LiveSession | undefined, key?: string): void {
     if (!l) return
@@ -3464,7 +3464,7 @@ class SessionManager {
     }
   }
 
-  /** Reads the mode from the CLI's footer on its screen as it redraws, so a mode change in the terminal shows in Hive at once. */
+  /** Reads the mode from the CLI's footer on its screen as it redraws, so a mode change in the terminal shows in Combwork at once. */
   private readFooterMode(l: LiveSession, screen: TerminalScreen): void {
     if (this.live.get(liveId(l.state.projectPath, l.state.agentId)) !== l || !l.adapter.footerMode) return
     const text = screen.text()
@@ -3499,24 +3499,24 @@ class SessionManager {
     projectPath = workspace.assertSessionHost(projectPath)
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
-    if (!l || l.state.settingUp) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
+    if (!l || l.state.settingUp) throw combworkError(M.noSession, undefined, { kind: 'conflict' })
     const st = l.state
     const p = st.provider
     const name = l.adapter.descriptor.name
     if (st.permissionMode === mode) return { ok: true }
-    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw hiveError(M.assistantCliOwn, undefined, { kind: 'conflict' })
-    if (!modeAllowed(p, mode, config.settings)) throw hiveError(msg({ id: 'session.mode.off', defaultMessage: '{mode} is turned off in Settings → {provider}.', description: "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section)." }), { mode: permissionLabel(p, mode, tr), provider: name }, { kind: 'conflict' })
+    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw combworkError(M.assistantCliOwn, undefined, { kind: 'conflict' })
+    if (!modeAllowed(p, mode, config.settings)) throw combworkError(msg({ id: 'session.mode.off', defaultMessage: '{mode} is turned off in Settings → {provider}.', description: "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section)." }), { mode: permissionLabel(p, mode, tr), provider: name }, { kind: 'conflict' })
     const how = l.adapter.descriptor.capabilities.liveModeSwitch
-    // Never to or from the CLI's own setting (#1284): Hive doesn't know where such a session started.
+    // Never to or from the CLI's own setting (#1284): Combwork doesn't know where such a session started.
     if (how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
       return { ok: false, restart: true, message: tr(msg({ id: 'session.mode.restart', defaultMessage: "{mode} can't be switched to inside a running session. Restart the session in that mode; the conversation continues.", description: "Switching an agent's permission mode needs a restart. {mode} is the mode's name." }), { mode: permissionLabel(p, mode, tr) }) }
     }
-    if (st.status === 'waiting') throw hiveError(msg({ id: 'session.mode.asking', defaultMessage: 'The agent is asking you something. Answer it first, then switch the mode.', description: "Switching an agent's permission mode is refused: it waits for the user's answer." }), undefined, { kind: 'conflict' })
-    if (st.status === 'starting') throw hiveError(msg({ id: 'session.mode.starting', defaultMessage: 'The session is still starting. Try again in a moment.', description: "Switching an agent's permission mode is refused for a moment: it is starting." }), undefined, { kind: 'conflict' })
+    if (st.status === 'waiting') throw combworkError(msg({ id: 'session.mode.asking', defaultMessage: 'The agent is asking you something. Answer it first, then switch the mode.', description: "Switching an agent's permission mode is refused: it waits for the user's answer." }), undefined, { kind: 'conflict' })
+    if (st.status === 'starting') throw combworkError(msg({ id: 'session.mode.starting', defaultMessage: 'The session is still starting. Try again in a moment.', description: "Switching an agent's permission mode is refused for a moment: it is starting." }), undefined, { kind: 'conflict' })
     const key = this.key(projectPath, agentId)
-    // The composer is reserved while the keys go in (#649), as for a line Hive types: none is typed into the menu, nor
+    // The composer is reserved while the keys go in (#649), as for a line Combwork types: none is typed into the menu, nor
     // the keys into a line.
-    if (this.delivering.has(key)) throw hiveError(msg({ id: 'session.mode.typing', defaultMessage: 'Combwork is typing a line into this agent. Switch the mode in a moment.', description: "Switching an agent's permission mode is refused for a moment: Combwork is typing into its terminal." }), undefined, { kind: 'conflict' })
+    if (this.delivering.has(key)) throw combworkError(msg({ id: 'session.mode.typing', defaultMessage: 'Combwork is typing a line into this agent. Switch the mode in a moment.', description: "Switching an agent's permission mode is refused for a moment: Combwork is typing into its terminal." }), undefined, { kind: 'conflict' })
     this.delivering.add(key)
     try {
       return await this.switchModeKeys(l, mode, how)
@@ -3534,7 +3534,7 @@ class SessionManager {
     const key = this.key(st.projectPath, st.agentId)
     if (how === 'menu' && l.adapter.modeMenuKeys) {
       // The CLI's own menu (Codex: /permissions). Only while idle: typed into a working agent it would queue.
-      if (st.status === 'working') throw hiveError(msg({ id: 'session.mode.working', defaultMessage: '{provider} is working. Switch the mode once it has finished.', description: "Switching an agent's permission mode is refused while it works. {provider} is the coding agent's name." }), { provider: name }, { kind: 'conflict' })
+      if (st.status === 'working') throw combworkError(msg({ id: 'session.mode.working', defaultMessage: '{provider} is working. Switch the mode once it has finished.', description: "Switching an agent's permission mode is refused while it works. {provider} is the coding agent's name." }), { provider: name }, { kind: 'conflict' })
       const before = st.permissionMode
       st.modeSwitching = mode
       l.switchTail = ''
@@ -3683,7 +3683,7 @@ class SessionManager {
     }
   }
 
-  /** The user typed in a terminal (Hive's own typing goes through sendPrompt, not here). */
+  /** The user typed in a terminal (Combwork's own typing goes through sendPrompt, not here). */
   noteUserInput(key: string, data: string): void {
     // xterm's own replies (focus in/out, cursor reports, colour queries) aren't typing.
     const typed = typedText(data)
@@ -3726,7 +3726,7 @@ class SessionManager {
     })
   }
 
-  /** Its hooks aren't arriving (#1336): why if Hive can tell, its state unknown, its lanes paused, the user told once. */
+  /** Its hooks aren't arriving (#1336): why if Combwork can tell, its state unknown, its lanes paused, the user told once. */
   private hooksGone(l: LiveSession, after: 'start' | 'prompt' | 'transcript'): void {
     const st = l.state
     const offIn = (() => {
@@ -3750,7 +3750,7 @@ class SessionManager {
     toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Combwork isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label)) // i18n-ignore: select keys, never shown
   }
 
-  /** Its hooks came again (#1336): its status is Hive's to tell again, and its lanes go on. */
+  /** Its hooks came again (#1336): its status is Combwork's to tell again, and its lanes go on. */
   private hooksBack(l: LiveSession): void {
     const st = l.state
     const was = st.hooksMissing
@@ -3760,11 +3760,11 @@ class SessionManager {
     log.info(`${userText(this.label(st))}: its hooks are arriving again${was ? ` (missing since ${was.since})` : ''}`)
   }
 
-  /** Agents and conversations told their hooks went missing (#1336): once each while Hive runs, a bounded few (#1369). */
+  /** Agents and conversations told their hooks went missing (#1336): once each while Combwork runs, a bounded few (#1369). */
   private hooksTold = new SeenOnce(500)
 
   /**
-   * A line Hive typed into an agent wasn't taken, even after Enter again (#430: its CLI wasn't reading its input). It is
+   * A line Combwork typed into an agent wasn't taken, even after Enter again (#430: its CLI wasn't reading its input). It is
    * marked in its pane, and the user told once; nothing more is typed into it until the CLI takes it or the user types
    * there. Only for this launch.
    */
@@ -3807,8 +3807,8 @@ class SessionManager {
   }
 
   /**
-   * A line Hive typed into an agent, marked not taken, was taken after all (#1514): `delivery`, which that very line rang
-   * for, was read in the same launch (Codex takes a line typed while a turn runs as queued input, with no prompt Hive
+   * A line Combwork typed into an agent, marked not taken, was taken after all (#1514): `delivery`, which that very line rang
+   * for, was read in the same launch (Codex takes a line typed while a turn runs as queued input, with no prompt Combwork
    * sees). The mark goes, so its input isn't held for a line its CLI no longer has. Another line's delivery read leaves it
    * (round 1 finding: an older line's, read late, says nothing of this one).
    */
@@ -3818,13 +3818,13 @@ class SessionManager {
     this.clearUntaken(l, why)
   }
 
-  /** Whether an agent has a line Hive typed that its CLI hasn't taken (#430): nothing more is typed into it meanwhile. */
+  /** Whether an agent has a line Combwork typed that its CLI hasn't taken (#430): nothing more is typed into it meanwhile. */
   lineUntaken(projectPath: string, agentId: string): boolean {
     return !!this.live.get(liveId(projectPath, agentId))?.state.untakenLine
   }
 
   /**
-   * Whether a line Hive typed into an agent is still waiting to be taken (#430): typed in the last PENDING_MS and not
+   * Whether a line Combwork typed into an agent is still waiting to be taken (#430): typed in the last PENDING_MS and not
    * taken yet, or marked as not taken. Nothing more is typed into it meanwhile (it would clear that line, or be lost).
    */
   lineWaiting(projectPath: string, agentId: string): boolean {
@@ -3833,7 +3833,7 @@ class SessionManager {
   private lineBlocked(l: LiveSession | undefined): boolean {
     if (!l) return false
     if (l.state.untakenLine || l.confirming) return true
-    // The user's draft over a line of Hive's: until a prompt is submitted there.
+    // The user's draft over a line of Combwork's: until a prompt is submitted there.
     if (l.draftOver && (l.prompts ?? 0) <= l.draftOver.prompts) return true
     return !!l.typed && (l.prompts ?? 0) <= l.typed.prompts && Date.now() - l.typed.at < PENDING_MS
   }
@@ -3855,12 +3855,12 @@ class SessionManager {
 
   /**
    * The user sent an agent a prompt from its pane (#418): what its CLI took (UserPromptSubmit) soon after the user's own
-   * Enter there, later than any line Hive typed. main/watches.ts tells the Assistant's watches.
+   * Enter there, later than any line Combwork typed. main/watches.ts tells the Assistant's watches.
    */
   userReplied: (projectPath: string, agentId: string, agentName: string, text: string) => void = () => undefined
 
   /**
-   * A line Hive typed, never taken, was lost from the CLI's input (HI-1959): the deliveries it rang for, of that launch,
+   * A line Combwork typed, never taken, was lost from the CLI's input (HI-1959): the deliveries it rang for, of that launch,
    * are queued again by the delivery service (main/deliveries.ts), so the doorbell rings once more; one read meanwhile
    * isn't.
    */
@@ -3869,12 +3869,12 @@ class SessionManager {
   private noteUserReply(l: LiveSession, text: string | null | undefined): void {
     const st = l.state
     if (!text?.trim() || text.trim().startsWith('/') || workspace.isAssistantHome(st.projectPath)) return
-    // A launch's task on its command line is its CLI's first prompt (HI-2218, #712), Hive's whatever Enter the user
+    // A launch's task on its command line is its CLI's first prompt (HI-2218, #712), Combwork's whatever Enter the user
     // pressed on its start screen; `prompted` has counted it already.
     if (l.launchTask && (l.prompts ?? 0) <= 1) return
     const enterAt = this.userEnter.get(this.key(st.projectPath, st.agentId)) ?? 0
-    // Not when Hive's own Enter came after the user's (HI-2218): its line, reported taken while its typing still waits.
-    if (enterAt <= Math.max(l.typed?.at ?? 0, l.hiveEnterAt ?? 0) || Date.now() - enterAt > USER_REPLY_MS) return
+    // Not when Combwork's own Enter came after the user's (HI-2218): its line, reported taken while its typing still waits.
+    if (enterAt <= Math.max(l.typed?.at ?? 0, l.combworkEnterAt ?? 0) || Date.now() - enterAt > USER_REPLY_MS) return
     this.userReplied(st.projectPath, st.agentId, st.agentName ?? st.agentId, text)
   }
 
@@ -3894,7 +3894,7 @@ class SessionManager {
   }
 
   /**
-   * The run `runId` of the Hive Assistant was told its mode `modeId`: its conversation records it, so a resume
+   * The run `runId` of the Combwork Assistant was told its mode `modeId`: its conversation records it, so a resume
    * tells it again only after another switch (#334).
    */
   async modeGiven(projectPath: string, agentId: string, runId: string, modeId: string): Promise<void> {
@@ -3921,10 +3921,10 @@ class SessionManager {
   }
 
   /**
-   * Clears a CLI's input before Hive types into it (Settings → Advanced: Clear the CLI's draft before Hive types). One
+   * Clears a CLI's input before Combwork types into it (Settings → Advanced: Clear the CLI's draft before Combwork types). One
    * Ctrl+U where it clears the whole line, as before. Where it deletes only the row the cursor is on
    * (capabilities.ctrlUClearsRow, HI-1979: Claude Code 2.1.312), Ctrl+U a key at a time while its input box
-   * (adapter.promptBox) holds anything. Empty is only ever what a key of Hive's draws now, never a box already on the
+   * (adapter.promptBox) holds anything. Empty is only ever what a key of Combwork's draws now, never a box already on the
    * screen (its redraw may be late, HR6's round 1): a letter typed (CLEAR_PROBE) must show alone in the box, then the
    * Backspace that takes it back must leave the box empty; a draft left shows the letter at its end, and is cleared with
    * it. Each key must be answered within Advanced's wait for each key, by the box drawn differently, or, while the box
@@ -3953,7 +3953,7 @@ class SessionManager {
     const words = (box: string | null): string => (box ?? '').replace(/\s+/g, ' ').trim()
     const notCleared = (why: string): Error => {
       log.info(`${userText(this.label(l.state))}: its input wasn't seen empty, so nothing is typed into it: ${why}`) // i18n-ignore: why, for the log
-      return hiveError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Combwork cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Combwork pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
+      return combworkError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Combwork cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Combwork pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
     }
     const waitMs = advanced.number(CLEAR_KEY_WAIT) * 1000
     // Refused because a key went unanswered while the box read empty (HI-2191): something else may take its keys.
@@ -4028,7 +4028,7 @@ class SessionManager {
 
   /**
    * A clear refused because a key went unanswered while its box read empty (HI-2191: Claude Code 2.1.314's offer to teach
-   * auto mode, drawn under the empty box, took Hive's keys 105 times while nobody was told). At INPUT_BLOCKED_AFTER in a
+   * auto mode, drawn under the empty box, took Combwork's keys 105 times while nobody was told). At INPUT_BLOCKED_AFTER in a
    * row the input is blocked: the agent waits for the user with why, unless it already waits on something else, whose
    * reason stays (nothing is typed meanwhile either way).
    */
@@ -4100,7 +4100,7 @@ class SessionManager {
     const started = Date.now()
     try {
       await this.clearInput(l, key, () => {
-        if (this.live.get(id) !== l || l.inputBlocked !== b || this.userTypedAt(projectPath, agentId) > started) throw hiveError(M.stoppedBeforePrompt)
+        if (this.live.get(id) !== l || l.inputBlocked !== b || this.userTypedAt(projectPath, agentId) > started) throw combworkError(M.stoppedBeforePrompt)
       })
       this.unblockInput(id, l, 'Try again: its input took the key') // i18n-ignore: for the log
       return 'clear'
@@ -4113,30 +4113,30 @@ class SessionManager {
   }
 
   /** Types a message into an agent's terminal and sends it. */
-  /** Agents Hive is typing a prompt into (one at a time each). */
+  /** Agents Combwork is typing a prompt into (one at a time each). */
   private delivering = new Set<string>()
 
   /**
    * Types a prompt into an agent and sends it, on one line (a new line would send it early in the CLI).
    * Refused while another is being typed there; stops if the agent stops or restarts meanwhile. `guard` throws if the
    * prompt mustn't go in any more (the agent got busy, the user typed there): it is checked before the input is
-   * cleared, before each part is typed and before it is sent. Stopped part-way, what Hive typed is cleared again,
+   * cleared, before each part is typed and before it is sent. Stopped part-way, what Combwork typed is cleared again,
    * unless the user has typed since (their input stays).
    */
   async sendPrompt(projectPath: string, agentId: string, text: string, guard?: () => void, opts: { confirm?: boolean } = {}): Promise<void> {
     const key = this.key(projectPath, agentId)
     const l = this.live.get(liveId(projectPath, agentId))
     const runId = l?.state.runId
-    if (this.delivering.has(key)) throw hiveError(M.typingBusy, undefined, { kind: 'conflict' })
+    if (this.delivering.has(key)) throw combworkError(M.typingBusy, undefined, { kind: 'conflict' })
     // A line typed before isn't taken yet (#430): typing more would clear it, or be lost behind it.
     const waiting = (): void => {
-      if (this.lineBlocked(this.live.get(liveId(projectPath, agentId)))) throw hiveError(msg({ id: 'session.prompt.untaken', defaultMessage: "Its CLI hasn't taken the line Combwork typed before; nothing more is typed until it does.", description: "Typing into an agent is refused: its CLI hasn't taken the line Combwork typed before." }), undefined, { kind: 'conflict' })
+      if (this.lineBlocked(this.live.get(liveId(projectPath, agentId)))) throw combworkError(msg({ id: 'session.prompt.untaken', defaultMessage: "Its CLI hasn't taken the line Combwork typed before; nothing more is typed until it does.", description: "Typing into an agent is refused: its CLI hasn't taken the line Combwork typed before." }), undefined, { kind: 'conflict' })
     }
     // Its CLI's own question on its screen (HI-1959): it takes the keys, and Enter answers it.
     const asked = (): void => {
-      if (this.cliAsks(projectPath, agentId)) throw hiveError(msg({ id: 'session.prompt.cliAsks', defaultMessage: 'Its CLI shows a question for you: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer." }), undefined, { kind: 'conflict' })
+      if (this.cliAsks(projectPath, agentId)) throw combworkError(msg({ id: 'session.prompt.cliAsks', defaultMessage: 'Its CLI shows a question for you: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer." }), undefined, { kind: 'conflict' })
       // Something on its screen takes its keys (HI-2191): nothing more goes into it until it is seen to take them again.
-      if (this.inputBlocked(projectPath, agentId)) throw hiveError(msg({ id: 'session.prompt.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: keys Combwork typed into its coding agent's input didn't reach it (a dialog or question of the coding agent's own takes them)." }), undefined, { kind: 'conflict' })
+      if (this.inputBlocked(projectPath, agentId)) throw combworkError(msg({ id: 'session.prompt.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: keys Combwork typed into its coding agent's input didn't reach it (a dialog or question of the coding agent's own takes them)." }), undefined, { kind: 'conflict' })
     }
     waiting()
     asked()
@@ -4144,7 +4144,7 @@ class SessionManager {
     this.noteComposer(l, key)
     const same = (): boolean => !!runId && this.live.get(liveId(projectPath, agentId))?.state.runId === runId
     const check = (): void => {
-      if (!same()) throw hiveError(M.stoppedBeforePrompt)
+      if (!same()) throw combworkError(M.stoppedBeforePrompt)
       waiting()
       asked()
       guard?.()
@@ -4157,7 +4157,7 @@ class SessionManager {
     // deletes one wrapped row (backspaceKeys).
     let typedOut = ''
     let sent: { at: number; prompts: number; from: number } | null = null
-    // Settings → Advanced (#1286): whether Hive clears the CLI's input first (and takes back a prompt it stopped), and
+    // Settings → Advanced (#1286): whether Combwork clears the CLI's input first (and takes back a prompt it stopped), and
     // whether it keeps the prompt as written.
     const clearDraft = advanced.get<boolean>(PROMPT_CLEAR_DRAFT)
     const asTyped = advanced.get<boolean>(PROMPT_AS_TYPED)
@@ -4166,7 +4166,7 @@ class SessionManager {
       if (clearDraft) await this.clearInput(l, key, check)
       typed = true
       const line = asTyped ? text : text.replace(/\s+/g, ' ').trim()
-      // A CLI busy for a moment reads what Hive typed in one go, Ctrl+U and Enter included: Claude Code takes such a
+      // A CLI busy for a moment reads what Combwork typed in one go, Ctrl+U and Enter included: Claude Code takes such a
       // read as a paste with those keys in it as text, and then Enter again doesn't send it either (#597). A bracketed
       // paste is text however it arrives. A slash command is still typed: pasted, it is sent as a message.
       // Enter once the CLI has drawn the line (#600: a busy Codex drops an Enter it reads with the line): its end shows
@@ -4203,10 +4203,10 @@ class SessionManager {
         if (!drawn()) log.info(`${userText(this.label(l!.state))}: the line Combwork typed wasn't drawn within ${most} ms: Enter anyway`)
       }
       const before = l?.prompts ?? 0
-      // Hive's line from its Enter (HI-2218): the CLI reports it taken while the confirm below still waits, before `typed`.
-      if (l) l.hiveEnterAt = Date.now()
+      // Combwork's line from its Enter (HI-2218): the CLI reports it taken while the confirm below still waits, before `typed`.
+      if (l) l.combworkEnterAt = Date.now()
       writePty(key, '\r')
-      // Waiting to be taken from here (#430), for whatever Hive types next: recorded once this call is done with it (its
+      // Waiting to be taken from here (#430), for whatever Combwork types next: recorded once this call is done with it (its
       // own Enter again below is no line over it; nothing else types meanwhile, it holds `delivering`).
       sent = { at: Date.now(), prompts: before, from: since }
       // A hook should follow it (#1336), unless it is a command of the CLI's own.
@@ -4232,7 +4232,7 @@ class SessionManager {
         } catch {
           break
         }
-        if (l) l.hiveEnterAt = Date.now()
+        if (l) l.combworkEnterAt = Date.now()
         writePty(key, '\r')
       }
     } catch (e) {
@@ -4267,7 +4267,7 @@ class SessionManager {
   }
 
   /**
-   * Hands one agent's work over to another (any provider): the source writes a handover with Hive's
+   * Hands one agent's work over to another (any provider): the source writes a handover with Combwork's
    * cw_create_handover tool, then the target starts and picks it up with cw_read_latest_handover.
    * Conversations can't move between providers; a handover carries the work instead. To itself, it ends the agent's
    * conversation: only while it may (#1057, handOverCheck.ts: idle, not merging, on no running lane's card), checked as
@@ -4294,12 +4294,12 @@ class SessionManager {
       : undefined
     // To itself: the agent carries on in a new conversation (a long transcript made short again).
     const self = fromAgentId === toAgentId
-    if (!this.hiveMcp(projectPath)) throw hiveError(msg({ id: 'session.handOver.noTools', defaultMessage: 'Handing over needs Combwork\'s tools in sessions: turn on "Provide Combwork tools to sessions" in Settings → Agent API.', description: 'Hand Over to… is refused: agents need Combwork\'s tools to write and read a handover. "Provide Combwork tools to sessions" is a setting in Settings → Agent API: keep its name as Combwork shows it.' }), undefined, { kind: 'conflict' })
+    if (!this.combworkMcp(projectPath)) throw combworkError(msg({ id: 'session.handOver.noTools', defaultMessage: 'Handing over needs Combwork\'s tools in sessions: turn on "Provide Combwork tools to sessions" in Settings → Agent API.', description: 'Hand Over to… is refused: agents need Combwork\'s tools to write and read a handover. "Provide Combwork tools to sessions" is a setting in Settings → Agent API: keep its name as Combwork shows it.' }), undefined, { kind: 'conflict' })
     const { agent: to } = await this.agentDef(projectPath, toAgentId)
     const { agent: from } = await this.agentDef(projectPath, fromAgentId)
     // Ending its conversation only while it may (#1057): what the notice, the footer and the dialog offer, checked here
     // too, so a notice or dialog left open while the agent started work, joined a lane or took the merge slot can't.
-    if (self && !(await this.handOverAllowed(projectPath, fromAgentId).catch(() => false))) throw hiveError(M.handOverNotNow, { agent: from.name }, { kind: 'conflict' })
+    if (self && !(await this.handOverAllowed(projectPath, fromAgentId).catch(() => false))) throw combworkError(M.handOverNotNow, { agent: from.name }, { kind: 'conflict' })
     const source = this.live.get(liveId(projectPath, fromAgentId))?.state ?? null
     const fromSession = source?.sessionId || from.lastSessionId || ''
     // The handover the target reads, by name: a newer one appearing meanwhile isn't the one meant.
@@ -4309,10 +4309,10 @@ class SessionManager {
     let askedAt = NaN
     let writtenAt = NaN
     if (opts.handover) {
-      if (!source) throw hiveError(msg({ id: 'session.handOver.notRunning', defaultMessage: "{agent} isn't running. Resume it to write a handover, or hand over the latest handover.", description: "Hand Over to… with a new handover is refused: the agent handing over isn't running. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
-      if (source.status !== 'ready' && source.status !== 'finished') throw hiveError(M.handOverBusy, { agent: from.name }, { kind: 'conflict' })
+      if (!source) throw combworkError(msg({ id: 'session.handOver.notRunning', defaultMessage: "{agent} isn't running. Resume it to write a handover, or hand over the latest handover.", description: "Hand Over to… with a new handover is refused: the agent handing over isn't running. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
+      if (source.status !== 'ready' && source.status !== 'finished') throw combworkError(M.handOverBusy, { agent: from.name }, { kind: 'conflict' })
       // Proof, not status: the target starts only once a handover newer than this one exists, written in the
-      // source's own conversation (its header's Session, which Hive writes), not by another agent meanwhile.
+      // source's own conversation (its header's Session, which Combwork writes), not by another agent meanwhile.
       // Among the newest few, since another agent may write one after the source does.
       const known = new Map((await this.recentHandovers(projectPath, 20)).map((h) => [h.relPath, h.modified]))
       const want = source.sessionId
@@ -4352,17 +4352,17 @@ class SessionManager {
           break
         }
         const st = this.live.get(liveId(projectPath, fromAgentId))?.state
-        if (!st) throw hiveError(msg({ id: 'session.handOver.stopped', defaultMessage: '{agent} stopped before writing a handover.', description: "Hand Over to… failed: the agent handing over stopped. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
-        if (st.status === 'waiting') throw hiveError(msg({ id: 'session.handOver.asking', defaultMessage: '{agent} is asking you something before it can write the handover. Answer it, then hand over again without a new handover.', description: "Hand Over to… stopped: the agent handing over waits for the user. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
+        if (!st) throw combworkError(msg({ id: 'session.handOver.stopped', defaultMessage: '{agent} stopped before writing a handover.', description: "Hand Over to… failed: the agent handing over stopped. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
+        if (st.status === 'waiting') throw combworkError(msg({ id: 'session.handOver.asking', defaultMessage: '{agent} is asking you something before it can write the handover. Answer it, then hand over again without a new handover.', description: "Hand Over to… stopped: the agent handing over waits for the user. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
         // Finished without one (the file can land a moment after the turn ends): give it 20 seconds.
         idleSince = st.status === 'finished' || st.status === 'ready' ? idleSince || Date.now() : 0
-        if (idleSince && Date.now() - idleSince > 20_000 && Date.now() - t0 > 30_000) throw hiveError(msg({ id: 'session.handOver.noneWritten', defaultMessage: '{agent} finished without writing a handover. Ask it to write one, then hand over again without a new handover.', description: "Hand Over to… failed: the agent finished its turn without writing a handover. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
-        if (Date.now() - t0 > 15 * 60_000) throw hiveError(msg({ id: 'session.handOver.slow', defaultMessage: "{agent} didn't write its handover in 15 minutes.", description: "Hand Over to… gave up waiting for the handover. {agent} is the agent's name." }), { agent: from.name }, { kind: 'conflict' })
+        if (idleSince && Date.now() - idleSince > 20_000 && Date.now() - t0 > 30_000) throw combworkError(msg({ id: 'session.handOver.noneWritten', defaultMessage: '{agent} finished without writing a handover. Ask it to write one, then hand over again without a new handover.', description: "Hand Over to… failed: the agent finished its turn without writing a handover. {agent} is its name." }), { agent: from.name }, { kind: 'conflict' })
+        if (Date.now() - t0 > 15 * 60_000) throw combworkError(msg({ id: 'session.handOver.slow', defaultMessage: "{agent} didn't write its handover in 15 minutes.", description: "Hand Over to… gave up waiting for the handover. {agent} is the agent's name." }), { agent: from.name }, { kind: 'conflict' })
       }
     }
     if (!handover) {
       handover = (await this.latestHandover(projectPath))?.relPath ?? ''
-      if (!handover) throw hiveError(msg({ id: 'session.handOver.none', defaultMessage: 'There is no handover for {project} yet. Hand over with a new handover instead.', description: "Hand Over to… with the latest handover is refused: the project has none. {project} is its name." }), { project: basename(projectPath) }, { kind: 'conflict' })
+      if (!handover) throw combworkError(msg({ id: 'session.handOver.none', defaultMessage: 'There is no handover for {project} yet. Hand over with a new handover instead.', description: "Hand Over to… with the latest handover is refused: the project has none. {project} is its name." }), { project: basename(projectPath) }, { kind: 'conflict' })
     }
     // To itself: its conversation ends here (it stays in the Sessions tab), and a new one starts below. Only if it still
     // may (#1057): writing the handover takes minutes, in which it can take the merge slot, join a lane, be relaunched, or
@@ -4381,15 +4381,15 @@ class SessionManager {
       }
       const may = sameLaunch() && !otherWork() && (await this.handOverAllowed(projectPath, fromAgentId, true).catch(() => false))
       // And with nothing awaited between this and the stop, its launch and its work once more, and the caller's authority.
-      if (!may || !sameLaunch() || otherWork()) throw hiveError(M.handOverMomentLost, { agent: from.name, handover }, { kind: 'conflict' })
+      if (!may || !sameLaunch() || otherWork()) throw combworkError(M.handOverMomentLost, { agent: from.name, handover }, { kind: 'conflict' })
       allowed?.()
     }
-    if (self && this.live.has(liveId(projectPath, fromAgentId)) && !(await this.endConversation(projectPath, fromAgentId))) throw hiveError(msg({ id: 'session.handOver.didntStop', defaultMessage: '{agent} didn\'t stop. Stop it, then start it and ask it to read the handover "{handover}".', description: "Handing over to the same agent failed: it didn't stop to start a new conversation. {agent} is its name, {handover} the handover's path in the shared notes." }), { agent: from.name, handover }, { kind: 'conflict' })
+    if (self && this.live.has(liveId(projectPath, fromAgentId)) && !(await this.endConversation(projectPath, fromAgentId))) throw combworkError(msg({ id: 'session.handOver.didntStop', defaultMessage: '{agent} didn\'t stop. Stop it, then start it and ask it to read the handover "{handover}".', description: "Handing over to the same agent failed: it didn't stop to start a new conversation. {agent} is its name, {handover} the handover's path in the shared notes." }), { agent: from.name, handover }, { kind: 'conflict' })
     // The target: given the message in its running session, or started with it as its launch's task (#782), as a task
     // start is. Typed into a CLI that had only just looked ready, it could be lost under load (Codex's screen looks ready
     // before it takes input), and the next hand-over from it was refused.
     const target = this.live.get(liveId(projectPath, toAgentId))?.state ?? null
-    if (target && target.status !== 'ready' && target.status !== 'finished') throw hiveError(M.handOverBusy, { agent: to.name }, { kind: 'conflict' })
+    if (target && target.status !== 'ready' && target.status !== 'finished') throw combworkError(M.handOverBusy, { agent: to.name }, { kind: 'conflict' })
     // The caller's authority, after every await above (the handover's read, a conversation's end), before the target is given it.
     allowed?.()
     // A delivery's body is stored: said in the Default until stored records are said when read (5b, 6b).
@@ -4419,8 +4419,8 @@ class SessionManager {
   /**
    * Gives an idle running agent a task in a new conversation (cw_prompt_agent with newConversation): its conversation
    * ends as when it hands over to itself (it stays in the Sessions tab), and a new one starts on the task, with no
-   * handover. The caller has checked it is idle; refused while Hive is typing into it or its CLI hasn't taken a prompt
-   * Hive typed (ending it would lose that prompt). Nothing awaits before the stop, so the caller's checks still hold.
+   * handover. The caller has checked it is idle; refused while Combwork is typing into it or its CLI hasn't taken a prompt
+   * Combwork typed (ending it would lose that prompt). Nothing awaits before the stop, so the caller's checks still hold.
    * `allowed` throws if the caller may no longer have it (the Assistant's Control or session): checked before the stop,
    * after it, and just before the new launch spawns. `purpose` (#1434): where the new conversation has the agent work, as
    * a start's (#1443: a pooled reviewer's review, in the project folder, whatever slot it builds in).
@@ -4428,10 +4428,10 @@ class SessionManager {
   async newConversation(projectPath: string, agentId: string, prompt: string, allowed?: () => void, purpose?: FolderPurpose): Promise<LiveSessionState> {
     projectPath = workspace.assertProject(projectPath)
     const now = this.agentNow(projectPath, agentId)
-    if (!now) throw hiveError(msg({ id: 'session.newConversation.notRunning', defaultMessage: "It isn't running.", description: 'Giving an agent a task in a new conversation is refused: it isn\'t running.' }), undefined, { kind: 'conflict' })
-    if (now.pending || this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.pending', defaultMessage: 'It has just been given a prompt that its CLI has not taken yet.', description: "Giving an agent a task in a new conversation is refused: a prompt Combwork typed hasn't been taken yet." }), undefined, { kind: 'conflict' })
+    if (!now) throw combworkError(msg({ id: 'session.newConversation.notRunning', defaultMessage: "It isn't running.", description: 'Giving an agent a task in a new conversation is refused: it isn\'t running.' }), undefined, { kind: 'conflict' })
+    if (now.pending || this.delivering.has(this.key(projectPath, agentId))) throw combworkError(msg({ id: 'session.newConversation.pending', defaultMessage: 'It has just been given a prompt that its CLI has not taken yet.', description: "Giving an agent a task in a new conversation is refused: a prompt Combwork typed hasn't been taken yet." }), undefined, { kind: 'conflict' })
     allowed?.()
-    if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }), undefined, { kind: 'conflict' })
+    if (!(await this.endConversation(projectPath, agentId))) throw combworkError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }), undefined, { kind: 'conflict' })
     allowed?.()
     return this.start(projectPath, { agentId, prompt, allowed, ...(purpose ? { purpose } : {}) })
   }
@@ -4439,14 +4439,14 @@ class SessionManager {
   /**
    * Start Fresh (#1437): an idle running agent's conversation ended (it stays in the Sessions tab) and a new one started,
    * where its new conversations start (agentFolders.ts): null, or why not. `whyNot` (freshStarts.ts) says why it isn't
-   * idle now; it is asked, and Hive typing into it checked, just before the stop with no wait between them
+   * idle now; it is asked, and Combwork typing into it checked, just before the stop with no wait between them
    * (stopWhereAndWait marks the run stopping before its first wait), so the run stopped is the idle one checked.
    */
   async startFresh<W extends string>(projectPath: string, agentId: string, whyNot: () => W | null): Promise<W | 'pending' | null> {
     projectPath = workspace.assertProject(projectPath)
     const why = this.delivering.has(this.key(projectPath, agentId)) ? 'pending' : whyNot()
     if (why) return why
-    if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }), undefined, { kind: 'conflict' })
+    if (!(await this.endConversation(projectPath, agentId))) throw combworkError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }), undefined, { kind: 'conflict' })
     await this.start(projectPath, { agentId })
     return null
   }
@@ -4461,12 +4461,12 @@ class SessionManager {
   async setPlanMode(projectPath: string, agentId: string, on: boolean): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     const l = this.live.get(liveId(projectPath, agentId))
-    if (!l || l.state.settingUp) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
-    if (!l.adapter.planToggleKey) throw hiveError(msg({ id: 'session.plan.noToggle', defaultMessage: '{provider} has no Plan mode toggle.', description: "Turning Plan mode on or off is refused: the coding agent has no such toggle. {provider} is its name." }), { provider: l.adapter.descriptor.name }, { kind: 'invalid' })
-    if (l.state.status === 'waiting') throw hiveError(msg({ id: 'session.plan.asking', defaultMessage: 'The agent is asking you something. Answer it first.', description: 'Turning Plan mode on or off is refused: the agent waits for the user.' }), undefined, { kind: 'conflict' })
+    if (!l || l.state.settingUp) throw combworkError(M.noSession, undefined, { kind: 'conflict' })
+    if (!l.adapter.planToggleKey) throw combworkError(msg({ id: 'session.plan.noToggle', defaultMessage: '{provider} has no Plan mode toggle.', description: "Turning Plan mode on or off is refused: the coding agent has no such toggle. {provider} is its name." }), { provider: l.adapter.descriptor.name }, { kind: 'invalid' })
+    if (l.state.status === 'waiting') throw combworkError(msg({ id: 'session.plan.asking', defaultMessage: 'The agent is asking you something. Answer it first.', description: 'Turning Plan mode on or off is refused: the agent waits for the user.' }), undefined, { kind: 'conflict' })
     if (!!l.state.planMode === on) return
-    // Not into a line Hive is typing (#649: the composer is reserved meanwhile).
-    if (this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.plan.typing', defaultMessage: 'Combwork is typing a line into this agent. Try again in a moment.', description: 'Turning Plan mode on or off is refused for a moment: Combwork is typing into the terminal.' }), undefined, { kind: 'conflict' })
+    // Not into a line Combwork is typing (#649: the composer is reserved meanwhile).
+    if (this.delivering.has(this.key(projectPath, agentId))) throw combworkError(msg({ id: 'session.plan.typing', defaultMessage: 'Combwork is typing a line into this agent. Try again in a moment.', description: 'Turning Plan mode on or off is refused for a moment: Combwork is typing into the terminal.' }), undefined, { kind: 'conflict' })
     writePty(this.key(projectPath, agentId), l.adapter.planToggleKey)
     l.state.planMode = on
     this.emitState(l.state)
@@ -4475,10 +4475,10 @@ class SessionManager {
   /** Stops the agent and resumes the same conversation in another permission mode. */
   async restartInMode(projectPath: string, agentId: string, mode: PermissionMode): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
-    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw hiveError(M.assistantCliOwn, undefined, { kind: 'conflict' })
+    if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw combworkError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
-    if (!l) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
+    if (!l) throw combworkError(M.noSession, undefined, { kind: 'conflict' })
     const { sessionId, sessionName } = l.state
     // A session nobody has typed in yet has no conversation (its transcript, if any, holds no messages,
     // and the CLI answers "no conversation found" to --resume): start a new one in the mode instead.
@@ -4499,11 +4499,11 @@ class SessionManager {
     await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(8000, [l.adapter.exitKeys?.graceMs]))))])
     clearTimeout(timer)
     // Still running: said so, rather than the start's "already running" (its old run keeps its slot meanwhile).
-    if (this.live.get(id)?.state.runId === l.state.runId) throw hiveError(msg({ id: 'session.restartMode.didntStop', defaultMessage: "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.", description: "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started." }), { agent: l.state.agentName ?? agentId }, { kind: 'conflict' })
+    if (this.live.get(id)?.state.runId === l.state.runId) throw combworkError(msg({ id: 'session.restartMode.didntStop', defaultMessage: "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.", description: "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started." }), { agent: l.state.agentName ?? agentId }, { kind: 'conflict' })
     await this.start(projectPath, { resumeId: resumable ? sessionId : undefined, name: sessionName, agentId, permissionMode: mode })
   }
 
-  // A changed mode setting applies to new sessions; for running ones, Hive offers to switch them now.
+  // A changed mode setting applies to new sessions; for running ones, Combwork offers to switch them now.
   private modeOffers = new Map<string, { id: string; label: string; mode: string; value: PermissionMode }>()
   private modeOfferTimer: NodeJS.Timeout | null = null
   /**
@@ -4666,7 +4666,7 @@ class SessionManager {
       const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, config.settings))
       if (!stillApplies()) return
       const info = providerService.info(adapter.id)
-      if (!adapter.stopBackgroundJob || !info.path) throw hiveError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
+      if (!adapter.stopBackgroundJob || !info.path) throw combworkError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
       await adapter.stopBackgroundJob(info.path, jobId)
       // The job lets go of the conversation as it exits.
       await new Promise((r) => setTimeout(r, 1500))
@@ -4737,8 +4737,8 @@ class SessionManager {
       this.noteExit(l.state.sessionId)
       this.live.delete(id)
       this.recheckTools(id)
-      // The last of Hive's sessions in its folder: Hive's skill copies there go, as Settings → Advanced says (#1431). Not
-      // as Hive quits: the next start's sweep does it, unless sessions resume there first.
+      // The last of Combwork's sessions in its folder: Combwork's skill copies there go, as Settings → Advanced says (#1431). Not
+      // as Combwork quits: the next start's sweep does it, unless sessions resume there first.
       if (!this.shuttingDown && !this.runningIn(l.state.cwd)) void sessionEnded(projectPath, l.state.cwd)
       // Its hooks missing were this launch's (#1336): its lanes go on (a stopped agent is the lane's own business).
       if (l.state.hooksMissing) noteHooksMissing(projectPath, agentId, false)
@@ -4786,7 +4786,7 @@ class SessionManager {
 
   /**
    * What a launch's gate is told (#507): its command runs once its processes are tracked. One that can't be tracked
-   * runs anyway, untracked, and Hive says so (once); only one stopped while it was being tracked doesn't.
+   * runs anyway, untracked, and Combwork says so (once); only one stopped while it was being tracked doesn't.
    */
   private launchWord(r: TrackResult): GateWord {
     if (r.tracked) return { go: true }
@@ -4805,14 +4805,14 @@ class SessionManager {
     return ok
   }
 
-  /** Agents' processes can't be tracked (#507): said once a Hive run (noteUntracked); agents start all the same. */
+  /** Agents' processes can't be tracked (#507): said once a Combwork run (noteUntracked); agents start all the same. */
   private untracked(reason: TextPart | null): void {
     noteUntracked(reason)
   }
 
   /**
    * A launch's CLI has exited: what it left running (#507) is ended, as Settings → Agents says, or offered to the user
-   * to end; the agent's pane header lists it meanwhile. Quitting Hive asks about every agent's at once instead.
+   * to end; the agent's pane header lists it meanwhile. Quitting Combwork asks about every agent's at once instead.
    */
   private async afterLaunch(runId: string, label: string): Promise<void> {
     let left = await launchEnded(runId)
@@ -4978,14 +4978,14 @@ class SessionManager {
 
   /**
    * A live session's cost as the settings say now (#436): the CLI's own report (`reportedCost`, from its status line)
-   * for a provider that reports one, unless the user chose their prices; else Hive's estimate, which re-reads the whole
+   * for a provider that reports one, unless the user chose their prices; else Combwork's estimate, which re-reads the whole
    * transcript, so at most every 30 seconds while the agent works and at each turn's end (`force`, also after a price
    * change). With the user's prices but none for its model, the CLI's newest report (its status line's, else its
    * transcript's), never recomputed. Without a price or a report the cost is cleared, so it shows as unknown.
    */
   private async liveCost(l: LiveSession, src: string, force: boolean): Promise<void> {
     // On a server connection (HI-1772) the CLI's report prices its server's model as a Claude model: never used, only
-    // Hive's estimate by the real model's id (unpriced unless the user priced it).
+    // Combwork's estimate by the real model's id (unpriced unless the user priced it).
     const onServer = !!l.state.launchedConnection?.server
     // Free (HI-1772): only on servers on this PC, the conversation's record says: a known $0, shown as free (local).
     // Shown as its conversation's policy is now, both ways (a /resume into a conversation that ran elsewhere ends it).
@@ -5001,7 +5001,7 @@ class SessionManager {
     const usage = await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider, this.costPolicy(l))
     // The settings changed while it was read: the read they started decides.
     if ((onServer || usesOwnPrices(l.state.provider, config.settings)) !== own || !usage) return
-    // An estimate is Hive's (the user's prices, or a provider that reports none); anything else is the CLI's report.
+    // An estimate is Combwork's (the user's prices, or a provider that reports none); anything else is the CLI's report.
     if (usage.costUsd != null && usage.costEstimated) this.setLiveCost(l, usage.costUsd, true)
     else if (onServer) this.setLiveCost(l, undefined, false)
     else if (own) this.setLiveCost(l, l.reportedCost ?? usage.costUsd ?? undefined, false)
@@ -5161,7 +5161,7 @@ class SessionManager {
     for (const ev of l.adapter.safeguards(text.slice(0, end + 1), (l.guardMemo ??= {}))) if (ev.at >= since) this.noteSafeguard(l, ev)
   }
 
-  /** A safeguard event on the agent's state (noteSafeguard); a switch to another model is told: Hive's own notice, and a note on its Doing cards. */
+  /** A safeguard event on the agent's state (noteSafeguard); a switch to another model is told: Combwork's own notice, and a note on its Doing cards. */
   private noteSafeguard(l: LiveSession, ev: SafeguardEvent): void {
     const st = l.state
     if (ev.kind === 'stop' && ev.asked && ev.turn && this.guardSeen(l, ev.turn, 'asked')) {
@@ -5199,7 +5199,7 @@ class SessionManager {
 
   /**
    * Whether the CLI's screen shows its prompt about a safeguard stop now (ProviderAdapter.safeguardAsk), for `ask` (the one
-   * it waits on, or any blocking ask naming no tool). False when Hive doesn't read its screen.
+   * it waits on, or any blocking ask naming no tool). False when Combwork doesn't read its screen.
    */
   private guardShown(l: LiveSession, ask: Ask = { kind: 'question', blocking: true, message: '' }): boolean {
     const screen = l.adapter.safeguardAsk ? l.screen?.text() : null
@@ -5243,7 +5243,7 @@ class SessionManager {
       // Counted unless the CLI's record of it in this turn was read first.
       if (!turn || !this.guardSeen(l, turn, 'screen')) noted = noteSafeguard(noted, { kind: 'stop', at, model, tools: memoTools(memo) }) ?? noted
       // Kept on the session's record with its turn, so Performance counts it though the transcript may never record it
-      // (HB3's didn't), and once if it does (withScreenStops), whenever Hive reads it.
+      // (HB3's didn't), and once if it does (withScreenStops), whenever Combwork reads it.
       if (st.sessionId) {
         const stop: ScreenStop = { at: new Date(at).toISOString(), ...(model ? { model } : {}), ...(turn ? { turn } : {}) }
         await this.keepScreenStop(st.projectPath, st.sessionId, stop).catch((e) => log.warn('safeguard: could not keep the stop seen on screen', e))
@@ -5373,7 +5373,7 @@ class SessionManager {
   }
 
   /**
-   * A line Hive typed, held as not taken, gone from the CLI's input since (HI-1959: a screen of the CLI's took it): seen
+   * A line Combwork typed, held as not taken, gone from the CLI's input since (HI-1959: a screen of the CLI's took it): seen
    * lost, it is looked at again after cw.lostLine.steadySeconds, and any draw meanwhile that says otherwise (a redraw, a
    * dialog, text in the input, a turn) calls that off.
    */
@@ -5487,7 +5487,7 @@ class SessionManager {
 
   /**
    * The running conversation's transcript size, for the footer (shown in 0.1 MB steps), and a warning once it
-   * passes Settings → Sessions → Warn when a transcript is over: a long one slows the CLI and Hive, and only a
+   * passes Settings → Sessions → Warn when a transcript is over: a long one slows the CLI and Combwork, and only a
    * new conversation (a handover) makes it short again, since compacting keeps the whole history in the file.
    */
   private noteTranscriptSize(l: LiveSession, bytes: number): void {
@@ -5524,7 +5524,7 @@ class SessionManager {
   laneParts: (projectPath: string, agentId: string) => Promise<('builder' | 'reviewer')[]> = async () => []
 
   /**
-   * The side of the workflow of an agent's launch `runId` (HI-2049), for what its hive server reports: `unknown` once
+   * The side of the workflow of an agent's launch `runId` (HI-2049), for what its combwork server reports: `unknown` once
    * that launch has ended or another has taken its place, so a late report never takes the next launch's side.
    */
   launchSide(projectPath: string, agentId: string, runId: string | null): LaunchWorkflow | 'unknown' {
@@ -5539,7 +5539,7 @@ class SessionManager {
   }
 
   /**
-   * The language Hive shows changed (#797): what a live session's state says in Hive's words (where its
+   * The language Combwork shows changed (#797): what a live session's state says in Combwork's words (where its
    * auto-compaction setting comes from) is said again in it.
    */
   relabel(): void {
@@ -5553,13 +5553,13 @@ class SessionManager {
   }
 
   private emitState(state: LiveSessionState): void {
-    // Its input as Hive holds it now (#648): a line typed or given up since the last report.
+    // Its input as Combwork holds it now (#648): a line typed or given up since the last report.
     const l = state.projectPath ? this.live.get(liveId(state.projectPath, state.agentId)) : undefined
     if (l?.state === state) this.recheckOffers(l)
     if (l?.state === state) this.fact(state, { composer: this.composerOf(l) })
     // A launch with its task on its command line: when it first became ready, before a watch shows that as watching (#721).
     if (l?.state === state && l.launchTask && l.launchReadyAt === undefined && (state.status === 'ready' || state.status === 'watching' || state.status === 'finished')) l.launchReadyAt = Date.now()
-    // And any launch: its hive tools' bound runs from then (#865), which a wait for them looks at again.
+    // And any launch: its Combwork tools' bound runs from then (#865), which a wait for them looks at again.
     if (l?.state === state && l.readyAt === undefined && (state.status === 'ready' || state.status === 'watching' || state.status === 'finished')) {
       l.readyAt = Date.now()
       this.recheckTools(liveId(state.projectPath, state.agentId))
@@ -5589,7 +5589,7 @@ class SessionManager {
   /**
    * A CLI whose full-screen interface a resize while it starts can leave drawn at the wrong width (Copilot): a size
    * refresh, as resizing the window by hand gives, once it has started (its first status: ready, or a question at
-   * start) and once it is ready (#486); also after Hive switches its mode live (setPermissionMode).
+   * start) and once it is ready (#486); also after Combwork switches its mode live (setPermissionMode).
    */
   private refreshSize(state: LiveSessionState): void {
     const l = this.live.get(liveId(state.projectPath, state.agentId))
@@ -5705,13 +5705,13 @@ class SessionManager {
       return st?.signIn && (st.status === 'ready' || st.status === 'finished' || st.status === 'signin') ? st : null
     }
     const st = stalled()
-    if (!st) throw hiveError(msg({ id: 'session.carryOn.already', defaultMessage: 'It has already carried on.', description: 'Resume is refused for an agent whose turn a refused sign-in stopped: it carried on by itself meanwhile.' }), undefined, { kind: 'conflict' })
+    if (!st) throw combworkError(msg({ id: 'session.carryOn.already', defaultMessage: 'It has already carried on.', description: 'Resume is refused for an agent whose turn a refused sign-in stopped: it carried on by itself meanwhile.' }), undefined, { kind: 'conflict' })
     // A control notice for this launch (#649), given now or not at all: never once it has carried on by itself.
     await this.delivery().now(projectPath, { agentId, kind: 'control', from: CW_SENDER, body: inDefaultDialect(() => say(CARRY_ON_PROMPT)), source: 'carry-on', ref: st.runId, need: 'stalled', forRun: st.runId }, () => !!stalled())
   }
 
   /**
-   * An agent whose turn a dropped connection ended, while Hive waits for the connection (HI-1612, outageResume.ts): its
+   * An agent whose turn a dropped connection ended, while Combwork waits for the connection (HI-1612, outageResume.ts): its
    * status says what the wait is doing; null puts back the failed turn's own. Only for that launch, still stopped there.
    */
   connectionWait(projectPath: string, agentId: string, runId: string, text: TextPart | null): void {
@@ -5814,7 +5814,7 @@ class SessionManager {
       })
     }
     // A compaction's end the CLI sends no hook for (Copilot, #454): as the end hook would, once per recorded end of this
-    // launch, and only while Hive thinks it compacting (a /compact's end read later, with nothing under way, is history).
+    // launch, and only while Combwork thinks it compacting (a /compact's end read later, with nothing under way, is history).
     // Not after a hook that came once the read began (a newer PreCompact, a prompt), nor for a compaction that began after
     // it ended (Copilot's clock is this machine's): this end is then an older compaction's.
     const compacted = d.compactedAt && Date.parse(d.compactedAt) >= Date.parse(l.state.startedAt) && (!l.compactedAt || d.compactedAt > l.compactedAt) ? d.compactedAt : null
@@ -5827,7 +5827,7 @@ class SessionManager {
         this.carryOut(id, l, hookStep({ kind: 'compactEnd' }, this.statusInput(l)), 'transcript', { kind: 'compactEnd' })
       })
     }
-    // The CLI's own record that its latest turn is over (#648): kept, and acted on if Hive missed that turn's Stop. And,
+    // The CLI's own record that its latest turn is over (#648): kept, and acted on if Combwork missed that turn's Stop. And,
     // for a CLI whose records don't name turns, when its Stops were answered (this launch's only, the latest kept).
     if (d.turnEnded !== undefined) l.turnRecord = d.turnEnded
     const started = Date.parse(l.state.startedAt)
@@ -5877,7 +5877,7 @@ class SessionManager {
   // -------------------------------------------------------------------------
 
   /**
-   * The project's file locks (its workflow option, HI-1766), as its workspace last read it: Hive's, the workspace's or its
+   * The project's file locks (its workflow option, HI-1766), as its workspace last read it: Combwork's, the workspace's or its
    * own. The Assistant's home isn't a project and shares no folder: off.
    */
   private lockMode(projectPath: string): FileLockMode {
@@ -5931,7 +5931,7 @@ class SessionManager {
         return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: say(SESSION.lock.warn, { holder: who, file: rel }) }), keys)
       }
       if (mode === 'ask' && !l.adapter.descriptor.capabilities.lockAsk) {
-        // The CLI can't show its own approval for this, so Hive asks the user and the agent waits.
+        // The CLI can't show its own approval for this, so Combwork asks the user and the agent waits.
         const key = `${id}|${keys.get(abs)!}`
         // Allowed against this claim (HI-2386: an Allow given against another claim of the file allows nothing here, and
         // goes, so the user can be asked about this one).
@@ -6109,7 +6109,7 @@ class SessionManager {
 
   /**
    * Gives the agent one go-ahead for its allowed files (and those whose claim it waited on ended, HI-2386) once its turn
-   * has ended: a delivery (#649: a control notice for this launch) the delivery service offers as any line of Hive's is,
+   * has ended: a delivery (#649: a control notice for this launch) the delivery service offers as any line of Combwork's is,
    * only while it is free and the user isn't writing in its terminal (Pause after you type), checked again until Enter,
    * so the user's input is never added to or sent. The allowed files are allowed again for the turn it starts. Not typed
    * yet, it waits (the user's own prompt, or a wake, went first; the files stay allowed for it, and the next turn's end
@@ -6193,7 +6193,7 @@ class SessionManager {
   private hookQueues = new Map<string, Promise<void>>()
 
   /**
-   * The notice for what the agent has unread (#650, inboxNotices.ts): Hive's fixed text, or null when there is nothing
+   * The notice for what the agent has unread (#650, inboxNotices.ts): Combwork's fixed text, or null when there is nothing
    * to tell. At a checkpoint (a tool call of the agent's own ended) or its turn's end (the drain: a reply that carries
    * the turn on). The turn ledger counts a turn's end only from a Stop answered with nothing, as continuations fire no
    * prompt (#648).
@@ -6201,7 +6201,7 @@ class SessionManager {
   inboxNotice: ((state: LiveSessionState, at: 'checkpoint' | 'drain') => Promise<string | null> | string | null) | null = null
 
   /**
-   * What Hive answers a hook call with (the hook server sends it, then calls handleHook with the same body): a
+   * What Combwork answers a hook call with (the hook server sends it, then calls handleHook with the same body): a
    * PreToolUse's file-lock decision (made at once, before anything is awaited: it claims locks in the order hooks came);
    * for a hook that may carry a notice (a tool's end, a Stop: noticeReply), a reply decided in the launch's hook order by
    * handleHookNow, once the turn ledger has the hooks before it (#650: the ledger's verdict and turn, never a view of its
@@ -6281,12 +6281,12 @@ class SessionManager {
     }
   }
 
-  /** What Hive observes of each hook it handles (HI-982), by its body, while it handles it. */
+  /** What Combwork observes of each hook it handles (HI-982), by its body, while it handles it. */
   private hookObs = new WeakMap<object, HookObservation>()
 
   /**
    * A hook arriving on its launch's own authenticated route (the hook server, HI-982): its observation, which its lock
-   * decision and the turn ledger fill in, for the launch's Hooks dialog; null when no launch of Hive's has it.
+   * decision and the turn ledger fill in, for the launch's Hooks dialog; null when no launch of Combwork's has it.
    */
   observeHook(runId: string | null, body: Record<string, any>): HookObservation | null {
     const l = this.findLaunch(runId, body.session_id)?.[1]
@@ -6298,7 +6298,7 @@ class SessionManager {
   }
 
   /**
-   * A hook handled (HI-982): its reply (context, where its lock decision said nothing) or its error, and how long Hive
+   * A hook handled (HI-982): its reply (context, where its lock decision said nothing) or its error, and how long Combwork
    * took, kept in its launch's history (the newest HOOK_FIRED_MAX). Never logged: the history is the dialog's alone.
    */
   hookHandled(obs: HookObservation, reply: unknown, error?: { step: string; error: unknown }): void {
@@ -6314,7 +6314,7 @@ class SessionManager {
 
   /**
    * An agent's hooks for its Hooks dialog (HI-982): its launch's (runId), what it has (listed again: the CLI asked now, or
-   * its files compared with the launch's) and what Hive received, newest first. Null when it isn't running.
+   * its files compared with the launch's) and what Combwork received, newest first. Null when it isn't running.
    */
   async sessionHooks(projectPath: string, agentId: string): Promise<SessionHooks | null> {
     const l = this.live.get(liveId(projectPath, agentId))
@@ -6350,7 +6350,7 @@ class SessionManager {
   /**
    * The notice for a hook in the launch's order (#650), with the turn ledger as it is just before it (nothing else of the
    * launch is handled while this is worked out): none for a hook the ledger finds stale; a checkpoint after the agent's
-   * own tool call; the drain at a Stop of the running turn that Hive hasn't carried on yet (the ledger's own count, so at
+   * own tool call; the drain at a Stop of the running turn that Combwork hasn't carried on yet (the ledger's own count, so at
    * most once a turn, whatever a Stop says of it). Null when there is nothing to tell.
    */
   private async noticeIn(runId: string | null, l: LiveSession, ledger: TurnLedger, body: Record<string, any>, woke: boolean, at: number): Promise<Record<string, unknown> | null> {
@@ -6366,7 +6366,7 @@ class SessionManager {
     // Still that launch and that turn (the queue holds the rest of the launch's hooks, so only its end can change them).
     if (!text || this.findLaunch(runId, body.session_id)?.[1] !== l || ledger.active !== turn) return null
     const reply = l.adapter.noticeReply(String(body.hook_event_name ?? ''), text)
-    // A CLI that takes the drain as a new prompt: that prompt is Hive's own, in the turn it carries on.
+    // A CLI that takes the drain as a new prompt: that prompt is Combwork's own, in the turn it carries on.
     if (reply && drain && l.adapter.drainIsPrompt) expectInjected(ledger, text)
     return reply
   }
@@ -6379,7 +6379,7 @@ class SessionManager {
   handleHook(runId: string | null, body: Record<string, any>, reply: unknown = null): Promise<void> {
     // A turn's end releases only the locks claimed before it arrived: PreToolUse claims them at once, outside this queue.
     const arrived = this.lockSeq
-    // When it reached Hive, before it waits its turn: a turn begins then, for comparing with the CLI's records (#648).
+    // When it reached Combwork, before it waits its turn: a turn begins then, for comparing with the CLI's records (#648).
     const at = Date.now()
     const launch = this.findLaunch(runId, body.session_id)?.[1]
     // The launch's hooks before this one: what the old conversation had seen, if this one switches conversations.
@@ -6457,7 +6457,7 @@ class SessionManager {
       this.observeMode(l, hook.mode)
       this.emitState(st)
     }
-    // The turn ledger first (#648): a hook about a turn that is over is old news, and a Stop Hive carried on isn't an end.
+    // The turn ledger first (#648): a hook about a turn that is over is old news, and a Stop Combwork carried on isn't an end.
     const ledger = (l.ledger ??= newLedger())
     const ids = hook.ids
     // The transcript turn it names is heard (#1371), whatever the ledger makes of it and whether or not an alarm stands:
@@ -6479,7 +6479,7 @@ class SessionManager {
     }
     const continued = hook.event.kind === 'stop' && !hook.event.failed && !!reply && typeof reply === 'object' && l.adapter.stopContinues(reply as Record<string, unknown>)
     const was = ledger.active
-    const took = admit(ledger, hook.event, ids, { hiveContinued: continued, woke, now: at })
+    const took = admit(ledger, hook.event, ids, { combworkContinued: continued, woke, now: at })
     if (ledger.active !== was) l.woke = false
     // Its CLI tries a failed model request again (HI-1973: Copilot's recoverable error): the turn's wait, kept from try to
     // try while nothing else is heard (its first try's time, the tries counted). The CLI says neither when it tries again
@@ -6499,7 +6499,7 @@ class SessionManager {
       endRetryWait(st, at)
       this.emitState(st)
     }
-    // What the ledger made of it, for the Hooks dialog (HI-982), apart from Hive's reply: an ignored hook may have had one.
+    // What the ledger made of it, for the Hooks dialog (HI-982), apart from Combwork's reply: an ignored hook may have had one.
     const obs = this.hookObs.get(body)
     if (obs) Object.assign(obs.fired, took.verdict === 'stale' ? { ledger: 'ignored', ledgerWhy: clip(took.why, HOOK_SHORT_MAX).text } : { ledger: took.verdict === 'apply' ? 'applied' : 'continued' })
     // What ends a lock block's decision (HI-982): the blocked call's end, or its turn's (a new prompt, a stop, the end).
@@ -6516,7 +6516,7 @@ class SessionManager {
       if (back) this.hooksBack(l)
     }
     let actions: readonly string[] = [took.verdict === 'stale' ? 'stale' : 'continued']
-    // Hive went on with a turn that had been marked failed (#1658): it carries on, so it needs the user no more.
+    // Combwork went on with a turn that had been marked failed (#1658): it carries on, so it needs the user no more.
     if (took.verdict === 'continued' && st.failedTurn) this.carryOut(id, l, { next: null, failed: null, message: null, actions: [] }, 'continued')
     // A prompt about a safeguard stop says why (#606): told so now if the screen shows it, else when it draws it.
     const guard = this.guardCandidate(l, hook.event)
@@ -6547,7 +6547,7 @@ class SessionManager {
         actions = step.actions
       } else l.guardAsk = { ask, at, applied: false }
     }
-    // The developer console (#636): the hook as it came, next to what Hive made of it (with the turn ledger's verdict).
+    // The developer console (#636): the hook as it came, next to what Combwork made of it (with the turn ledger's verdict).
     const made = took.verdict === 'apply' ? took.event : hook.event
     devConsole.capture([sessionSourceId(st.projectPath, st.agentId)], () => {
       const name = safeWord(body.hook_event_name) || '(unnamed)'
@@ -6592,8 +6592,8 @@ class SessionManager {
   }
 
   /**
-   * What the CLI's own records say ended the turn Hive has running (#648), for the log; null when they don't: its record
-   * of that turn by id (Codex), or of a Stop of it Hive never got (Copilot, by when its Stops were answered).
+   * What the CLI's own records say ended the turn Combwork has running (#648), for the log; null when they don't: its record
+   * of that turn by id (Codex), or of a Stop of it Combwork never got (Copilot, by when its Stops were answered).
    */
   private recordEnds(l: LiveSession): string | null {
     if (!l.ledger) return null
@@ -6606,7 +6606,7 @@ class SessionManager {
   }
 
   /**
-   * A turn's end as Hive applies it (#1632), once the turn ledger has it over: the Stop of the turn a recorded failure
+   * A turn's end as Combwork applies it (#1632), once the turn ledger has it over: the Stop of the turn a recorded failure
    * names ends it failed, with the CLI's words; a record of an older turn is dropped.
    */
   private failedIfRecorded(l: LiveSession, ev: HookEvent): HookEvent {
@@ -6635,7 +6635,7 @@ class SessionManager {
     if (where === 'over') this.carryOut(id, l, { next: null, ...failedTurnStep(rec.words), actions: [] }, 'transcript')
   }
 
-  /** The CLI recorded the end of the turn Hive has running, whose Stop never came (#642): over, as that Stop would end it, in order with the hooks. */
+  /** The CLI recorded the end of the turn Combwork has running, whose Stop never came (#642): over, as that Stop would end it, in order with the hooks. */
   private reconcileTurn(l: LiveSession): void {
     const id = liveId(l.state.projectPath, l.state.agentId)
     void this.inHookOrder(l.state.runId, async () => {
@@ -6644,7 +6644,7 @@ class SessionManager {
     })
   }
 
-  /** Ends the running turn on other evidence than its Stop (the CLI's record, its screen), as that Stop would; logged with what Hive saw before. */
+  /** Ends the running turn on other evidence than its Stop (the CLI's record, its screen), as that Stop would; logged with what Combwork saw before. */
   private async endTurnFrom(id: string, l: LiveSession, by: 'transcript' | 'screen', why: string): Promise<void> {
     const st = l.state
     const before = st.status
@@ -6743,7 +6743,7 @@ class SessionManager {
   }
 
   /**
-   * A running turn Hive has heard nothing of for a while (silentMs): its end, if the CLI's record or its screen shows it,
+   * A running turn Combwork has heard nothing of for a while (silentMs): its end, if the CLI's record or its screen shows it,
    * open tool calls or not (their ends may be lost too); else, after the longer silence an open call allows (a test run
    * can take long), its state is unknown (#648). Unknown isn't idle: nothing is typed into it, and the user can Mark
    * idle. Never a turn's end on the time alone.
@@ -6786,7 +6786,7 @@ class SessionManager {
 
   /**
    * The user says an agent whose state is unknown is idle (Mark idle, #648): its turn is over. Only while its state is
-   * unknown; anything Hive hears of it in the meantime says more.
+   * unknown; anything Combwork hears of it in the meantime says more.
    */
   markIdle(projectPath: string, agentId: string): Promise<void> {
     const id = liveId(projectPath, agentId)
@@ -6795,8 +6795,8 @@ class SessionManager {
     return this.inHookOrder(l.state.runId, () => {
       if (this.live.get(id) !== l || l.state.turn?.state !== 'unknown' || !l.ledger) return
       const before = l.state.status
-      // The user's word supersedes what Hive thought runs (their ends may be lost too): the turn and its open tool calls
-      // (the ledger's), a compaction (markedIdle ends Hive's own), a person asked.
+      // The user's word supersedes what Combwork thought runs (their ends may be lost too): the turn and its open tool calls
+      // (the ledger's), a compaction (markedIdle ends Combwork's own), a person asked.
       endRunning(l.ledger, 'user')
       this.fact(l.state, { maintenance: null, attention: null })
       this.carryOut(id, l, markedIdle(this.statusInput(l)), 'Mark idle') // i18n-ignore: the cause, for the log
@@ -6875,7 +6875,7 @@ class SessionManager {
           l.compacting = undefined
           break
         case 'autoCompact':
-          // Compaction Hive started is already shown as "Compacting…".
+          // Compaction Combwork started is already shown as "Compacting…".
           toast(
             'info',
             tr(msg({ id: 'session.autoCompact.title', defaultMessage: '{agent}: compacting conversation', description: "A notice's title: an agent's CLI compacts its conversation by itself. {agent} is the agent." }), { agent: label }),
@@ -6909,7 +6909,7 @@ class SessionManager {
           this.clearTasks(l)
           break
         case 'idleAgain': {
-          // Hive missed how its last turn ended (#612): what it saw before, so the next time says why. Hook kinds and
+          // Combwork missed how its last turn ended (#612): what it saw before, so the next time says why. Hook kinds and
           // statuses only, no user text.
           const seen = (l.recentHooks ?? []).map((h) => `${h.kind} ${new Date(h.at).toISOString().slice(11, 19)} → ${h.status}`).join(', ')
           log.info(`${userText(label)}: ${l.adapter.descriptor.name} is idle at its prompt while Combwork showed it working; idle again (hooks before: ${seen || 'none'})`)
@@ -6918,10 +6918,10 @@ class SessionManager {
         case 'signedOut':
           {
             const said = ev?.kind === 'signIn' && ev.message?.slice(0, 500)
-            // The CLI's own message, or Hive's (its English for agents, its text for the window).
-            const hive = said ? null : withValues(msg({ id: 'session.signIn.notSignedIn', defaultMessage: "{provider} isn't signed in.", description: "Why an agent's turn stopped, when its CLI didn't say: its sign-in was refused. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name })
+            // The CLI's own message, or Combwork's (its English for agents, its text for the window).
+            const combwork = said ? null : withValues(msg({ id: 'session.signIn.notSignedIn', defaultMessage: "{provider} isn't signed in.", description: "Why an agent's turn stopped, when its CLI didn't say: its sign-in was refused. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name })
             // agent-stored: agentField says it for each agent where the status is sent (servers.ts statusMessageOf)
-            st.signIn = { message: said || englishText(hive!), since: new Date().toISOString(), ...(hive ? { messageText: hive } : {}) }
+            st.signIn = { message: said || englishText(combwork!), since: new Date().toISOString(), ...(combwork ? { messageText: combwork } : {}) }
           }
           this.signInLost(st)
           break
@@ -6991,7 +6991,7 @@ class SessionManager {
     else if (carriedOn || (now.lifecycle === 'starting' && ev && ev.kind !== 'ignore' && !l.askedAtStart)) out.lifecycle = 'running'
     if (ev?.kind === 'compactStart') out.maintenance = 'compacting'
     else if (ev && (ev.kind === 'compactEnd' || ev.kind === 'stop' || ev.kind === 'interrupt' || ev.kind === 'idle' || ev.kind === 'signIn' || ev.kind === 'end')) out.maintenance = null
-    // A prompt starts a turn once a compaction has begun; before Hive's own begins, it may be the /compact Hive typed.
+    // A prompt starts a turn once a compaction has begun; before Combwork's own begins, it may be the /compact Combwork typed.
     else if (ev?.kind === 'prompt' && !ev.injected && !(l.compacting && !l.compacting.started)) out.maintenance = null
     if (step.actions.includes('compactEnded')) out.maintenance = null
     const waits = step.next === 'waiting' ? true : step.next ? false : now.attention === 'waiting'
@@ -7063,7 +7063,7 @@ class SessionManager {
    * Tells the user (and for finished/waiting, the chime), through tell() (main/notify.ts, HI-2320): a pop-up in the
    * window they are using (kept in its bell), else a Windows notification, as shared/notify.ts's table says. A waiting
    * agent's entry is its ask's offer, resolved once the agent no longer asks; a notice ('work') needs no sound. Its title
-   * and body are formatted in the language Hive shows; the Agent API's stream gets the title in English (`apiTitle`,
+   * and body are formatted in the language Combwork shows; the Agent API's stream gets the title in English (`apiTitle`,
    * #796), and never the body.
    */
   private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string, action?: { label: Text; command: string; args?: unknown[] }): void {
@@ -7111,9 +7111,9 @@ class SessionManager {
     this.deliver(projectPath, shownText(title), shownText(body), extra.kind ?? 'work', undefined, undefined, englishText(title), action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) }, { ...extra, apiTitleText: title })
   }
 
-  /** Where a notice about this project goes now: the settings, and the Hive window the user is using (notifyRoute), with why for the log. */
+  /** Where a notice about this project goes now: the settings, and the Combwork window the user is using (notifyRoute), with why for the log. */
   private routeWhy(projectPath: string, kind: NotifyKind): { route: NotifyRoute; why: string } {
-    return notifyRoute(config.settings.notifications, kind, focusedHive(), { workspacePath: workspaceOf(projectPath)?.path ?? null, projectPath })
+    return notifyRoute(config.settings.notifications, kind, focusedCombwork(), { workspacePath: workspaceOf(projectPath)?.path ?? null, projectPath })
   }
 
   /**
@@ -7170,7 +7170,7 @@ class SessionManager {
     if (st.sessionId) resolveOffers((o) => mine(o) && o.endsWith(`#${st.sessionId}`), tr(OUTCOME.openHereAgain))
   }
 
-  /** An agent's name as Hive shows it, for a notice's link (its id when it has gone). */
+  /** An agent's name as Combwork shows it, for a notice's link (its id when it has gone). */
   private agentName(projectPath: string, agentId: string): string {
     return this.live.get(liveId(projectPath, agentId))?.state.agentName ?? agentId
   }
@@ -7203,7 +7203,7 @@ class SessionManager {
   )
 
   /**
-   * An agent started its next turn while its finish waited to be told (HI-2312: a Hive delivery typed at its turn's end,
+   * An agent started its next turn while its finish waited to be told (HI-2312: a Combwork delivery typed at its turn's end,
    * a wake, the user typing): it isn't told. Told then, the notice would arrive as the agent works again, with the last
    * turn's message, and stand where its next need (a permission prompt) should; its next end is told as any is.
    */
@@ -7356,11 +7356,11 @@ class SessionManager {
     }
   }
 
-  /** Launch notices already shown (launchNotice), by agent, folder and notice: once each while Hive runs. */
+  /** Launch notices already shown (launchNotice), by agent, folder and notice: once each while Combwork runs. */
   private launchNotices = new Set<string>()
 
   /**
-   * A large transcript in which Hive found no requests at all most likely means the CLI changed its
+   * A large transcript in which Combwork found no requests at all most likely means the CLI changed its
    * format: say so once per provider version, rather than quietly showing zeros.
    */
   private checkUnderstood(provider: ProviderId, usage: SessionUsage, size: number): void {
@@ -7444,7 +7444,7 @@ class SessionManager {
   private async attachTarget(projectPath: string, agentId?: string): Promise<LiveSession> {
     agentId ||= await this.soleAgent(projectPath)
     const l = this.live.get(liveId(projectPath, agentId))
-    if (!l) throw hiveError(M.noSession, undefined, { kind: 'conflict' })
+    if (!l) throw combworkError(M.noSession, undefined, { kind: 'conflict' })
     return l
   }
 
@@ -7475,7 +7475,7 @@ class SessionManager {
     await rmdir(early).catch(() => undefined)
   }
 
-  /** The provider's transcript, or Hive's backup (active or archived) when the provider no longer has it. */
+  /** The provider's transcript, or Combwork's backup (active or archived) when the provider no longer has it. */
   async anyTranscript(projectPath: string, sessionId: string, ctx?: ListContext): Promise<string | null> {
     const t = await this.providerTranscript(projectPath, sessionId, ctx)
     if (t) return t.path
@@ -7487,7 +7487,7 @@ class SessionManager {
   }
 
   /**
-   * Hive's backup of a session in a folder (active or archived), as it is kept (#1110): its plain `.jsonl` while it runs
+   * Combwork's backup of a session in a folder (active or archived), as it is kept (#1110): its plain `.jsonl` while it runs
    * (and after a resume, the newer), else its compressed `.jsonl.gz`; null when it has neither.
    */
   backupCopy(projectPath: string, sessionId: string, archived = false): string | null {
@@ -7497,8 +7497,8 @@ class SessionManager {
   }
 
   /**
-   * The provider a conversation to resume ran in (#506): its record's, or for one Hive has no record of (started
-   * outside Hive) the provider whose CLI has its transcript. Null when neither knows it: the agent's provider tries.
+   * The provider a conversation to resume ran in (#506): its record's, or for one Combwork has no record of (started
+   * outside Combwork) the provider whose CLI has its transcript. Null when neither knows it: the agent's provider tries.
    */
   async resumeProvider(projectPath: string, sessionId: string, rec: SessionRecord | undefined): Promise<ProviderId | null> {
     if (rec) return recordProvider(rec)
@@ -7571,22 +7571,22 @@ class SessionManager {
     return title ? { ...usage, title, customTitle: usage.customTitle ?? title } : usage
   }
 
-  /** Listings of Hive's own sessions under way, per host (#1646): see list(). */
+  /** Listings of Combwork's own sessions under way, per host (#1646): see list(). */
   private listings = coalesced<SessionListItem[]>()
-  /** The listing of Hive's own sessions running now, per host, which `own` joins (HI-1681). */
+  /** The listing of Combwork's own sessions running now, per host, which `own` joins (HI-1681). */
   private ownRunning = new Map<string, Promise<SessionListItem[]>>()
   /** Listings of the other sessions under way, per host (HI-1681): see list(). */
   private others = joined<{ items: SessionListItem[]; folders: number }>()
 
   /**
-   * A host's sessions, for its Overview, its Sessions tab and the Agent API: Hive's own, from its records, and the other
+   * A host's sessions, for its Overview, its Sessions tab and the Agent API: Combwork's own, from its records, and the other
    * sessions its CLIs keep for its folders, read at the same time. One listing of each per host at a time (#1646): a
    * listing stats each session's files and the CLIs' session folders, and the window asks again as sessions change, so
    * overlapping ones (61 at once, seen on a 400-session project) shared the disk's threads and each took minutes.
-   * Asked while one runs, callers share one more listing of Hive's sessions, started once it ends, so each gets its
-   * records as they were after it asked; and the other sessions' listing under way (HI-1681): nothing tells Hive when
+   * Asked while one runs, callers share one more listing of Combwork's sessions, started once it ends, so each gets its
+   * records as they were after it asked; and the other sessions' listing under way (HI-1681): nothing tells Combwork when
    * those change, and one more after it only doubled the wait (19 s and then 10 s, seen while agents started).
-   * `own`: Hive's sessions alone, joining their listing under way, for a view that shows them before the rest.
+   * `own`: Combwork's sessions alone, joining their listing under way, for a view that shows them before the rest.
    */
   list(projectPath: string, opts: { own?: boolean } = {}): Promise<SessionListItem[]> {
     projectPath = workspace.assertSessionHost(projectPath)
@@ -7616,7 +7616,7 @@ class SessionManager {
       this.others(key, () => this.listOthers(projectPath)).finally(() => (othersMs = performance.now() - started))
     ])
     const ids = new Set(own.map((i) => i.id))
-    // A session Hive took on while the other sessions were read is listed once, as Hive's.
+    // A session Combwork took on while the other sessions were read is listed once, as Combwork's.
     const items = [...own, ...others.items.filter((i) => !ids.has(i.id))]
     const ms = performance.now() - started
     if (ms > SLOW_LIST_MS) {
@@ -7626,7 +7626,7 @@ class SessionManager {
     return items.sort((a, b) => (b.lastActivity ?? '').localeCompare(a.lastActivity ?? ''))
   }
 
-  /** Hive's own sessions, from its records. */
+  /** Combwork's own sessions, from its records. */
   private async listOwn(projectPath: string): Promise<SessionListItem[]> {
     const file = await workspace.sessionsFile(projectPath)
     // Read once for the whole list, not once per session.
@@ -7637,7 +7637,7 @@ class SessionManager {
     const items: SessionListItem[] = []
     // Records from before sub-sessions were told apart (a guardian review adopted then): found now, and kept on them.
     const found = new Map<string, SubSession>()
-    // Hive's backups, from its two folders' names (#1649): not four checks per session on main's thread.
+    // Combwork's backups, from its two folders' names (#1649): not four checks per session on main's thread.
     const backups = await this.backupNames(projectPath)
     // A few sessions at a time (#1649): each waits on its files, and one after another 400 took a second.
     const listed = await atMost(LIST_AT_ONCE, file.sessions, async (rec): Promise<SessionListItem> => {
@@ -7693,8 +7693,8 @@ class SessionManager {
   }
 
   /**
-   * Sessions started outside Hive in the project folder; and from the other folders its sessions ran in (agents'
-   * worktrees, the Assistant's workspace folder), only the sub-sessions of sessions listed here. Hive's own sessions'
+   * Sessions started outside Combwork in the project folder; and from the other folders its sessions ran in (agents'
+   * worktrees, the Assistant's workspace folder), only the sub-sessions of sessions listed here. Combwork's own sessions'
    * files, the bulk of those folders, aren't looked at (HI-1681): each CLI leaves them out by id, and reads a folder's
    * names again only when the folder changed, so a listing opens only new transcripts and stats only the others.
    */
@@ -7706,7 +7706,7 @@ class SessionManager {
     // Deleted sessions stay hidden, though the CLI still has their transcripts.
     const known = new Set([...file.sessions.map((s) => s.id), ...(file.deleted ?? [])])
     const skip = (id: string): boolean => known.has(id)
-    // Whose sub-sessions are listed from the other folders: Hive's sessions, and the other sessions listed before them.
+    // Whose sub-sessions are listed from the other folders: Combwork's sessions, and the other sessions listed before them.
     const listed = new Set(file.sessions.map((s) => s.id))
     const folders = this.sessionFolders(projectPath, file.sessions, cfg)
     const asks = allProviders().flatMap((adapter) => folders.map((folder, i) => ({ adapter, folder, i })))
@@ -7762,7 +7762,7 @@ class SessionManager {
   }
 
   /**
-   * Whether one of Hive's records is a sub-session, from its transcript's first line (the CLI's, else Hive's copy).
+   * Whether one of Combwork's records is a sub-session, from its transcript's first line (the CLI's, else Combwork's copy).
    * `transcript`: the CLI's, when the caller has looked it up already (null: it has none), and `mtimeMs` its time, when
    * the caller has stat'd it.
    */
@@ -7809,7 +7809,7 @@ class SessionManager {
   }
 
   /**
-   * Archives or unarchives one of Hive's sessions (its backup moves to or from .combwork/archive), all or nothing: with the
+   * Archives or unarchives one of Combwork's sessions (its backup moves to or from .combwork/archive), all or nothing: with the
    * session reserved (nothing reads, resumes or moves it meanwhile) and nothing having it in use (assertFree), the new
    * archive is built aside, then each copy is moved; a failure at any step (a copy another program holds, the record
    * not saved) moves everything back, and the record changes only once the files have.
@@ -7817,7 +7817,7 @@ class SessionManager {
   async archive(projectPath: string, sessionId: string, archived: boolean): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     assertSessionId(sessionId)
-    if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === sessionId)) throw hiveError(msg({ id: 'session.archive.notKept', defaultMessage: 'Only sessions Combwork keeps can be archived: adopt it first.', description: "Archiving a session is refused: it was started outside Combwork, so Combwork has no copy of it (Adopt keeps one)." }))
+    if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === sessionId)) throw combworkError(msg({ id: 'session.archive.notKept', defaultMessage: 'Only sessions Combwork keeps can be archived: adopt it first.', description: "Archiving a session is refused: it was started outside Combwork, so Combwork has no copy of it (Adopt keeps one)." }))
     const action = archived ? 'archive' : 'unarchive'
     const active = this.backupPath(projectPath, sessionId)
     const arch = this.backupPath(projectPath, sessionId, true)
@@ -7887,10 +7887,10 @@ class SessionManager {
   }
 
   /**
-   * Backup retention (#1110, Settings → Sessions → Keep transcript backups; off by default): Hive's copies of a host's
+   * Backup retention (#1110, Settings → Sessions → Keep transcript backups; off by default): Combwork's copies of a host's
    * sessions last active more than that many days ago go to the Recycle Bin (trash()), only where the CLI still has the
    * session's transcript (it can still be opened and resumed from there), and only once the usage history has what it
-   * used. A session whose only copy is Hive's is never touched (the Assistant for Darren, 20 Oct): deleting those stays
+   * used. A session whose only copy is Combwork's is never touched (the Assistant for Darren, 20 Oct): deleting those stays
    * the user's (Delete, Clean Up). Running sessions and those whose files are moving are skipped; each is checked again
    * with its backups locked, just before they go. Returns how many sessions' copies went. `signal`: the workspace's
    * opening it runs in (background housekeeping), ending it when the workspace closes (#1379).
@@ -7935,7 +7935,7 @@ class SessionManager {
   }
 
   /**
-   * Compresses the backups of a host's sessions that ended before this Hive did it (#1110): one at a time, in the
+   * Compresses the backups of a host's sessions that ended before this Combwork did it (#1110): one at a time, in the
    * background, the oldest first; those running or active in the last ten minutes are left for their end. `signal`: as
    * applyRetention's.
    */
@@ -7962,7 +7962,7 @@ class SessionManager {
     if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', withValues(M.stopFirst, { action }))
   }
 
-  /** When Hive saw each session's CLI exit (its own sessions): their transcripts are finished. At most 500, the oldest go. */
+  /** When Combwork saw each session's CLI exit (its own sessions): their transcripts are finished. At most 500, the oldest go. */
   private exitedAt = new Map<string, number>()
 
   private noteExit(sessionId: string | undefined): void {
@@ -7974,12 +7974,12 @@ class SessionManager {
 
   /**
    * Why a session's files can't be archived or deleted now, or null. Run with the session reserved, so no read,
-   * resume or other move can start after it: it is running or starting (in any window); Hive is reading its transcript
+   * resume or other move can start after it: it is running or starting (in any window); Combwork is reading its transcript
    * (a search, an export, the viewer loading it); its transcript is open in a Sessions view, in any window (the window
    * asking closes its own first, and says so); another program holds the CLI's transcript open (checked by opening it to
    * read, never changing it); or (`writing`) its CLI is still writing it: changed in the last SESSION_WRITING_MS and
-   * not since Hive saw that CLI exit (a session started outside Hive, or a Codex guardian review, still going). A copy
-   * of Hive's another program holds is found when it is moved (inUseOnFail).
+   * not since Combwork saw that CLI exit (a session started outside Combwork, or a Codex guardian review, still going). A copy
+   * of Combwork's another program holds is found when it is moved (inUseOnFail).
    */
   private async inUse(projectPath: string, sessionId: string, opts: { writing: boolean }): Promise<SessionInUse | null> {
     if (this.liveAnywhere(sessionId)) return new SessionInUse('live', msg({ id: 'session.inUse.running', defaultMessage: 'It is running. Stop it first.', description: 'A session is left alone (archive, delete): it is running.' }))
@@ -7997,7 +7997,7 @@ class SessionManager {
   }
 
   private async assertFree(projectPath: string, sessionId: string, action: 'archive' | 'unarchive' | 'delete'): Promise<void> {
-    // Unarchiving moves only Hive's copy back: the CLI still writing its own transcript doesn't matter to it.
+    // Unarchiving moves only Combwork's copy back: the CLI still writing its own transcript doesn't matter to it.
     const why = await this.inUse(projectPath, sessionId, { writing: action !== 'unarchive' })
     if (why?.reason === 'live') throw new SessionInUse('live', withValues(M.stopFirst, { action }))
     if (why) throw why
@@ -8006,7 +8006,7 @@ class SessionManager {
   /**
    * Archives, unarchives or deletes several sessions (a branch of the Sessions tab). Each is all or nothing, with the
    * same checks as one at a time; those in use, running, open in another window or started outside Hive (nothing of
-   * Hive's to archive) are skipped and listed with why. The CLIs' own transcripts are never touched.
+   * Combwork's to archive) are skipped and listed with why. The CLIs' own transcripts are never touched.
    */
   async bulk(projectPath: string, action: SessionBulkAction, sessionIds: string[]): Promise<SessionBulkResult> {
     projectPath = workspace.assertSessionHost(projectPath)
@@ -8015,7 +8015,7 @@ class SessionManager {
     // agent-protocol: a programming error no person or agent sees (the window sends a list)
     if (!Array.isArray(sessionIds)) throw new Error('sessionIds: a list of session ids') // i18n-ignore: a refusal no person sees (the window sends a list)
     const ids = [...new Set(sessionIds)]
-    // Hive's own sessions, read once for the whole action (#1659), not once for each.
+    // Combwork's own sessions, read once for the whole action (#1659), not once for each.
     const kept = new Set((await workspace.sessionsFile(projectPath)).sessions.map((s) => s.id))
     const progress = bulkProgress(projectPath, action, ids.length)
     let results: BulkOutcome[]
@@ -8052,12 +8052,12 @@ class SessionManager {
     }
   }
 
-  /** Hive's copies of a session's transcript that exist (the active backup, the archived one). */
+  /** Combwork's copies of a session's transcript that exist (the active backup, the archived one). */
   backupFiles(projectPath: string, sessionId: string): string[] {
     return [false, true].flatMap((archived) => [this.backupPath(projectPath, sessionId, archived), this.backupPath(projectPath, sessionId, archived) + GZ]).filter((b) => existsSync(b))
   }
 
-  /** The names of Hive's copies of a host's transcripts (active and archived), lower-cased: a listing's backupFiles. */
+  /** The names of Combwork's copies of a host's transcripts (active and archived), lower-cased: a listing's backupFiles. */
   private async backupNames(projectPath: string): Promise<Set<string>> {
     const names = await Promise.all([false, true].map((archived) => readdir(this.backupDir(projectPath, archived)).catch(() => [] as string[])))
     return new Set(names.flat().map((n) => n.toLowerCase()))
@@ -8086,8 +8086,8 @@ class SessionManager {
    */
   async whileCleaning<T>(projectPath: string, sessionId: string, fn: () => Promise<T>): Promise<T> {
     const k = `${projectPath.toLowerCase()}|${sessionId.toLowerCase()}`
-    if (this.cleaning.has(k)) throw hiveError(msg({ id: 'session.cleanUp.already', defaultMessage: "Clean Up is already removing this session's files.", description: 'Clean Up… is refused for a session: it is removing its files already.' }))
-    if (this.sessionOpen(projectPath, sessionId)) throw hiveError(M.sessionRunning)
+    if (this.cleaning.has(k)) throw combworkError(msg({ id: 'session.cleanUp.already', defaultMessage: "Clean Up is already removing this session's files.", description: 'Clean Up… is refused for a session: it is removing its files already.' }))
+    if (this.sessionOpen(projectPath, sessionId)) throw combworkError(M.sessionRunning)
     this.cleaning.add(k)
     try {
       return await fn()
@@ -8130,15 +8130,15 @@ class SessionManager {
    */
   private async assertCleanable(projectPath: string, sessionId: string, expected: string[]): Promise<void> {
     const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-    if (!rec?.archived) throw hiveError(msg({ id: 'session.cleanUp.unarchived', defaultMessage: 'The session is no longer archived.', description: 'Clean Up… left a session alone: it was unarchived since the preview.' }))
-    if (this.sessionOpen(projectPath, sessionId)) throw hiveError(M.sessionRunning)
+    if (!rec?.archived) throw combworkError(msg({ id: 'session.cleanUp.unarchived', defaultMessage: 'The session is no longer archived.', description: 'Clean Up… left a session alone: it was unarchived since the preview.' }))
+    if (this.sessionOpen(projectPath, sessionId)) throw combworkError(M.sessionRunning)
     const want = new Set(expected.map((e) => e.toLowerCase()))
     const has = this.backupFiles(projectPath, sessionId).map((b) => b.toLowerCase())
-    if (has.length !== want.size || !has.every((b) => want.has(b))) throw hiveError(msg({ id: 'session.cleanUp.changed', defaultMessage: "The session's copies changed since the preview.", description: "Clean Up… left a session alone: Combwork's copies of its transcript changed since the preview." }))
+    if (has.length !== want.size || !has.every((b) => want.has(b))) throw combworkError(msg({ id: 'session.cleanUp.changed', defaultMessage: "The session's copies changed since the preview.", description: "Clean Up… left a session alone: Combwork's copies of its transcript changed since the preview." }))
   }
 
   /**
-   * Moves Hive's backups of an archived session the CLI still has to the Recycle Bin (Clean Up…), what it used recorded
+   * Moves Combwork's backups of an archived session the CLI still has to the Recycle Bin (Clean Up…), what it used recorded
    * in the usage history first (#1106), so totals still count it once the CLI's transcript goes too. `expected` is what
    * the preview listed. Nothing goes unless the session is unchanged since (assertCleanable, again right before the
    * files go) and what it used was recorded; the session can't be resumed meanwhile (whileCleaning).
@@ -8149,8 +8149,8 @@ class SessionManager {
     await this.whileCleaning(projectPath, sessionId, () =>
       this.withBackupsLocked(projectPath, sessionId, async () => {
         await this.assertCleanable(projectPath, sessionId, expected)
-        if (!(await this.providerTranscript(projectPath, sessionId))) throw hiveError(msg({ id: 'session.cleanUp.cliGone', defaultMessage: "The CLI no longer has this session's transcript.", description: "Clean Up… kept a session's backups: the coding agent's own transcript is gone since the preview." }))
-        if (!(await usageHistory.recordNow(projectPath, sessionId).catch(() => false))) throw hiveError(msg({ id: 'session.cleanUp.unreadBackups', defaultMessage: "Combwork couldn't read what the session used, so its backups are kept.", description: "Clean Up… kept a session's backups: Combwork couldn't read its usage, which the project's totals keep." }))
+        if (!(await this.providerTranscript(projectPath, sessionId))) throw combworkError(msg({ id: 'session.cleanUp.cliGone', defaultMessage: "The CLI no longer has this session's transcript.", description: "Clean Up… kept a session's backups: the coding agent's own transcript is gone since the preview." }))
+        if (!(await usageHistory.recordNow(projectPath, sessionId).catch(() => false))) throw combworkError(msg({ id: 'session.cleanUp.unreadBackups', defaultMessage: "Combwork couldn't read what the session used, so its backups are kept.", description: "Clean Up… kept a session's backups: Combwork couldn't read its usage, which the project's totals keep." }))
         await this.assertCleanable(projectPath, sessionId, expected)
         for (const b of this.backupFiles(projectPath, sessionId)) await trash(b)
       })
@@ -8159,7 +8159,7 @@ class SessionManager {
   }
 
   /**
-   * Purge… (#1138): removes what Hive keeps of one of its sessions as the preview listed it (`listed`: its backups,
+   * Purge… (#1138): removes what Combwork keeps of one of its sessions as the preview listed it (`listed`: its backups,
    * leftovers of them, its attachments folder, the old usage on its record). The session is reserved (nothing resumes it
    * meanwhile) with its backups locked, and checked again just before anything goes: not running or starting, its
    * transcript not being read by Hive (nor shown, when its last copy goes), and its copies exactly those listed. What it used is recorded in the usage
@@ -8175,19 +8175,19 @@ class SessionManager {
       // A view reads the CLI's transcript while the CLI has it: only a last copy going takes what it shows.
       if (listed.lastCopy && viewingWindows(projectPath, sessionId).length) throw new SessionInUse('open', msg({ id: 'session.purge.open', defaultMessage: 'Its transcript is open in Combwork. Close it, then try again.', description: "Purge left a session alone: its transcript is open in Combwork's Sessions tab." }))
       const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-      if (!rec) throw hiveError(msg({ id: 'session.purge.gone', defaultMessage: 'The session is no longer in Combwork.', description: 'Purge left a session alone: it was deleted since the preview.' }))
+      if (!rec) throw combworkError(msg({ id: 'session.purge.gone', defaultMessage: 'The session is no longer in Combwork.', description: 'Purge left a session alone: it was deleted since the preview.' }))
       const want = new Set(listed.backups.map((b) => b.toLowerCase()))
       const has = this.backupFiles(projectPath, sessionId).map((b) => b.toLowerCase())
-      if (want.size && (has.length !== want.size || !has.every((b) => want.has(b)))) throw hiveError(msg({ id: 'session.purge.changed', defaultMessage: "The session's copies changed since the preview.", description: "Purge left a session alone: Combwork's copies of its transcript changed since the preview." }))
+      if (want.size && (has.length !== want.size || !has.every((b) => want.has(b)))) throw combworkError(msg({ id: 'session.purge.changed', defaultMessage: "The session's copies changed since the preview.", description: "Purge left a session alone: Combwork's copies of its transcript changed since the preview." }))
     }
     const deleted = await this.whileCleaning(projectPath, sessionId, () =>
       this.withBackupsLocked(projectPath, sessionId, async () => {
         await check()
         if (listed.backups.length && !!(await this.providerTranscript(projectPath, sessionId).catch(() => null)) === listed.lastCopy) {
-          throw hiveError(listed.lastCopy ? msg({ id: 'session.purge.cliBack', defaultMessage: "The CLI has this session's transcript again.", description: "Purge left a session alone: the coding agent's own transcript is back since the preview, so Combwork's backups are no longer its last copy." }) : msg({ id: 'session.purge.cliGone', defaultMessage: "The CLI no longer has this session's transcript.", description: "Purge left a session alone: the coding agent's own transcript went since the preview, so Combwork's backups are now its last copy." }))
+          throw combworkError(listed.lastCopy ? msg({ id: 'session.purge.cliBack', defaultMessage: "The CLI has this session's transcript again.", description: "Purge left a session alone: the coding agent's own transcript is back since the preview, so Combwork's backups are no longer its last copy." }) : msg({ id: 'session.purge.cliGone', defaultMessage: "The CLI no longer has this session's transcript.", description: "Purge left a session alone: the coding agent's own transcript went since the preview, so Combwork's backups are now its last copy." }))
         }
         if ((listed.backups.length || listed.keptUsage) && !(await usageHistory.recordNow(projectPath, sessionId).catch(() => false))) {
-          throw hiveError(msg({ id: 'session.purge.unread', defaultMessage: "Combwork couldn't record what the session used, so it is kept.", description: "Purge left a session alone: Combwork couldn't save its usage in the usage history, which the totals keep." }))
+          throw combworkError(msg({ id: 'session.purge.unread', defaultMessage: "Combwork couldn't record what the session used, so it is kept.", description: "Purge left a session alone: Combwork couldn't save its usage in the usage history, which the totals keep." }))
         }
         // Again after the waits above, and the files as listed (`unchanged`): nothing else is awaited before the first removal.
         await check()
@@ -8225,8 +8225,8 @@ class SessionManager {
   }
 
   /**
-   * Deletes a session from Hive: its record and Hive's copies of the transcript (to the Recycle Bin). The CLI's
-   * own transcript is left alone (Hive doesn't change the CLIs' files), so Hive remembers the id to keep it hidden.
+   * Deletes a session from Combwork: its record and Combwork's copies of the transcript (to the Recycle Bin). The CLI's
+   * own transcript is left alone (Combwork doesn't change the CLIs' files), so Combwork remembers the id to keep it hidden.
    * Clean Up… passes `expected`, the copies its preview listed (see removeBackups).
    */
   async delete(projectPath: string, sessionId: string, expected?: string[]): Promise<void> {
@@ -8238,7 +8238,7 @@ class SessionManager {
 
   /**
    * delete() without its log line and refresh (bulk() does those once). All or nothing: with the session reserved and
-   * nothing having it in use (assertFree; running checked again with its copies locked), Hive's copies go to the
+   * nothing having it in use (assertFree; running checked again with its copies locked), Combwork's copies go to the
    * Recycle Bin and the record goes with trashAllOrNothing: if a copy fails to go, or the record can't be saved, the
    * copies already gone are put back (a copy stays in the Recycle Bin).
    */
@@ -8246,17 +8246,17 @@ class SessionManager {
     assertSessionId(sessionId)
     const remove = (): Promise<void> =>
       this.withBackupsLocked(projectPath, sessionId, async () => {
-        // Clean Up… (a session whose only copies are Hive's): only as the preview listed it, and only once what it used is saved.
+        // Clean Up… (a session whose only copies are Combwork's): only as the preview listed it, and only once what it used is saved.
         if (expected) {
           await this.assertCleanable(projectPath, sessionId, expected)
-          if (await this.providerTranscript(projectPath, sessionId)) throw hiveError(msg({ id: 'session.cleanUp.cliBack', defaultMessage: "The CLI has this session's transcript again.", description: "Clean Up… kept a session: the coding agent's own transcript is back since the preview." }))
+          if (await this.providerTranscript(projectPath, sessionId)) throw combworkError(msg({ id: 'session.cleanUp.cliBack', defaultMessage: "The CLI has this session's transcript again.", description: "Clean Up… kept a session: the coding agent's own transcript is back since the preview." }))
         } else await this.assertFree(projectPath, sessionId, 'delete')
         // What it used stays in the project's totals: recorded in the usage history (#1106) before its copies go, where
         // it stays once the record is gone.
         const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-        // Not recorded (the worker ended, a write another Hive held): the session stays, Delete and Clean Up alike.
+        // Not recorded (the worker ended, a write another Combwork held): the session stays, Delete and Clean Up alike.
         const recorded = rec ? await usageHistory.recordNow(projectPath, sessionId).catch(() => false) : true
-        if (!recorded) throw hiveError(msg({ id: 'session.cleanUp.unread', defaultMessage: "Combwork couldn't read what the session used, so it is kept.", description: "Clean Up… kept a session: Combwork couldn't read its usage, which the project's totals keep." }))
+        if (!recorded) throw combworkError(msg({ id: 'session.cleanUp.unread', defaultMessage: "Combwork couldn't read what the session used, so it is kept.", description: "Clean Up… kept a session: Combwork couldn't read its usage, which the project's totals keep." }))
         if (expected) await this.assertCleanable(projectPath, sessionId, expected)
         this.assertNotLive(sessionId, 'delete')
         const files = this.backupFiles(projectPath, sessionId)
@@ -8281,10 +8281,10 @@ class SessionManager {
   }
 
   /**
-   * Hive's sessions of a host (and deleted ones') with only what totals need, for the Workspace Overview and Performance:
+   * Combwork's sessions of a host (and deleted ones') with only what totals need, for the Workspace Overview and Performance:
    * their usage from the usage history (#1106), no transcript read. Until the history has imported the host's sessions,
    * what it has so far: a record it hasn't reached yet counts its kept usage, or none (the Overview says the figures
-   * are partial meanwhile). Sessions started outside Hive aren't in it.
+   * are partial meanwhile). Sessions started outside Combwork aren't in it.
    */
   async usageItems(projectPath: string): Promise<SessionListItem[]> {
     projectPath = workspace.assertSessionHost(projectPath)
@@ -8353,7 +8353,7 @@ class SessionManager {
       recache: null
     })
     const out: SessionListItem[] = []
-    // Sessions started outside Hive are kept for the Sessions list, never counted.
+    // Sessions started outside Combwork are kept for the Sessions list, never counted.
     for (const [id, s] of stored) if (!records.has(id) && s.source !== 'external') out.push(item({ ...s.meta, id, usage: { ...s.usage, lastPrompt: null } }))
     if (!done) for (const k of file.deletedUsage ?? []) if (!stored.has(k.id) && !records.has(k.id)) out.push(item(k))
     return out
@@ -8409,5 +8409,5 @@ onLanguageChange(() => sessions.relabel())
 // session (the Agent API's scripts and viewers) gets the API chain of the workspace its request is for, which follows
 // the files (servers.ts binds it: inApiWorkspace).
 setChainResolver((scope) => (scope.kind === 'session' ? sessions.pinnedChain(scope.session.projectPath, scope.session.agentId) : requestApiChain()))
-WorkspaceService.dialectsListeners.add((ws) => apiChainChanged(ws.hiveDir))
+WorkspaceService.dialectsListeners.add((ws) => apiChainChanged(ws.combworkDir))
 WorkspaceService.closingListeners.add((path) => forgetApiChain(join(path, CW_DIR)))

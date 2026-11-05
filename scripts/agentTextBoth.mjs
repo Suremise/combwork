@@ -1,15 +1,15 @@
 // The window's messages agents also read (dialects, HI-2065, card 5b HI-2440; plans/2026-11-03-dialects-design.md,
-// section 2, decision 13): a `msg()` descriptor is the window's text, but where Hive renders it for an agent (a HiveError
+// section 2, decision 13): a `msg()` descriptor is the window's text, but where Combwork renders it for an agent (a CombworkError
 // the Agent API answers with, a history line, a refusal, `agentText`), agents read it too. Each keeps its one descriptor
 // and its UI id; the agent-text catalogue lists it with `audience: "both"` so a dialect can override it, and the schema
 // checks that override's placeholders.
 //
-// This module finds them by following Hive's code, as the design's scan did:
+// This module finds them by following Combwork's code, as the design's scan did:
 //   - **the rendering points:** `agentText`, `englishText` (Default English stored once and said again when read; a log
 //     line marked `// log` or the window's own `// window: <why>` aside), `storedText`, `workflowText` and
-//     `new HiveError(…)`; a HiveError subclass's `super(…)`;
+//     `new CombworkError(…)`; a CombworkError subclass's `super(…)`;
 //   - **wrappers:** any function that passes a parameter of its own straight on to one of these (or to another wrapper),
-//     found to a fixed point across files, so `hiveError(M.x)`, `columnError(M.y, …)` and `new LaneError(M.z)` are
+//     found to a fixed point across files, so `combworkError(M.x)`, `columnError(M.y, …)` and `new LaneError(M.z)` are
 //     rendering calls too;
 //   - **the argument of each**, followed back to its descriptors: an inline `msg({…})`, a const (in the file or
 //     imported), a table's entry (`ERR.archived`; with a key computed at run time, the whole table), text built from them
@@ -35,7 +35,7 @@ const POINTS = { agentText: [0], englishText: [0], storedText: [0], workflowText
 /** Where each point is defined: a function of the same name elsewhere (toolReplies.ts's own agentText) isn't one. */
 const POINT_FILES = { agentText: 'src/shared/advanced.ts', englishText: 'src/shared/advanced.ts', storedText: 'src/shared/taskHistory.ts', workflowText: 'src/shared/workflow/texts.ts' }
 /** The class whose text agents read, and the argument its constructor takes it as. */
-const ERROR_CLASS = 'HiveError'
+const ERROR_CLASS = 'CombworkError'
 /** Text built from parts (shared/advanced.ts): the arguments that are text of their own. */
 const BUILDERS = { withValues: [0, 1], listOf: [0], linesOf: [0], capitalised: [0], forAgents: [1] }
 /** Calls whose result is no message to follow: an agent message (catalogued on its own), an error's own text (found where it was thrown). */
@@ -46,9 +46,9 @@ const SCOPED = new Set(['withCardNames', 'inDefaultDialect', 'inDialectOf', 'inW
 const NOTHING = new Set(['saidText', 'agentMsg', 'errorText', 'say', 'String', 'cardRef', 'basename', 'userText'])
 
 /** English formatted for any reader (the Default's, whatever dialect reads it): only the agent-text module may, and the log. */
-const ONE_WAY = { englishText: 'src/shared/advanced.ts', englishError: 'src/main/hiveError.ts', workflowEnglish: 'src/shared/workflow/texts.ts', problemEnglish: 'src/main/workflow/optionsForm.ts', agentEnglish: 'src/main/tasks.ts' }
+const ONE_WAY = { englishText: 'src/shared/advanced.ts', englishError: 'src/main/combworkError.ts', workflowEnglish: 'src/shared/workflow/texts.ts', problemEnglish: 'src/main/workflow/optionsForm.ts', agentEnglish: 'src/main/tasks.ts' }
 /** Where they are defined, and the formatting itself lives. */
-const ONE_WAY_FREE = [/^src\/shared\/advanced\.ts$/, /^src\/main\/hiveError\.ts$/, /^src\/shared\/agentText\//]
+const ONE_WAY_FREE = [/^src\/shared\/advanced\.ts$/, /^src\/main\/combworkError\.ts$/, /^src\/shared\/agentText\//]
 /** A call inside a log line (`log.warn(…)`): the log's English. */
 const inLogCall = (p) => !!p.findParent((q) => q.isCallExpression() && q.node.callee.type === 'MemberExpression' && q.node.callee.object.type === 'Identifier' && /^(log|logger|console)$/.test(q.node.callee.object.name))
 
@@ -127,7 +127,7 @@ export function marksOf(ast, code) {
 }
 
 /**
- * Follows Hive's code to the window's messages agents read. Returns `messages` (id → { text, note, at }), `unresolved`
+ * Follows Combwork's code to the window's messages agents read. Returns `messages` (id → { text, note, at }), `unresolved`
  * (each call it couldn't follow and no mark covers: { file, line, site }), and `problems` (a mark that leads nowhere).
  */
 export function analyzeBoth(root = ROOT, files = sourceFiles(root).filter(isScanned)) {
@@ -520,16 +520,16 @@ function analyzeFiles(root, files) {
 
   for (const rel of files) load(rel)
 
-  // The HiveError subclasses, by class node, and what each constructor passes to its parent: the wrappers' seed.
+  // The CombworkError subclasses, by class node, and what each constructor passes to its parent: the wrappers' seed.
   const wrappers = new Map()
   const errorClasses = new Set()
-  /** The class a `new X(…)` makes, when it is HiveError or one of its subclasses: its node, or the name HiveError. */
+  /** The class a `new X(…)` makes, when it is CombworkError or one of its subclasses: its node, or the name CombworkError. */
   const errorClassOf = (p) => {
     const c = p.node.callee
     if (c.type !== 'Identifier') return null
     if (c.name === ERROR_CLASS) return ERROR_CLASS
     const d = definition(p, c.name)
-    if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts') return ERROR_CLASS
+    if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/combworkError.ts') return ERROR_CLASS
     return d?.isClassDeclaration() && errorClasses.has(d.node) ? d.node : null
   }
   // Subclasses to a fixed point (a subclass of a subclass).
@@ -541,7 +541,7 @@ function analyzeFiles(root, files) {
         const s = p.node.superClass
         if (!s || s.type !== 'Identifier' || errorClasses.has(p.node)) continue
         const d = s.name === ERROR_CLASS ? ERROR_CLASS : definition(p, s.name)
-        const isBase = d !== ERROR_CLASS && d?.isClassDeclaration?.() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts'
+        const isBase = d !== ERROR_CLASS && d?.isClassDeclaration?.() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/combworkError.ts'
         if (d === ERROR_CLASS || isBase || (d?.isClassDeclaration?.() && errorClasses.has(d.node))) {
           errorClasses.add(p.node)
           grew = true
@@ -570,7 +570,7 @@ function analyzeFiles(root, files) {
     return { def: d, name, file: fileOf(d) }
   }
 
-  /** The argument indexes of a call agents read text through: a rendering point, a wrapper, a HiveError's class. */
+  /** The argument indexes of a call agents read text through: a rendering point, a wrapper, a CombworkError's class. */
   const readsAt = (p) => {
     const n = p.node
     // Text as data said for an agent (agentField and its kin): its messages are found where the data was made.
@@ -588,7 +588,7 @@ function analyzeFiles(root, files) {
           const s = parent.superClass
           if (s?.name === ERROR_CLASS) return [[0, false]]
           const d = s ? definition(p, s.name) : null
-          if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts') return [[0, false]]
+          if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/combworkError.ts') return [[0, false]]
           parent = d?.isClassDeclaration() ? d.node : null
           const pc = parent?.body.body.find((m) => m.type === 'ClassMethod' && m.kind === 'constructor')
           if (pc) return [...(wrappers.get(pc) ?? [])]

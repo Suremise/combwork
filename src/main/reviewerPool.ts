@@ -7,7 +7,7 @@
 //   other card of the project (in a lane or not; a card waiting on its own open question to the user doesn't count,
 //   HI-2559: it stays its), it didn't build the card, and with G1b = 2 it isn't the submission's
 //   first reviewer. Recorded as `ReviewerAssigned` in a write that checks again, as combwork.db has it then, the submission
-//   still waiting and the agent's leases and reviews (another Hive's or connection's change before it is seen there).
+//   still waiting and the agent's leases and reviews (another Combwork's or connection's change before it is seen there).
 // - **tell**: the agent given the card is told, once per assignment (its delivery's identity is the card, the submission, the
 //   agent and its `ReviewerAssigned`): typed into its conversation when it runs, else launched with it, for review (the project folder: #1434's
 //   purpose, with #1439's grant to the review copies). One whose delivery wasn't given is told again at the next pass.
@@ -37,7 +37,7 @@ import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { advanced } from './advanced'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { onLanesWritten, rawLanes } from './lanes'
 import { readyFor } from './readiness'
 import { createLogger, userText } from './logger'
@@ -60,7 +60,7 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
 /**
  * The statuses an agent isn't free in: in a turn, starting, waiting for the user, its background tasks, a sign-in. Not a
  * card watch (HI-2333): a watching session is at its prompt, where the pool's line is typed as into an idle one, and
- * Hive's loop wakes reach it; what it reviews or checks keeps it from the pool by itself (`reviewersNow`).
+ * Combwork's loop wakes reach it; what it reviews or checks keeps it from the pool by itself (`reviewersNow`).
  */
 const BUSY: ReadonlySet<string> = new Set(['working', 'starting', 'waiting', 'background', 'signin'])
 
@@ -186,7 +186,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     if (!workflowEnforced() || ws.lifetime.aborted) return
     const c = cards.get(a.card)!
     const given = await wf.write(c.rec, null, 'combwork', (w) => {
-      // In this write, as combwork.db has it now (another Hive's or connection's change committed before it is seen): the
+      // In this write, as combwork.db has it now (another Combwork's or connection's change committed before it is seen): the
       // same submission still waiting, and the agent still free of it, of every other card of the project in Review
       // (whatever its lane: none, ended, another's) and of any dispatch lease.
       const s = w.state()
@@ -411,7 +411,7 @@ export function startReviewerPool(): void {
   }
   // An agent's state as the pass reads it, by agent: a status event that changes none of it (a refused line's own, HI-2333) asks no pass.
   const seen = new Map<string, string>()
-  const offEvents = onHiveEvent((e) => {
+  const offEvents = onCombworkEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'workspace-changed' || e.type === 'team-pause-changed') later()
     else if (e.type === 'session-status') {
       const key = `${e.state.projectPath.toLowerCase()}#${e.state.agentId}`

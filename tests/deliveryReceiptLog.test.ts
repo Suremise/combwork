@@ -18,7 +18,7 @@ vi.mock('../src/main/logger', async (original) => ({
 }))
 
 describe("a delivery's receipt and ack in the log (HI-2036)", async () => {
-  const base = tempDir('hive-deliverylog-')
+  const base = tempDir('cw-deliverylog-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const dismiss = admitted(base)
   afterAll(async () => {

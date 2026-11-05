@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-sessionlisting-')
+const base = tempDir('cw-sessionlisting-')
 // The CLIs' homes are the test's (never ~/.claude or ~/.codex).
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')

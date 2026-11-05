@@ -8,7 +8,7 @@ import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from './tempDir'
 
-const homes = tempDir('hive-cli-homes-')
+const homes = tempDir('cw-cli-homes-')
 for (const [name, dir] of [['CLAUDE_CONFIG_DIR', 'claude'], ['CODEX_HOME', 'codex'], ['COPILOT_HOME', 'copilot']] as const) {
   process.env[name] = join(homes, dir)
   mkdirSync(process.env[name], { recursive: true })

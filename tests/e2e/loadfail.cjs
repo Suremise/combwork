@@ -33,7 +33,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(only, 'SKILL.md'), '---\nname: alpha-only\ndescription: Only in alpha.\n---\n\nAlpha.\n')
   lib.enableProviders(userData)
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

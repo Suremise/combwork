@@ -12,7 +12,7 @@ const log = createLogger('notes')
 export const workspaceNotesFile = (sharedDir: string): string => join(sharedDir, WORKSPACE_NOTES_PATH)
 
 /**
- * What a launch in `projectPath` (a project, or the Hive Assistant's home) adds to its instructions of the Workspace notes
+ * What a launch in `projectPath` (a project, or the Combwork Assistant's home) adds to its instructions of the Workspace notes
  * note (#1433): its part for the project, bounded (Settings → Advanced), as the note is now; '' when the switch is off,
  * the note is empty or missing, or it can't be read (the launch goes on without it). A running session keeps what it
  * started with: an edit reaches each agent's next launch or new conversation.

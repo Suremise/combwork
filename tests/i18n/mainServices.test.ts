@@ -42,7 +42,7 @@ const { setLanguage } = await import('../../src/shared/i18n')
 const { PSEUDO_LANGUAGE } = await import('../../src/shared/i18n/languages')
 const { config } = await import('../../src/main/config')
 const { planNotice, reportPlanUsage } = await import('../../src/main/planUsage')
-const { onHiveEvent } = await import('../../src/main/events')
+const { onCombworkEvent } = await import('../../src/main/events')
 const { closedNotice } = await import('../../src/main/notices')
 const { setNotifyHost, tell } = await import('../../src/main/notify')
 const { apiEventFor } = await import('../../src/main/apiEvents')
@@ -68,7 +68,7 @@ describe('notices: in the language shown, their Agent API title in English', () 
   let off: () => void
   beforeEach(() => {
     seen.length = 0
-    off = onHiveEvent((e) => void seen.push(e as never))
+    off = onCombworkEvent((e) => void seen.push(e as never))
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
     config.get().planWarnings = {}
     // Combwork in the background: a Windows notification, told to the Agent API's stream.
@@ -180,7 +180,7 @@ describe("Initialise Git Repository's reply", () => {
   })
 
   it('in the language shown: its steps joined by the language, the first capitalised', { timeout: 60_000 }, async () => {
-    const base = tempDir('hive-i18n-gitinit-')
+    const base = tempDir('cw-i18n-gitinit-')
     const global = join(base, 'global.gitconfig')
     writeFileSync(global, '[user]\n\tname = Global Person\n\temail = global@example.com\n')
     process.env.GIT_CONFIG_GLOBAL = global

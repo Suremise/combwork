@@ -37,7 +37,7 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(alpha)
   const hdir = path.join(ws, '.combwork', 'shared', 'handovers')
   fs.mkdirSync(hdir, { recursive: true })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...lib.fakeClaude(userData, claudeHome, [alpha]) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...lib.fakeClaude(userData, claudeHome, [alpha]) })
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -191,7 +191,7 @@ const check = (name, ok, extra = '') => {
     // Its old notice is its last conversation's: the new one is the lane's (HI-2232).
     check('…in a new conversation, done with its brief', staleLane.renewed, staleLane.now)
     const staleSession = (await live(staleAgent.id)).sessionId
-    const staleRow = async () => (await page.evaluate(() => window.__hiveBell())).find((t) => t.title.includes('Stale: long conversation'))
+    const staleRow = async () => (await page.evaluate(() => window.__cwBell())).find((t) => t.title.includes('Stale: long conversation'))
     // Its old conversation ended (the lane's renewal stops it first) or moved on: either says so.
     check('the old notice loses Hand Over to…, saying its conversation ended', !!(await lib.until(async () => ['Its conversation ended', 'It has a new conversation now'].includes((await staleRow())?.resolved), HUNG_MS, 200)) && (await stale.getByRole('button', { name: 'Hand Over to…', exact: true }).count()) === 0 && (await dialog.count()) === 0 && (await live(staleAgent.id))?.sessionId === staleSession, JSON.stringify(await staleRow()))
     await lib.agentMenu(page, 'Stale')

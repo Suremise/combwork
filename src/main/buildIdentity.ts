@@ -70,7 +70,7 @@ export function runningIdentity(version: string, resources: string = process.res
  * then the identity file again. Known only when they agree: an identity file whose version isn't the asar's, one that
  * changed between the reads (an installer replacing the copy), malformed, or a read failing, is `unreadable`. No
  * identity file at all is a copy from before builds said what they are (a release), its version the asar's. Never the
- * running Hive's own version: the copy on disk may be newer.
+ * running Combwork's own version: the copy on disk may be newer.
  */
 export function installedCopy(resources: string = process.resourcesPath): InstalledCopy {
   try {

@@ -2,7 +2,7 @@ import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS, holderText, holdingNote, wa
 import type { MergeSlotInfo } from '../shared/types'
 import { msg, tr } from '../shared/i18n'
 
-/** The window's notice that a merge slot expired (HI-2320: in the language Hive shows). */
+/** The window's notice that a merge slot expired (HI-2320: in the language Combwork shows). */
 const EXPIRED = {
   title: msg({ id: 'main.mergeSlot.expiredTitle', defaultMessage: "{agent}'s merge slot expired", description: "A notice's title: an agent ({agent}) held the merge slot longer than its limit without reporting progress, so Combwork gave it to the next agent in line." }),
   body: msg({ id: 'main.mergeSlot.expiredBody', defaultMessage: '{agent} held the merge slot for {branch} longer than its limit without reporting progress, so it went to the next in line. Check whether its merge finished.', description: "The notice that an agent's merge slot expired. {agent} is the agent, {branch} the branch it was merging into." })
@@ -11,7 +11,7 @@ const EXPIRED = {
 /**
  * The merge slot (#350): one merge at a time into a project's branch. An agent claims it right before its final merge
  * (merge the base in, run the checks, merge, cards to Done) and releases it after, so the base can't move during its
- * checks; others wait in order. The user's merge from Hive's Merge dialog takes it too. Merges done outside Hive aren't
+ * checks; others wait in order. The user's merge from Combwork's Merge dialog takes it too. Merges done outside Combwork aren't
  * controlled: merge-ready's "has the base moved?" check still covers them.
  *
  * Everything here is synchronous between awaits (main's one thread), so a check and the change it allows can't be split
@@ -26,7 +26,7 @@ export const KEEP_PLACE_MS = 2 * 60_000
 /** A holder whose open Progress run reported this recently isn't expired: it is still at work. */
 export const PROGRESS_FRESH_MS = 15 * 60_000
 /**
- * The longest a claim waits in one call: under 300 s, when Node's fetch (the hive tools') gives up waiting for a reply
+ * The longest a claim waits in one call: under 300 s, when Node's fetch (the Combwork tools') gives up waiting for a reply
  * (undici's headersTimeout).
  */
 export const MAX_WAIT_MS = CLAIM_WAIT_MAX_SECONDS * 1000
@@ -121,7 +121,7 @@ export interface MergeSlotDeps {
   holdMs?: number
 }
 
-/** A merge-slot call Hive refuses (status: the HTTP status the Agent API answers with). */
+/** A merge-slot call Combwork refuses (status: the HTTP status the Agent API answers with). */
 export class MergeSlotError extends Error {
   constructor(
     readonly status: number,
@@ -366,7 +366,7 @@ export class MergeSlots {
     }
   }
 
-  /** The holds to keep across a restart (agents' only: the user's merge ends with Hive). */
+  /** The holds to keep across a restart (agents' only: the user's merge ends with Combwork). */
   heldByAgents(): SlotRecord[] {
     const out: SlotRecord[] = []
     for (const s of this.slots.values()) if (s.hold?.who.kind === 'agent') out.push({ projectPath: s.projectPath, branch: s.branch, agentId: s.hold.who.agentId, agentName: s.hold.who.agentName, runId: s.hold.who.runId, cards: s.hold.cards, since: s.hold.since, until: s.hold.until })
@@ -507,7 +507,7 @@ export class MergeSlots {
   }
 }
 
-/** An agent's hold as the workspace's record keeps it, to tell the user about one Hive closed under. */
+/** An agent's hold as the workspace's record keeps it, to tell the user about one Combwork closed under. */
 export interface SlotRecord {
   projectPath: string
   /** The project's stable id (#508): the record is told against the folder that has it now. */
@@ -519,7 +519,7 @@ export interface SlotRecord {
   cards: number[]
   since: number
   until: number
-  /** The folder its agent worked in (#984): where a merge Hive closed under was, its worktree or the main checkout. */
+  /** The folder its agent worked in (#984): where a merge Combwork closed under was, its worktree or the main checkout. */
   cwd?: string
 }
 

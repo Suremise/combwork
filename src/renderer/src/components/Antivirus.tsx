@@ -10,8 +10,8 @@ import { Icon, LoadFailed } from './ui'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 
 /**
- * Antivirus scanning of the workspace (#316; main/antivirus.ts): whether Microsoft Defender scans the folders Hive's work
- * goes through, the exclusions Hive can add (with consent, one UAC prompt) and remove, and Dev Drive. Settings →
+ * Antivirus scanning of the workspace (#316; main/antivirus.ts): whether Microsoft Defender scans the folders Combwork's work
+ * goes through, the exclusions Combwork can add (with consent, one UAC prompt) and remove, and Dev Drive. Settings →
  * Workspace shows it in full; Performance says when scanning likely slows the workspace; the window suggests it once
  * when it matters. Answers for a workspace the window no longer shows are dropped.
  */
@@ -65,7 +65,7 @@ const M = {
   checkAdmin: msg({ id: 'workspace.antivirus.checkAdmin', defaultMessage: 'Check with Administrator Rights…', description: "Settings → Workspace's antivirus: a button (Windows asks for administrator rights)." }),
   goneTitle: msg({ id: 'workspace.antivirus.goneTitle', defaultMessage: 'Combwork’s exclusions of folders that are gone', description: "Settings → Workspace's antivirus: a heading over a list of exclusions Combwork added for folders that no longer exist (moved or deleted)." }),
   goneHint: msg({ id: 'workspace.antivirus.goneHint', defaultMessage: '{n, plural, one {Combwork excluded this folder, which no longer exists (moved or deleted). Remove Combwork’s Exclusions… takes it away too.} other {Combwork excluded these folders, which no longer exist (moved or deleted). Remove Combwork’s Exclusions… takes them away too.}}', description: "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Combwork’s Exclusions… is the button below: use its name as shown." }),
-  removeHive: msg({ id: 'workspace.antivirus.removeCombwork', defaultMessage: 'Remove Combwork’s Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
+  removeCombwork: msg({ id: 'workspace.antivirus.removeCombwork', defaultMessage: 'Remove Combwork’s Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   addExclusions: msg({ id: 'workspace.antivirus.addExclusions', defaultMessage: 'Add Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   aboutDevDrive: msg({ id: 'workspace.antivirus.aboutDevDrive', defaultMessage: 'About Dev Drive', description: "Settings → Workspace's antivirus: opens Microsoft's Dev Drive documentation." }),
   slowLine: msg({ id: 'workspace.antivirus.slowLine', defaultMessage: 'Microsoft Defender scans this workspace’s folders as Combwork’s work changes them, which slows builds, tests and git. <link>Antivirus scanning…</link>', description: "Performance, when Defender likely slows the workspace. <link> opens Settings → Workspace's antivirus." }),
@@ -182,7 +182,7 @@ export function AntivirusPanel() {
   const defender = status.scan === 'defender'
   const offerable = status.paths.filter((p) => !p.unsafe)
   const toAdd = offerable.filter((p) => p.state !== 'excluded')
-  const hiveAdded = offerable.some((p) => p.addedByHive) || !!status.gone?.length
+  const combworkAdded = offerable.some((p) => p.addedByCombwork) || !!status.gone?.length
   return (
     <div className="antivirus">
       <p className={cx('antivirus-scan', status.slowed && 'warn-text')}>
@@ -265,9 +265,9 @@ export function AntivirusPanel() {
             <Icon name="shield" /> {tr(M.checkAdmin)}
           </button>
         )}
-        {defender && hiveAdded && (
+        {defender && combworkAdded && (
           <button className="btn subtle small" disabled={checking} onClick={() => void change('remove')}>
-            <Icon name="discard" /> {tr(M.removeHive)}
+            <Icon name="discard" /> {tr(M.removeCombwork)}
           </button>
         )}
         {defender && toAdd.length > 0 && (

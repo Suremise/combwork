@@ -37,13 +37,13 @@ import { Icon, IconButton, Modal, ReviewMark, statusText, Tooltip, useContextMen
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 
 /**
- * The Hive Assistant's side panel: the workspace's overseer. Its header (mode, controls) and status line, what is
+ * The Combwork Assistant's side panel: the workspace's overseer. Its header (mode, controls) and status line, what is
  * happening in the workspace, its terminal, its footer (model, mode, context, cost) and what it has done. Everything about the
  * Assistant is here, apart from managing modes (their own view) and its defaults (Settings → Assistant).
  */
 
 const AGENT = ASSISTANT_AGENT_ID
-// i18n-ignore: the name Hive's own names for the Assistant's sessions start with (sessionLabel tells them apart), not text
+// i18n-ignore: the name Combwork's own names for the Assistant's sessions start with (sessionLabel tells them apart), not text
 const SESSION_NAMES = 'Assistant'
 
 const M = {
@@ -170,7 +170,7 @@ const settingsLink = (c: React.ReactNode[]): React.ReactNode => (
 )
 
 /**
- * A mode's name in the window: one Hive ships (SHIPPED_MODE_NAMES, #806), in the window's language while its file still
+ * A mode's name in the window: one Combwork ships (SHIPPED_MODE_NAMES, #806), in the window's language while its file still
  * has Hive's name for it; any other (the user's own, or one they renamed) as its file has it.
  */
 export function modeName(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>): string {
@@ -178,7 +178,7 @@ export function modeName(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>): string {
   return shipped && p.name === shipped.defaultMessage ? tr(shipped) : p.name
 }
 
-/** What a mode is for, in the window: as modeName, one Hive ships in the window's language while its file still has Hive's words. */
+/** What a mode is for, in the window: as modeName, one Combwork ships in the window's language while its file still has Combwork's words. */
 export function modeDescription(p: Pick<ModeInfo, 'id' | 'description' | 'bundled'>): string {
   const shipped = p.bundled ? SHIPPED_MODE_DESCRIPTIONS[p.id] : undefined
   if (shipped && p.description === shipped.defaultMessage) return tr(shipped)
@@ -652,7 +652,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   )
 }
 
-/** A question's text as the window shows it (HI-2449): in the language Hive shows, or as Hive sent it with none. */
+/** A question's text as the window shows it (HI-2449): in the language Combwork shows, or as Combwork sent it with none. */
 const questionText = (q: AssistantQuestion, field: 'title' | 'message' | 'yes' | 'no'): string => (q.text ? shownText(q.text[field]) : q[field])
 
 /** Questions the Assistant's actions wait on (e.g. stopping a busy agent): the user answers on the card. */
@@ -695,7 +695,7 @@ const doneOpenKey = (ws: string): string => `assistant-done:${ws.toLowerCase()}`
 function AssistantStatus({ a }: { a: AgentInfo }) {
   useDateStyle()
   const live = a.live
-  // Hive's own questions its actions wait on (the cards under this line): the user is wanted first.
+  // Combwork's own questions its actions wait on (the cards under this line): the user is wanted first.
   const approvals = useStore((s) => s.assistantQuestions)
   const tasks = useStore((s) => s.tasks)
   const done = useDoneCount()
@@ -989,7 +989,7 @@ export function AssistantSettingsDialog() {
         <ConnectionChoice id="assistant-connection" value={connection} onChange={setConnection} unavailable={(c) => (cliOwn(c, cliOf(c.id)) ? tr(M.cliOwnConnection) : null)} />
         <label>{tr(M.mode)}</label>
         <select className="select" value={mode} onChange={(e) => setMode(e.target.value)}>
-          <option value="">{tr(M.defaultMode, { name: (defaultMode && modeName(defaultMode)) ?? settings?.assistant.mode ?? 'Overseer' /* i18n-ignore: the default mode's name, as Hive ships it */ })}</option>
+          <option value="">{tr(M.defaultMode, { name: (defaultMode && modeName(defaultMode)) ?? settings?.assistant.mode ?? 'Overseer' /* i18n-ignore: the default mode's name, as Combwork ships it */ })}</option>
           {modes
             .filter((p) => p.bundled !== 'missing')
             .map((p) => (

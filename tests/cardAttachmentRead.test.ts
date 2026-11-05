@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 import { moveFolder } from './moveFolder'
 
-const base = tempDir('hive-attachread-')
+const base = tempDir('cw-attachread-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

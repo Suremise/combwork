@@ -141,7 +141,7 @@ const LANES: TableDef = {
   children: [
     { table: 'lane_cards', cols: ['lane', 'ord', 'card'], parent: ['lane'], order: 'ord' },
     { table: 'lane_frozen', cols: ['lane', 'ord', 'card', 'title', 'col', 'blocked', 'round', 'reviewing'], parent: ['lane'], order: 'ord' },
-    // Its run (#1270: Hive owns the lane): the ruleset it started with, the card in flight, a list change queued.
+    // Its run (#1270: Combwork owns the lane): the ruleset it started with, the card in flight, a list change queued.
     { table: 'lane_runs', cols: ['lane', 'ruleset', 'current_card', 'has_pending'], parent: ['lane'], order: 'lane', later: true },
     { table: 'lane_pending', cols: ['lane', 'ord', 'card'], parent: ['lane'], order: 'ord', later: true }
   ],
@@ -317,7 +317,7 @@ const METRICS: TableDef = {
     const series: Row[] = []
     const part = (name: string, p: unknown): void => {
       const families = obj(p)
-      // A family Hive doesn't know (or a part with fields of its own) has no rows to go in: kept whole.
+      // A family Combwork doesn't know (or a part with fields of its own) has no rows to go in: kept whole.
       if (Object.keys(families).some((k) => !PART_KNOWN.has(k))) throw new Unfit()
       for (const family of FAMILIES) {
         const f = obj(families[family])

@@ -41,7 +41,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
 ;(async () => {
   // The fake trusts the project and the worktree Combwork makes for the Reviewer below.
   const claude = lib.fakeClaude(userData, path.join(scratch, 'agents-claude-home'), [proj, path.join(wtRoot, 'demo', 'reviewer')])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
@@ -145,8 +145,8 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check("another launch's token is refused", (await post({ url: h1.url, token: h2.token }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
   check('a call naming no launch is refused', (await post({ url: h1.url.replace(/\?.*/, ''), token: h1.token }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
   // Combwork's log says so, once each (#711): a hook a CLI sent but Combwork refused leaves a trace on Combwork's side.
-  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
-  const refusedLines = () => hiveLog().split('\n').filter((x) => x.includes('Refused a hook call'))
+  const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
+  const refusedLines = () => combworkLog().split('\n').filter((x) => x.includes('Refused a hook call'))
   check("Combwork's log tells of each refused hook call, and why", !!(await lib.until(() => refusedLines().some((x) => x.includes(`run ${l1.runId}: its token didn't match`)) && refusedLines().some((x) => x.includes('named no launch')), 10000)), refusedLines().join(' | '))
   const file = path.join(proj, 'app.txt')
   const pre = (sid, f = file, tool = 'Edit') => hook({ session_id: sid, hook_event_name: 'PreToolUse', tool_name: tool, tool_input: { file_path: f }, cwd: proj })

@@ -54,7 +54,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   cfg.settings.assistant = { ...cfg.settings.assistant, provider: 'codex' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47903), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47903), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -139,7 +139,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
 
   // --- The Assistant on Codex: its skills in the workspace folder, where it works, and its role in its instructions.
   // The fake Codex is a .cmd launcher, as npm's codex.cmd is: Combwork starts its node and script directly, since the
-  // Assistant's command line (hooks, instructions, the hive server) is longer than cmd.exe's 8,191 characters.
+  // Assistant's command line (hooks, instructions, the combwork server) is longer than cmd.exe's 8,191 characters.
   const home = (await inv('workspace:refresh')).assistant.path
   await inv('session:start', home, { agentId: 'assistant' })
   check('the Assistant starts on Codex through its .cmd launcher', !!(await ready(home, 'assistant')))

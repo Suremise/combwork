@@ -6,7 +6,7 @@ import { brief, cardPart, historyBlocked, historyVerdict, WAKE_MAX_BYTES, WATCH_
 import { cardRef } from './projectKeys'
 import { agentMsg, say } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
-// Types only: agentWatch loads the translations, which hive-mcp (toolReplies imports this) never does.
+// Types only: agentWatch loads the translations, which cw-mcp (toolReplies imports this) never does.
 import type { AgentEvent, WatchedAgent } from './agentWatch'
 
 const T = {
@@ -142,11 +142,11 @@ export interface LaneNow {
   mergeCommit?: string | null
 }
 
-/** A lane card's newest open request for the user (HI-1991): when it was made, who asked (null: Hive) and its text. */
+/** A lane card's newest open request for the user (HI-1991): when it was made, who asked (null: Combwork) and its text. */
 export interface LaneAsked {
   since: string
   by: string | null
-  /** Its English as stored; `shown`, Hive's own request as data, which a reader's chain says again (HI-2464). */
+  /** Its English as stored; `shown`, Combwork's own request as data, which a reader's chain says again (HI-2464). */
   text: string
   shown?: StoredText
 }
@@ -262,7 +262,7 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
     if (on.has('unblocked') && !is.b && was.b) parts.push({ n: c.number, event: 'unblocked', text: say(T.unblocked, { card }) })
     if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: say(T.stalled, { card }), ...(c.stalled ? { detail: c.stalled } : {}) })
     if (on.has('moved') && is.c !== was.c) parts.push({ n: c.number, event: 'moved', text: say(T.moved, { card, column: columnLabel(is.c) }) })
-    // A new request for the user on it (HI-1991): an agent's question (cw_ask_user) or Hive's own, under For you. The
+    // A new request for the user on it (HI-1991): an agent's question (cw_ask_user) or Combwork's own, under For you. The
     // agent asking isn't waiting at a prompt, so `waiting` never tells it. A mark from before has no `q`.
     if (on.has('paused-user') && was.q !== undefined && is.q !== undefined && is.q > was.q) parts.push({ n: c.number, event: 'paused-user', text: say(T.asked, { card, who: !c.asked ? 'none' : c.asked.by ? 'agent' : 'combwork', by: c.asked?.by ?? '' }), ...(c.asked?.text ? { detail: firstLine(storedForAgents(c.asked.text, c.asked.shown)) } : {}) })
   }
@@ -463,7 +463,7 @@ export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): 
   return { ids, events: withAlwaysEvents(ids, e as LaneEvent[]) }
 }
 
-/** A saved lane watch condition, checked (null: not one Hive would have made). */
+/** A saved lane watch condition, checked (null: not one Combwork would have made). */
 export function readSavedLaneCondition(v: unknown): LaneWatchCondition | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
   const r = readLaneCondition({ lanes: (v as { ids?: unknown }).ids === 'all' ? 'all' : (v as { ids?: unknown }).ids, events: (v as { events?: unknown }).events })

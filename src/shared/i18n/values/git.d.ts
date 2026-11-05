@@ -1,6 +1,6 @@
 // Generated from locales/en/git.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'git.branch.delete': undefined
   'git.branch.deleteMergedMessage': { target: string | number }
   'git.branch.deleteMergedTitle': { branch: string | number }

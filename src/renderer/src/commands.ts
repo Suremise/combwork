@@ -356,7 +356,7 @@ const COMMAND_DEFS: CommandDef[] = [
     id: 'session.resumeAfterClose',
     name: msg({ id: 'shell.command.session.resumeAfterClose', defaultMessage: 'Resume the Agents Running When Combwork Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
     category: 'session',
-    // Only from the notice that Hive closed unexpectedly (#984), which lists them.
+    // Only from the notice that Combwork closed unexpectedly (#984), which lists them.
     internal: true,
     run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeAfterClose', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were running when Combwork closed unexpectedly failed." })), () => call('app:resumeAfterClose'))
   },
@@ -364,7 +364,7 @@ const COMMAND_DEFS: CommandDef[] = [
     id: 'session.stopLeftAfterClose',
     name: msg({ id: 'shell.command.session.stopLeftAfterClose', defaultMessage: 'Stop What the Agents Started Before Combwork Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: ends the processes the agents had started that still run after Combwork closed unexpectedly. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
     category: 'session',
-    // Only from the notice that Hive closed unexpectedly (#987), which lists them.
+    // Only from the notice that Combwork closed unexpectedly (#987), which lists them.
     internal: true,
     run: () => actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Combwork closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
   },
@@ -829,7 +829,7 @@ export function terminalReserved(provider?: ProviderId): Set<string> {
   return new Set(provider ? providerDescriptor(provider).reservedKeys : PROVIDERS.flatMap((p) => p.reservedKeys))
 }
 
-/** Keys the terminal must pass through to Hive instead of the agent. Chords are not started from the terminal. */
+/** Keys the terminal must pass through to Combwork instead of the agent. Chords are not started from the terminal. */
 export function isAppShortcut(e: KeyboardEvent, provider?: ProviderId, allKeysToCli = false): boolean {
   if (e.type !== 'keydown') return false
   const key = eventToKey(e)

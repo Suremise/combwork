@@ -1,17 +1,17 @@
 /**
- * An agent's hooks for its Hooks dialog (HI-982), from what each provider can establish: Hive's own as passed for the
+ * An agent's hooks for its Hooks dialog (HI-982), from what each provider can establish: Combwork's own as passed for the
  * launch, then the CLI's own listing where it has one (Codex's hooks/list) or its settings files as read at launch
- * (Claude Code), each row saying how sure Hive is. Read-only and bounded: a source lists at most HOOK_ROWS_MAX hooks,
- * each text cut short and Hive's authentication left out.
+ * (Claude Code), each row saying how sure Combwork is. Read-only and bounded: a source lists at most HOOK_ROWS_MAX hooks,
+ * each text cut short and Combwork's authentication left out.
  */
-import { HOOK_ROWS_MAX, HOOK_SHORT_MAX, HOOK_TEXT_MAX, clip, withoutHiveAuth, type HookNote, type HookRow, type HookSource, type HookStatus } from '../shared/hooks'
+import { HOOK_ROWS_MAX, HOOK_SHORT_MAX, HOOK_TEXT_MAX, clip, withoutCombworkAuth, type HookNote, type HookRow, type HookSource, type HookStatus } from '../shared/hooks'
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null)
 
-/** A hook's command or URL (what it runs), whichever its form has, Hive's authentication left out and cut short. */
+/** A hook's command or URL (what it runs), whichever its form has, Combwork's authentication left out and cut short. */
 function runs(handler: Record<string, unknown>, secrets: readonly string[]): { command: string; truncated?: true } {
   const v = [handler.command, handler.url, handler.prompt].find((x): x is string => typeof x === 'string') ?? ''
-  const { text, truncated } = clip(withoutHiveAuth(v.slice(0, HOOK_TEXT_MAX * 2), secrets), HOOK_TEXT_MAX)
+  const { text, truncated } = clip(withoutCombworkAuth(v.slice(0, HOOK_TEXT_MAX * 2), secrets), HOOK_TEXT_MAX)
   return truncated ? { command: text, truncated: true } : { command: text }
 }
 
@@ -20,7 +20,7 @@ const KNOWN_TYPES = new Set(['command', 'http', 'prompt', 'agent'])
 
 /**
  * The rows of a settings file's `hooks` table, in Claude Code's (and Copilot's) form: `{ <event>: [{ matcher?, hooks: [{
- * type, command | url | prompt }] }] }`, each with the status given (or `unsupported`, for a form Hive doesn't know). At
+ * type, command | url | prompt }] }] }`, each with the status given (or `unsupported`, for a form Combwork doesn't know). At
  * most `max` rows; `more` counts the rest.
  */
 export function rowsOfHooksTable(hooks: unknown, base: { source: HookSource; file?: string; status: HookStatus; why?: string; observed?: boolean }, secrets: readonly string[] = [], max = HOOK_ROWS_MAX): { rows: HookRow[]; more: number } {
@@ -71,7 +71,7 @@ export interface ScopeRead {
  * Claude Code's own hooks for a launch, from its settings scopes as read at launch (highest first): each is configured,
  * its loading unverified (Claude Code doesn't say which it loaded), but `disabled` where the first scope setting
  * disableAllHooks sets it on (managed hooks too, when managed settings set it), and `notLoaded` outside managed
- * settings where they allow only their own (allowManagedHooksOnly). A file Hive couldn't read, or that isn't JSON, is a
+ * settings where they allow only their own (allowManagedHooksOnly). A file Combwork couldn't read, or that isn't JSON, is a
  * note, never "no hooks".
  */
 export function claudeScopeHooks(scopes: readonly ScopeRead[], secrets: readonly string[] = []): { rows: HookRow[]; notes: HookNote[] } {
@@ -111,11 +111,11 @@ const eventOfLabel = (label: string): string => label.split('_').map((w) => w.ch
 /**
  * Codex's own listing of a launch's hooks as rows: each with Codex's trust (trusted, untrusted, modified), its source
  * and file from its key (`<file>:<event>:<group>:<handler>`). `hive` is the command Hive passed for its own: an entry of
- * the session flags running exactly that is Hive's (its row is Hive's, with Codex's trust), never another.
+ * the session flags running exactly that is Combwork's (its row is Combwork's, with Codex's trust), never another.
  */
-export function codexListedHooks(listed: readonly CodexListedHook[], hive: { command: string; flagsFile: string }, secrets: readonly string[] = [], max = HOOK_ROWS_MAX): { rows: HookRow[]; hiveTrust: Map<string, HookStatus>; more: number } {
+export function codexListedHooks(listed: readonly CodexListedHook[], combwork: { command: string; flagsFile: string }, secrets: readonly string[] = [], max = HOOK_ROWS_MAX): { rows: HookRow[]; combworkTrust: Map<string, HookStatus>; more: number } {
   const rows: HookRow[] = []
-  const hiveTrust = new Map<string, HookStatus>()
+  const combworkTrust = new Map<string, HookStatus>()
   let more = 0
   for (const h of listed) {
     const key = typeof h.key === 'string' ? h.key : ''
@@ -123,9 +123,9 @@ export function codexListedHooks(listed: readonly CodexListedHook[], hive: { com
     const event = typeof h.eventName === 'string' ? h.eventName : m ? eventOfLabel(m[2]) : '?'
     const trust: HookStatus = h.trustStatus === 'trusted' ? 'trusted' : h.trustStatus === 'untrusted' ? 'untrusted' : h.trustStatus === 'modified' ? 'modified' : 'unknown'
     const command = typeof h.command === 'string' ? h.command : ''
-    const flags = h.source === 'sessionFlags' || (m?.[1] ?? '') === hive.flagsFile
-    if (flags && command === hive.command) {
-      hiveTrust.set(event, trust)
+    const flags = h.source === 'sessionFlags' || (m?.[1] ?? '') === combwork.flagsFile
+    if (flags && command === combwork.command) {
+      combworkTrust.set(event, trust)
       continue
     }
     if (rows.length >= max) {
@@ -133,7 +133,7 @@ export function codexListedHooks(listed: readonly CodexListedHook[], hive: { com
       continue
     }
     const source: HookSource = flags ? 'cli' : h.source === 'user' ? 'user' : h.source === 'project' ? 'project' : h.source === 'managed' || h.source === 'system' ? 'managed' : 'other'
-    const { text, truncated } = clip(withoutHiveAuth(command.slice(0, HOOK_TEXT_MAX * 2), secrets), HOOK_TEXT_MAX)
+    const { text, truncated } = clip(withoutCombworkAuth(command.slice(0, HOOK_TEXT_MAX * 2), secrets), HOOK_TEXT_MAX)
     rows.push({
       event: clip(event, HOOK_SHORT_MAX).text,
       source,
@@ -146,5 +146,5 @@ export function codexListedHooks(listed: readonly CodexListedHook[], hive: { com
       observed: false
     })
   }
-  return { rows, hiveTrust, more }
+  return { rows, combworkTrust, more }
 }

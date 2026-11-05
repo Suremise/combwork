@@ -4,10 +4,10 @@
 // the user (the window), the Assistant within Settings → Assistant → Control (the Agent API, through assistantChange),
 // never a project agent. The callers check it; this module does what they allowed.
 //
-// A pause is saved (the pause tables, reason `user` and who), so it holds across a restart and in every Hive on the
+// A pause is saved (the pause tables, reason `user` and who), so it holds across a restart and in every Combwork on the
 // workspace. The queue stops before its next entry; an entry mid-check finishes its checks and waits, open, without
-// advancing (mergeQueue.ts). Resume clears any pause, Hive's own included, once the user says its cause is fixed: one
-// whose cause Hive can see (§16.9.2's conditions, the rules off, a process or folder of an earlier runner) is checked
+// advancing (mergeQueue.ts). Resume clears any pause, Combwork's own included, once the user says its cause is fixed: one
+// whose cause Combwork can see (§16.9.2's conditions, the rules off, a process or folder of an earlier runner) is checked
 // first, and paused again, saying so, when it still holds.
 
 import { app } from 'electron'
@@ -15,7 +15,7 @@ import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { git } from '../git'
 import type { TaskActor } from '../tasks'
 import type { TaskCard } from '../../shared/types'
@@ -37,7 +37,7 @@ import { HISTORY_MAX, RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type Branch
 /**
  * The targets of a project's queues: every target a card was queued for, and any paused one, in that order; for the
  * window (`also`), then the targets its cards in flight merge into under their own rules and the one its current options
- * have Hive merge into (#1356: the panel decides from these which queues show).
+ * have Combwork merge into (#1356: the panel decides from these which queues show).
  */
 export function queueTargets(wf: Workflow, also: Iterable<string> = []): string[] {
   const out = new Set<string>()
@@ -49,15 +49,15 @@ export function queueTargets(wf: Workflow, also: Iterable<string> = []): string[
 
 /** Where a project's queues stand beyond their entries (#1356): its cards in flight by target, and its current target. */
 interface QueueScope {
-  /** Per target, the cards in flight whose own ruleset has Hive merge into it, in number order. */
+  /** Per target, the cards in flight whose own ruleset has Combwork merge into it, in number order. */
   inFlight: Map<string, number[]>
-  /** The target the project's current options have Hive merge into (null: they don't, or it can't be read). */
+  /** The target the project's current options have Combwork merge into (null: they don't, or it can't be read). */
   current: string | null
 }
 
 /**
  * A project's queues (one target's, or every one's), as the window, the Agent API and cw_queue read them. `window`: the
- * window's listing (#1356), which also lists the targets that only have cards in flight under Hive merges, or are the
+ * window's listing (#1356), which also lists the targets that only have cards in flight under Combwork merges, or are the
  * current options' target, so the panel can decide which show.
  */
 export function queueViews(ws: WorkspaceService, projectPath: string, target?: string, window = false): Promise<QueueView[]> {
@@ -94,13 +94,13 @@ const VIEWS_KEPT_MS = 5000
 
 /** Bumped as a project's workflow is written (its options: which queues show, and its target). */
 let optionsWritten = 0
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type === 'workflow-changed' || e.type === 'workspace-changed') optionsWritten++
 })
 
 /**
  * What a project's queue listings are made from, as a token: the board's revision (its facts, pauses, leases and seen
- * returns, committed here or by another process), this Hive's hosts of the project's queues, its options written, the
+ * returns, committed here or by another process), this Combwork's hosts of the project's queues, its options written, the
  * rules switch and the test seam. Null when the board can't say (no listing is kept then).
  */
 function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
@@ -121,7 +121,7 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
 }
 
 /**
- * Which of a project's cards are in flight under Hive merges, by target (started, not Done: a card keeps the ruleset it
+ * Which of a project's cards are in flight under Combwork merges, by target (started, not Done: a card keeps the ruleset it
  * started with, so after a switch to "The agent merges" its queue stays until its last entry has an outcome), and the
  * target its current options merge into.
  */
@@ -179,7 +179,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
 
 /**
  * The history's own detail for the latest outcomes (HI-1924, the Progress panel's Recent merges): how long the queue took
- * over each (entryTook) and, for a merge by Hive, its push as recorded (G18). Only these few cards' facts are read.
+ * over each (entryTook) and, for a merge by Combwork, its push as recorded (G18). Only these few cards' facts are read.
  */
 export function historyOf(wf: Workflow, target: string, recent: QueueRecent[]): QueueRecent[] {
   const facts = new Map<number, Fact[]>()
@@ -264,7 +264,7 @@ function testSize(name: string, real: number): number {
 
 /**
  * The user saw these returned entries of a target's queue (#1356: the Progress panel's Merges tab, open in a focused
- * window): marked once, for every window and Hive, and the queue's windows told. Entries not returned in this target's
+ * window): marked once, for every window and Combwork, and the queue's windows told. Entries not returned in this target's
  * queue are ignored.
  */
 export async function markQueueSeen(ws: WorkspaceService, projectPath: string, target: string, entries: readonly string[]): Promise<void> {
@@ -276,7 +276,7 @@ export async function markQueueSeen(ws: WorkspaceService, projectPath: string, t
 
 /**
  * Pause queue: the target's queue stops before its next entry (one mid-check finishes its checks and waits). Saved, with
- * who; a queue paused already (by Hive, for its reason) keeps that pause, which says more.
+ * who; a queue paused already (by Combwork, for its reason) keeps that pause, which says more.
  */
 export async function pauseQueue(ws: WorkspaceService, projectPath: string, target: string, by: 'user' | 'assistant', guard?: () => void): Promise<QueueView> {
   const wf = await needWorkflow(ws, projectPath)
@@ -290,7 +290,7 @@ export async function pauseQueue(ws: WorkspaceService, projectPath: string, targ
 }
 
 /**
- * Resume: the pause cleared and the queue run, once its cause, where Hive can see it, is gone; else paused again, as
+ * Resume: the pause cleared and the queue run, once its cause, where Combwork can see it, is gone; else paused again, as
  * it is now (`resumed` false). A queue not paused is just run.
  */
 export async function resumeQueue(ws: WorkspaceService, projectPath: string, target: string, guard?: () => void): Promise<QueueResumed> {
@@ -331,8 +331,8 @@ export async function queueHistory(ws: WorkspaceService, projectPath: string, ta
 }
 
 /**
- * The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog, OP-13): a card in flight
- * (started, not Done) on that line whose own ruleset has Hive merge it, with the rules enforced; and where it stands in
+ * The card an agent's worktree branch is for, when Combwork merges it (#1357, the Merge dialog, OP-13): a card in flight
+ * (started, not Done) on that line whose own ruleset has Combwork merge it, with the rules enforced; and where it stands in
  * the queue. Null: no such card (the dialog merges as ever).
  */
 export async function branchQueueCard(ws: WorkspaceService, projectPath: string, branch: string): Promise<BranchQueueCard | null> {
@@ -381,11 +381,11 @@ async function needWorkflow(ws: WorkspaceService, projectPath: string): Promise<
 }
 
 /**
- * Whether a pause's cause still holds, as far as Hive can see it now: the rules still off; §16.9.2's conditions on its
+ * Whether a pause's cause still holds, as far as Combwork can see it now: the rules still off; §16.9.2's conditions on its
  * folder; the user's answer to "update it now" still awaited (For you: Resume doesn't stand in for it); a begun advance
  * still in its terminal state; an earlier runner's process still running or its folder still there. What it finds (the
- * files named now), or null when it is gone or Hive can't tell (Pause queue, targetMovesFast…: the user's word). A
- * `checkedOut` pause is from before #1351: Hive merges into a checked-out target now.
+ * files named now), or null when it is gone or Combwork can't tell (Pause queue, targetMovesFast…: the user's word). A
+ * `checkedOut` pause is from before #1351: Combwork merges into a checked-out target now.
  */
 async function stillPaused(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string, p: QueuePause): Promise<Partial<QueuePause> | null> {
   switch (p.reason) {
