@@ -6,7 +6,7 @@ import { app, safeStorage } from 'electron'
 import { msg } from '../shared/i18n'
 import { config } from './config'
 import { writeJsonAtomic } from './fsutil'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { addWindows, fingerprint, maskingState, MOD, setMasking, type MatchSecret, type Window } from './keyMatcher'
 import { createLogger } from './logger'
 

@@ -6,7 +6,7 @@ import { keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, merg
 import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, readSetUp, rereadTrust, serverEnv } from './accounts'
 import { hasPty } from './ptyHost'
 import { emit } from './events'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { keyInfo, removeKey, saveKey, withKey } from './keyStore'
 import { createLogger, userText } from './logger'
 import { plainHttpGet, type PlainReply } from './plainHttpsJson'

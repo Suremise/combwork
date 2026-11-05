@@ -8,7 +8,7 @@ import { devConsole } from './devConsole'
 import { readFlightWhat, type FlightWhat } from '../shared/flightRecorder'
 import { providerService } from './providerService'
 import { createLogger, userText } from './logger'
-import { englishError, hiveError, shownError } from './hiveError'
+import { englishError, hiveError, shownError } from './combworkError'
 import { requireMasking } from './keyCoverage'
 import { msg } from '../shared/i18n'
 

@@ -4,7 +4,7 @@ import { resolve as resolvePath } from 'path'
 import { msg } from '../shared/i18n'
 import { failure as commandFailed, git, isBinary, MAX_DIFF_BYTES, tooLargeDiff } from './git'
 import { gitProblem } from './gitTool'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
 

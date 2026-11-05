@@ -10,7 +10,7 @@ import { inRequestScope } from '../src/shared/agentText/asyncScope'
 import { formatIcu, IcuError, parseIcu, placeholdersOf, type Part } from '../src/shared/agentText/icu'
 import { chainFromFile, loadProcessDialect } from '../src/shared/agentText/processDialect'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
-import { boardSkillsLine, controlRules, hiveInstructions, journalRule, withLatestHandover } from '../src/shared/hiveGuidance'
+import { boardSkillsLine, controlRules, hiveInstructions, journalRule, withLatestHandover } from '../src/shared/combworkGuidance'
 import { deliveredNotes } from '../src/shared/workspaceNotes'
 import { instructionsStarter } from '../src/shared/projectTabs'
 import { shareInstructions } from '../src/shared/instructions'
@@ -167,7 +167,7 @@ describe("hive-mcp.js and hive-progress.js's dialect file", () => {
   })
 
   it('is loaded by each script first, before any text is said', () => {
-    for (const entry of ['src/main/mcp/hive-mcp.ts', 'src/main/progressReporters/hive-progress.ts']) {
+    for (const entry of ['src/main/mcp/cw-mcp.ts', 'src/main/progressReporters/cw-progress.ts']) {
       const imports = [...readFileSync(join(ROOT, entry), 'utf8').matchAll(/^import\s.*$/gm)].map((m) => m[0])
       expect(imports[0], entry).toBe("import '../../shared/agentText/processDialect'")
     }

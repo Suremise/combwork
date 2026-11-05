@@ -25,7 +25,7 @@ const notes = await import('../../src/main/notes')
 const modes = await import('../../src/main/modes')
 const templates = await import('../../src/main/templates')
 const { switchMode } = await import('../../src/main/assistantMode')
-const { shownError, windowError } = await import('../../src/main/hiveError')
+const { shownError, windowError } = await import('../../src/main/combworkError')
 const { apiErrorReply, handOverFailedToast, handoverCreatedToast } = await import('../../src/main/servers')
 
 const ROOT = resolve(__dirname, '../..')

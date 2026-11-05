@@ -310,7 +310,7 @@ describe('agent-facing scripts never load the translations', () => {
     }
     return { files: [...seen].map((f) => f.slice(ROOT.length + 1).replace(/\\/g, '/')), packages: [...packages] }
   }
-  it.each(['src/main/mcp/hive-mcp.ts', 'src/main/progressReporters/hive-progress.ts'])('%s', (entry) => {
+  it.each(['src/main/mcp/cw-mcp.ts', 'src/main/progressReporters/cw-progress.ts'])('%s', (entry) => {
     const { files, packages } = reach(join(ROOT, entry))
     expect(files.length).toBeGreaterThan(1)
     expect(files.filter((f) => f.startsWith('src/shared/i18n/') && !/\/(msg|languages|languageText|locale)\.ts$/.test(f))).toEqual([])

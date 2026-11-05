@@ -49,7 +49,7 @@
       "rules": { "unicorn/require-post-message-target-origin": "off" }
     },
     {
-      "files": ["src/main/mcp/hive-mcp.ts", "src/main/progressReporters/hive-progress.ts", "src/main/progressReporters/wrapper.ts", "src/main/progressReporters/report.mts", "src/main/closeCommand/hive-close-runner.ts", "src/main/closeCommand/runner.ts", "src/main/closeCommand/listRunner.ts"],
+      "files": ["src/main/mcp/cw-mcp.ts", "src/main/progressReporters/cw-progress.ts", "src/main/progressReporters/wrapper.ts", "src/main/progressReporters/report.mts", "src/main/closeCommand/cw-close-runner.ts", "src/main/closeCommand/runner.ts", "src/main/closeCommand/listRunner.ts"],
       "rules": { "no-restricted-imports": "off" }
     }
   ],

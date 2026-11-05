@@ -4,7 +4,7 @@ import { codex } from './codex/adapter'
 import { copilot } from './copilot/adapter'
 import type { ProviderAdapter } from './types'
 import { msg } from '../../shared/i18n/msg'
-import { hiveError } from '../hiveError'
+import { hiveError } from '../combworkError'
 
 /** Every provider adapter, in display order. Adding a provider: its descriptor in shared/providers.ts and its adapter here. */
 const ADAPTERS: ProviderAdapter[] = [claudeCode, codex, copilot]

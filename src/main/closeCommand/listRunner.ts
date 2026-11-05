@@ -2,7 +2,7 @@
 // its start, each attempt of a step run by runner.ts' runJob in a folder of its own, and Hive only watches it and
 // steers it by control files. Its job.json is a snapshot: the steps' templates and the placeholders' values as the run
 // began, so editing a command meanwhile changes nothing in it; a Rerun may bring newer values (a project added since).
-// Node built-ins only: it runs outside the asar (hive-close-runner.js).
+// Node built-ins only: it runs outside the asar (cw-close-runner.js).
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync } from 'fs'
 import { join } from 'path'
 import { CONTROL_MS, fillCommand, OBSERVER_STALE_MS, type CommandValues } from '../../shared/commands'

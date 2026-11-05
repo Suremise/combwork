@@ -126,7 +126,7 @@ export const TOOLS_SERVER = 'combwork'
 /** Whether a name is the reserved server name, Combwork's own (case-insensitive, as servers' names are compared). */
 export const isReservedServerName = (name: string): boolean => name.trim().toLowerCase() === TOOLS_SERVER
 
-/** Every tool the combwork MCP server has (a test checks it against hive-mcp.ts): the only tool names metrics record. */
+/** Every tool the combwork MCP server has (a test checks it against cw-mcp.ts): the only tool names metrics record. */
 export const CW_TOOLS: readonly string[] = [
   'cw_list_projects', 'cw_project_status', 'cw_session_usage', 'cw_list_shared_notes', 'cw_read_shared_note', 'cw_write_shared_note', 'cw_doc_outline', 'cw_read_section',
   'cw_read_latest_handover', 'cw_create_handover', 'cw_notify', 'cw_list_providers', 'cw_agent_activity', 'cw_wait_for_agents',

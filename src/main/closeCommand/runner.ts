@@ -1,4 +1,4 @@
-// The close command's runner (HI-1368): a small Node process Hive starts detached (hive-close-runner.js, Hive's own
+// The close command's runner (HI-1368): a small Node process Hive starts detached (cw-close-runner.js, Hive's own
 // executable with ELECTRON_RUN_AS_NODE=1), which starts the user's command and outlives Hive if it must ("Don't wait",
 // Hive quitting). It reads the command's output as it comes, so the command never blocks on a full pipe, and keeps only
 // its last TAIL_BYTES: tail.txt and status.json in the run's folder, each rewritten whole (a temp file, then a rename)

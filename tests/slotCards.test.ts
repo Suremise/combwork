@@ -197,7 +197,7 @@ vi.mock('../src/main/sessions', async (orig) => {
       state.calls.push(how ? `${name} (${how})` : name)
       if (how === 'fails') throw new Error("its conversation couldn't resume (test)")
       if (how === 'busy') {
-        const { HiveError } = await vi.importActual<typeof import('../src/main/hiveError')>('../src/main/hiveError')
+        const { HiveError } = await vi.importActual<typeof import('../src/main/combworkError')>('../src/main/combworkError')
         const text = 'slot-a still has another session in it (test)'
         throw new HiveError({ shown: text, agent: text }, { kind: 'conflict' })
       }

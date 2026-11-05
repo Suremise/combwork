@@ -4,7 +4,7 @@
 // or another window's). A value set (an empty string too: "none", over the old `worktreeSetup` / `worktreeCopy`) is the
 // project's own; null removes it, so it falls back (slots.ts `slotOptionsOf`).
 
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { msg } from '../shared/i18n/msg'
 import type { ProjectConfig, SlotDefaults, SlotOptions, WorkflowLevel } from '../shared/types'
 import { config } from './config'

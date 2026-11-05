@@ -72,7 +72,7 @@ describe("a lane's brief (#1280)", () => {
   })
 
   it('every Combwork tool it names is one the Combwork MCP server has', () => {
-    const server = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+    const server = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
     const text = ['builder', 'reviewer'].map((r) => laneBrief(input(), r as 'builder' | 'reviewer')).join('\n') + laneRules(null).join('\n')
     const named = [...new Set(text.match(/cw_[a-z_]+/g))]
     expect(named.length).toBeGreaterThan(5)

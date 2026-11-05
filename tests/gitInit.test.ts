@@ -30,7 +30,7 @@ vi.mock('../src/main/mergeSlotHost', () => ({ mergeSlots: {} }))
 vi.mock('../src/main/branchWatch', () => ({ checkProject: async () => undefined }))
 
 const { initCheck, initRepo } = await import('../src/main/gitInit')
-const { HiveError, shownError } = await import('../src/main/hiveError')
+const { HiveError, shownError } = await import('../src/main/combworkError')
 const { setLanguage } = await import('../src/shared/i18n')
 const { shownText } = await import('../src/shared/advanced')
 

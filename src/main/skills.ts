@@ -10,7 +10,7 @@ import { bundledDir, bundledIds, bundledStatus, restoreBundled } from './bundled
 import { copyDir, COPY_MARKER, isDir, isFile, readDirBounded } from './fsutil'
 import { englishText, withValues, type Text, type TextValues } from '../shared/advanced'
 import { msg, type Msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { createLogger } from './logger'
 import { headerOf, SKILL_HEAD_MAX } from './revisions'
 import { workspace, workspaceOf } from './workspace'

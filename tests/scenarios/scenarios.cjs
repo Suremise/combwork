@@ -1062,7 +1062,7 @@ const sentMessage = (c) => {
 }
 /** The delivery of the second message the Assistant left (`c.sent2`), as sentMessage. */
 const secondMessage = (c) => sentMessage({ sent: c.sent2, got: c.got })
-const contractWas = (o, on) => o.measures?.coreChars === require('../../src/shared/hiveGuidance.ts').hiveInstructions('alpha', 'agent', on).length
+const contractWas = (o, on) => o.measures?.coreChars === require('../../src/shared/combworkGuidance.ts').hiveInstructions('alpha', 'agent', on).length
 
 module.exports.FIXTURES_VERSION = FIXTURES_VERSION
 /**

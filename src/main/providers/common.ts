@@ -8,7 +8,7 @@ import type { AgentInstallInfo, ReadinessIssue, RecacheEstimate, SessionUsage } 
 import { readFirstLineOf } from '../transcriptFiles'
 import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, sourceProblem, swapIn, swapOut, tooBigToDeliver, withFileLock } from '../fsutil'
 import { createLogger, userText } from '../logger'
-import { hiveError } from '../hiveError'
+import { hiveError } from '../combworkError'
 import { git } from '../git'
 import type { HookIds, LaunchContext, SkillCopyBook, SkillCopyRecord, SkillDelivery } from './types'
 

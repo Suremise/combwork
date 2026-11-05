@@ -1,11 +1,11 @@
-// HI-2462, HR1's round 1: the folder move's card rewrite (hiveMoveWorker.ts) reads each batch inside its own write
+// HI-2462, HR1's round 1: the folder move's card rewrite (combworkMoveWorker.ts) reads each batch inside its own write
 // transaction, so a user's edit through another connection is never overwritten: one committed before the batch is
 // read with its new text and rewritten keeping it; one tried while the batch holds the write waits (here, refused at
 // once) and lands as written after the commit. A description, a comment and a context entry. Real SQLite connections.
 import { join } from 'path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
-import { cardsTestHooks, rewriteCards } from '../src/main/hiveMoveWorker'
+import { cardsTestHooks, rewriteCards } from '../src/main/combworkMoveWorker'
 import { tempDir } from './tempDir'
 
 const WS = 'D:\\ws'

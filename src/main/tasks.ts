@@ -37,7 +37,7 @@ import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow
 import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
-import { HiveError, hiveError } from './hiveError'
+import { HiveError, hiveError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { workspace, workspaceFor, type WorkspaceService } from './workspace'
 import { trash } from './trash'

@@ -10,7 +10,7 @@
 import { basename } from 'path'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
-import { HiveError, hiveError } from '../hiveError'
+import { HiveError, hiveError } from '../combworkError'
 import { foundKey, projectPlatform } from '../platform/registry'
 import { isPlatformId, type PlatformId } from '../../shared/platform/descriptors'
 import { PLATFORM_NAME, SWITCH_REFUSED, switchRefused, switchRefusalText } from '../../shared/platform/switching'

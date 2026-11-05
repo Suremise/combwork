@@ -7,7 +7,7 @@ import { shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from 
 import { allProviders, provider } from './providers'
 import type { KeySteps, UpdateRetry } from './providers/types'
 import { msg, onLanguageChange, tr } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { config } from './config'
 import { advanced } from './advanced'
 import { noteCliFolder, refreshPath } from './freshPath'

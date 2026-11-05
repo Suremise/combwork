@@ -4,21 +4,21 @@ import { join, resolve } from 'path'
 import { Worker } from 'worker_threads'
 import { CW_DIR } from '../shared/defaults'
 import { ASSISTANT_DIR } from '../shared/assistant'
-import { LEGACY_HIVE_DIR, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../shared/hiveFolderMove'
+import { LEGACY_HIVE_DIR, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../shared/combworkFolderMove'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { toast } from './events'
 import { readKeptJson, realPath, writeKeptJson, writeTextAtomic } from './fsutil'
 import { ifAbsent, lstatOrNullAsync, present } from './fsPresence'
 import { git } from './git'
-import { HiveError, errorText, hiveError } from './hiveError'
-import { excludeLine, gitDirOf, vcsOf } from './hiveVcs'
+import { HiveError, errorText, hiveError } from './combworkError'
+import { excludeLine, gitDirOf, vcsOf } from './combworkVcs'
 import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
-import { ours, type HostKind } from './hiveFolder'
+import { ours, type HostKind } from './combworkFolder'
 import { withNamedLock } from './repoLock'
 import { projectNamesDone, record as recordNames, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
-import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolders, CopyFoldersAnswer } from './hiveMoveWorker'
+import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolders, CopyFoldersAnswer } from './combworkMoveWorker'
 
 /**
  * The move of a workspace's `.hive` folders to `.combwork` (HI-2462, SPEC §4.1.1; the design is the card's: HI-2462/s21,
@@ -39,7 +39,7 @@ import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolde
  *   runs again over all of it (each is idempotent), and the hash is written once the last has worked.
  * - **Never moved**: another tool's `.hive`, a `.hive` beside a `.combwork` with no marker (both: `.combwork` is used,
  *   `.hive` left as it is, a warning), a linked `.hive`, a host whose real place is outside the workspace. Stored paths,
- *   links and a conversation's folder are translated through the map alone (shared/hiveFolderMove.ts).
+ *   links and a conversation's folder are translated through the map alone (shared/combworkFolderMove.ts).
  */
 
 const log = createLogger('hiveMove')
@@ -560,24 +560,24 @@ export async function rewriteNotes(dir: string, moves: FolderMove[]): Promise<nu
 }
 
 /** The worker's script, beside main's; in unit tests (no build) its code runs here. */
-const workerScript = (): string => join(__dirname, 'hive-move-worker.js')
+const workerScript = (): string => join(__dirname, 'cw-move-worker.js')
 
-/** Rewrites the board's cards in the worker (hiveMoveWorker.ts). */
+/** Rewrites the board's cards in the worker (combworkMoveWorker.ts). */
 export function rewriteCardsOffMain(job: CardsRewrite): Promise<CardsAnswer> {
-  return inMoveWorker<CardsAnswer>(job, async () => (await import('./hiveMoveWorker')).rewriteCards(job))
+  return inMoveWorker<CardsAnswer>(job, async () => (await import('./combworkMoveWorker')).rewriteCards(job))
 }
 
-/** Checkpoints and closes the board's old file in the worker (hiveMoveWorker.ts), before its rename (HI-2587). */
+/** Checkpoints and closes the board's old file in the worker (combworkMoveWorker.ts), before its rename (HI-2587). */
 export function checkpointOffMain(file: string): Promise<CheckpointAnswer> {
   const job: Checkpoint = { kind: 'checkpoint', file }
-  return inMoveWorker<CheckpointAnswer>(job, async () => (await import('./hiveMoveWorker')).checkpointFile(job))
+  return inMoveWorker<CheckpointAnswer>(job, async () => (await import('./combworkMoveWorker')).checkpointFile(job))
 }
 
 /** The folders the board's skill copies records name, read in the worker (HI-2587's marker step); none without a board. */
 export async function copyFoldersOffMain(file: string): Promise<string[]> {
   if (!present(file)) return []
   const job: CopyFolders = { kind: 'copyFolders', file }
-  const a = await inMoveWorker<CopyFoldersAnswer>(job, async () => (await import('./hiveMoveWorker')).copyFolders(job))
+  const a = await inMoveWorker<CopyFoldersAnswer>(job, async () => (await import('./combworkMoveWorker')).copyFolders(job))
   if (!a.ok) throw new Error(a.error)
   return a.folders
 }

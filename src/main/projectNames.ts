@@ -4,7 +4,7 @@ import { CW_DIR } from '../shared/defaults'
 import { isProjectId } from '../shared/projectIds'
 import { readKeptJson, retryWhileSaving, withFileLock, writeKeptJson } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { createLogger, userText } from './logger'
 import type { ProjectSeen, WorkspaceService } from './workspace'
 

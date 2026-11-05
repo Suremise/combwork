@@ -18,7 +18,7 @@ const { syncAgentsSkills, removeHiveCopies } = await import('../src/main/provide
 const { contentHash } = await import('../src/main/fsutil')
 const { SKILLS_REMOVE_IDLE_COPIES } = await import('../src/shared/advanced')
 const { offNames, skillOff, withSkillDelivered } = await import('../src/shared/skillDelivery')
-const { boardSkillsLine, hiveInstructions } = await import('../src/shared/hiveGuidance')
+const { boardSkillsLine, hiveInstructions } = await import('../src/shared/combworkGuidance')
 
 /** A book kept in memory, as combwork.db's table keeps it (by folder and skill, case-insensitively). */
 function memBook(): SkillCopyBook & { rows: Map<string, SkillCopyRecord & { folder: string }> } {

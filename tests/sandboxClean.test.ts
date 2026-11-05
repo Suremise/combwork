@@ -42,7 +42,7 @@ test('a folder: names and text files searched, logs apart, a profile\'s binaries
   write(path.join(install, 'resources', 'hive-skills', 'SKILL.md'), '# A skill\n')
   write(path.join(install, 'resources', 'notes.txt'), 'Made by Combwork.\nHive Desktop moved.\n')
   write(path.join(install, 'resources', 'utf16.txt'), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('From HIVE_USER_DATA', 'utf16le')]))
-  write(path.join(install, 'resources', 'app.asar'), Buffer.from('\0\0{"files":{"hiveGuidance.js":{}}}\0 .hive hive.db \0'))
+  write(path.join(install, 'resources', 'app.asar'), Buffer.from('\0\0{"files":{"combworkGuidance.js":{}}}\0 .hive hive.db \0'))
   const local = path.join(dir, 'Local', 'Combwork')
   write(path.join(local, 'logs', 'main.log'), 'started\nopened C:\\w\\.hive\\hive.db\n')
   write(path.join(local, 'combwork.db'), Buffer.from('SQLite format 3\0\0\0 card: Hive-Card trailer \0'))

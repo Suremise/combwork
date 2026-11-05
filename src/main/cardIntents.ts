@@ -9,7 +9,7 @@ import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/run
 import { refusal } from '../shared/workflow/refusals'
 import { workflowFor } from './workflow/service'
 import { workspace, type WorkspaceService } from './workspace'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { msg } from '../shared/i18n'
 import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
 import { projectPreferences } from './workflow/preferences'

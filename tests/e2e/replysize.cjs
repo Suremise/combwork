@@ -803,7 +803,7 @@ const prose = (seed, n) => {
   const ga = (after.workspace?.guidance ?? []).find((x) => x.role === 'assistant')
   // Its custom part is the journal's rule (#1032: on by default, work only).
   const journalBytes = Buffer.byteLength(`
-${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/shared/journal.ts').DEFAULT_SCOPE)}`)
+${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src/shared/journal.ts').DEFAULT_SCOPE)}`)
   check("metrics: the Assistant's launch is the workspace's own, its core, role and mode each measured, and the journal's rule as its custom part", ga?.launches >= 1 && ga.guidanceBytes > 0 && ga.roleBytes > 0 && ga.modeBytes > 0 && ga.customBytes === journalBytes, `${JSON.stringify(ga)}; the journal's rule: ${journalBytes}`)
 
   // --- cw_inbox's three forms (#1531), by each caller: the Assistant (its tool), a script with an agent's own token

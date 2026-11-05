@@ -7,7 +7,7 @@
 import { createLogger, userText } from '../logger'
 import { projectPlatform } from '../platform/registry'
 import { isPlatformId } from '../../shared/platform/descriptors'
-import { HiveError } from '../hiveError'
+import { HiveError } from '../combworkError'
 import { asksPreset } from '../../shared/workflow/presetStep'
 import { setPresetAsked } from '../../shared/workflow/projectWorkflow'
 import type { WorkspaceService } from '../workspace'

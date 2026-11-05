@@ -19,16 +19,16 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const files = await import('../../src/main/files')
 const { gitDiff } = await import('../../src/main/git')
 const gitRepo = await import('../../src/main/gitRepo')
-const { untrackHive } = await import('../../src/main/hiveVcs')
+const { untrackHive } = await import('../../src/main/combworkVcs')
 const { ownAttachmentsFolder } = await import('../../src/main/attachmentsFolder')
 const lanes = await import('../../src/main/lanes')
 const metrics = await import('../../src/main/metrics')
-const { HiveError, shownError, windowError } = await import('../../src/main/hiveError')
+const { HiveError, shownError, windowError } = await import('../../src/main/combworkError')
 const { apiErrorReply } = await import('../../src/main/servers')
 
 const ROOT = resolve(__dirname, '../..')
 const EN = JSON.parse(readFileSync(join(ROOT, 'locales/en/service.json'), 'utf8')) as Record<string, { defaultMessage: string; description: string }>
-const FILES = ['advanced.ts', 'attachmentsFolder.ts', 'benchmarks.ts', 'files.ts', 'fsutil.ts', 'git.ts', 'gitRepo.ts', 'hiveVcs.ts', 'lanes.ts', 'lineWriter.ts', 'metrics.ts', 'progress.ts', 'providerService.ts', 'transcriptReads.ts', 'transcripts.ts', 'workspace.ts']
+const FILES = ['advanced.ts', 'attachmentsFolder.ts', 'benchmarks.ts', 'files.ts', 'fsutil.ts', 'git.ts', 'gitRepo.ts', 'combworkVcs.ts', 'lanes.ts', 'lineWriter.ts', 'metrics.ts', 'progress.ts', 'providerService.ts', 'transcriptReads.ts', 'transcripts.ts', 'workspace.ts']
 
 /** A German translation of some of the area's messages, as a language file gives them (the rest stays English). */
 const GERMAN: Record<string, string> = {

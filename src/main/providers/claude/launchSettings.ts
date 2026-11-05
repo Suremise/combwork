@@ -2,7 +2,7 @@ import { isAbsolute, join } from 'path'
 import { open, stat } from 'original-fs/promises'
 import { SETTINGS_FILE_LIMIT, SETTINGS_READ_CHUNK, settingsArgValue } from './autoCompact'
 import { msg } from '../../../shared/i18n/msg'
-import { errorText, hiveError } from '../../hiveError'
+import { errorText, hiveError } from '../../combworkError'
 
 /**
  * A `--settings` in the user's own arguments (#330). Claude Code reads only the last `--settings` it is given (checked

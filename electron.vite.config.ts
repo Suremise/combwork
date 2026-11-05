@@ -43,10 +43,10 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           // The scripts agents' sessions run, named for what agents see (HI-2463: cw-*); their sources keep hive-* names.
-          'cw-mcp': resolve(__dirname, 'src/main/mcp/hive-mcp.ts'),
-          'cw-progress': resolve(__dirname, 'src/main/progressReporters/hive-progress.ts'),
+          'cw-mcp': resolve(__dirname, 'src/main/mcp/cw-mcp.ts'),
+          'cw-progress': resolve(__dirname, 'src/main/progressReporters/cw-progress.ts'),
           // The close commands' runner (HI-1368), run as Node outside the asar.
-          'cw-close-runner': resolve(__dirname, 'src/main/closeCommand/hive-close-runner.ts'),
+          'cw-close-runner': resolve(__dirname, 'src/main/closeCommand/cw-close-runner.ts'),
           // The usage history's worker thread (#1106).
           'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
           // The repository lock's worker thread (HI-1680).
@@ -64,7 +64,7 @@ export default defineConfig({
           // Codex's log's worker thread (HI-1972).
           'codex-log-worker': resolve(__dirname, 'src/main/codexLogWorker.ts'),
           // The .hive → .combwork move's card rewrite (HI-2462).
-          'hive-move-worker': resolve(__dirname, 'src/main/hiveMoveWorker.ts')
+          'cw-move-worker': resolve(__dirname, 'src/main/combworkMoveWorker.ts')
         }
       }
     }

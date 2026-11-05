@@ -13,8 +13,8 @@ const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 20000
 
-const userData = path.join(lib.WORK, 'hivefolder-profile')
-const ws = path.join(lib.WORK, 'hivefolder-ws')
+const userData = path.join(lib.WORK, 'combworkfolder-profile')
+const ws = path.join(lib.WORK, 'combworkfolder-ws')
 const alpha = path.join(ws, 'alpha')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -129,7 +129,7 @@ function folders() {
     check('the project keeps its agent', (project.agents ?? []).some((a) => a.id === 'a-coder'), JSON.stringify(project.agents))
     check('the move finished: its plan gone, its map kept', !fs.existsSync(path.join(ws, '.combwork', 'combwork-move.json')) && fs.existsSync(path.join(ws, '.combwork', 'combwork-moved.json')))
     // Opened again (another workspace, then this one): nothing moves twice.
-    const other = path.join(lib.WORK, 'hivefolder-other')
+    const other = path.join(lib.WORK, 'combworkfolder-other')
     fs.rmSync(other, { recursive: true, force: true })
     fs.mkdirSync(other, { recursive: true })
     await lib.openWorkspace(inv, page, other, HUNG_MS)

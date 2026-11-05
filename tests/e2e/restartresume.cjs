@@ -120,7 +120,7 @@ function processStart(pid) {
   return r.stdout.trim()
 }
 
-/** The installer's request, as hiveAskToClose.ps1 writes it, for a copy's process: written beside, then renamed. */
+/** The installer's request, as askToClose.ps1 writes it, for a copy's process: written beside, then renamed. */
 function writeRequest(pid, nonce) {
   const text = JSON.stringify({ v: 1, nonce, pid, pidCreated: processStart(pid), exe: lib.ELECTRON, reason: 'install', at: new Date().toISOString() })
   fs.writeFileSync(`${requestFile}.tmp`, text)

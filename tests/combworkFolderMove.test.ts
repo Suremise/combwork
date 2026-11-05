@@ -1,8 +1,8 @@
 // HI-2462: the paths stored before the .hive → .combwork move, translated through the map of folders that really moved
-// and nothing else (shared/hiveFolderMove.ts): whole paths only, any case, either separator, in a file link as
+// and nothing else (shared/combworkFolderMove.ts): whole paths only, any case, either separator, in a file link as
 // encodeURI writes it; the Assistant's inner folder before the workspace's; another folder's .hive never anyone's.
 import { describe, expect, it } from 'vitest'
-import { movedContextRef, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../src/shared/hiveFolderMove'
+import { movedContextRef, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../src/shared/combworkFolderMove'
 
 const WS = 'D:\\Work\\my ws'
 const MOVES: FolderMove[] = [

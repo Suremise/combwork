@@ -18,9 +18,9 @@ const { deliveriesOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
 
-const userData = path.join(lib.WORK, 'hivetools-profile')
-const ws = path.join(lib.WORK, 'hivetools-ws')
-const claudeHome = path.join(lib.WORK, 'hivetools-claude-home')
+const userData = path.join(lib.WORK, 'combworktools-profile')
+const ws = path.join(lib.WORK, 'combworktools-ws')
+const claudeHome = path.join(lib.WORK, 'combworktools-claude-home')
 const alpha = path.join(ws, 'alpha')
 const PORT = Number(lib.port(47873))
 const API = `http://127.0.0.1:${PORT}`

@@ -46,7 +46,7 @@ const SCOPED = new Set(['withCardNames', 'inDefaultDialect', 'inDialectOf', 'inW
 const NOTHING = new Set(['saidText', 'agentMsg', 'errorText', 'say', 'String', 'cardRef', 'basename', 'userText'])
 
 /** English formatted for any reader (the Default's, whatever dialect reads it): only the agent-text module may, and the log. */
-const ONE_WAY = { englishText: 'src/shared/advanced.ts', englishError: 'src/main/hiveError.ts', workflowEnglish: 'src/shared/workflow/texts.ts', problemEnglish: 'src/main/workflow/optionsForm.ts', agentEnglish: 'src/main/tasks.ts' }
+const ONE_WAY = { englishText: 'src/shared/advanced.ts', englishError: 'src/main/combworkError.ts', workflowEnglish: 'src/shared/workflow/texts.ts', problemEnglish: 'src/main/workflow/optionsForm.ts', agentEnglish: 'src/main/tasks.ts' }
 /** Where they are defined, and the formatting itself lives. */
 const ONE_WAY_FREE = [/^src\/shared\/advanced\.ts$/, /^src\/main\/hiveError\.ts$/, /^src\/shared\/agentText\//]
 /** A call inside a log line (`log.warn(…)`): the log's English. */
@@ -529,7 +529,7 @@ function analyzeFiles(root, files) {
     if (c.type !== 'Identifier') return null
     if (c.name === ERROR_CLASS) return ERROR_CLASS
     const d = definition(p, c.name)
-    if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts') return ERROR_CLASS
+    if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/combworkError.ts') return ERROR_CLASS
     return d?.isClassDeclaration() && errorClasses.has(d.node) ? d.node : null
   }
   // Subclasses to a fixed point (a subclass of a subclass).
@@ -541,7 +541,7 @@ function analyzeFiles(root, files) {
         const s = p.node.superClass
         if (!s || s.type !== 'Identifier' || errorClasses.has(p.node)) continue
         const d = s.name === ERROR_CLASS ? ERROR_CLASS : definition(p, s.name)
-        const isBase = d !== ERROR_CLASS && d?.isClassDeclaration?.() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts'
+        const isBase = d !== ERROR_CLASS && d?.isClassDeclaration?.() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/combworkError.ts'
         if (d === ERROR_CLASS || isBase || (d?.isClassDeclaration?.() && errorClasses.has(d.node))) {
           errorClasses.add(p.node)
           grew = true
@@ -588,7 +588,7 @@ function analyzeFiles(root, files) {
           const s = parent.superClass
           if (s?.name === ERROR_CLASS) return [[0, false]]
           const d = s ? definition(p, s.name) : null
-          if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/hiveError.ts') return [[0, false]]
+          if (d?.isClassDeclaration() && d.node.id?.name === ERROR_CLASS && fileOf(d) === 'src/main/combworkError.ts') return [[0, false]]
           parent = d?.isClassDeclaration() ? d.node : null
           const pc = parent?.body.body.find((m) => m.type === 'ClassMethod' && m.kind === 'constructor')
           if (pc) return [...(wrappers.get(pc) ?? [])]

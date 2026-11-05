@@ -130,7 +130,7 @@ describe('the tests a change needs (pickTests)', () => {
   })
 
   it('HI-1866 (fd860b662): a new src/main file and a changed suite select tests/e2esuites.test.ts', () => {
-    const paths = ['CHANGELOG.md', 'docs/USER_GUIDE.md', 'locales/de/service.json', 'locales/en/service.json', 'resources/skills/card-loop/SKILL.md', 'src/main/assistantAsk.ts', 'src/main/bundledHistory.json', 'src/main/index.ts', 'src/main/mcp/hive-mcp.ts', 'src/shared/toolReplies.ts', 'tests/assistantAsk.test.ts', 'tests/e2e/intents.cjs', 'tests/e2e/replysize.cjs', 'tests/laneWatch.test.ts', 'tests/scenarios/scenarios.cjs']
+    const paths = ['CHANGELOG.md', 'docs/USER_GUIDE.md', 'locales/de/service.json', 'locales/en/service.json', 'resources/skills/card-loop/SKILL.md', 'src/main/assistantAsk.ts', 'src/main/bundledHistory.json', 'src/main/index.ts', 'src/main/mcp/cw-mcp.ts', 'src/shared/toolReplies.ts', 'tests/assistantAsk.test.ts', 'tests/e2e/intents.cjs', 'tests/e2e/replysize.cjs', 'tests/laneWatch.test.ts', 'tests/scenarios/scenarios.cjs']
     const added = ['src/main/assistantAsk.ts', 'tests/assistantAsk.test.ts']
     expect(units({ paths, added })).toEqual(expect.arrayContaining(['tests/e2esuites.test.ts', 'tests/assistantAsk.test.ts', 'tests/laneWatch.test.ts', 'tests/guidance.test.ts', 'tests/tips.test.ts', 'tests/userGuide.test.ts', 'tests/i18n.test.ts', 'tests/bundled.test.ts']))
     // A new file alone, no suite file changed, still selects it (every AREAS path, every tracked file placed).

@@ -15,7 +15,7 @@ import { AGENT_TEMP_FOLDER_ID } from '../shared/advanced'
 import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { takesTestSeams } from './testQuiet'
 import type { WorkspaceService } from './workspace'
 

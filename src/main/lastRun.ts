@@ -17,12 +17,12 @@ import { onHiveEvent, toast } from './events'
 import { dropOfferActions, resolveOffer } from './notify'
 import { crashDumps, type CrashDump } from './exitLog'
 import { renameRetrying } from './fsutil'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { adoptInstalledRun, ownsResume } from './restartResume'
 import { inWorkspace, openWorkspaces, workspaceOf } from './workspace'
-import { dataFolder } from './hiveFolder'
+import { dataFolder } from './combworkFolder'
 
 /**
  * Hive closing unexpectedly (#984, shared/unexpectedClose.ts): the marker in the profile while Hive runs, and at the next

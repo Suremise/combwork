@@ -5,7 +5,7 @@ import type { ProviderId, Transcript, TranscriptItem, TranscriptSearchResult, Tr
 import { TRANSCRIPT_WINDOW, assertSessionId } from '../shared/defaults'
 import { formatDateTime } from '../shared/dates'
 import { msg, tr } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { provider } from './providers'
 import { searchItems, shownNotice, transcriptMarkdown } from './providers/conversation'
 import type { ConversationParserLike } from './providers/types'

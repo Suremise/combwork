@@ -49,10 +49,10 @@ export const PATCHES = [
   ['src/shared/i18n/index.ts', 'export function tr<Id extends string>(m: Msg<Id>, ...values: MessageArgs<Id>): string {', 'export function tr<Id extends string>(m: Msg<Id>, ...values: NoInfer<MessageArgs<Id>>): string {'],
   ['src/shared/advanced.ts', 'export const withValues = (m: Msg, values: TextValues): Text => ({ m, values })', `${AUDIT_V}export const withValues = <Id extends string>(m: Msg<Id>, values: NoInfer<AuditV<Id>>): Text => ({ m, values: values as TextValues })`],
   // hiveError() is typed by the message already: in the copy a plain placeholder there takes text (a Text too), not a number.
-  ['src/main/hiveError.ts', 'type ErrorArgs<Id extends string> = string extends Id', `type ErrorArgs<Id extends string> = string extends Id ? [values?: Record<string, string | Text | ${DYNAMIC}>, options?: { kind?: HiveErrorKind; cause?: unknown }] : string extends Id`],
-  ['src/main/hiveError.ts', '(m: Msg<Id>, ...[values, options]: ErrorArgs<Id>): HiveError {', '(m: Msg<Id>, ...[values, options]: NoInfer<ErrorArgs<Id>>): HiveError {'],
-  ['src/main/hiveError.ts', 'HiveMessageValues[Id][K] extends string ? string : TextPart }', 'HiveMessageValues[Id][K] extends string ? string | Text : TextPart }'],
-  ['src/main/hiveError.ts', 'withValues(m, values as TextValues)', 'withValues(m as Msg, values as never)'],
+  ['src/main/combworkError.ts', 'type ErrorArgs<Id extends string> = string extends Id', `type ErrorArgs<Id extends string> = string extends Id ? [values?: Record<string, string | Text | ${DYNAMIC}>, options?: { kind?: HiveErrorKind; cause?: unknown }] : string extends Id`],
+  ['src/main/combworkError.ts', '(m: Msg<Id>, ...[values, options]: ErrorArgs<Id>): HiveError {', '(m: Msg<Id>, ...[values, options]: NoInfer<ErrorArgs<Id>>): HiveError {'],
+  ['src/main/combworkError.ts', 'HiveMessageValues[Id][K] extends string ? string : TextPart }', 'HiveMessageValues[Id][K] extends string ? string | Text : TextPart }'],
+  ['src/main/combworkError.ts', 'withValues(m, values as TextValues)', 'withValues(m as Msg, values as never)'],
   ['src/main/gitRepo.ts', 'const refusal = (m: Msg, values?: TextValues): HiveError =>', `const refusal = <Id extends string>(m: Msg<Id>, values?: ${V}): HiveError =>`],
   // failed() adds `why` itself.
   ['src/main/gitRepo.ts', 'function failed(m: Msg, values: TextValues, r: GitResult): Error {', `function failed<Id extends string>(m: Msg<Id>, values: Omit<${V}, 'why'>, r: GitResult): Error {`],

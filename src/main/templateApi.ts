@@ -7,7 +7,7 @@ import { overlayTemplateWorkflow, TEMPLATE_PLATFORMS, type TemplateOptions, type
 import { nameTaken, suggestTemplateAgentName } from '../shared/agentNames'
 import { workspaceAgents } from './agentNames'
 import { noteChange } from './assistantChanges'
-import { HiveError } from './hiveError'
+import { HiveError } from './combworkError'
 import { agentField } from '../shared/advanced'
 import { projectKeyOf } from './projectKeys'
 import { applyConnections, connectionsPlan, listAllTemplates, listTemplates, loadTemplateWith, templatePlanEnglish } from './templates'

@@ -11,7 +11,7 @@ import { checkGit, gitExe, gitOnPath, gitProblem, gitTool, realGit, realGitBehin
 import { git, gitStatus } from '../src/main/git'
 import { withLauncherEnv } from '../src/main/gitWorker'
 import { branchStatus, createWorktree, removeCheckedWorktree, worktreeCheck } from '../src/main/worktrees'
-import { ensureHiveExcluded } from '../src/main/hiveVcs'
+import { ensureHiveExcluded } from '../src/main/combworkVcs'
 import { tempDir, tempRoot } from './tempDir'
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' })

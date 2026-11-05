@@ -711,7 +711,7 @@ describe('cost', () => {
 describe('approved labels', () => {
   it("the tool names metrics take are exactly the Combwork MCP server's tools", async () => {
     const { CW_TOOLS } = await import('../src/shared/assistantTools')
-    const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+    const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
     // A tool's name, or an intent tool's (#1267: intent('cw_submit', …)).
     const offered = [...source.matchAll(/(?:^ {4}name: |\bintent\(\s*)'(cw_[a-z_]+)'/gm)].map((m) => m[1])
     expect([...offered].sort()).toEqual([...CW_TOOLS].sort())
@@ -1251,7 +1251,7 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
 
   it("a launch's guidance in parts: core, the project's additions, the Assistant's role and mode", async () => {
     const { launchParts } = await import('../src/main/guidance')
-    const { hiveInstructions, withLatestHandover } = await import('../src/shared/hiveGuidance')
+    const { hiveInstructions, withLatestHandover } = await import('../src/shared/combworkGuidance')
     const core = hiveInstructions('alpha')
     const withHandover = withLatestHandover(core, 'handovers/alpha/one.md')
     const agent = launchParts(withHandover, 'agent', 'alpha', null)
@@ -1263,7 +1263,7 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
     expect([assistant.customBytes, assistant.roleBytes, assistant.modeBytes]).toEqual([0, utf8Bytes(text) - utf8Bytes(mode), utf8Bytes(mode)])
     // The Assistant's journal (HI-2112): off, the contract is all core; on, its skills line changes inside the contract
     // (HI-2048), which is still core, and its rule after it is custom.
-    const { journalRule } = await import('../src/shared/hiveGuidance')
+    const { journalRule } = await import('../src/shared/combworkGuidance')
     const assistantCore = hiveInstructions('', 'assistant')
     expect(launchParts(hiveInstructions('', 'assistant', true, undefined, null), 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(assistantCore), customBytes: 0 })
     const journalOn = hiveInstructions('', 'assistant', true, undefined, ['decision', 'plan'])

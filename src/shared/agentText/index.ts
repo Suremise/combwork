@@ -19,7 +19,7 @@
 import { formatIcu, IcuError } from './icu.ts'
 import type { AgentMsg, AgentValues } from './msg.ts'
 
-// Imports name their extension: tests' scripts load agent text in plain Node (hiveGuidance.ts, through replysize.cjs).
+// Imports name their extension: tests' scripts load agent text in plain Node (combworkGuidance.ts, through replysize.cjs).
 export { agentMsg, type AgentMsg, type AgentValues } from './msg.ts'
 
 /** A resolved chain: each text an override of it changes (id → ICU text, merged down the chain), and where they came from. */

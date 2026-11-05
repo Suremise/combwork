@@ -15,7 +15,7 @@ import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from
 import { hashText, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { recordTestToken } from './testQuiet'
-import { assistantHomeIn } from './hiveFolder'
+import { assistantHomeIn } from './combworkFolder'
 
 /**
  * What the Hive Assistant may do through the Agent API, and what it did. Each workspace's Assistant gets its own

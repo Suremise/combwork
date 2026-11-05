@@ -9,7 +9,7 @@ import type { RunStatus } from './runner'
 import type { ListJob, ListStatus, ListStep } from './listRunner'
 import { resolvePoint, type CommandReason } from '../../shared/commands'
 
-// HI-1368: a close command's run, as Hive starts and follows it. Hive starts the runner (hive-close-runner.js) detached,
+// HI-1368: a close command's run, as Hive starts and follows it. Hive starts the runner (cw-close-runner.js) detached,
 // with no pipe to it; the runner starts the command and keeps its folder's status.json and tail.txt (runner.ts). Hive
 // reads those, bounded, for the panel; it never holds the command or its output.
 

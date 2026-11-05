@@ -5,7 +5,7 @@ import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
 import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
-import { capturedText, errorText, hiveError, HiveError, shownError } from './hiveError'
+import { capturedText, errorText, hiveError, HiveError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
 import { overridesNow } from './advancedValues'
@@ -156,7 +156,7 @@ import { projectPreferences } from './workflow/preferences'
 import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 import { movedFolders, movedPath } from './combworkMove'
 import { freshReasonOf, SESSION_NAMES, type FreshReason } from '../shared/sessionFresh'
-import type { FolderMove } from '../shared/hiveFolderMove'
+import type { FolderMove } from '../shared/combworkFolderMove'
 
 const log = createLogger('sessions')
 

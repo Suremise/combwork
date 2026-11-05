@@ -5,7 +5,7 @@ import { app, safeStorage } from 'electron'
 import { msg } from '../shared/i18n'
 import { emit } from './events'
 import { writeJsonAtomic } from './fsutil'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { addKeyFingerprint, resetCoverage } from './keyCoverage'
 import { createLogger } from './logger'
 

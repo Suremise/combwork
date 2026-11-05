@@ -28,7 +28,7 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 const { apiErrorReply, entryForAgents, metricsForAgents } = await import('../src/main/servers')
 const { agentEnglish, columnError, unknownTask } = await import('../src/main/tasks')
 const { agentBusyError } = await import('../src/main/taskStart')
-const { HiveError } = await import('../src/main/hiveError')
+const { HiveError } = await import('../src/main/combworkError')
 
 const ROOT = join(__dirname, '..')
 const catalogue = readCatalogue(ROOT) as Record<string, { text: string; note?: string; audience?: string }>

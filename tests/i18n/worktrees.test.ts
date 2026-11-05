@@ -18,7 +18,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const wt = await import('../../src/main/worktrees')
 const agents = await import('../../src/main/projectAgents')
 const { PruneBlocked, recreateWorktree, unlinkMissingWorktree } = await import('../../src/main/agentWorktree')
-const { shownError, windowError } = await import('../../src/main/hiveError')
+const { shownError, windowError } = await import('../../src/main/combworkError')
 const { apiErrorReply } = await import('../../src/main/servers')
 
 const ROOT = resolve(__dirname, '../..')

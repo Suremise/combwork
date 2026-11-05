@@ -32,7 +32,7 @@ import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
 
 /**
- * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/hiveError.ts
+ * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/combworkError.ts
  * has the whole contract). What they store or return as data keeps its English field, which agents, the log, old
  * records and any code matching it go on reading, and gains its text as data beside it: a `…Text` field (a `Text`,
  * shared/advanced.ts, or a `StoredText` in a file). The window shows the `…Text` in the user's language and falls back

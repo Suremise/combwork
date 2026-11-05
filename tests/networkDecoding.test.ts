@@ -11,7 +11,7 @@ const SRC = join(__dirname, '..', 'src')
 const ROOTS = ['main', 'preload', 'shared'].map((d) => join(SRC, d))
 
 /** fetch to Combwork's own local API (the Agent API on 127.0.0.1) only: the hive MCP server and hive-progress's reports. */
-const FETCH_ALLOWED = ['main/mcp/hive-mcp.ts', 'main/progressReporters/report.mts']
+const FETCH_ALLOWED = ['main/mcp/cw-mcp.ts', 'main/progressReporters/report.mts']
 /** Brotli decompression of Combwork's own data only (the journal's compressed details, usage.db's saved parser states: HI-1912). */
 const BROTLI_ALLOWED = ['main/journal.ts', 'main/usageParsers.ts']
 

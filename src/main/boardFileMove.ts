@@ -2,7 +2,7 @@ import { readdir, rename, rm, stat } from 'original-fs/promises'
 import { join } from 'path'
 import { msg, tr } from '../shared/i18n'
 import { toast } from './events'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { ifAbsent, present } from './fsPresence'
 

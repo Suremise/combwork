@@ -17,7 +17,7 @@ import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, c
 import type { McpCatalogCheck, McpCatalogFilter, McpCatalogPrepared, McpCatalogRow, McpCatalogServer, McpCatalogSettings, McpCatalogSourcePage, McpServerDef, McpShown } from '../shared/types'
 import { advanced } from './advanced'
 import { config } from './config'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { findSecretWarnings } from './mcpSecrets'
 import { checkShown, inTurn, listMcp, mcpRuns, placesNow, retarget, serverFromZip, validMcpName, writeServerNow } from './mcp'
 import { createLogger, userText } from './logger'

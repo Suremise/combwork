@@ -1,10 +1,10 @@
 import { readdir, readFile, rename } from 'original-fs/promises'
 import { join } from 'path'
-import { EXCLUDE_COMMENT } from '../shared/hiveFolderMove'
+import { EXCLUDE_COMMENT } from '../shared/combworkFolderMove'
 import { contentHash, COPY_MARKER, SwapAbandoned, swapOut, withFileLock, writeTextAtomic } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
-import { gitDirOf, vcsOf } from './hiveVcs'
+import { gitDirOf, vcsOf } from './combworkVcs'
 import { ifAbsent, present } from './fsPresence'
 
 /**

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CW_FOLDER_GUIDE, hiveVcsKey, hiveVcsText } from '@shared/hiveVcsText'
+import { CW_FOLDER_GUIDE, hiveVcsKey, hiveVcsText } from '@shared/combworkVcsText'
 import { msg, tr } from '@shared/i18n'
 import type { ProjectInfo } from '@shared/types'
 import { call, errorMessage } from '../api'

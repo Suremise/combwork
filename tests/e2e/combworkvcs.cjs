@@ -8,8 +8,8 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 
-const userData = path.join(lib.WORK, 'hivevcs-profile')
-const ws = path.join(lib.WORK, 'hivevcs-ws')
+const userData = path.join(lib.WORK, 'combworkvcs-profile')
+const ws = path.join(lib.WORK, 'combworkvcs-ws')
 const plain = path.join(ws, 'plain')
 const repo = path.join(ws, 'repo')
 const committed = path.join(ws, 'committed')
@@ -40,7 +40,7 @@ const excludeOf = (p) => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
   const state = async (p) => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.hiveVcs
-  const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `hivevcs-${name}.png`) })
+  const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `combworkvcs-${name}.png`) })
 
   // --- A repository from the start: excluded at once, and no notice.
   check("a repository's own .combwork is in its info/exclude", /^\/\.combwork\/$/m.test(excludeOf(repo)), excludeOf(repo))

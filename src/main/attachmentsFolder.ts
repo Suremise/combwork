@@ -7,7 +7,7 @@ import { ATTACHMENTS_DIR, OLD_ATTACHMENTS_DIR, isSessionFolder, movedAttachmentP
 import { CW_DIR } from '../shared/defaults'
 import { insideReal, writeJsonAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { createLogger, userText } from './logger'
 
 const log = createLogger('attachments')

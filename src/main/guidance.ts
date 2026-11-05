@@ -1,6 +1,6 @@
 import { agentMsg, currentChain, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { inDefaultDialect } from '../shared/agentText/asyncScope'
-import { assistantSkillsLine, controlRules, hiveInstructions, journalRule, sessionContract } from '../shared/hiveGuidance'
+import { assistantSkillsLine, controlRules, hiveInstructions, journalRule, sessionContract } from '../shared/combworkGuidance'
 import { taskPrompt } from '../shared/tasks'
 import type { SkillInfo } from '../shared/types'
 import { ContentTooLarge, hashText } from './fsutil'

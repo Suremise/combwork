@@ -7,7 +7,7 @@ import { basename } from 'path'
 import type { OpenProgress } from '../shared/types'
 import { msg } from '../shared/i18n'
 import { emitTo } from './events'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { createLogger, userText } from './logger'
 import type { WorkspaceService } from './workspace'
 

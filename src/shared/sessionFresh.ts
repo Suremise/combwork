@@ -3,7 +3,7 @@
 // starts. Pure: main gives it the session's record and its workspace's folder moves.
 
 import type { SessionRecord } from './types'
-import { movedPathOf, type FolderMove } from './hiveFolderMove'
+import { movedPathOf, type FolderMove } from './combworkFolderMove'
 
 /** The names a session's launches give it (SessionRecord.names, HI-2463): 2 is Combwork's (cw_ tools, [CW], cw-progress). */
 export const SESSION_NAMES = 2 as const

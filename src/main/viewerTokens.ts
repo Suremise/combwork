@@ -5,7 +5,7 @@ import type { ViewerToken } from '../shared/types'
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 
 /**
  * The Agent API's read-only viewer tokens (#620): made and revoked by the user in Settings → Agent API, each named for

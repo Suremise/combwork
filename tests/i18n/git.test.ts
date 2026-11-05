@@ -8,7 +8,7 @@ import { gitFixText, gitOldText, gitProblemEnglish, gitProblemText } from '../..
 import { folderBusy, folderBusyData, gitStatusText, gitStatusTip, headText, identityWarnings, type GitRepoSummary } from '../../src/shared/gitRepo'
 import { gitignoreName, initAbout, type GitInitCheck } from '../../src/shared/gitInit'
 import { englishText } from '../../src/shared/advanced'
-import { hiveVcsText } from '../../src/shared/hiveVcsText'
+import { hiveVcsText } from '../../src/shared/combworkVcsText'
 
 // #804: the `git` area (the Git tab, Initialise repository, the .combwork notice, and what the shared git modules say). Its
 // messages are read from the English catalogue (tests/i18nCatalogues.test.ts checks it is current); the sentences that

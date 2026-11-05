@@ -27,11 +27,11 @@ vi.mock('../src/main/git', async (importOriginal) => {
     gitReading: ((cwd, args) => (failing?.(args) ? failed() : real.gitReading(cwd, args))) as typeof real.gitReading
   }
 })
-const { ensureHiveExcluded, excludeLine, hasExcludeLine, hiveVcs, literalPattern, syncServiceOf, trackedHiveFiles, untrackHive, vcsOf } = await import('../src/main/hiveVcs')
+const { ensureHiveExcluded, excludeLine, hasExcludeLine, hiveVcs, literalPattern, syncServiceOf, trackedHiveFiles, untrackHive, vcsOf } = await import('../src/main/combworkVcs')
 afterEach(() => {
   failing = null
 })
-import { hiveVcsKey, hiveVcsText } from '../src/shared/hiveVcsText'
+import { hiveVcsKey, hiveVcsText } from '../src/shared/combworkVcsText'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-vcs-')

@@ -2,7 +2,7 @@ import { ASSISTANT_AGENT_ID, assistantModeId, modeMessage, modeSummary } from '.
 import { projectAgents } from '../shared/defaults'
 import { config } from './config'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { readMode } from './modes'
 import { sessions } from './sessions'

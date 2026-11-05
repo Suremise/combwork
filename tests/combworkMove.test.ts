@@ -26,7 +26,7 @@ const base = tempDir('combworkmove-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { MOVED_FILE, MOVE_LOCK_FILE, MARK_FILE, finishMove, moveFolders, moveTestHooks, movedFolders, movedPath, treeOf } = await import('../src/main/combworkMove')
 const { NAMES_VERSION } = await import('../src/main/nameUpgrade')
-const { dataFolder } = await import('../src/main/hiveFolder')
+const { dataFolder } = await import('../src/main/combworkFolder')
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
 const WAIT = { timeout: 30_000, interval: 25 }

@@ -76,7 +76,7 @@ describe('errors thrown at a launch (#842): English for the Agent API, as before
 
   it('says each in English exactly as before, whatever language Combwork shows, and in German to the window', async () => {
     const { userSettings } = await import('../../src/main/providers/claude/launchSettings')
-    const { shownError, windowError } = await import('../../src/main/hiveError')
+    const { shownError, windowError } = await import('../../src/main/combworkError')
     const { apiErrorReply } = await import('../../src/main/servers')
     const dir = tempDir('hive-launch-errors-')
     mkdirSync(join(dir, 'folder.json'))
@@ -111,7 +111,7 @@ describe('errors thrown at a launch (#842): English for the Agent API, as before
 
   it.runIf(process.platform === 'win32')("formats cmd.exe's limit with its numbers in each language", async () => {
     const { toSpawnable, CMD_MAX_CHARS } = await import('../../src/main/providers/common')
-    const { shownError } = await import('../../src/main/hiveError')
+    const { shownError } = await import('../../src/main/combworkError')
     setLanguage('de', GERMAN)
     const e = await caught(() => toSpawnable(join(tempDir('hive-cmd-'), 'tool.cmd'), ['x'.repeat(CMD_MAX_CHARS)]))
     expect(e.message).toMatch(/^tool\.cmd has to run through cmd\.exe, which takes a command line of at most 8,191 characters, and this launch needs about \d{1,3}(,\d{3})+\. Set the CLI's path in Settings to its \.exe \(or install the standalone CLI\), which has no such limit\.$/)

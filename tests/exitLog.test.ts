@@ -51,7 +51,7 @@ describe('every way out is logged (#985)', () => {
     readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
       const p = join(dir, e.name)
       if (e.isDirectory()) return e.name === 'mcp' || e.name === 'progressReporters' ? [] : files(p)
-      return e.name.endsWith('.ts') && e.name !== 'hive-close-runner.ts' ? [p] : []
+      return e.name.endsWith('.ts') && e.name !== 'cw-close-runner.ts' ? [p] : []
     })
 
   it('ends or restarts the app only inside exitBy()', () => {

@@ -45,7 +45,7 @@ import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWork
 import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
-import { HiveVcsNotice } from '../components/HiveVcsNotice'
+import { HiveVcsNotice } from '../components/CombworkVcsNotice'
 import { InitRepoButton } from '../components/InitRepo'
 import { MergeSlotList, projectSlots, useMergeSlots } from '../components/MergeSlots'
 import { cx, formatDuration, formatNumber, formatTokens, resetsIn, timeAgo } from '../util'

@@ -24,7 +24,7 @@ asarUnpack:
   - out/main/cw-mcp.js
   - out/main/cw-progress.js
   - out/main/cw-close-runner.js
-  # Code cw-mcp.js (or cw-progress.js) shares with the main process (e.g. shared/hiveGuidance.ts) is split into chunks,
+  # Code cw-mcp.js (or cw-progress.js) shares with the main process (e.g. shared/combworkGuidance.ts) is split into chunks,
   # which the CLIs load from outside the asar too.
   - out/main/chunks/**
 npmRebuild: false

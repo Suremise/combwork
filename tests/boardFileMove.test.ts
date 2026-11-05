@@ -21,7 +21,7 @@ vi.mock('../src/main/events', async (orig) => ({
 }))
 
 const { boardFileNeeded, boardMoveTestHooks, moveBoardFile, NEW_DB_FILE, OLD_DB_FILE } = await import('../src/main/boardFileMove')
-const { checkpointFile } = await import('../src/main/hiveMoveWorker')
+const { checkpointFile } = await import('../src/main/combworkMoveWorker')
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
 const base = tempDir('boardfilemove-')
@@ -193,7 +193,7 @@ describe('a process killed halfway through the move', () => {
       `
 const { appendFileSync } = require('fs')
 const m = require(${JSON.stringify(join(__dirname, '..', 'src', 'main', 'boardFileMove.ts'))})
-const w = require(${JSON.stringify(join(__dirname, '..', 'src', 'main', 'hiveMoveWorker.ts'))})
+const w = require(${JSON.stringify(join(__dirname, '..', 'src', 'main', 'combworkMoveWorker.ts'))})
 const [dir, out, stopAt] = process.argv.slice(2)
 // Killed outright at that point: no clean-up, no close (a crash).
 m.boardMoveTestHooks.after = (p) => { if (p === stopAt) { appendFileSync(out, 'stopped ' + p + '\\n'); process.exit(9) } }

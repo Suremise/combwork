@@ -7,7 +7,7 @@
 // change is refused, never written over (#1418's base).
 
 import { basename } from 'path'
-import { HiveError } from '../hiveError'
+import { HiveError } from '../combworkError'
 import { listLanes } from '../lanes'
 import { createLogger } from '../logger'
 import { config } from '../config'

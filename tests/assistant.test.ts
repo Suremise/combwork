@@ -8,7 +8,7 @@ import { legacyLaunchSettings as agentLaunchSettings } from '../src/shared/conne
 import type { AppSettings, ProjectConfig } from '../src/shared/types'
 import { assistantTools, controlAllows } from '../src/shared/assistantTools'
 import { assistantStatusLine } from '../src/shared/assistantStatus'
-import { controlRules } from '../src/shared/hiveGuidance'
+import { controlRules } from '../src/shared/combworkGuidance'
 import { promptArg } from '../src/main/providers/common'
 
 const settings = (patch: Partial<AppSettings['assistant']> = {}): AppSettings => ({ ...structuredClone(DEFAULT_SETTINGS), assistant: { ...structuredClone(DEFAULT_SETTINGS.assistant), ...patch } })

@@ -25,7 +25,7 @@ async function fresh() {
   const electron = await import('electron')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
   const { createViewerToken } = await import('../src/main/viewerTokens')
-  const { HiveError, windowError } = await import('../src/main/hiveError')
+  const { HiveError, windowError } = await import('../src/main/combworkError')
   // The i18n these modules use: a test's language is set here, on the same instance.
   const { setLanguage } = await import('../src/shared/i18n')
   putBack = () => setLanguage('en', {})

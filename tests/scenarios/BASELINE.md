@@ -400,7 +400,7 @@ given a card, reviews it and joins no lane), and in round 2 (v77) **isolated-che
 while other agents edit the shared folder: with `--isolated`, in a check copy at the card's revision, which the check
 records).
 - **Fakes, compared** (round 2, after HR3's round 1): both sides fixtures v77, on 152440e6, neither changing while it ran.
-  Before: the pre-change guidance (the skills, the contract, `hive-mcp.ts`, `toolReplies.ts`, `servers.ts` and
+  Before: the pre-change guidance (the skills, the contract, `cw-mcp.ts`, `toolReplies.ts`, `servers.ts` and
   `bundledHistory.json` as on 1.0.0 df336407) with the new scenarios (`fake-1444-before-v77`,
   `2026-10-24T01-59-35-fake`); after: the change (`fake-1444-after-v77`, `2026-10-24T02-35-52-fake`). Each has 124 of 124
   scenarios passing (the fakes act from scripts, so the change can't move them; they check the harness and Hive's

@@ -6,7 +6,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { controlRules, hiveInstructions, journalRule, withLatestHandover } from '../src/shared/hiveGuidance'
+import { controlRules, hiveInstructions, journalRule, withLatestHandover } from '../src/shared/combworkGuidance'
 import { taskPrompt } from '../src/shared/tasks'
 import { ASSISTANT_ONLY_TOOLS, assistantTools } from '../src/shared/assistantTools'
 import { parseSkillFrontmatter, skillFor } from '../src/main/skills'
@@ -17,13 +17,13 @@ import type { Finisher, ReviewBy } from '../src/shared/workflow/options'
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
 /**
- * What the hive tools say (HI-2434): their descriptions, replies and errors are agent messages in hive-mcp.ts, read here
+ * What the hive tools say (HI-2434): their descriptions, replies and errors are agent messages in cw-mcp.ts, read here
  * from their catalogue (id → English, both roles' and every Control level's); the server's source for the code that
  * says them (`T['<id after tool.>']`).
  */
 const TOOL_TEXTS: Record<string, string> = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(ROOT, 'agent-text', 'catalogue', 'tool.json'), 'utf8')) as Record<string, { text: string }>).map(([id, m]) => [id, m.text]))
 const TOOL_DESCRIPTIONS = Object.entries(TOOL_TEXTS).filter(([id]) => /\.(description|arg)\b/.test(id) || id.startsWith('tool.arg.')).map(([, text]) => text)
-const TOOLS_SOURCE = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+const TOOLS_SOURCE = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
 /**
  * Each bundled skill: its SKILL.md (`skill`), its reference files beside it (HI-2011: SKILL.md as a contents page, the
  * rest read only when needed), and `text`, all of them together, which the checks of what the skills say read, so a
@@ -39,7 +39,7 @@ for (const name of readdirSync(SKILLS)) {
   catalog.set(name, { audience: fm.audience!, description: fm.description ?? '', skill, refs, others, text: [skill, ...refs.values()].join('\n\n') })
 }
 /** Every hive tool the MCP server defines. */
-const TOOLS = [...readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8').matchAll(/(?:name: |\bintent\(\s*)'(cw_\w+)'/g)].map((m) => m[1])
+const TOOLS = [...readFileSync(join(ROOT, 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8').matchAll(/(?:name: |\bintent\(\s*)'(cw_\w+)'/g)].map((m) => m[1])
 const skillsNamed = (text: string): string[] => [...text.matchAll(/\b([a-z]+(?:-[a-z]+)+) skill/g)].map((m) => m[1])
 const toolsNamed = (text: string): string[] => [...new Set([...text.matchAll(/\bcw_[a-z_]+/g)].map((m) => m[0]))]
 
@@ -858,7 +858,7 @@ describe('coordinator guidance', () => {
   it("has a push or release OK given in the agent's own pane, not relayed", () => {
     expect(text()).toMatch(/An agent needs the user's OK to push or release, even one the user gives you to pass on: ask the user to answer in that agent's own pane, and don't relay it \(no message, prompt or start note carrying it/)
     // Also where the relaying would happen (asked to pass an OK on, the Assistant read no skill).
-    expect(readFileSync(join(ROOT, 'src/main/mcp/hive-mcp.ts'), 'utf8')).toMatch(/Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane\./)
+    expect(readFileSync(join(ROOT, 'src/main/mcp/cw-mcp.ts'), 'utf8')).toMatch(/Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane\./)
   })
 })
 

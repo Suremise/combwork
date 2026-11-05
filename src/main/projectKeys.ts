@@ -6,7 +6,7 @@ import { fmt, msg, tr } from '../shared/i18n'
 import { projectNow } from '../shared/projectIds'
 import { keyProblem, KEY_FORM, nameWithKey, normalKey, setCardNaming, suggestKey, type CardNames, type KeyHeld } from '../shared/projectKeys'
 import type { WorkspaceInfo } from '../shared/types'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { contextWorkspace, workspaceFor, type WorkspaceService } from './workspace'
 

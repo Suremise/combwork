@@ -2,14 +2,14 @@ import { dirname, join, relative, resolve } from 'path'
 import { appendFile, mkdir, readFile } from 'original-fs/promises'
 import { existsSync, readFileSync, statSync } from 'original-fs'
 import { CW_DIR } from '../shared/defaults'
-import { EXCLUDE_COMMENT } from '../shared/hiveFolderMove'
+import { EXCLUDE_COMMENT } from '../shared/combworkFolderMove'
 import { git, gitReading } from './git'
 import { gitTool } from './gitTool'
 import type { HiveVcs } from '../shared/types'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { hiveError } from './combworkError'
 
 /**
  * Keeping a project's .combwork (sessions, transcript backups, launch settings: this machine's, not the project's) out of

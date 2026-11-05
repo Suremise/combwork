@@ -11,7 +11,7 @@ import { agentMsg, inDefaultDialect, say, type AgentMsg } from '../../shared/age
 
 /**
  * What hive-progress says (agent text, HI-2065): its usage, refusals and run lines. It runs as the session's own process,
- * so it speaks the session's dialect (processDialect.ts, loaded first by hive-progress.ts). "hive-progress: " before a
+ * so it speaks the session's dialect (processDialect.ts, loaded first by cw-progress.ts). "hive-progress: " before a
  * line is the command's name, as a shell's error says it: protocol, not wording.
  */
 const A = {
