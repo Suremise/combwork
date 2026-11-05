@@ -4627,8 +4627,10 @@ repeating them (#533) [note §8].
   in a turn, waiting, with background tasks or runs, and able to take a line now, `readyFor`'s `idle`; a card watch
   doesn't count, HI-2333: Hive's loop wakes reach a watching agent, and what it reviews or checks holds it already),
   not reviewing another card of the project (given or
-  started its latest submission with no verdict: any card in Review, in a running lane, an ended one or none), not the
-  card's builder (`review.notAuthor`'s builders), and with G1b = 2 not one who has seen this submission: the second is
+  started its latest submission with no verdict: any card in Review, in a running lane, an ended one or none; not a card
+  waiting on that reviewer's own open question to the user, HI-2559: an `ApprovalRequested` it asked, still in For
+  you, so the card waits on the user, not on it; the card stays its, given to nobody else, and once the question is
+  answered or closed it holds the reviewer again), not the card's builder (`review.notAuthor`'s builders), and with G1b = 2 not one who has seen this submission: the second is
   given it once the first has passed. Recorded as `ReviewerAssigned { reviewer, submission }` in a write that checks
   again, from hive.db inside that transaction, the submission still waiting and the agent's dispatch leases and reviews
   (HR3's round 1: another Hive's or connection's review start or lease committed first is seen there, never a snapshot

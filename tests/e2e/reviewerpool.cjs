@@ -14,6 +14,8 @@
 //    flagged as not watching when it ends with no watch; the card's reviewer now is.
 // 5. epsilon (HI-2333, the cli project's stall on rc.19): its one pooled reviewer, watching a card in its loop, is still
 //    free: given the card's revised design and then its submission, each told once and read.
+// 6. zeta (HI-2559, the cli project's stall on 5 Nov): its one pooled reviewer, its card held on its own question to
+//    the user, is free for the other lane's card: given its waiting design and then its submission, each told once.
 // Screenshots of Start Lane with the pool chosen and of the lane's row, in both themes; the builder's brief as text.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -32,6 +34,7 @@ const beta = path.join(ws, 'beta')
 const gamma = path.join(ws, 'gamma')
 const delta = path.join(ws, 'delta')
 const epsilon = path.join(ws, 'epsilon')
+const zeta = path.join(ws, 'zeta')
 const slotsRoot = path.join(`${ws}.worktrees`, 'alpha')
 const PORT = Number(lib.port(47805))
 const identity = { name: 'Hive Pool Test', email: 'pool@example.com' }
@@ -53,14 +56,14 @@ const commitIn = (dir, files, message, trailer) => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
-  for (const p of [alpha, beta, gamma, delta, epsilon]) {
+  for (const p of [alpha, beta, gamma, delta, epsilon, zeta]) {
     lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
     lib.git(p, ['branch', '-M', 'main'])
     // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
     lib.git(p, ['config', 'user.name', identity.name])
     lib.git(p, ['config', 'user.email', identity.email])
   }
-  const env = lib.fakeClaude(userData, home, [alpha, beta, gamma, delta, epsilon, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
+  const env = lib.fakeClaude(userData, home, [alpha, beta, gamma, delta, epsilon, zeta, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -443,6 +446,70 @@ const commitIn = (dir, files, message, trailer) => {
     check('…its three assignments told in at most two tries each (no pass looping on a refused line)', tellings >= 3 && tellings <= 6, String(tellings))
     await idle(epsilon, er1.id)
     check('EP-R1 reviews and passes Z: Done', (await intent(ter, z, 'start-review')).status === 200 && (await intent(ter, z, 'verdict', { pass: true, comment: 'Z: passed' })).status === 200 && !!(await until(async () => (await card(z))?.column === 'done', HUNG_MS)), (await card(z))?.column)
+
+    // --- 6. zeta (HI-2559, the cli project's stall on 5 Nov): one pooled reviewer, ZE-R1, two pool lanes. Reviewing P,
+    // it is busy: Q's design waits. It asks the user about P and watches P: the request (a board change, no pass asked
+    // by the test) frees it, so Q's waiting design goes to it, and then Q's submission, each told once and read, while
+    // P's question stays open and P stays ZE-R1's. The user answers; ZE-R1 passes both: Done.
+    await inv('workflow:setOptions', zeta, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
+    const zb1 = await lib.addAgent(inv, zeta, { name: 'ZE-B1', workflowRole: 'builder' })
+    const zb2 = await lib.addAgent(inv, zeta, { name: 'ZE-B2', workflowRole: 'builder' })
+    const zr1 = await lib.addAgent(inv, zeta, { name: 'ZE-R1', workflowRole: 'reviewer' })
+    const p = await create(zeta, 'Pool P')
+    const q = await create(zeta, 'Pool Q')
+    const keyP = (await card(p)).key
+    const keyQ = (await card(q)).key
+    const lp = await inv('lanes:start', zeta, { builder: zb1.id, reviewer: null, pool: true, cards: [p] })
+    const lq = await inv('lanes:start', zeta, { builder: zb2.id, reviewer: null, pool: true, cards: [q] })
+    check("zeta's two lanes start on the pool", lp.lane.pool === true && lq.lane.pool === true, JSON.stringify([lp, lq]))
+    const tzb1 = await tokenOf(zeta, zb1.id)
+    const tzb2 = await tokenOf(zeta, zb2.id)
+    check('ZE-B1 starts P', (await intent(tzb1, p, 'start')).status === 200)
+    const revP = commitIn(zeta, { 'p.txt': 'p\n' }, 'P done', keyP)
+    check('ZE-B1 submits P', (await intent(tzb1, p, 'submit', { summary: 'P: ready', revision: revP })).status === 200 && !!(await until(async () => (await card(p))?.column === 'review', HUNG_MS)))
+    check('P goes to ZE-R1', !!(await until(async () => JSON.stringify(await assigned(p)) === JSON.stringify([zr1.id]), HUNG_MS)), JSON.stringify(await assigned(p)))
+    const zToldOf = async (what) => (await deliveryRows('zeta', zr1.name)).filter((dv) => dv.text.includes(what) && dv.text.includes('from the pool'))
+    const zReadOnce = (what) => until(async () => {
+      const given = (await zToldOf(what)).filter((dv) => dv.state !== 'cancelled')
+      return given.length === 1 && ['received', 'acked'].includes(given[0].state)
+    }, HUNG_MS)
+    check('…told once, and it reads it', !!(await zReadOnce(`${keyP} (ZE-B1's card) is in Review`)), JSON.stringify(await zToldOf(keyP)))
+    const tzr = await tokenOf(zeta, zr1.id)
+    await idle(zeta, zr1.id)
+    check('ZE-R1 starts reviewing P', (await intent(tzr, p, 'start-review')).status === 200)
+    const designsQ = async () => (await facts(q)).filter((f) => f.kind === 'ReviewerAssigned' && f.data.design).map((f) => f.data.reviewer)
+    check('ZE-B2 starts Q and posts a design', (await intent(tzb2, q, 'start')).status === 200 && (await intent(tzb2, q, 'loop-step', { step: 'design', text: 'Q: the plan' })).status === 200)
+    const q1 = `${keyQ}/s${(await facts(q)).findLast((f) => f.kind === 'LoopStep' && f.data.step === 'design').seq}`
+    // Busy with P (no question yet): the design waits, its lane waiting for a reviewer. (That nothing gives it while ZE-R1
+    // is busy is the unit tests' control; here, what follows is what frees it.)
+    check('…ZE-R1, reviewing P, is busy: the design waits for a reviewer', !!(await until(async () => (await lane(lq.lane.id))?.status?.reason === 'reviewer', HUNG_MS)) && JSON.stringify(await designsQ()) === '[]', JSON.stringify({ given: await designsQ(), status: (await lane(lq.lane.id))?.status }))
+    // ZE-R1 asks the user about P, then watches P (as the cli's CR1 did).
+    const askP = await intent(tzr, p, 'ask', { kind: 'decide', text: 'Do you accept the bounded "not reproduced" conclusion?' })
+    const askReq = (await facts(p)).findLast((f) => f.kind === 'ApprovalRequested' && f.data.asker === zr1.id)?.data?.request
+    check('ZE-R1 asks the user about P', askP.status === 200 && !!askReq, JSON.stringify(askP.body))
+    await idle(zeta, zr1.id)
+    await lib.typeLine(inv, lib.ptyKey(zeta, zr1.id), home, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${p}`], changes: ['comment', 'verdict'], wake: true })}`, { live: () => live(zeta, zr1.id) })
+    check('ZE-R1 watches P', !!(await until(async () => (await live(zeta, zr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(zeta, zr1.id)))
+    check("Q's waiting design goes to ZE-R1, P held on its question (HI-2559)", !!(await until(async () => JSON.stringify(await designsQ()) === JSON.stringify([zr1.id]), HUNG_MS)), JSON.stringify(await designsQ()))
+    check('…told of it once, and it reads it', !!(await zReadOnce(q1)), JSON.stringify(await zToldOf(q1)))
+    await idle(zeta, zr1.id)
+    check('ZE-R1 answers the design: ok', (await intent(tzr, q, 'loop-step', { step: 'ok', design: q1, text: 'Q: good' })).status === 200)
+    await lib.typeLine(inv, lib.ptyKey(zeta, zr1.id), home, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${p}`], changes: ['comment', 'verdict'], wake: true })}`, { live: () => live(zeta, zr1.id) })
+    check('ZE-R1 watches P again', !!(await until(async () => (await live(zeta, zr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(zeta, zr1.id)))
+    const revQ = commitIn(zeta, { 'q.txt': 'q\n' }, 'Q done', keyQ)
+    check('ZE-B2 submits Q', (await intent(tzb2, q, 'submit', { summary: 'Q: ready', revision: revQ })).status === 200 && !!(await until(async () => (await card(q))?.column === 'review', HUNG_MS)))
+    check('Q goes to ZE-R1, watching, P still held', !!(await until(async () => JSON.stringify(await assigned(q)) === JSON.stringify([zr1.id, zr1.id]), HUNG_MS)), JSON.stringify(await assigned(q)))
+    check('…told once that it reviews Q from the pool, and it reads it', !!(await zReadOnce(`${keyQ} (ZE-B2's card) is in Review`)), JSON.stringify(await zToldOf(keyQ)))
+    const factsP = await facts(p)
+    const openAsk = (await inv('tasks:list')).find((c) => c.number === p)
+    check("P's question is still open, and P still ZE-R1's: never released or given again", JSON.stringify(await assigned(p)) === JSON.stringify([zr1.id]) && !factsP.some((f) => f.kind === 'ReviewerReleased') && factsP.some((f) => f.kind === 'ApprovalRequested' && f.data.request === askReq) && !factsP.some((f) => f.kind === 'Approval'), JSON.stringify({ assigned: await assigned(p), forYou: openAsk?.forYou }))
+    check('…and told of P once only', (await zToldOf(keyP)).filter((dv) => dv.state !== 'cancelled').length === 1, JSON.stringify(await zToldOf(keyP)))
+    // The user answers; ZE-R1 passes P and Q: both Done.
+    await inv('tasks:answer', p, askReq, { outcome: 'answered', reply: 'Yes' })
+    await inv('watch:cancel', zeta, zr1.id)
+    await idle(zeta, zr1.id)
+    check('ZE-R1 passes P: Done', (await intent(tzr, p, 'verdict', { pass: true, comment: 'P: passed' })).status === 200 && !!(await until(async () => (await card(p))?.column === 'done', HUNG_MS)), (await card(p))?.column)
+    check('ZE-R1 passes Q: Done', (await intent(tzr, q, 'start-review')).status === 200 && (await intent(tzr, q, 'verdict', { pass: true, comment: 'Q: passed' })).status === 200 && !!(await until(async () => (await card(q))?.column === 'done', HUNG_MS)), (await card(q))?.column)
   } catch (err) {
     check('no unexpected error', false, err.stack)
   } finally {
