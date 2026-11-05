@@ -103,8 +103,8 @@ describe('the workflow text in every locale', () => {
 
   it("renders a submit.checksPassed refusal recorded before its text took the last run's reason, in every locale (HR1's #1654 round 1)", async () => {
     // A Refused fact's values as they were stored then: no why, files or copy.
-    const before = { card: 'AM-12', check: 'lint', revision: 'a3f2c1d', command: 'hive-progress --check lint --card AM-12' }
-    expect(refusal('submit.checksPassed', before)).toMatchObject({ message: "Review refused: lint hasn't passed on a3f2c1d.", next: 'Run hive-progress --check lint --card AM-12, then submit again.' })
+    const before = { card: 'AM-12', check: 'lint', revision: 'a3f2c1d', command: 'cw-progress --check lint --card AM-12' }
+    expect(refusal('submit.checksPassed', before)).toMatchObject({ message: "Review refused: lint hasn't passed on a3f2c1d.", next: 'Run cw-progress --check lint --card AM-12, then submit again.' })
     for (const code of LOCALES) {
       setLanguage(code, await loadCatalogue(code), code)
       const shown = refusalLines('submit.checksPassed', before, WINDOW)
@@ -112,7 +112,7 @@ describe('the workflow text in every locale', () => {
         expect(line, code).not.toMatch(/[{}]/)
         expect(line, code).toContain('lint')
       }
-      expect(shown.next, code).toContain('hive-progress --check lint --card AM-12')
+      expect(shown.next, code).toContain('cw-progress --check lint --card AM-12')
       // A value it has is kept: the new reason shows.
       expect(refusalLines('submit.checksPassed', { ...before, why: 'changed', files: 'src/a.ts', copy: 'yes' }, WINDOW).message, code).toContain('src/a.ts')
     }
