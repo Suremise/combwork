@@ -83,7 +83,7 @@
   "content.templates.failed": "No se cambió nada: {error}",
   "content.templates.fenced": "Se está cargando una plantilla en este proyecto",
   "content.templates.gone": "Esa plantilla ya no existe.",
-  "content.templates.hiveOnly": "Las plantillas propias de Combwork no se pueden cambiar: duplica una al espacio de trabajo o a un proyecto para cambiarla.",
+  "content.templates.combworkOnly": "Las plantillas propias de Combwork no se pueden cambiar: duplica una al espacio de trabajo o a un proyecto para cambiarla.",
   "content.templates.importNotJson": "No es una plantilla de agentes de Combwork (no es JSON).",
   "content.templates.importTooLarge": "No es una plantilla de agentes de Combwork (ocupa más de {kb} KB).",
   "content.templates.loading": "Ya se está cargando una plantilla en este proyecto.",

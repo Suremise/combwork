@@ -9,7 +9,7 @@
   },
   "main.accounts.folderNotUsable": {
     "defaultMessage": "{name}'s folder isn't the one Combwork made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.",
-    "description": "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made."
+    "description": "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Combwork made."
   },
   "main.accounts.inUse": {
     "defaultMessage": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
@@ -37,7 +37,7 @@
   },
   "main.accounts.noProvider": {
     "defaultMessage": "{cli} can't have sign-in connections in Combwork yet.",
-    "description": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Hive keeps no connections for."
+    "description": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Combwork keeps no connections for."
   },
   "main.accounts.notFound": {
     "defaultMessage": "There is no such connection.",
@@ -57,7 +57,7 @@
   },
   "main.accounts.setUpCancelled": {
     "defaultMessage": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.",
-    "description": "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started."
+    "description": "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Combwork was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started."
   },
   "main.accounts.usageMove.bad": {
     "defaultMessage": "Choose a share from 1% to 100%, a limit, and another account of the same CLI to move its agents to.",
@@ -101,7 +101,7 @@
   },
   "main.antivirus.timeout": {
     "defaultMessage": "PowerShell took longer than {seconds} s",
-    "description": "An error in Settings → Workspace → Antivirus scanning: Hive's PowerShell check didn't finish in time."
+    "description": "An error in Settings → Workspace → Antivirus scanning: Combwork's PowerShell check didn't finish in time."
   },
   "main.antivirus.tooLong": {
     "defaultMessage": "That change waited too long for an answer: ask again.",
@@ -117,7 +117,7 @@
   },
   "main.assistantQuestion.answered": {
     "defaultMessage": "Answered",
-    "description": "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short."
+    "description": "What the notification of a question from the Combwork Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short."
   },
   "main.assistantQuestion.stop.message": {
     "defaultMessage": "The Assistant wants to stop {agent}, which is {state}.{hasReason, select, yes { Its reason: {reason}} other {}} Its conversation is kept and can be resumed.",
@@ -129,11 +129,11 @@
   },
   "main.assistantQuestion.stop.state": {
     "defaultMessage": "{status, select, working {working} waiting {waiting for the user} signin {waiting for the user to sign in to its CLI again (its sign-in expired)} starting {starting} background {waiting on background tasks it started} watching {waiting for cards to change (a card watch: its card loop pauses until it is resumed)} ready {idle} finished {idle (finished its task)} error {in error} stopped {stopped} other {{status}}}",
-    "description": "What an agent is doing, inside \"The Assistant wants to stop <agent>, which is …\". The other branch is its status as Hive names it in code: keep {status}."
+    "description": "What an agent is doing, inside \"The Assistant wants to stop <agent>, which is …\". The other branch is its status as Combwork names it in code: keep {status}."
   },
   "main.assistantQuestion.stop.title": {
     "defaultMessage": "Stop {agent} in {project}?",
-    "description": "A question from the Hive Assistant to the user, in its panel (and a notification while the panel is hidden): it wants to stop an agent that is busy. {agent} is the agent's name, {project} its project's."
+    "description": "A question from the Combwork Assistant to the user, in its panel (and a notification while the panel is hidden): it wants to stop an agent that is busy. {agent} is the agent's name, {project} its project's."
   },
   "main.assistantQuestion.stop.yes": {
     "defaultMessage": "Stop",
@@ -141,23 +141,23 @@
   },
   "main.board.damagedBody": {
     "defaultMessage": "{files} stayed out of the board. They are kept in {folder}.",
-    "description": "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept."
+    "description": "The notice about card files Combwork couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept."
   },
   "main.board.damagedTitle": {
     "defaultMessage": "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}",
-    "description": "A notice as Hive moved the board's cards into its database: some card files weren't valid. {n} is how many."
+    "description": "A notice as Combwork moved the board's cards into its database: some card files weren't valid. {n} is how many."
   },
   "main.board.foundBody": {
     "defaultMessage": "They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.",
-    "description": "The notice about cards an older Hive saved: {folder} is the folder where they are kept."
+    "description": "The notice about cards an older Combwork saved: {folder} is the folder where they are kept."
   },
   "main.board.foundTitle": {
     "defaultMessage": "{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}",
-    "description": "A notice: this workspace was opened in an older Hive meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many."
+    "description": "A notice: this workspace was opened in an older Combwork meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many."
   },
   "main.board.review": {
     "defaultMessage": "Review…",
-    "description": "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it."
+    "description": "A button on the notice about cards an older Combwork saved: opens a dialog listing them, to add each to the board or discard it."
   },
   "main.branchMerge.cardWork": {
     "defaultMessage": "{branch} is {card}'s work: merge it through its card, or confirm merging it here.",
@@ -170,6 +170,42 @@
   "main.branchMerge.same": {
     "defaultMessage": "{branch} can't be merged into itself.",
     "description": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch})."
+  },
+  "main.combworkMove.bothBody": {
+    "defaultMessage": "Combwork uses .combwork and leaves .hive as it is. Move anything you still need out of .hive yourself.",
+    "description": "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other. Keep .hive and .combwork as they are."
+  },
+  "main.combworkMove.bothTitle": {
+    "defaultMessage": "{folder} has both a .hive and a .combwork folder",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its old name (.hive) and its new one (.combwork). Keep .hive and .combwork as they are."
+  },
+  "main.combworkMove.linkBody": {
+    "defaultMessage": "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.",
+    "description": "The warning's text (HI-2462): why the .hive folder wasn't renamed, and how the user can do it. Keep .hive and .combwork as they are."
+  },
+  "main.combworkMove.linkTitle": {
+    "defaultMessage": "{folder}'s .hive folder wasn't moved",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder}'s .hive wasn't renamed .combwork. Keep .hive and .combwork as they are."
+  },
+  "main.combworkMove.what.cards": {
+    "defaultMessage": "the paths in cards",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): links and paths in cards' descriptions and comments."
+  },
+  "main.combworkMove.what.excludes": {
+    "defaultMessage": "git's exclude lines",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): the lines that keep the folder out of git."
+  },
+  "main.combworkMove.what.folders": {
+    "defaultMessage": "the agents' folders inside it",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): slots and other agents' folders kept inside the moved folder."
+  },
+  "main.combworkMove.what.notes": {
+    "defaultMessage": "the paths in shared notes and handovers",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed)."
+  },
+  "main.combworkMove.what.worktrees": {
+    "defaultMessage": "the worktrees inside it",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): git worktrees kept inside the moved folder."
   },
   "main.connections.badMode": {
     "defaultMessage": "{cli} has no permission mode {mode}.",
@@ -197,11 +233,11 @@
   },
   "main.connections.launch.changedAgain": {
     "defaultMessage": "{agent}'s connection was changed again while it was starting. Start it again.",
-    "description": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)."
+    "description": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Combwork started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)."
   },
   "main.connections.launch.changing": {
     "defaultMessage": "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.",
-    "description": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as."
+    "description": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Combwork checked who it is signed in as."
   },
   "main.connections.launch.deleted": {
     "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.",
@@ -261,19 +297,19 @@
   },
   "main.corrupt.damaged": {
     "defaultMessage": "{file} was damaged",
-    "description": "A notice: one of Hive's settings or record files couldn't be read. {file} is its name."
+    "description": "A notice: one of Combwork's settings or record files couldn't be read. {file} is its name."
   },
   "main.corrupt.defaultsBody": {
     "defaultMessage": "Combwork had no good copy, so it started from defaults. The damaged file was kept as {aside}.",
-    "description": "The notice about a damaged file Hive had no good copy of. {aside} is where the damaged file was kept."
+    "description": "The notice about a damaged file Combwork had no good copy of. {aside} is where the damaged file was kept."
   },
   "main.corrupt.restored": {
     "defaultMessage": "{file} was damaged and has been restored",
-    "description": "A notice: one of Hive's settings or record files couldn't be read, and Hive went back to its last good copy. {file} is its name."
+    "description": "A notice: one of Combwork's settings or record files couldn't be read, and Combwork went back to its last good copy. {file} is its name."
   },
   "main.corrupt.restoredBody": {
     "defaultMessage": "Combwork went back to its last good copy. The damaged file was kept as {aside}.",
-    "description": "The notice about a damaged file Hive restored. {aside} is where the damaged file was kept."
+    "description": "The notice about a damaged file Combwork restored. {aside} is where the damaged file was kept."
   },
   "main.danger.off": {
     "defaultMessage": "{modes} turned off",
@@ -281,7 +317,7 @@
   },
   "main.danger.offBody": {
     "defaultMessage": "These projects were switched back to Inherit: {projects}. Running sessions keep their mode until restarted.",
-    "description": "The notice after dangerous permission modes were turned off: the projects that used one. Inherit is a choice of the project's settings: keep it as Hive shows it."
+    "description": "The notice after dangerous permission modes were turned off: the projects that used one. Inherit is a choice of the project's settings: keep it as Combwork shows it."
   },
   "main.finished.inProject": {
     "defaultMessage": "{n, plural, one {# agent finished in {project}} other {# agents finished in {project}}}",
@@ -393,23 +429,23 @@
   },
   "main.gitInit.step.commit": {
     "defaultMessage": "{n, plural, one {committed # file} other {committed # files}}",
-    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Hive capitalises the first of the list. {n} is how many files the first commit has."
+    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Combwork capitalises the first of the list. {n} is how many files the first commit has."
   },
   "main.gitInit.step.empty": {
     "defaultMessage": "made an empty first commit",
-    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Hive capitalises the first of the list."
+    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Combwork capitalises the first of the list."
   },
   "main.gitInit.step.gitignore": {
     "defaultMessage": "added {gitignore}",
-    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Hive capitalises the first of the list. {gitignore} names the starter .gitignore (a Node .gitignore)."
+    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Combwork capitalises the first of the list. {gitignore} names the starter .gitignore (a Node .gitignore)."
   },
   "main.gitInit.step.identity": {
     "defaultMessage": "set this repository's commit identity",
-    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Hive capitalises the first of the list: the name and email the commits are made as."
+    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Combwork capitalises the first of the list: the name and email the commits are made as."
   },
   "main.gitInit.step.init": {
     "defaultMessage": "initialised a git repository on main",
-    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Hive capitalises the first of the list. main is the branch's name: keep it."
+    "description": "A step that worked in making a git repository: a clause in a list of them (\"Initialised a git repository on main, added a Node .gitignore and committed 3 files.\"); Combwork capitalises the first of the list. main is the branch's name: keep it."
   },
   "main.gitInit.stopped": {
     "defaultMessage": "{what}: {why}",
@@ -423,89 +459,53 @@
     "defaultMessage": "Git couldn't read this repository: {why}",
     "description": "Why a folder can't be made a git repository. {why} is git's own message."
   },
-  "main.hiveMove.bothBody": {
-    "defaultMessage": "Combwork uses .combwork and leaves .hive as it is. Move anything you still need out of .hive yourself.",
-    "description": "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other. Keep .hive and .combwork as they are."
-  },
-  "main.hiveMove.bothTitle": {
-    "defaultMessage": "{folder} has both a .hive and a .combwork folder",
-    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its old name (.hive) and its new one (.combwork). Keep .hive and .combwork as they are."
-  },
-  "main.hiveMove.linkBody": {
-    "defaultMessage": "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.",
-    "description": "The warning's text (HI-2462): why the .hive folder wasn't renamed, and how the user can do it. Keep .hive and .combwork as they are."
-  },
-  "main.hiveMove.linkTitle": {
-    "defaultMessage": "{folder}'s .hive folder wasn't moved",
-    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder}'s .hive wasn't renamed .combwork. Keep .hive and .combwork as they are."
-  },
-  "main.hiveMove.what.cards": {
-    "defaultMessage": "the paths in cards",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): links and paths in cards' descriptions and comments."
-  },
-  "main.hiveMove.what.excludes": {
-    "defaultMessage": "git's exclude lines",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): the lines that keep the folder out of git."
-  },
-  "main.hiveMove.what.folders": {
-    "defaultMessage": "the agents' folders inside it",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): slots and other agents' folders kept inside the moved folder."
-  },
-  "main.hiveMove.what.notes": {
-    "defaultMessage": "the paths in shared notes and handovers",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed)."
-  },
-  "main.hiveMove.what.worktrees": {
-    "defaultMessage": "the worktrees inside it",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): git worktrees kept inside the moved folder."
-  },
   "main.installDir.close": {
     "defaultMessage": "Close",
-    "description": "A button of the message window when Hive can't start from its install folder: closes it (Hive then quits)."
+    "description": "A button of the message window when Combwork can't start from its install folder: closes it (Combwork then quits)."
   },
   "main.installDir.copied": {
     "defaultMessage": "Copied",
-    "description": "A button of the message window when Hive can't start from its install folder: what Copy Command says once it has copied the command."
+    "description": "A button of the message window when Combwork can't start from its install folder: what Copy Command says once it has copied the command."
   },
   "main.installDir.copy": {
     "defaultMessage": "(Ctrl+C copies this message.)",
-    "description": "The last line of Electron's error box when Hive can't start from its install folder. Ctrl+C is a key: keep it."
+    "description": "The last line of Electron's error box when Combwork can't start from its install folder. Ctrl+C is a key: keep it."
   },
   "main.installDir.copyCommand": {
     "defaultMessage": "Copy Command",
-    "description": "A button of the message window when Hive can't start from its install folder: copies the command to run."
+    "description": "A button of the message window when Combwork can't start from its install folder: copies the command to run."
   },
   "main.installDir.title": {
     "defaultMessage": "Combwork can't start",
-    "description": "The title of the message when Hive can't start from its install folder."
+    "description": "The title of the message when Combwork can't start from its install folder."
   },
   "main.installDir.whatFile": {
     "defaultMessage": "Windows won't let Combwork's windows read a file in the folder Combwork is installed in:",
-    "description": "The message when Hive can't start from its install folder, its first line (the file's path follows on the next)."
+    "description": "The message when Combwork can't start from its install folder, its first line (the file's path follows on the next)."
   },
   "main.installDir.whatFolder": {
     "defaultMessage": "Windows won't let Combwork's windows read the folder Combwork is installed in:",
-    "description": "The message when Hive can't start from its install folder, its first line (the folder's path follows on the next)."
+    "description": "The message when Combwork can't start from its install folder, its first line (the folder's path follows on the next)."
   },
   "main.installDir.whyFile": {
     "defaultMessage": "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Combwork's sandboxed windows need, and Combwork couldn't add one. Run this command in PowerShell (as an administrator if you don't own them): it adds the entry to the folder and to the file. Then start Combwork again:",
-    "description": "The message when Hive can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them."
+    "description": "The message when Combwork can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them."
   },
   "main.installDir.whyFolder": {
     "defaultMessage": "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Combwork's sandboxed windows need, and Combwork couldn't add one. Run this command in PowerShell (as an administrator if you don't own the folder), then start Combwork again:",
-    "description": "The message when Hive can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them."
+    "description": "The message when Combwork can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them."
   },
   "main.keys.maskingFull": {
     "defaultMessage": "Combwork can't keep masking for another key: it already keeps the most it can. The key wasn't saved.",
-    "description": "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit."
+    "description": "An error saving a server connection's API key: Combwork keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit."
   },
   "main.keys.maskingUnreadable": {
     "defaultMessage": "Combwork can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.",
-    "description": "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset."
+    "description": "An error: an export, Copy Diagnostics or a recording was refused because the data Combwork uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset."
   },
   "main.keys.unsafe": {
     "defaultMessage": "Combwork can't store a key safely on this system, so it wasn't saved.",
-    "description": "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text."
+    "description": "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Combwork won't keep a key in plain text."
   },
   "main.leftovers.end": {
     "defaultMessage": "End Them",
@@ -537,7 +537,7 @@
   },
   "main.leftovers.offerIncomplete": {
     "defaultMessage": "Combwork couldn't list them all, so it can't end exactly these: see the ⋯ menu on the agent's pane",
-    "description": "What the notice of processes an agent left running says when End Them is pressed but the notice couldn't list every process (more than it shows, or one without a start time), so Hive won't end them from it (HI-2320). The ⋯ menu on the agent's pane lists them with End and Keep."
+    "description": "What the notice of processes an agent left running says when End Them is pressed but the notice couldn't list every process (more than it shows, or one without a start time), so Combwork won't end them from it (HI-2320). The ⋯ menu on the agent's pane lists them with End and Keep."
   },
   "main.leftovers.offerKept": {
     "defaultMessage": "Kept running",
@@ -549,15 +549,15 @@
   },
   "main.leftovers.offerUnchecked": {
     "defaultMessage": "Combwork couldn't check what runs now, so it ended nothing. Try again.",
-    "description": "An error after End Them or Keep Running on the notice of processes an agent left running: Hive couldn't read what the agent's processes are now, so it did nothing (HI-2320)."
+    "description": "An error after End Them or Keep Running on the notice of processes an agent left running: Combwork couldn't read what the agent's processes are now, so it did nothing (HI-2320)."
   },
   "main.leftovers.quitDetail": {
     "defaultMessage": "{n, plural, one {The agents started it, and it may hold project folders or ports. End it as Combwork quits, or leave it running?} other {The agents started them, and they may hold project folders or ports. End them as Combwork quits, or leave them running?}}",
-    "description": "The question as Hive quits, under the list of the processes agents left running. {n} is how many."
+    "description": "The question as Combwork quits, under the list of the processes agents left running. {n} is how many."
   },
   "main.leftovers.quitMessage": {
     "defaultMessage": "{n, plural, one {Agents left # process running} other {Agents left # processes running}}",
-    "description": "The question as Hive quits: processes the agents started are still running. {n} is how many."
+    "description": "The question as Combwork quits: processes the agents started are still running. {n} is how many."
   },
   "main.leftovers.restoredBody": {
     "defaultMessage": "{n, plural, one {{processes}. It was started by the agent before Combwork last closed, and may hold the project's folder or ports.} other {{processes}. They were started by the agent before Combwork last closed, and may hold the project's folder or ports.}}",
@@ -565,7 +565,7 @@
   },
   "main.leftovers.restoredTitle": {
     "defaultMessage": "{n, plural, one {{agent} left # process running} other {{agent} left # processes running}}",
-    "description": "A notice at start: processes an agent started before Hive last closed still run. {agent} is the agent (or project) name; {n} how many."
+    "description": "A notice at start: processes an agent started before Combwork last closed still run. {agent} is the agent (or project) name; {n} how many."
   },
   "main.mergeSlot.expiredBody": {
     "defaultMessage": "{agent} held the merge slot for {branch} longer than its limit without reporting progress, so it went to the next in line. Check whether its merge finished.",
@@ -573,19 +573,19 @@
   },
   "main.mergeSlot.expiredTitle": {
     "defaultMessage": "{agent}'s merge slot expired",
-    "description": "A notice's title: an agent ({agent}) held the merge slot longer than its limit without reporting progress, so Hive gave it to the next agent in line."
+    "description": "A notice's title: an agent ({agent}) held the merge slot longer than its limit without reporting progress, so Combwork gave it to the next agent in line."
   },
   "main.mergeSlot.leftBody": {
     "defaultMessage": "It held the merge slot for {branch}{hasCards, select, yes { ({cards})} other {}}. Check {folder} for a merge left half done (git status there) before the next merge.",
-    "description": "The notice that an agent was merging when Hive closed: {branch} is the branch it held the slot for, {cards} the cards it named (\"#7, #9\"; shown when {hasCards} is yes), {folder} where the merge was. 'git status' is a command: keep it."
+    "description": "The notice that an agent was merging when Combwork closed: {branch} is the branch it held the slot for, {cards} the cards it named (\"#7, #9\"; shown when {hasCards} is yes), {folder} where the merge was. 'git status' is a command: keep it."
   },
   "main.mergeSlot.leftBodyGone": {
     "defaultMessage": "It held the merge slot for {branch}{hasCards, select, yes { ({cards})} other {}} in {project}, a project this workspace no longer has (its folder is another project's now, or gone). Check {folder} for a merge left half done (git status there) before the next merge.",
-    "description": "The notice that an agent was merging when Hive closed, in a project ({project}, its name) the workspace no longer has: {branch} is the branch it held the slot for, {cards} the cards it named (\"#7, #9\"; shown when {hasCards} is yes), {folder} where the merge was. 'git status' is a command: keep it."
+    "description": "The notice that an agent was merging when Combwork closed, in a project ({project}, its name) the workspace no longer has: {branch} is the branch it held the slot for, {cards} the cards it named (\"#7, #9\"; shown when {hasCards} is yes), {folder} where the merge was. 'git status' is a command: keep it."
   },
   "main.mergeSlot.leftTitle": {
     "defaultMessage": "{agent} was merging when Combwork closed",
-    "description": "A notice's title as a workspace opens: the agent {agent} (its name) held the merge slot when Hive last closed, so its merge may be half done."
+    "description": "A notice's title as a workspace opens: the agent {agent} (its name) held the merge slot when Combwork last closed, so its merge may be half done."
   },
   "main.modes.retiredBody": {
     "defaultMessage": "Coordinator, Planner, QA triager and Release manager replace Combwork's character personas ({moved}). Switch modes from the Assistant's header; your own personas are unchanged.",
@@ -609,7 +609,7 @@
   },
   "main.move.assistant": {
     "defaultMessage": "Assistant",
-    "description": "The Hive Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running."
+    "description": "The Combwork Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running."
   },
   "main.move.branchBoth": {
     "defaultMessage": "both names are branches",
@@ -629,7 +629,7 @@
   },
   "main.move.branchRenamed": {
     "defaultMessage": "{host}: branch {from} of agent {agent} is now {to}.",
-    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)."
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Combwork's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)."
   },
   "main.move.branchRenamedRemote": {
     "defaultMessage": "{host}: branch {from} of agent {agent} is now {to}; it still tracks {from} on remote {remote}, so push it under the new name when you're ready.",
@@ -641,7 +641,7 @@
   },
   "main.move.branchUnrecorded": {
     "defaultMessage": "{host}: the branch of agent {agent} is now {to}, but Combwork couldn't record it yet ({why}). Repair finishes it.",
-    "description": "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)."
+    "description": "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Combwork's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)."
   },
   "main.move.cards": {
     "defaultMessage": "{n, plural, one {# card of {from} now belongs to {to}, with its agents.} other {# cards of {from} now belong to {to}, with their agents.}}",
@@ -653,7 +653,7 @@
   },
   "main.move.closeRunsFailed": {
     "defaultMessage": "Combwork's records of the workspace's close command couldn't all follow it from the old folder ({why}). Combwork tries again.",
-    "description": "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message."
+    "description": "A line of Repair's report, after a workspace moved to another folder: the output Combwork keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message."
   },
   "main.move.copied": {
     "defaultMessage": "{n, plural, one {{owner, select, project {{host}: copied {n, number} file of {provider}'s conversations and memory for the project to its folder for the new path (the old folder is kept).} assistant {{host}: copied {n, number} file of {provider}'s conversations and memory for the Assistant to its folder for the new path (the old folder is kept).} worktree {{host}: copied {n, number} file of {provider}'s conversations and memory for {agent}'s worktree to its folder for the new path (the old folder is kept).} other {{host}: copied {n, number} file of {provider}'s conversations and memory for {of} to its folder for the new path (the old folder is kept).}}} other {{owner, select, project {{host}: copied {n, number} files of {provider}'s conversations and memory for the project to its folder for the new path (the old folder is kept).} assistant {{host}: copied {n, number} files of {provider}'s conversations and memory for the Assistant to its folder for the new path (the old folder is kept).} worktree {{host}: copied {n, number} files of {provider}'s conversations and memory for {agent}'s worktree to its folder for the new path (the old folder is kept).} other {{host}: copied {n, number} files of {provider}'s conversations and memory for {of} to its folder for the new path (the old folder is kept).}}}}",
@@ -669,15 +669,15 @@
   },
   "main.move.defenderFailed": {
     "defaultMessage": "Combwork's Defender exclusions couldn't be moved to the new folders ({why}).",
-    "description": "A line of Repair's report, after a workspace moved to another folder: moving Hive's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message."
+    "description": "A line of Repair's report, after a workspace moved to another folder: moving Combwork's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message."
   },
   "main.move.folder.busy": {
     "defaultMessage": "Combwork is using it now",
-    "description": "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Hive's own steps (setting it up, removing it) holds it now. A clause."
+    "description": "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Combwork's own steps (setting it up, removing it) holds it now. A clause."
   },
   "main.move.folder.failed": {
     "defaultMessage": "{host}: {what} at {path} couldn't be recorded ({why}). Repair tries again.",
-    "description": "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) was found at {path}, but Hive's record of it couldn't be updated ({why}). {host} is the project."
+    "description": "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) was found at {path}, but Combwork's record of it couldn't be updated ({why}). {host} is the project."
   },
   "main.move.folder.forgotten": {
     "defaultMessage": "{host}: {what} is no longer kept (it was at {path}); its conversations can't be resumed there.",
@@ -689,7 +689,7 @@
   },
   "main.move.folder.later": {
     "defaultMessage": "{host}: {what} wasn't found; it's made again at {path} when it is next used.",
-    "description": "A line of Repair's report: a free slot or a review copy ({what}: its name) whose folder wasn't found; Hive makes it again at {path} the next time it lends it. {host} is the project."
+    "description": "A line of Repair's report: a free slot or a review copy ({what}: its name) whose folder wasn't found; Combwork makes it again at {path} the next time it lends it. {host} is the project."
   },
   "main.move.folder.movedTo": {
     "defaultMessage": "{host}: {what} is now at {path}.",
@@ -709,7 +709,7 @@
   },
   "main.move.folder.released": {
     "defaultMessage": "{host}: {what} was released; it's made again where it belongs when it is next lent.",
-    "description": "A line of Repair's report: a lent slot whose folder was gone was released (its agent no longer has it); Hive makes it again at its next use. {what} is its name, {host} the project."
+    "description": "A line of Repair's report: a lent slot whose folder was gone was released (its agent no longer has it); Combwork makes it again at its next use. {what} is its name, {host} the project."
   },
   "main.move.folder.relinked": {
     "defaultMessage": "{host}: {what} at {path} is linked to the project again.",
@@ -745,7 +745,7 @@
   },
   "main.move.more": {
     "defaultMessage": "{n, plural, one {# more} other {# more}}",
-    "description": "The last item of a long list in Repair's report (after a workspace moved), after the first few: how many more there are (folders, files or names). Hive joins it to the list (\"A, B, C and 3 more\")."
+    "description": "The last item of a long list in Repair's report (after a workspace moved), after the first few: how many more there are (folders, files or names). Combwork joins it to the list (\"A, B, C and 3 more\")."
   },
   "main.move.movedTo": {
     "defaultMessage": "{host}: {agent}'s worktree is now at {path}.",
@@ -889,7 +889,7 @@
   },
   "main.move.result.unrecorded": {
     "defaultMessage": "renamed, but not recorded yet ({why}): Repair finishes it",
-    "description": "Repair's report, the Result column: git renamed an agent's branch, but Hive couldn't record it yet ({why}: the system's message)."
+    "description": "Repair's report, the Result column: git renamed an agent's branch, but Combwork couldn't record it yet ({why}: the system's message)."
   },
   "main.move.result.working": {
     "defaultMessage": "marked again: {projects}",
@@ -937,15 +937,15 @@
   },
   "main.outage.gaveUpBody": {
     "defaultMessage": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Combwork won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
-    "description": "The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
+    "description": "The notice that Combwork stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
   },
   "main.outage.gaveUpTitle": {
     "defaultMessage": "{agent}'s connection keeps dropping",
-    "description": "A notice's title: an agent's connection dropped again after Hive had resumed it several times in an hour, so Hive stopped resuming it. {agent} is the agent's name."
+    "description": "A notice's title: an agent's connection dropped again after Combwork had resumed it several times in an hour, so Combwork stopped resuming it. {agent} is the agent's name."
   },
   "main.outage.progressTitle": {
     "defaultMessage": "{agent}: waiting for the connection",
-    "description": "A Progress panel run's title while Hive waits for an agent's connection to come back, to resume it. {agent} is the agent's name."
+    "description": "A Progress panel run's title while Combwork waits for an agent's connection to come back, to resume it. {agent} is the agent's name."
   },
   "main.outage.progressWaiting": {
     "defaultMessage": "the connection to come back",
@@ -953,15 +953,15 @@
   },
   "main.outage.resumedSummary": {
     "defaultMessage": "Resumed: the connection dropped at {dropped} and came back at {back}.",
-    "description": "A Progress panel run's summary: Hive resumed an agent once its connection came back. {dropped} and {back} are times of day."
+    "description": "A Progress panel run's summary: Combwork resumed an agent once its connection came back. {dropped} and {back} are times of day."
   },
   "main.outage.timedOutBody": {
     "defaultMessage": "Combwork waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
-    "description": "The notice that Hive stopped waiting for an agent's connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
+    "description": "The notice that Combwork stopped waiting for an agent's connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them."
   },
   "main.outage.timedOutTitle": {
     "defaultMessage": "{agent}'s connection didn't come back",
-    "description": "A notice's title: Hive waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name."
+    "description": "A notice's title: Combwork waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name."
   },
   "main.outcome.allowed": {
     "defaultMessage": "Allowed",
@@ -1001,15 +1001,15 @@
   },
   "main.outcome.notResumed": {
     "defaultMessage": "Not resumed",
-    "description": "What the notice offering to resume the agents that were working before Hive restarted says after Don't Resume (HI-2320), in place of its buttons."
+    "description": "What the notice offering to resume the agents that were working before Combwork restarted says after Don't Resume (HI-2320), in place of its buttons."
   },
   "main.outcome.offerReplaced": {
     "defaultMessage": "Replaced by a newer offer",
-    "description": "What the notice offering to resume the agents that were working before Hive restarted says once a newer such notice replaces it, listing every agent offered (another workspace got ready later; HI-2356), in place of its buttons."
+    "description": "What the notice offering to resume the agents that were working before Combwork restarted says once a newer such notice replaces it, listing every agent offered (another workspace got ready later; HI-2356), in place of its buttons."
   },
   "main.outcome.openHereAgain": {
     "defaultMessage": "The conversation is open here again",
-    "description": "What the notice that a conversation runs as a background job says once it is open in Hive again (HI-2320), in place of its Stop It and Resume button."
+    "description": "What the notice that a conversation runs as a background job says once it is open in Combwork again (HI-2320), in place of its Stop It and Resume button."
   },
   "main.outcome.released": {
     "defaultMessage": "Released",
@@ -1017,11 +1017,11 @@
   },
   "main.outcome.resuming": {
     "defaultMessage": "Resuming, one at a time",
-    "description": "What the notice offering to resume the agents that were working before Hive restarted says after Resume, in place of its buttons, until it says how the resumes went (HI-2356)."
+    "description": "What the notice offering to resume the agents that were working before Combwork restarted says after Resume, in place of its buttons, until it says how the resumes went (HI-2356)."
   },
   "main.outcome.runsAnother": {
     "defaultMessage": "It runs another conversation here now",
-    "description": "What the notice that a conversation runs as a background job says once the agent runs another conversation in Hive (HI-2320), in place of its Stop It and Resume button."
+    "description": "What the notice that a conversation runs as a background job says once the agent runs another conversation in Combwork (HI-2320), in place of its Stop It and Resume button."
   },
   "main.outcome.stoppedAndResumed": {
     "defaultMessage": "Stopped and resumed here",
@@ -1029,11 +1029,11 @@
   },
   "main.outcome.updateInstalling": {
     "defaultMessage": "Installing: Combwork restarts",
-    "description": "What the notice that a Hive update is ready says after Restart and Update (HI-2320), in place of its button, as Hive restarts to install it."
+    "description": "What the notice that a Combwork update is ready says after Restart and Update (HI-2320), in place of its button, as Combwork restarts to install it."
   },
   "main.outcome.updateNotReady": {
     "defaultMessage": "No longer ready to install",
-    "description": "What the notice that a Hive update is ready says once that update is no longer the one ready (HI-2320), in place of its Restart and Update button."
+    "description": "What the notice that a Combwork update is ready says once that update is no longer the one ready (HI-2320), in place of its Restart and Update button."
   },
   "main.plan.close": {
     "defaultMessage": "You are getting close to the limit.",
@@ -1061,15 +1061,15 @@
   },
   "main.profileMove.fallbackBody": {
     "defaultMessage": "{n, plural, one {The Combwork folder isn't there, so Combwork runs from {folders}, Hive Desktop's, as before.} other {The Combwork folders aren't there, so Combwork runs from {folders}, Hive Desktop's, as before.}} Running the Combwork installer with Combwork closed moves {n, plural, one {it} other {them}}; nothing is lost meanwhile.",
-    "description": "The notice that Hive uses its old data folders. {folders} lists their paths; {n} is how many (1 or 2). \"Installing Combwork\": running the installer of the app under its new name."
+    "description": "The notice that Combwork uses its old data folders. {folders} lists their paths; {n} is how many (1 or 2). \"Installing Combwork\": running the installer of the app under its new name."
   },
   "main.profileMove.fallbackBodyDev": {
     "defaultMessage": "{n, plural, one {The {name} folder isn't there, so this dev build runs from {folders}.} other {The {name} folders aren't there, so this dev build runs from {folders}.}} To move {n, plural, one {it} other {them}}, close Combwork and rename {n, plural, one {it} other {each}} to {name}.",
-    "description": "The same notice for a development build of Hive (no installer moves its folders). {name} is the new folder name (Combwork-Dev: keep it as it is); {folders} lists the old folders' paths; {n} is how many (1 or 2)."
+    "description": "The same notice for a development build of Combwork (no installer moves its folders). {name} is the new folder name (Combwork-Dev: keep it as it is); {folders} lists the old folders' paths; {n} is how many (1 or 2)."
   },
   "main.profileMove.fallbackTitle": {
     "defaultMessage": "Combwork is using Hive Desktop's data folders",
-    "description": "A notice at start (HI-2461): the app's data folders are now named Combwork (the app's new name, keep it as it is), which the installer moves them to; they weren't moved yet, so Hive uses its old folders. Nothing is lost."
+    "description": "A notice at start (HI-2461): the app's data folders are now named Combwork (the app's new name, keep it as it is), which the installer moves them to; they weren't moved yet, so Combwork uses its old folders. Nothing is lost."
   },
   "main.profileMove.signInBody": {
     "defaultMessage": "Since its data moved to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.",
@@ -1081,19 +1081,19 @@
   },
   "main.quit.closed": {
     "defaultMessage": "Combwork has closed",
-    "description": "A notice after Hive quit without asking, its sessions stopped."
+    "description": "A notice after Combwork quit without asking, its sessions stopped."
   },
   "main.quit.closedBody": {
     "defaultMessage": "{n, plural, one {# session was stopped. Resume it from Combwork next time; nothing was lost.} other {# sessions were stopped. Resume them from Combwork next time; nothing was lost.}}",
-    "description": "The notice after Hive quit: how many sessions it stopped."
+    "description": "The notice after Combwork quit: how many sessions it stopped."
   },
   "main.quit.dialogTitle": {
     "defaultMessage": "Quit Combwork",
-    "description": "The title of the question, as Hive quits, about the processes agents left running."
+    "description": "The title of the question, as Combwork quits, about the processes agents left running."
   },
   "main.removal.ahead": {
     "defaultMessage": "{n, plural, one {# commit not merged} other {# commits not merged}}",
-    "description": "Work in an agent's worktree that stops Remove from Hive: its commits not merged. {n} is how many."
+    "description": "Work in an agent's worktree that stops Remove from Combwork: its commits not merged. {n} is how many."
   },
   "main.removal.already": {
     "defaultMessage": "{project} is already being removed.",
@@ -1109,11 +1109,11 @@
   },
   "main.removal.dirty": {
     "defaultMessage": "{n, plural, one {# uncommitted file} other {# uncommitted files}}",
-    "description": "Work in an agent's worktree that stops Remove from Hive: its files not committed. {n} is how many."
+    "description": "Work in an agent's worktree that stops Remove from Combwork: its files not committed. {n} is how many."
   },
   "main.removal.folder.copyBusy": {
     "defaultMessage": "Combwork is setting it up or removing it now",
-    "description": "Remove Project (#1447): a review copy is kept because one of Hive's steps holds it. A clause."
+    "description": "Remove Project (#1447): a review copy is kept because one of Combwork's steps holds it. A clause."
   },
   "main.removal.folder.copyHeld": {
     "defaultMessage": "it is in use ({by})",
@@ -1125,7 +1125,7 @@
   },
   "main.removal.folder.deleting": {
     "defaultMessage": "another Delete of this project holds its slots",
-    "description": "Why Delete can't go ahead (#1447): another Hive window or process is deleting the same project now. A clause."
+    "description": "Why Delete can't go ahead (#1447): another Combwork window or process is deleting the same project now. A clause."
   },
   "main.removal.folder.heldNow": {
     "defaultMessage": "one of Combwork's steps or a session took it up meanwhile",
@@ -1135,17 +1135,17 @@
     "defaultMessage": "left as it is: its conversations resume there",
     "description": "Remove Project (#1447): an old reviewer folder (a reviewer's own worktree from before 1.0) stays where it is. A clause."
   },
+  "main.removal.folder.notCombwork": {
+    "defaultMessage": "left as it is: it isn't in Combwork's worktrees folder for the project",
+    "description": "Remove Project (#1447): a slot whose folder Combwork didn't make (outside <workspace>.worktrees/<project>) stays. A clause."
+  },
   "main.removal.folder.notForgotten": {
     "defaultMessage": "Combwork's record of the project's slots couldn't all be cleared: {why}",
-    "description": "A warning after Delete (#1447): the project's slot or copy records stayed in Hive's database ({why}: the system's message)."
+    "description": "A warning after Delete (#1447): the project's slot or copy records stayed in Combwork's database ({why}: the system's message)."
   },
   "main.removal.folder.notHeld": {
     "defaultMessage": "{n, plural, one {# slot or copy was} other {# slots or copies were}} taken up by another step, and left",
     "description": "A warning's reason after Delete (#1447): records of the project's slots or copies Delete didn't hold, so it didn't delete them. Follows main.removal.folder.notForgotten's colon."
-  },
-  "main.removal.folder.notHives": {
-    "defaultMessage": "left as it is: it isn't in Combwork's worktrees folder for the project",
-    "description": "Remove Project (#1447): a slot whose folder Hive didn't make (outside <workspace>.worktrees/<project>) stays. A clause."
   },
   "main.removal.folder.notTrashed": {
     "defaultMessage": "{path} couldn't be moved to the Recycle Bin: {why}",
@@ -1153,7 +1153,7 @@
   },
   "main.removal.folder.outsideDelete": {
     "defaultMessage": "it isn't in Combwork's worktrees folder for the project, and would be left without its repository: release its slot and move or remove it first",
-    "description": "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Hive didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause."
+    "description": "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Combwork didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause."
   },
   "main.removal.folderGone": {
     "defaultMessage": "The folder {folder} is no longer in the workspace. Put it back, or forget it.",
@@ -1161,19 +1161,19 @@
   },
   "main.removal.folderKept": {
     "defaultMessage": "Left in place: {what} at {path} ({why}).",
-    "description": "A warning after Remove from Hive or Delete (#1447): a slot, review copy or old reviewer folder ({what}: its name) that was kept, at {path}, and why ({why}: a clause)."
+    "description": "A warning after Remove from Combwork or Delete (#1447): a slot, review copy or old reviewer folder ({what}: its name) that was kept, at {path}, and why ({why}: a clause)."
   },
   "main.removal.handoverKept": {
     "defaultMessage": "{note} stayed in the shared notes (a copy is packed in the folder): {why}",
-    "description": "A warning after Remove from Hive: a handover note couldn't be moved to the Recycle Bin. {note} is its path, {why} the system's message."
+    "description": "A warning after Remove from Combwork: a handover note couldn't be moved to the Recycle Bin. {note} is its path, {why} the system's message."
   },
   "main.removal.heldTree": {
     "defaultMessage": "{agent}'s worktree ({work})",
-    "description": "An agent's worktree with work in it, in the reason Remove from Hive can't go ahead. {work} says what (commits not merged, uncommitted files) or why git couldn't check."
+    "description": "An agent's worktree with work in it, in the reason Remove from Combwork can't go ahead. {work} says what (commits not merged, uncommitted files) or why git couldn't check."
   },
   "main.removal.leftAlone": {
     "defaultMessage": "Left alone: {worktree}.",
-    "description": "A warning after Delete: an agent's worktree Hive didn't delete with the project (main.removal.refusedTree)."
+    "description": "A warning after Delete: an agent's worktree Combwork didn't delete with the project (main.removal.refusedTree)."
   },
   "main.removal.notHidden": {
     "defaultMessage": "{project} isn't hidden or removed.",
@@ -1189,7 +1189,7 @@
   },
   "main.removal.refusedTree": {
     "defaultMessage": "{agent}'s worktree {path} ({why})",
-    "description": "An agent's worktree Hive won't remove or delete with its project. {agent} is the agent's name, {path} the worktree's folder, {why} why (main.removal.why.*)."
+    "description": "An agent's worktree Combwork won't remove or delete with its project. {agent} is the agent's name, {path} the worktree's folder, {why} why (main.removal.why.*)."
   },
   "main.removal.stillThere": {
     "defaultMessage": "{project} is still in the workspace: restore it instead.",
@@ -1209,31 +1209,31 @@
   },
   "main.removal.unmerged": {
     "defaultMessage": "Merge or discard the work in {worktrees} first: a worktree can't go with the project folder.",
-    "description": "Why Remove from Hive can't go ahead. {worktrees} lists the agents' worktrees with work in them (main.removal.heldTree)."
+    "description": "Why Remove from Combwork can't go ahead. {worktrees} lists the agents' worktrees with work in them (main.removal.heldTree)."
   },
   "main.removal.why.contains": {
     "defaultMessage": "it contains the project or the workspace",
-    "description": "Why Hive won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)."
+    "description": "Why Combwork won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)."
   },
   "main.removal.why.notListed": {
     "defaultMessage": "git doesn't list it as one of the project's worktrees",
-    "description": "Why Hive won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)."
+    "description": "Why Combwork won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)."
   },
   "main.removal.why.otherProject": {
     "defaultMessage": "it is another project of the workspace",
-    "description": "Why Hive won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)."
+    "description": "Why Combwork won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)."
   },
   "main.removal.wontRemove": {
     "defaultMessage": "Combwork won't remove {worktrees}. Fix or remove that agent first.",
-    "description": "Why Remove from Hive refused: agents' worktrees it won't remove. {worktrees} lists them, joined with “or” (main.removal.refusedTree)."
+    "description": "Why Remove from Combwork refused: agents' worktrees it won't remove. {worktrees} lists them, joined with “or” (main.removal.refusedTree)."
   },
   "main.restart.dismiss": {
     "defaultMessage": "Don't Resume",
-    "description": "A button in the notice offering to resume the agents that were working when Hive closed: resumes none, and the offer is not made again (the notice's × only closes it)."
+    "description": "A button in the notice offering to resume the agents that were working when Combwork closed: resumes none, and the offer is not made again (the notice's × only closes it)."
   },
   "main.restart.notResumedLine": {
     "defaultMessage": "Not resumed: {agent} ({project}): {why}.",
-    "description": "A line of the notice after Hive resumed agents when it started again: one it did not resume, and why."
+    "description": "A line of the notice after Combwork resumed agents when it started again: one it did not resume, and why."
   },
   "main.restart.offerQuit": {
     "defaultMessage": "Combwork was quit while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.",
@@ -1241,7 +1241,7 @@
   },
   "main.restart.offerTitle": {
     "defaultMessage": "{n, plural, one {Resume the agent that was working?} other {Resume the # agents that were working?}}",
-    "description": "A notice at start: Hive was quit (or restarted for an update with resuming turned off) while agents worked. {n} is how many; Resume starts them again in their conversations."
+    "description": "A notice at start: Combwork was quit (or restarted for an update with resuming turned off) while agents worked. {n} is how many; Resume starts them again in their conversations."
   },
   "main.restart.offerUpdate": {
     "defaultMessage": "Combwork restarted for an update while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.",
@@ -1249,51 +1249,51 @@
   },
   "main.restart.reportResume": {
     "defaultMessage": "{n, plural, one {Resumed one agent} other {Resumed # agents}}",
-    "description": "A notice's title: the agents that were working when Hive was quit were resumed, as the user asked. {n} is how many."
+    "description": "A notice's title: the agents that were working when Combwork was quit were resumed, as the user asked. {n} is how many."
   },
   "main.restart.reportUpdate": {
     "defaultMessage": "{n, plural, one {Resumed one agent after the update} other {Resumed # agents after the update}}",
-    "description": "A notice's title: Hive restarted for an update and resumed the agents that were working. {n} is how many resumed."
+    "description": "A notice's title: Combwork restarted for an update and resumed the agents that were working. {n} is how many resumed."
   },
   "main.restart.resume": {
     "defaultMessage": "Resume",
-    "description": "A button in the notice offering to resume the agents that were working when Hive closed."
+    "description": "A button in the notice offering to resume the agents that were working when Combwork closed."
   },
   "main.restart.resumedLine": {
     "defaultMessage": "Resumed: {names}.",
-    "description": "A line of the notice after Hive resumed agents when it started again. {names} lists them, each with its project."
+    "description": "A line of the notice after Combwork resumed agents when it started again. {names} lists them, each with its project."
   },
   "main.restart.why.expired": {
     "defaultMessage": "it waited more than a day",
-    "description": "Why an agent was not resumed after Hive restarted: the restart was over a day ago."
+    "description": "Why an agent was not resumed after Combwork restarted: the restart was over a day ago."
   },
   "main.restart.why.held": {
     "defaultMessage": "its working folder is held for other work (resume it by hand)",
-    "description": "Why an agent was not resumed after Hive restarted: the slot (working folder) its conversation ran in is free or holds other work, so only the user's own Resume may take it."
+    "description": "Why an agent was not resumed after Combwork restarted: the slot (working folder) its conversation ran in is free or holds other work, so only the user's own Resume may take it."
   },
   "main.restart.why.movedOn": {
     "defaultMessage": "it has a newer conversation",
-    "description": "Why an agent was not resumed after Hive restarted: it was started in another conversation since."
+    "description": "Why an agent was not resumed after Combwork restarted: it was started in another conversation since."
   },
   "main.restart.why.notReady": {
     "defaultMessage": "it didn't get ready in time, so it was stopped",
-    "description": "Why an agent was not resumed after Hive restarted: its CLI did not become ready within the time allowed (Settings → Advanced), so Hive stopped it."
+    "description": "Why an agent was not resumed after Combwork restarted: its CLI did not become ready within the time allowed (Settings → Advanced), so Combwork stopped it."
   },
   "main.restart.why.notStopped": {
     "defaultMessage": "it didn't get ready in time and hasn't stopped yet; the others resume once it has",
-    "description": "Why an agent was not resumed after Hive restarted: its CLI did not become ready in time, and it did not end when Hive stopped it; Hive starts no other agent until it has ended."
+    "description": "Why an agent was not resumed after Combwork restarted: its CLI did not become ready in time, and it did not end when Combwork stopped it; Combwork starts no other agent until it has ended."
   },
   "main.restart.why.removed": {
     "defaultMessage": "it was removed",
-    "description": "Why an agent was not resumed after Hive restarted: the agent has been removed from its project."
+    "description": "Why an agent was not resumed after Combwork restarted: the agent has been removed from its project."
   },
   "main.restart.why.running": {
     "defaultMessage": "it is running already",
-    "description": "Why an agent was not resumed after Hive restarted: it is running already."
+    "description": "Why an agent was not resumed after Combwork restarted: it is running already."
   },
   "main.restart.why.stopped": {
     "defaultMessage": "it was stopped while it started",
-    "description": "Why an agent was not resumed after Hive restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready."
+    "description": "Why an agent was not resumed after Combwork restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready."
   },
   "main.server.key.chars": {
     "defaultMessage": "A key has no spaces or special characters outside plain ASCII. Check what was pasted.",
@@ -1317,11 +1317,11 @@
   },
   "main.server.unsupported": {
     "defaultMessage": "{cli} can't get its model from a server in Combwork.",
-    "description": "An error adding a server connection for a coding agent CLI ({cli}: \"Codex\") that Hive has no server connections for."
+    "description": "An error adding a server connection for a coding agent CLI ({cli}: \"Codex\") that Combwork has no server connections for."
   },
   "main.server.url.extra": {
     "defaultMessage": "The URL can't have a query (?…) or a fragment (#…): give the key in its own field.",
-    "description": "An error saving a server connection's base URL: it has a query string or a fragment, which Hive won't keep (a key could be in it)."
+    "description": "An error saving a server connection's base URL: it has a query string or a fragment, which Combwork won't keep (a key could be in it)."
   },
   "main.server.url.invalid": {
     "defaultMessage": "That isn't a URL Combwork can use: write it in full, such as https://api.example.com.",
@@ -1337,7 +1337,7 @@
   },
   "main.server.url.userinfo": {
     "defaultMessage": "The URL can't hold a user name or password: give the key in its own field.",
-    "description": "An error saving a server connection's base URL: it has user:password@ in it, which Hive won't keep."
+    "description": "An error saving a server connection's base URL: it has user:password@ in it, which Combwork won't keep."
   },
   "main.storage.claimed": {
     "defaultMessage": "The folder belongs to a session again.",
@@ -1353,7 +1353,7 @@
   },
   "main.storage.purgeClaimed": {
     "defaultMessage": "It belongs to a session again.",
-    "description": "Purge skipped a file or folder of a session Hive no longer had: it has one again."
+    "description": "Purge skipped a file or folder of a session Combwork no longer had: it has one again."
   },
   "main.storage.purgeExpired": {
     "defaultMessage": "This preview is out of date. Open Purge again to see what goes now.",
@@ -1377,11 +1377,11 @@
   },
   "main.storage.purgeSessionChanged": {
     "defaultMessage": "One of the session's backups changed since the preview, so nothing of it goes.",
-    "description": "Purge left a session alone: one of Hive's copies of its transcript changed since the preview (it was resumed, say)."
+    "description": "Purge left a session alone: one of Combwork's copies of its transcript changed since the preview (it was resumed, say)."
   },
   "main.storage.purgeUnrecorded": {
     "defaultMessage": "Combwork couldn't record it in the usage history, so it is kept.",
-    "description": "Purge kept a deleted session's old usage: Hive couldn't save it in the usage history, which the totals keep."
+    "description": "Purge kept a deleted session's old usage: Combwork couldn't save it in the usage history, which the totals keep."
   },
   "main.storage.running": {
     "defaultMessage": "The session is running.",
@@ -1397,7 +1397,7 @@
   },
   "main.tray.cancelQuit": {
     "defaultMessage": "Cancel Pending Quit",
-    "description": "The tray menu: Hive no longer quits when the agents finish."
+    "description": "The tray menu: Combwork no longer quits when the agents finish."
   },
   "main.tray.counts": {
     "defaultMessage": "{working} working, {needYou, plural, one {# needs you} other {# need you}}",
@@ -1421,7 +1421,7 @@
   },
   "main.tray.quit": {
     "defaultMessage": "Quit Combwork",
-    "description": "The tray menu: quits Hive."
+    "description": "The tray menu: quits Combwork."
   },
   "main.tray.quitNow": {
     "defaultMessage": "Quit Now",
@@ -1429,7 +1429,7 @@
   },
   "main.tray.quitting": {
     "defaultMessage": "{n, plural, one {Quitting when the agent finishes} other {Quitting when # agents finish}}",
-    "description": "The tray menu while Hive waits for working agents to finish before quitting."
+    "description": "The tray menu while Combwork waits for working agents to finish before quitting."
   },
   "main.tray.restartToUpdate": {
     "defaultMessage": "Restart to Update ({version})",
@@ -1445,7 +1445,7 @@
   },
   "main.tray.show": {
     "defaultMessage": "Show Combwork",
-    "description": "The tray menu: brings Hive's window up."
+    "description": "The tray menu: brings Combwork's window up."
   },
   "main.tray.status.background": {
     "defaultMessage": "Background tasks",
@@ -1497,95 +1497,95 @@
   },
   "main.tray.willQuit": {
     "defaultMessage": "Will quit when agents finish",
-    "description": "A line of the tray icon's tooltip while Hive waits for agents to finish before quitting."
+    "description": "A line of the tray icon's tooltip while Combwork waits for agents to finish before quitting."
   },
   "main.unexpectedClose.agents": {
     "defaultMessage": "{n, plural, =0 {No agents were running.} one {One agent was running in {projects}.} other {# agents were running in {projects}.}}",
-    "description": "The notice that Hive closed unexpectedly: how many agents were running ({n}) and in which projects ({projects}: their names, listed)."
+    "description": "The notice that Combwork closed unexpectedly: how many agents were running ({n}) and in which projects ({projects}: their names, listed)."
   },
   "main.unexpectedClose.dump": {
     "defaultMessage": "Combwork kept a crash dump of it: Help → Copy Diagnostics names it.",
-    "description": "The notice that Hive closed unexpectedly: a crash dump of that run was saved on this PC."
+    "description": "The notice that Combwork closed unexpectedly: a crash dump of that run was saved on this PC."
   },
   "main.unexpectedClose.failed": {
     "defaultMessage": "{n, plural, one {One couldn't resume: {agents}.} other {# couldn't resume: {agents}.}}",
-    "description": "In the notice that Hive closed unexpectedly, or the report of resuming its agents: the agents that failed to resume ({agents}: their names with why)."
+    "description": "In the notice that Combwork closed unexpectedly, or the report of resuming its agents: the agents that failed to resume ({agents}: their names with why)."
   },
   "main.unexpectedClose.held": {
     "defaultMessage": "{n, plural, one {One was left stopped: {agents}.} other {# were left stopped: {agents}.}}",
-    "description": "In the notice that Hive closed unexpectedly (#1434): agents whose conversations can't resume now where they ran (their slot is free, or holds other work), left for the user ({agents}: their names, each with why in a few words)."
+    "description": "In the notice that Combwork closed unexpectedly (#1434): agents whose conversations can't resume now where they ran (their slot is free, or holds other work), left for the user ({agents}: their names, each with why in a few words)."
   },
   "main.unexpectedClose.heldTitle": {
     "defaultMessage": "{n, plural, one {One agent left stopped} other {# agents left stopped}}",
-    "description": "A notice's title after resuming the agents that were running when Hive closed unexpectedly (#1434): {n} were left stopped, their conversations' slots free (only their own Resume takes one) or holding other work."
+    "description": "A notice's title after resuming the agents that were running when Combwork closed unexpectedly (#1434): {n} were left stopped, their conversations' slots free (only their own Resume takes one) or holding other work."
   },
   "main.unexpectedClose.merge": {
     "defaultMessage": "{agent} was merging {branch}: check {folder} for a merge left half done (git status there) before the next merge.",
-    "description": "The notice that Hive closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}); {folder} is where the merge was (its worktree or the main checkout)."
+    "description": "The notice that Combwork closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}); {folder} is where the merge was (its worktree or the main checkout)."
   },
   "main.unexpectedClose.mergeCards": {
     "defaultMessage": "{agent} was merging {branch} ({cards}): check {folder} for a merge left half done (git status there) before the next merge.",
-    "description": "The notice that Hive closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}) for cards ({cards}); {folder} is where the merge was (its worktree or the main checkout)."
+    "description": "The notice that Combwork closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}) for cards ({cards}); {folder} is where the merge was (its worktree or the main checkout)."
   },
   "main.unexpectedClose.notChecked": {
     "defaultMessage": "{u, plural, one {A process started by a test run may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",
-    "description": "Stop Them (in the notice that Hive closed unexpectedly) ended what it could, but {u} processes a test run had started may still run: Windows let Hive neither end nor check them, and with what started them ended Hive can't tell them from other processes any more, so pressing Stop Them again won't reach them. {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab."
+    "description": "Stop Them (in the notice that Combwork closed unexpectedly) ended what it could, but {u} processes a test run had started may still run: Windows let Combwork neither end nor check them, and with what started them ended Combwork can't tell them from other processes any more, so pressing Stop Them again won't reach them. {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab."
   },
   "main.unexpectedClose.notResumed": {
     "defaultMessage": "Nothing was resumed.",
-    "description": "The notice that Hive closed unexpectedly: Hive did not resume the agents that were running (the user chooses)."
+    "description": "The notice that Combwork closed unexpectedly: Combwork did not resume the agents that were running (the user chooses)."
   },
   "main.unexpectedClose.notStopped": {
     "defaultMessage": "{n, plural, one {# process is still running: Windows didn't let Combwork end it.} other {# processes are still running: Windows didn't let Combwork end them.}} Stop Them in the notice tries again.",
-    "description": "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run; Stop Them is the notice's button."
+    "description": "Stopping the processes the agents had started before Combwork closed unexpectedly failed for some. {n} is how many still run; Stop Them is the notice's button."
   },
   "main.unexpectedClose.notStoppedNorChecked": {
     "defaultMessage": "{n, plural, one {# process is still running: Windows didn't let Combwork end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Combwork end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",
-    "description": "Stopping the processes the agents had started before Hive closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Hive neither end nor check, so Hive can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab."
+    "description": "Stopping the processes the agents had started before Combwork closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Combwork neither end nor check, so Combwork can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab."
   },
   "main.unexpectedClose.overview": {
     "defaultMessage": "Show Overview",
-    "description": "A button in the notice that Hive closed unexpectedly: shows the Workspace Overview, with every project's agents."
+    "description": "A button in the notice that Combwork closed unexpectedly: shows the Workspace Overview, with every project's agents."
   },
   "main.unexpectedClose.progressRun": {
     "defaultMessage": "{title} ({n, plural, one {# process} other {# processes}})",
-    "description": "In the notice that Hive closed unexpectedly, a test run (or other command) an agent ran through cw-progress that still runs, as one item of the list of what still runs: its title as the agent gave it ({title}: \"e2e: 196 suites in hb2\") and how many of its processes still run ({n})."
+    "description": "In the notice that Combwork closed unexpectedly, a test run (or other command) an agent ran through cw-progress that still runs, as one item of the list of what still runs: its title as the agent gave it ({title}: \"e2e: 196 suites in hb2\") and how many of its processes still run ({n})."
   },
   "main.unexpectedClose.resumeAll": {
     "defaultMessage": "Resume All",
-    "description": "A button in the notice that Hive closed unexpectedly: resumes the agents that were running."
+    "description": "A button in the notice that Combwork closed unexpectedly: resumes the agents that were running."
   },
   "main.unexpectedClose.resumeFailedTitle": {
     "defaultMessage": "Some agents couldn't resume",
-    "description": "A notice's title: resuming the agents that were running when Hive closed unexpectedly failed for some."
+    "description": "A notice's title: resuming the agents that were running when Combwork closed unexpectedly failed for some."
   },
   "main.unexpectedClose.resumed": {
     "defaultMessage": "{n, plural, =0 {None was resumed.} one {One was resumed, as Settings → Sessions says.} other {# were resumed, as Settings → Sessions says.}}",
-    "description": "The notice that Hive closed unexpectedly, with \"Resume agents after an unexpected close\" on: how many of the agents Hive resumed ({n})."
+    "description": "The notice that Combwork closed unexpectedly, with \"Resume agents after an unexpected close\" on: how many of the agents Combwork resumed ({n})."
   },
   "main.unexpectedClose.resumedTitle": {
     "defaultMessage": "{n, plural, =0 {Nothing to resume} one {Resumed one agent} other {Resumed # agents}}",
-    "description": "A notice's title: the agents that were running when Hive closed unexpectedly were resumed ({n} of them; 0: all were running again or had no conversation)."
+    "description": "A notice's title: the agents that were running when Combwork closed unexpectedly were resumed ({n} of them; 0: all were running again or had no conversation)."
   },
   "main.unexpectedClose.stillRunning": {
     "defaultMessage": "{n, plural, one {One process the agents started is still running: {processes}.} other {# processes the agents started are still running: {processes}.}}",
-    "description": "The notice that Hive closed unexpectedly: processes the agents had started (test runs, servers) still run, checked to be the same ones. {n} is how many; {processes} lists them (\"node serve.js, 2 × npm run e2e\"). The notice has a Stop Them button."
+    "description": "The notice that Combwork closed unexpectedly: processes the agents had started (test runs, servers) still run, checked to be the same ones. {n} is how many; {processes} lists them (\"node serve.js, 2 × npm run e2e\"). The notice has a Stop Them button."
   },
   "main.unexpectedClose.stopThem": {
     "defaultMessage": "Stop Them",
-    "description": "A button in the notice that Hive closed unexpectedly: ends the processes the agents had started that are still running (only those, checked to be the same processes)."
+    "description": "A button in the notice that Combwork closed unexpectedly: ends the processes the agents had started that are still running (only those, checked to be the same processes)."
   },
   "main.unexpectedClose.stopped": {
     "defaultMessage": "{n, plural, one {Stopped one process} other {Stopped # processes}}",
-    "description": "A notice's title: the processes the agents had started before Hive closed unexpectedly were ended ({n} of them)."
+    "description": "A notice's title: the processes the agents had started before Combwork closed unexpectedly were ended ({n} of them)."
   },
   "main.unexpectedClose.title": {
     "defaultMessage": "Combwork closed unexpectedly",
-    "description": "The notice's title at start when the last run of Hive ended without quitting (killed, a crash, the power)."
+    "description": "The notice's title at start when the last run of Combwork ended without quitting (killed, a crash, the power)."
   },
   "main.unexpectedClose.when": {
     "defaultMessage": "Combwork was last seen on {date} at {time}.",
-    "description": "The notice at start that the last run of Hive ended without quitting (its title says so): when that run was last seen running ({date}, {time})."
+    "description": "The notice at start that the last run of Combwork ended without quitting (its title says so): when that run was last seen running ({date}, {time})."
   },
   "main.unused.branchKept": {
     "defaultMessage": "git kept {branch}: {why}",
@@ -1649,7 +1649,7 @@
   },
   "main.unused.noIndex": {
     "defaultMessage": "git couldn't list its index ({why})",
-    "description": "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds. {why} is git's message. index is git's term."
+    "description": "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds. {why} is git's message. index is git's term."
   },
   "main.unused.notChecked": {
     "defaultMessage": "what it holds was not checked for this removal",
@@ -1665,23 +1665,23 @@
   },
   "main.unused.read.base": {
     "defaultMessage": "git could not read {branch}",
-    "description": "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). {branch} is the project's main branch."
+    "description": "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). {branch} is the project's main branch."
   },
   "main.unused.read.branch": {
     "defaultMessage": "git could not read its branch",
-    "description": "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)."
+    "description": "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)."
   },
   "main.unused.read.commits": {
     "defaultMessage": "git could not count its commits",
-    "description": "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)."
+    "description": "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)."
   },
   "main.unused.read.head": {
     "defaultMessage": "git could not read its HEAD",
-    "description": "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). HEAD is git's term."
+    "description": "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). HEAD is git's term."
   },
   "main.unused.read.status": {
     "defaultMessage": "git status failed",
-    "description": "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). git status is a command: keep it."
+    "description": "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). git status is a command: keep it."
   },
   "main.unused.refused": {
     "defaultMessage": "Combwork doesn't remove it: {why}.",
@@ -1689,47 +1689,47 @@
   },
   "main.unused.slot.archiveFailed": {
     "defaultMessage": "its archive command failed ({error})",
-    "description": "Why Hive didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause."
+    "description": "Why Combwork didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause."
   },
   "main.unused.slot.busy": {
     "defaultMessage": "Combwork is setting it up or removing it now",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees: another operation of Hive's has it. A clause."
+    "description": "Why Combwork won't remove a slot listed in Unused worktrees: another operation of Combwork's has it. A clause."
   },
   "main.unused.slot.cantCheck": {
     "defaultMessage": "Combwork couldn't check it ({detail})",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause."
+    "description": "Why Combwork won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause."
   },
   "main.unused.slot.dirty": {
     "defaultMessage": "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause."
+    "description": "Why Combwork won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause."
   },
   "main.unused.slot.editedSkillCopy": {
     "defaultMessage": "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Combwork's} other {its skill folders {names} aren't unchanged copies of Combwork's}}",
-    "description": "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named cw-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. cw-merge-ready; {copies}: how many. A clause."
+    "description": "Why Combwork didn't remove a slot listed in Unused worktrees (#1500): Combwork removed its own skill copies from the slot's .agents/skills, but a folder named cw-… is left there (changed since Combwork copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. cw-merge-ready; {copies}: how many. A clause."
   },
   "main.unused.slot.gitRefused": {
     "defaultMessage": "git didn't remove it ({detail})",
-    "description": "Why Hive didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause."
+    "description": "Why Combwork didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause."
   },
   "main.unused.slot.inFlight": {
     "defaultMessage": "card {card}, which it held, is still being merged",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its key, such as HI-12) that worked in it. A clause."
+    "description": "Why Combwork won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its key, such as HI-12) that worked in it. A clause."
   },
   "main.unused.slot.leased": {
     "defaultMessage": "it is lent to agent {agent}",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause. A noun before the name (glossary §1 rule 4)."
+    "description": "Why Combwork won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause. A noun before the name (glossary §1 rule 4)."
   },
   "main.unused.slot.process": {
     "defaultMessage": "a process still has it open",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause."
+    "description": "Why Combwork won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause."
   },
   "main.unused.slot.session": {
     "defaultMessage": "a session runs in it ({detail})",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees: an agent's session runs in it ({detail}: the agent and its state). A clause."
+    "description": "Why Combwork won't remove a slot listed in Unused worktrees: an agent's session runs in it ({detail}: the agent and its state). A clause."
   },
   "main.unused.slot.unmerged": {
     "defaultMessage": "it has commits that aren't on {target}",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees: its commit isn't contained in its target branch ({target}). A clause."
+    "description": "Why Combwork won't remove a slot listed in Unused worktrees: its commit isn't contained in its target branch ({target}). A clause."
   },
   "main.unused.stale": {
     "defaultMessage": "{n, plural, one {what it holds was checked more than # minute ago} other {what it holds was checked more than # minutes ago}}",
@@ -1737,51 +1737,51 @@
   },
   "main.unused.tooBig": {
     "defaultMessage": "it holds more than {n, number} GB of files, too much to check",
-    "description": "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause. {n} is the limit."
+    "description": "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause. {n} is the limit."
   },
   "main.unused.tooMany": {
     "defaultMessage": "it holds more than {n, number} files and folders, too many to check",
-    "description": "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause. {n} is the limit."
+    "description": "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause. {n} is the limit."
   },
   "main.unused.why.contains": {
     "defaultMessage": "it contains the project or the workspace",
-    "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
+    "description": "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
   },
   "main.unused.why.detached": {
     "defaultMessage": "it is not on a branch (detached HEAD)",
-    "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause. detached HEAD is git's term."
+    "description": "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause. detached HEAD is git's term."
   },
   "main.unused.why.notListed": {
     "defaultMessage": "git doesn't list it as one of the project's worktrees",
-    "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
+    "description": "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
   },
   "main.unused.why.notUnused": {
     "defaultMessage": "it isn't one of the project's unused worktrees now (an agent's conversation, a review copy or the merge queue may use it)",
-    "description": "Why Hive won't remove or merge a folder from Unused worktrees (#1450): it isn't listed any more, as a conversation can resume there, it is one of Hive's copies, or the merge queue holds it. A clause."
+    "description": "Why Combwork won't remove or merge a folder from Unused worktrees (#1450): it isn't listed any more, as a conversation can resume there, it is one of Combwork's copies, or the merge queue holds it. A clause."
   },
   "main.unused.why.otherProject": {
     "defaultMessage": "it is another project of the workspace",
-    "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
+    "description": "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
   },
   "main.unused.why.owned": {
     "defaultMessage": "an agent works in it now",
-    "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
+    "description": "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
   },
   "main.unused.why.queueBusy": {
     "defaultMessage": "the merge queue is using it",
-    "description": "Why Hive won't remove a folder from Unused worktrees (#1644): it is the merge queue's working folder, and the queue is merging in it or starting to (it may have started since the list was read). A clause. Glossary: merge queue."
+    "description": "Why Combwork won't remove a folder from Unused worktrees (#1644): it is the merge queue's working folder, and the queue is merging in it or starting to (it may have started since the list was read). A clause. Glossary: merge queue."
   },
   "main.unused.why.session": {
     "defaultMessage": "a session runs in it",
-    "description": "Why Hive won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause."
+    "description": "Why Combwork won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause."
   },
   "main.unused.why.slotGuarded": {
     "defaultMessage": "it is a slot, which Combwork removes only when it is clean and its work is merged",
-    "description": "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause."
+    "description": "Why Combwork won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause."
   },
   "main.unused.why.slotInUse": {
     "defaultMessage": "it is a slot in use",
-    "description": "Why Hive won't remove a slot from Unused worktrees (#1450): it is lent, protected or busy now (it changed since it was listed). A clause."
+    "description": "Why Combwork won't remove a slot from Unused worktrees (#1450): it is lent, protected or busy now (it changed since it was listed). A clause."
   },
   "main.update.checksum": {
     "defaultMessage": "The downloaded update did not match its checksum and was discarded.",
@@ -1789,7 +1789,7 @@
   },
   "main.update.devBuild": {
     "defaultMessage": "Updates are checked by the installed app, not development builds.",
-    "description": "Settings → Updates in a development build of Hive, which never updates."
+    "description": "Settings → Updates in a development build of Combwork, which never updates."
   },
   "main.update.noRelease": {
     "defaultMessage": "No release of Combwork has been published yet.",
@@ -1797,15 +1797,15 @@
   },
   "main.update.notInstalled": {
     "defaultMessage": "{app} {version} wasn't installed",
-    "description": "A notice: the user chose Restart and Update, and Hive didn't install the downloaded update. {app} is Hive's name."
+    "description": "A notice: the user chose Restart and Update, and Combwork didn't install the downloaded update. {app} is Combwork's name."
   },
   "main.update.notInstalledNotNewer": {
     "defaultMessage": "The copy installed on this computer is the same version or newer (a local build, say).",
-    "description": "Why Hive did not install a downloaded update: what is installed is not older than it."
+    "description": "Why Combwork did not install a downloaded update: what is installed is not older than it."
   },
   "main.update.notInstalledUnreadable": {
     "defaultMessage": "Combwork couldn't read the copy installed on this computer, so it didn't replace it. Try again once any other Combwork installer has finished.",
-    "description": "Why Hive did not install a downloaded update: it could not read the installed copy (another installer may be replacing it)."
+    "description": "Why Combwork did not install a downloaded update: it could not read the installed copy (another installer may be replacing it)."
   },
   "main.update.offline": {
     "defaultMessage": "Couldn't reach GitHub to check for updates. Check your internet connection.",
@@ -1817,7 +1817,7 @@
   },
   "main.update.ready": {
     "defaultMessage": "{app} {version} is ready",
-    "description": "A notice: an update was downloaded. {app} is Hive's name, {version} the new version."
+    "description": "A notice: an update was downloaded. {app} is Combwork's name, {version} the new version."
   },
   "main.update.readyAuto": {
     "defaultMessage": "It installs when you quit Combwork, or restart now.",
@@ -1829,11 +1829,11 @@
   },
   "main.update.restart": {
     "defaultMessage": "Restart and Update",
-    "description": "The notice's button: restarts Hive and installs the update."
+    "description": "The notice's button: restarts Combwork and installs the update."
   },
   "main.update.sameVersion": {
     "defaultMessage": "A published {app} {version} is available",
-    "description": "A notice: the user runs a local build (one they built themselves) of a version, and a published release of the same version exists. {app} is Hive's name."
+    "description": "A notice: the user runs a local build (one they built themselves) of a version, and a published release of the same version exists. {app} is Combwork's name."
   },
   "main.update.sameVersionBody": {
     "defaultMessage": "You're running a local build of {version}{hasCommit, select, yes { ({commit})} other {}}. Combwork doesn't install a release of the same version over it.",
@@ -1841,15 +1841,15 @@
   },
   "main.update.testCopy": {
     "defaultMessage": "A test copy of Combwork doesn't check for updates.",
-    "description": "Settings → Updates in a copy of Hive started by its tests, which never checks for updates."
+    "description": "Settings → Updates in a copy of Combwork started by its tests, which never checks for updates."
   },
   "main.update.updated": {
     "defaultMessage": "{app} updated to {version}",
-    "description": "A notice after Hive was updated. {app} is its name, {version} the new version."
+    "description": "A notice after Combwork was updated. {app} is its name, {version} the new version."
   },
   "main.update.updatedBody": {
     "defaultMessage": "See what changed in this version.",
-    "description": "The notice after Hive was updated."
+    "description": "The notice after Combwork was updated."
   },
   "main.update.whatsNew": {
     "defaultMessage": "What's New",
@@ -1873,7 +1873,7 @@
   },
   "main.usageMove.movedTitle": {
     "defaultMessage": "{count, plural, one {# agent moves} other {# agents move}} from {from} to {to}",
-    "description": "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Hive moves its agents to another account ({to})."
+    "description": "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Combwork moves its agents to another account ({to})."
   },
   "main.viewerTokens.noName": {
     "defaultMessage": "Give the viewer token a name, such as the app it is for",
@@ -1889,50 +1889,50 @@
   },
   "main.viewerTokens.tooMany": {
     "defaultMessage": "Combwork keeps at most {most, number} viewer tokens: revoke one first",
-    "description": "Why a viewer token was not made: Hive already keeps the most it keeps. {most} is that number (20). Revoke is the button beside each token."
+    "description": "Why a viewer token was not made: Combwork already keeps the most it keeps. {most} is that number (20). Revoke is the button beside each token."
   },
   "main.window.openLogs": {
     "defaultMessage": "Open Logs",
-    "description": "Button: opens the folder of Hive's log files."
+    "description": "Button: opens the folder of Combwork's log files."
   },
   "main.window.quit": {
     "defaultMessage": "Quit Combwork",
-    "description": "Button: quits Hive."
+    "description": "Button: quits Combwork."
   },
   "main.window.reload": {
     "defaultMessage": "Reload",
-    "description": "Button: reloads Hive's window."
+    "description": "Button: reloads Combwork's window."
   },
   "main.window.reloaded": {
     "defaultMessage": "Your agents kept running.",
-    "description": "The notice after Hive's window crashed and was reloaded."
+    "description": "The notice after Combwork's window crashed and was reloaded."
   },
   "main.window.reloadedLost": {
     "defaultMessage": "{n, plural, one {Your agents kept running. Unsaved changes to one file were lost.} other {Your agents kept running. Unsaved changes to # files were lost.}}",
-    "description": "The notice after Hive's window crashed and was reloaded, when files had unsaved edits. {n} is how many."
+    "description": "The notice after Combwork's window crashed and was reloaded, when files had unsaved edits. {n} is how many."
   },
   "main.window.reloadedTitle": {
     "defaultMessage": "Combwork's window stopped and was reloaded",
-    "description": "A notice's title after Hive's window crashed and was reloaded."
+    "description": "A notice's title after Combwork's window crashed and was reloaded."
   },
   "main.window.stillRunning": {
     "defaultMessage": "Your agents are still running: reloading the window reconnects to them.",
-    "description": "Hive's question when its window stopped or isn't responding."
+    "description": "Combwork's question when its window stopped or isn't responding."
   },
   "main.window.stopped": {
     "defaultMessage": "Combwork's window stopped working.",
-    "description": "Hive's question when its window crashed again soon after a reload."
+    "description": "Combwork's question when its window crashed again soon after a reload."
   },
   "main.window.unresponsive": {
     "defaultMessage": "Combwork's window isn't responding.",
-    "description": "Hive's question when its window has stopped responding."
+    "description": "Combwork's question when its window has stopped responding."
   },
   "main.window.unresponsiveDetail": {
     "defaultMessage": "{stillRunning} Wait for it, or reload it.",
-    "description": "Hive's question when its window isn't responding. {stillRunning} says the agents are still running."
+    "description": "Combwork's question when its window isn't responding. {stillRunning} says the agents are still running."
   },
   "main.window.wait": {
     "defaultMessage": "Wait",
-    "description": "Button: waits for Hive's window to respond."
+    "description": "Button: waits for Combwork's window to respond."
   }
 }

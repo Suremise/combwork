@@ -149,19 +149,19 @@ if ($env:CW_DIALOG_SNAPSHOT) {
 export function cantStartMessage(dir: string, file?: string): { title: string; text: string; command: string; buttons: { copy: string; copied: string; close: string } } {
   // Each paragraph a message (a message keeps no line break): what Windows won't let it read, the path, why and what to run.
   const what = file
-    ? tr(msg({ id: 'main.installDir.whatFile', defaultMessage: "Windows won't let Combwork's windows read a file in the folder Combwork is installed in:", description: "The message when Hive can't start from its install folder, its first line (the file's path follows on the next)." }))
-    : tr(msg({ id: 'main.installDir.whatFolder', defaultMessage: "Windows won't let Combwork's windows read the folder Combwork is installed in:", description: "The message when Hive can't start from its install folder, its first line (the folder's path follows on the next)." }))
+    ? tr(msg({ id: 'main.installDir.whatFile', defaultMessage: "Windows won't let Combwork's windows read a file in the folder Combwork is installed in:", description: "The message when Combwork can't start from its install folder, its first line (the file's path follows on the next)." }))
+    : tr(msg({ id: 'main.installDir.whatFolder', defaultMessage: "Windows won't let Combwork's windows read the folder Combwork is installed in:", description: "The message when Combwork can't start from its install folder, its first line (the folder's path follows on the next)." }))
   const why = file
-    ? tr(msg({ id: 'main.installDir.whyFile', defaultMessage: "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Combwork's sandboxed windows need, and Combwork couldn't add one. Run this command in PowerShell (as an administrator if you don't own them): it adds the entry to the folder and to the file. Then start Combwork again:", description: "The message when Hive can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them." }))
-    : tr(msg({ id: 'main.installDir.whyFolder', defaultMessage: "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Combwork's sandboxed windows need, and Combwork couldn't add one. Run this command in PowerShell (as an administrator if you don't own the folder), then start Combwork again:", description: "The message when Hive can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them." }))
+    ? tr(msg({ id: 'main.installDir.whyFile', defaultMessage: "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Combwork's sandboxed windows need, and Combwork couldn't add one. Run this command in PowerShell (as an administrator if you don't own them): it adds the entry to the folder and to the file. Then start Combwork again:", description: "The message when Combwork can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them." }))
+    : tr(msg({ id: 'main.installDir.whyFolder', defaultMessage: "Its permissions have an entry for an app package but none for ALL APPLICATION PACKAGES, which Combwork's sandboxed windows need, and Combwork couldn't add one. Run this command in PowerShell (as an administrator if you don't own the folder), then start Combwork again:", description: "The message when Combwork can't start from its install folder, its last paragraph (a command follows). ALL APPLICATION PACKAGES is a Windows name and PowerShell a program: keep them." }))
   return {
-    title: tr(msg({ id: 'main.installDir.title', defaultMessage: "Combwork can't start", description: "The title of the message when Hive can't start from its install folder." })),
+    title: tr(msg({ id: 'main.installDir.title', defaultMessage: "Combwork can't start", description: "The title of the message when Combwork can't start from its install folder." })),
     text: `${what}\n${file ?? dir}\n\n${why}`,
     command: grantCommand(dir, file),
     buttons: {
-      copy: tr(msg({ id: 'main.installDir.copyCommand', defaultMessage: 'Copy Command', description: "A button of the message window when Hive can't start from its install folder: copies the command to run." })),
-      copied: tr(msg({ id: 'main.installDir.copied', defaultMessage: 'Copied', description: "A button of the message window when Hive can't start from its install folder: what Copy Command says once it has copied the command." })),
-      close: tr(msg({ id: 'main.installDir.close', defaultMessage: 'Close', description: "A button of the message window when Hive can't start from its install folder: closes it (Hive then quits)." }))
+      copy: tr(msg({ id: 'main.installDir.copyCommand', defaultMessage: 'Copy Command', description: "A button of the message window when Combwork can't start from its install folder: copies the command to run." })),
+      copied: tr(msg({ id: 'main.installDir.copied', defaultMessage: 'Copied', description: "A button of the message window when Combwork can't start from its install folder: what Copy Command says once it has copied the command." })),
+      close: tr(msg({ id: 'main.installDir.close', defaultMessage: 'Close', description: "A button of the message window when Combwork can't start from its install folder: closes it (Combwork then quits)." }))
     }
   }
 }
@@ -210,7 +210,7 @@ export function tellCantStart(dir: string, file?: string, tools: MessageTools = 
   }
   if (tools.window(message)) return
   try {
-    tools.errorBox(message.title, `${message.text}\n\n${message.command}\n\n${tr(msg({ id: 'main.installDir.copy', defaultMessage: '(Ctrl+C copies this message.)', description: "The last line of Electron's error box when Hive can't start from its install folder. Ctrl+C is a key: keep it." }))}`)
+    tools.errorBox(message.title, `${message.text}\n\n${message.command}\n\n${tr(msg({ id: 'main.installDir.copy', defaultMessage: '(Ctrl+C copies this message.)', description: "The last line of Electron's error box when Combwork can't start from its install folder. Ctrl+C is a key: keep it." }))}`)
   } catch (e) {
     log.error("Couldn't show the error box either", e)
   }

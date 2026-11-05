@@ -162,7 +162,7 @@ describe('the sentences once built by hand read as before, in English', () => {
   it("who gets a skill, and where it goes", () => {
     expect(tr(m('assistant.skills.copiedDetail'), { audience: 'assistant' })).toBe('The Assistant now gets it as a Combwork skill, from their next session.')
     expect(tr(m('assistant.skills.copiedDetail'), { audience: 'agents' })).toBe('The project agents now get it as a Combwork skill, from their next session.')
-    expect(tr(m('assistant.skills.deleteHive'), { audience: 'all' })).toMatch(/^It's removed from the workspace, so new sessions of the project agents and the Assistant no longer get it\./)
+    expect(tr(m('assistant.skills.deleteCombwork'), { audience: 'all' })).toMatch(/^It's removed from the workspace, so new sessions of the project agents and the Assistant no longer get it\./)
     expect(tr(m('assistant.skills.deleteLocal'), { known: 'yes', provider: 'Codex' })).toBe('Codex agents in this project no longer load it in new sessions.')
     expect(tr(m('assistant.skills.deleteLocal'), { known: 'no', provider: '' })).toBe('The agents in this project no longer load it in new sessions.')
     expect(tr(m('assistant.modes.deleteMessage'), { file: 'advisor.md', bundled: 'yes' })).toBe('advisor.md goes to the Recycle Bin. It ships with Combwork, so you can restore it later.')

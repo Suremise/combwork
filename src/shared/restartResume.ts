@@ -190,16 +190,16 @@ export function checkRequest(text: string, t: RequestTarget, samePath: (a: strin
 // ---------------------------------------------------------------------------
 
 const T = {
-  restarting: agentMsg({ id: 'notice.restart.restarting', text: "Combwork is restarting for an update. Your work is saved; you'll be resumed.", note: 'HI-1707: the notice an agent finds in its inbox as Hive closes for an update, an install or a restart.' }),
+  restarting: agentMsg({ id: 'notice.restart.restarting', text: "Combwork is restarting for an update. Your work is saved; you'll be resumed.", note: 'HI-1707: the notice an agent finds in its inbox as Combwork closes for an update, an install or a restart.' }),
   resumed: agentMsg({
     id: 'notice.restart.resumed',
     text: '{reason, select, quit {Combwork was quit and started again} restart {Combwork restarted} other {Combwork restarted for an update}}{versions} at {time} UTC; your session was stopped and is resumed now.{where}{watch, select, yes { Carry on: re-arm your card watch if you were waiting.} other { Carry on where you were.}}',
-    note: 'HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: " (1.0.0 → 1.0.1)" when the version changed, or nothing; time: when Hive closed ("10:00"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane.'
+    note: 'HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: " (1.0.0 → 1.0.1)" when the version changed, or nothing; time: when Combwork closed ("10:00"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane.'
   }),
   where: agentMsg({
     id: 'notice.restart.where',
     text: "{onCard, select, yes {You were on {card}{hasRound, select, yes {, round {round}} other {}}{inLane, select, yes {, in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})} other {}}} other {You were in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})}}.",
-    note: 'HI-1707: what a resumed agent was on as Hive closed. onCard: yes with its card (card: "HI-12"; round: its round when hasRound is yes); inLane: yes with its lane (lane: its name or id; role: builder or reviewer). One of the two at least.'
+    note: 'HI-1707: what a resumed agent was on as Combwork closed. onCard: yes with its card (card: "HI-12"; round: its round when hasRound is yes); inLane: yes with its lane (lane: its name or id; role: builder or reviewer). One of the two at least.'
   })
 }
 

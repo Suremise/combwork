@@ -17,7 +17,7 @@
   },
   "stall.doing.startFailed": {
     "text": "{agent}'s start failed: {why}",
-    "note": "HI-1976: the card's agent couldn't be started. why: the failure, in Hive's or the CLI's own words."
+    "note": "HI-1976: the card's agent couldn't be started. why: the failure, in Combwork's or the CLI's own words."
   },
   "stall.doing.startWaiting": {
     "text": "{agent} waits to start: {why}",

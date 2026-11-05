@@ -85,7 +85,7 @@
   "content.templates.failed": "Nothing was changed: {error}",
   "content.templates.fenced": "A template is being loaded into this project",
   "content.templates.gone": "That template is no longer there.",
-  "content.templates.hiveOnly": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
+  "content.templates.combworkOnly": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
   "content.templates.importNotJson": "It isn't a Combwork agent template (not JSON).",
   "content.templates.importTooLarge": "It isn't a Combwork agent template (over {kb} KB).",
   "content.templates.loading": "A template is already being loaded into this project.",

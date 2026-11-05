@@ -135,7 +135,7 @@ export async function commonGitDir(folder: string): Promise<string> {
   const r = known ? null : await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   const dir = known ?? (r?.ok ? r.out.trim() : '')
   if (dir) return realpath(dir).catch(() => dir)
-  throw hiveError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message." }), { folder, why: r?.err || r?.out || '' }, { kind: 'conflict' })
+  throw hiveError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message." }), { folder, why: r?.err || r?.out || '' }, { kind: 'conflict' })
 }
 
 export interface RepoLockOptions {
@@ -156,12 +156,12 @@ export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts
     const waitSeconds = advanced.number(REPO_LOCK_WAIT)
     const onWait = (h: RepoLockHolder): void => {
       log.info(`Waiting for the repository lock of ${userText(folder)}, held by ${userText(h.profile)} (pid ${h.pid})`)
-      if (!opts.quiet) toast('info', tr(msg({ id: 'git.repoLock.waiting', defaultMessage: 'Another Combwork is merging into this repository ({profile})', description: "A notification's title: this Hive waits to merge into (or change) a repository because another Hive (its profile folder's name, {profile}, e.g. Hive-Dev) holds the repository's merge lock." }), { profile: h.profile }), tr(msg({ id: 'git.repoLock.waitingFor', defaultMessage: 'Combwork waits for it to finish, up to {seconds, number} s.', description: 'The notification\'s text under "Another Hive is merging into this repository": how long this Hive waits for the other one, in seconds.' }), { seconds: waitSeconds }), undefined, opts.project)
+      if (!opts.quiet) toast('info', tr(msg({ id: 'git.repoLock.waiting', defaultMessage: 'Another Combwork is merging into this repository ({profile})', description: "A notification's title: this Combwork waits to merge into (or change) a repository because another Combwork (its profile folder's name, {profile}, e.g. Combwork-Dev) holds the repository's merge lock." }), { profile: h.profile }), tr(msg({ id: 'git.repoLock.waitingFor', defaultMessage: 'Combwork waits for it to finish, up to {seconds, number} s.', description: 'The notification\'s text under "Another Combwork is merging into this repository": how long this Combwork waits for the other one, in seconds.' }), { seconds: waitSeconds }), undefined, opts.project)
     }
     const got = (await thread.ask({ type: 'take', dir, profile: profile(), waitMs: waitSeconds * 1000, noticeAfterMs: NOTICE_AFTER_MS }, onWait)) as TakeAnswer
     if ('timedOut' in got) {
       log.warn(`Gave up waiting for the repository lock of ${userText(folder)}, held by ${userText(got.timedOut.profile)} (pid ${got.timedOut.pid})`)
-      throw hiveError(msg({ id: 'git.repoLock.busy', defaultMessage: 'Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.', description: "An error: a merge or another change to a repository didn't start, because another Hive (its profile folder's name, {profile}) still held the repository's merge lock after Hive had waited for it." }), { profile: got.timedOut.profile }, { kind: 'conflict' })
+      throw hiveError(msg({ id: 'git.repoLock.busy', defaultMessage: 'Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.', description: "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it." }), { profile: got.timedOut.profile }, { kind: 'conflict' })
     }
     try {
       return await fn()

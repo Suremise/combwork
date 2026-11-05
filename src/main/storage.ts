@@ -487,7 +487,7 @@ export async function purgePreview(target: PurgeTarget): Promise<PurgePreview> {
 const M_PURGE = {
   notKept: msg({ id: 'main.storage.purgeNotKept', defaultMessage: "The folder isn't one Combwork keeps attachments in, so it is left alone.", description: "Purge skipped a session's attachments: their folder isn't a real folder in the project's attachments folder (a link, say)." }),
   changed: msg({ id: 'main.storage.purgeChanged', defaultMessage: 'It changed since the preview.', description: 'Purge skipped a file the preview listed: it was changed (written to) since.' }),
-  sessionChanged: msg({ id: 'main.storage.purgeSessionChanged', defaultMessage: "One of the session's backups changed since the preview, so nothing of it goes.", description: "Purge left a session alone: one of Hive's copies of its transcript changed since the preview (it was resumed, say)." }),
+  sessionChanged: msg({ id: 'main.storage.purgeSessionChanged', defaultMessage: "One of the session's backups changed since the preview, so nothing of it goes.", description: "Purge left a session alone: one of Combwork's copies of its transcript changed since the preview (it was resumed, say)." }),
   lastCopy: msg({ id: 'main.storage.purgeLastCopy', defaultMessage: "Whether Combwork's backup is the session's last copy changed since the preview.", description: "Purge left a session alone: its coding agent's own transcript went or came back since the preview, so what the purge would do to the session changed." }),
   noLonger: msg({ id: 'main.storage.purgeNoLonger', defaultMessage: 'It no longer qualifies (it changed since the preview).', description: 'Purge skipped an item the preview listed: it changed since (a session resumed, a file gone).' }),
   expired: msg({ id: 'main.storage.purgeExpired', defaultMessage: 'This preview is out of date. Open Purge again to see what goes now.', description: 'Purge refused: the preview it was asked to apply was already applied, or is too old.' })
@@ -651,7 +651,7 @@ export async function purge(previewId: string, listed: string[], permanent: bool
 async function whileUnclaimed<T>(host: string, name: string, fn: () => Promise<T>): Promise<T> {
   return sessions.whileCleaning(host, name, async () => {
     const lower = name.toLowerCase()
-    if ((await workspace.sessionsFile(host)).sessions.some((s) => s.id.toLowerCase() === lower)) throw hiveError(msg({ id: 'main.storage.purgeClaimed', defaultMessage: 'It belongs to a session again.', description: 'Purge skipped a file or folder of a session Hive no longer had: it has one again.' }))
+    if ((await workspace.sessionsFile(host)).sessions.some((s) => s.id.toLowerCase() === lower)) throw hiveError(msg({ id: 'main.storage.purgeClaimed', defaultMessage: 'It belongs to a session again.', description: 'Purge skipped a file or folder of a session Combwork no longer had: it has one again.' }))
     // After the read above: nothing is awaited between this check and fn's first look at the files.
     if (sessions.liveAnywhere(name) || sessions.projectStates(host).some((s) => `run-${s.runId}`.toLowerCase() === lower)) throw hiveError(msg({ id: 'main.storage.purgeRunning', defaultMessage: 'Its session is running.', description: 'Purge skipped a file or folder: its session is running now.' }))
     return fn()
@@ -662,7 +662,7 @@ async function whileUnclaimed<T>(host: string, name: string, fn: () => Promise<T
 async function purgeDeletedUsage(host: string, id: string): Promise<void> {
   const k = (await workspace.sessionsFile(host)).deletedUsage?.find((x) => x.id === id)
   if (!k) return
-  if (!(await usageHistory.recordKept(host, k).catch(() => false))) throw hiveError(msg({ id: 'main.storage.purgeUnrecorded', defaultMessage: "Combwork couldn't record it in the usage history, so it is kept.", description: "Purge kept a deleted session's old usage: Hive couldn't save it in the usage history, which the totals keep." }))
+  if (!(await usageHistory.recordKept(host, k).catch(() => false))) throw hiveError(msg({ id: 'main.storage.purgeUnrecorded', defaultMessage: "Combwork couldn't record it in the usage history, so it is kept.", description: "Purge kept a deleted session's old usage: Combwork couldn't save it in the usage history, which the totals keep." }))
   await workspace.mutateSessions(host, (f) => {
     if (f.deletedUsage?.some((x) => x.id === id)) f.deletedUsage = f.deletedUsage.filter((x) => x.id !== id)
   })

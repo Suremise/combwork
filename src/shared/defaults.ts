@@ -188,7 +188,7 @@ export { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX }
 export const agentLimitText = (tr?: Tr, max: number = AGENT_LIMIT_MAX): string => {
   if (max >= AGENT_LIMIT_MAX)
     return tr
-      ? tr(msg({ id: 'agents.limit.most', defaultMessage: 'A project can have up to {most, number} agents.', description: "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24)." }), { most: AGENT_LIMIT_MAX })
+      ? tr(msg({ id: 'agents.limit.most', defaultMessage: 'A project can have up to {most, number} agents.', description: "Why another agent can't be added to a project: it has as many as Combwork allows ({most}, 24)." }), { most: AGENT_LIMIT_MAX })
       : `A project can have up to ${AGENT_LIMIT_MAX} agents.` // i18n-ignore: English for main's error (the window passes tr)
   return tr
     ? tr(msg({ id: 'agents.limit.workflow', defaultMessage: 'This project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow.', description: "Why another agent can't be added to a project (HI-2058): its workflow option Maximum agents allows {max} and it has that many. Maximum agents, Version Control and Workflow are names in the window: as translated there." }), { max })

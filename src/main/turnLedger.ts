@@ -244,7 +244,7 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
       const i = running && ev.text ? ledger.injected.indexOf(flat(ev.text)) : -1
       if (i >= 0) {
         ledger.injected.splice(i, 1)
-        return { verdict: 'apply', event: { ...ev, injected: true }, note: "Hive's own message in the running turn" } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+        return { verdict: 'apply', event: { ...ev, injected: true }, note: "Combwork's own message in the running turn" } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
       }
       if (turn && running) return { verdict: 'apply', event: ev, note: 'a prompt in the running turn' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
       if (turn) return { verdict: 'stale', why: 'a prompt of a turn that is over' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)

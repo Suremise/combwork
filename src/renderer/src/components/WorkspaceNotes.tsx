@@ -7,7 +7,7 @@ import { useAdvancedValue } from '../advanced'
 import { NO_PROJECTS, useStore } from '../store'
 
 const M = {
-  title: msg({ id: 'workspace.notes.workspaceNotes.title', defaultMessage: 'Workspace notes', description: "The title of the shared note Hive gives every agent when it starts (notes about this machine), over its editor. Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told." }),
+  title: msg({ id: 'workspace.notes.workspaceNotes.title', defaultMessage: 'Workspace notes', description: "The title of the shared note Combwork gives every agent when it starts (notes about this machine), over its editor. Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told." }),
   template: msg({
     id: 'workspace.notes.workspaceNotes.template',
     defaultMessage: "# Workspace notes\n\nNotes about this machine that every agent should know: a full path a command needs, a local tool's version. Rules for anyone who works on a project belong in its AGENTS.md instead.\n",
@@ -24,7 +24,7 @@ const M = {
     defaultMessage: 'Over {max, number} bytes for {who}: they get it cut, and are told to read the note for the rest.',
     description: "A warning above the Workspace notes note's editor, as you type: what an agent gets of it is longer than the limit (Settings → Advanced). {max} is the limit in bytes, {who} the projects (a list, in the language's way) or the Assistant."
   }),
-  assistant: msg({ id: 'workspace.notes.workspaceNotes.assistant', defaultMessage: 'the Assistant', description: 'In the warning that the Workspace notes note is cut for some: the Hive Assistant, which gets the whole note.' })
+  assistant: msg({ id: 'workspace.notes.workspaceNotes.assistant', defaultMessage: 'the Assistant', description: 'In the warning that the Workspace notes note is cut for some: the Combwork Assistant, which gets the whole note.' })
 }
 
 const codeTag = (c: React.ReactNode[]): React.ReactNode => <code>{c}</code>

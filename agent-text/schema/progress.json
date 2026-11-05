@@ -38,7 +38,7 @@
   "progress.change.reflog": {
     "placeholders": {}
   },
-  "progress.check.outsideHive": {
+  "progress.check.outsideCombwork": {
     "placeholders": {
       "check": "plain"
     }

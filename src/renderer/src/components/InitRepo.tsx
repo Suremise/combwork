@@ -23,7 +23,7 @@ const M = {
   initialising: msg({ id: 'git.init.initialising', defaultMessage: 'Initialising…', description: 'The Initialise button while it runs.' }),
   makeFirstCommit: msg({ id: 'git.init.makeFirstCommit', defaultMessage: 'Make first commit', description: "The dialog's button: makes the repository's first commit." }),
   initialise: msg({ id: 'git.init.initialise', defaultMessage: 'Initialise', description: "The dialog's button: makes the folder a git repository." }),
-  looking: msg({ id: 'git.init.looking', defaultMessage: 'Looking at the folder…', description: 'The Initialise dialog while Hive checks the folder.' }),
+  looking: msg({ id: 'git.init.looking', defaultMessage: 'Looking at the folder…', description: 'The Initialise dialog while Combwork checks the folder.' }),
   nestedAnyway: msg({ id: 'git.init.nestedAnyway', defaultMessage: 'Make a repository of its own inside {folder} anyway', description: "Check box in the Initialise dialog of a project inside another repository. {folder} is that repository's folder." }),
   starterGitignore: msg({ id: 'git.init.starterGitignore', defaultMessage: 'Starter .gitignore', description: 'Label of the drop-down of starter .gitignore files.' }),
   yourName: msg({ id: 'git.init.yourName', defaultMessage: 'Your name', description: 'Label of the box for the name commits are made as.' }),

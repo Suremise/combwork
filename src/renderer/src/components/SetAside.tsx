@@ -16,12 +16,12 @@ import { BusyButton, Icon, Markdown, Modal, useBusy } from './ui'
  */
 
 const M = {
-  title: msg({ id: 'board.setAside.title', defaultMessage: 'Cards Made by an Older Combwork', description: "Title of the dialog listing cards an older version of Hive saved in this workspace after the board moved to its database; they were kept aside, not added to the board." }),
-  intro: msg({ id: 'board.setAside.intro', defaultMessage: 'This workspace was opened in an older Combwork, which saved these cards where it keeps them. They were set aside, unchanged, and not added to the board. Add each one, or discard it.', description: 'The top of the dialog listing cards an older Hive saved.' }),
-  links: msg({ id: 'board.setAside.links', defaultMessage: "Nothing is rewritten for them: a card here that links to one by its old number keeps that number, and a card added under a new number keeps its own links as they were.", description: 'A note in the dialog listing cards an older Hive saved: Hive changes no references between cards when adding them.' }),
-  none: msg({ id: 'board.setAside.none', defaultMessage: 'No cards are set aside.', description: 'The dialog listing cards an older Hive saved, when none are left.' }),
-  loading: msg({ id: 'board.setAside.loading', defaultMessage: 'Reading the set-aside cards…', description: 'The dialog listing cards an older Hive saved, while it reads them.' }),
-  number: msg({ id: 'board.setAside.number', defaultMessage: '#{n} in the older Combwork', description: "A set-aside card's number as the older Hive gave it. {n} is the number (after #)." }),
+  title: msg({ id: 'board.setAside.title', defaultMessage: 'Cards Made by an Older Combwork', description: "Title of the dialog listing cards an older version of Combwork saved in this workspace after the board moved to its database; they were kept aside, not added to the board." }),
+  intro: msg({ id: 'board.setAside.intro', defaultMessage: 'This workspace was opened in an older Combwork, which saved these cards where it keeps them. They were set aside, unchanged, and not added to the board. Add each one, or discard it.', description: 'The top of the dialog listing cards an older Combwork saved.' }),
+  links: msg({ id: 'board.setAside.links', defaultMessage: "Nothing is rewritten for them: a card here that links to one by its old number keeps that number, and a card added under a new number keeps its own links as they were.", description: 'A note in the dialog listing cards an older Combwork saved: Combwork changes no references between cards when adding them.' }),
+  none: msg({ id: 'board.setAside.none', defaultMessage: 'No cards are set aside.', description: 'The dialog listing cards an older Combwork saved, when none are left.' }),
+  loading: msg({ id: 'board.setAside.loading', defaultMessage: 'Reading the set-aside cards…', description: 'The dialog listing cards an older Combwork saved, while it reads them.' }),
+  number: msg({ id: 'board.setAside.number', defaultMessage: '#{n} in the older Combwork', description: "A set-aside card's number as the older Combwork gave it. {n} is the number (after #)." }),
   keeps: msg({ id: 'board.setAside.keeps', defaultMessage: 'Add keeps #{n}', description: "Beside a set-aside card: its old number {n} is free on this board, so Add gives it that number." }),
   taken: msg({ id: 'board.setAside.taken', defaultMessage: '#{n} is taken here: Add gives the next free number', description: "Beside a set-aside card: a card on this board has its old number {n}, so Add gives it a new one." }),
   made: msg({ id: 'board.setAside.made', defaultMessage: 'Made by {by} on {when}', description: "Who made a set-aside card ({by}: a name, You or Assistant) and when ({when}: a date and time)." }),
@@ -39,7 +39,7 @@ const M = {
 }
 
 /** The board's ⋯ menu item while any are set aside. */
-export const SET_ASIDE_ITEM = msg({ id: 'board.setAside.menu', defaultMessage: 'Set-Aside Cards ({n, number})…', description: "An item of the board's ⋯ menu, shown while cards an older Hive saved are set aside: opens the dialog to add or discard them. {n} is how many. The … says it opens a dialog: keep it." })
+export const SET_ASIDE_ITEM = msg({ id: 'board.setAside.menu', defaultMessage: 'Set-Aside Cards ({n, number})…', description: "An item of the board's ⋯ menu, shown while cards an older Combwork saved are set aside: opens the dialog to add or discard them. {n} is how many. The … says it opens a dialog: keep it." })
 
 const byText = (by: string): string => (Object.hasOwn(BY_TEXT, by) ? tr(BY_TEXT[by]) : by)
 

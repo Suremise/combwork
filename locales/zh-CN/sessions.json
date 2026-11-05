@@ -72,7 +72,7 @@
   "sessions.compaction.tokens": "{before} → {after}{next, select, none {} other {（含指令为 {next}）}} · 释放 {freed} · {when}",
   "sessions.delete.button": "删除",
   "sessions.delete.detailExternal": "Combwork 将不再列出它。{cli} 保留着它的会话记录，因此 {cli} 自己的恢复列表中仍有它。",
-  "sessions.delete.detailHive": "Combwork 保存的会话记录副本会移到回收站，它也不再显示在这里；它的用量仍计入总计。{cli} 保留着自己的会话记录，因此 {cli} 自己的恢复列表中仍有它。",
+  "sessions.delete.detailCombwork": "Combwork 保存的会话记录副本会移到回收站，它也不再显示在这里；它的用量仍计入总计。{cli} 保留着自己的会话记录，因此 {cli} 自己的恢复列表中仍有它。",
   "sessions.delete.failed": "{kind, select, conversation {无法删除对话} other {无法删除会话}}",
   "sessions.delete.message": "从 Combwork 中删除“{name}”？",
   "sessions.delete.title": "{kind, select, conversation {删除对话？} other {删除会话？}}",

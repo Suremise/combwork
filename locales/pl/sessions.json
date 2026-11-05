@@ -72,7 +72,7 @@
   "sessions.compaction.tokens": "{before} → {after}{next, select, none {} other { ({next} z instrukcjami)}} · zwolniono {freed} · {when}",
   "sessions.delete.button": "Usuń",
   "sessions.delete.detailExternal": "Combwork przestanie ją pokazywać. {cli} zachowuje jej transkrypcję, więc nadal będzie na liście wznawiania w {cli}.",
-  "sessions.delete.detailHive": "Kopie jej transkrypcji w Combwork trafią do Kosza i nie będzie jej już tutaj; jej użycie zostaje w sumach. {cli} zachowuje własną transkrypcję, więc nadal będzie na liście wznawiania w {cli}.",
+  "sessions.delete.detailCombwork": "Kopie jej transkrypcji w Combwork trafią do Kosza i nie będzie jej już tutaj; jej użycie zostaje w sumach. {cli} zachowuje własną transkrypcję, więc nadal będzie na liście wznawiania w {cli}.",
   "sessions.delete.failed": "{kind, select, conversation {Nie udało się usunąć rozmowy} other {Nie udało się usunąć sesji}}",
   "sessions.delete.message": "Usunąć „{name}” z Combwork?",
   "sessions.delete.title": "{kind, select, conversation {Usunąć rozmowę?} other {Usunąć sesję?}}",

@@ -58,14 +58,14 @@ const SESSION_FOLDER = /^(?!\.{1,2}$)[\w.-]+$/
  * or symbolic link, never really outside the host. Throws otherwise, so nothing is written through one.
  */
 export async function ownAttachmentsFolder(host: string, sessionFolder?: string): Promise<string> {
-  if (sessionFolder !== undefined && !SESSION_FOLDER.test(sessionFolder)) throw hiveError(msg({ id: 'service.attachments.badFolder', defaultMessage: 'Not a session folder name.', description: "An error: a name given for a session's attachments folder isn't one Hive makes (a session id)." }), undefined, { kind: 'invalid' })
+  if (sessionFolder !== undefined && !SESSION_FOLDER.test(sessionFolder)) throw hiveError(msg({ id: 'service.attachments.badFolder', defaultMessage: 'Not a session folder name.', description: "An error: a name given for a session's attachments folder isn't one Combwork makes (a session id)." }), undefined, { kind: 'invalid' })
   const root = await attachmentsDir(host)
   const chain = [join(host, CW_DIR), root, ...(sessionFolder !== undefined ? [join(root, sessionFolder)] : [])]
   for (const p of chain) {
     if (!(await lstat(p).catch(() => null))) await mkdir(p).catch((e: NodeJS.ErrnoException) => (e.code === 'EEXIST' ? undefined : Promise.reject(e)))
     if (!(await isOwnFolder(host, p))) {
       log.warn(`${userText(p)} is a link or not a folder: no attachments are kept through it`)
-      throw hiveError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Hive writes nothing through it." }), { folder: p })
+      throw hiveError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Combwork writes nothing through it." }), { folder: p })
     }
   }
   return chain[chain.length - 1]
@@ -177,7 +177,7 @@ async function recordRenamed(root: string, from: string, to: string): Promise<vo
   let map: Record<string, string> = {}
   try {
     const v = JSON.parse(await readFile(path, 'utf8')) as unknown
-    if (!v || typeof v !== 'object' || Array.isArray(v)) throw hiveError(msg({ id: 'service.attachments.badRecord', defaultMessage: '{file} is not a record of moved files', description: "An error: the file {file} where Hive records attachments it renamed can't be read as one (damaged)." }), { file: MOVED_FILE })
+    if (!v || typeof v !== 'object' || Array.isArray(v)) throw hiveError(msg({ id: 'service.attachments.badRecord', defaultMessage: '{file} is not a record of moved files', description: "An error: the file {file} where Combwork records attachments it renamed can't be read as one (damaged)." }), { file: MOVED_FILE })
     map = v as Record<string, string>
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e

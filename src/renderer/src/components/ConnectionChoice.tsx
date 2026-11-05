@@ -246,7 +246,7 @@ export function NoConnectionBanner({ cli, where = 'project' }: { cli: ProviderId
 }
 
 const INTRO = {
-  text: msg({ id: 'connections.intro.text', defaultMessage: "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Combwork no longer uses the sign-in of your own terminal, which stays as it is.", description: 'A one-time banner in the main window (HI-1774; HI-2108): coding agents now each run on an account (a sign-in Hive keeps, Settings → Accounts & Connections) and none has been added yet. {clis} names the coding agent CLIs, joined ("Claude Code and Codex").' }),
+  text: msg({ id: 'connections.intro.text', defaultMessage: "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Combwork no longer uses the sign-in of your own terminal, which stays as it is.", description: 'A one-time banner in the main window (HI-1774; HI-2108): coding agents now each run on an account (a sign-in Combwork keeps, Settings → Accounts & Connections) and none has been added yet. {clis} names the coding agent CLIs, joined ("Claude Code and Codex").' }),
   add: msg({ id: 'connections.intro.add', defaultMessage: 'Add an Account', description: 'The one-time accounts banner\'s button (HI-2108): opens Settings → Accounts & Connections.' }),
   dismiss: msg({ id: 'connections.intro.dismiss', defaultMessage: 'Dismiss', description: 'The one-time connections banner\'s button: hides it for good.' })
 }

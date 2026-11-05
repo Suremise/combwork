@@ -83,7 +83,7 @@
   "content.templates.failed": "Nic nie zmieniono: {error}",
   "content.templates.fenced": "Do tego projektu jest wczytywany szablon",
   "content.templates.gone": "Tego szablonu już nie ma.",
-  "content.templates.hiveOnly": "Szablonów Combwork nie można zmieniać: zduplikuj jeden do obszaru roboczego lub projektu, aby go zmienić.",
+  "content.templates.combworkOnly": "Szablonów Combwork nie można zmieniać: zduplikuj jeden do obszaru roboczego lub projektu, aby go zmienić.",
   "content.templates.importNotJson": "To nie jest szablon agentów Combwork (to nie JSON).",
   "content.templates.importTooLarge": "To nie jest szablon agentów Combwork (ponad {kb} KB).",
   "content.templates.loading": "Do tego projektu jest już wczytywany szablon.",

@@ -6,7 +6,7 @@ import type { ProviderDescriptor } from './providers'
 
 export const SHARED_INSTRUCTIONS = 'AGENTS.md'
 
-const STARTER = agentMsg({ id: 'contract.instructions.starter', text: 'Instructions for every agent in this project.', note: "A new AGENTS.md's first line under the project's name, when Hive makes the CLIs share one and none had any." })
+const STARTER = agentMsg({ id: 'contract.instructions.starter', text: 'Instructions for every agent in this project.', note: "A new AGENTS.md's first line under the project's name, when Combwork makes the CLIs share one and none had any." })
 
 export interface InstructionsFile {
   provider: string

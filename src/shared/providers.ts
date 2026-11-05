@@ -565,9 +565,9 @@ export function modeCaveat(provider: ProviderId, mode: PermissionMode | '' | nul
 
 /** Where Hive finds a CLI (AgentInstallInfo.source, as the adapters name it) in the window's words; PATH, npm and WinGet are names (#885). */
 const INSTALL_SOURCES: Record<string, Msg> = {
-  settings: msg({ id: 'agents.installSource.settings', defaultMessage: 'Settings', description: "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings." }),
-  'native install': msg({ id: 'agents.installSource.native', defaultMessage: 'native install', description: "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings." }),
-  'standalone install': msg({ id: 'agents.installSource.standalone', defaultMessage: 'standalone install', description: "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings." })
+  settings: msg({ id: 'agents.installSource.settings', defaultMessage: 'Settings', description: "Where Combwork found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings." }),
+  'native install': msg({ id: 'agents.installSource.native', defaultMessage: 'native install', description: "Where Combwork found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings." }),
+  'standalone install': msg({ id: 'agents.installSource.standalone', defaultMessage: 'standalone install', description: "Where Combwork found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings." })
 }
 
 /** Where Hive found a CLI, as the window shows it: its source's words, else the source as it is (a name: PATH, npm, WinGet). */

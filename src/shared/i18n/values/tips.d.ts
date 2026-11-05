@@ -159,6 +159,12 @@ interface HiveMessageValues {
   'tips.codexSandboxConnections.title': undefined
   'tips.codexScriptCalls.text': undefined
   'tips.codexScriptCalls.title': undefined
+  'tips.combworkFolder.text': undefined
+  'tips.combworkFolder.title': undefined
+  'tips.combworkMerges.text': undefined
+  'tips.combworkMerges.title': undefined
+  'tips.combworkSkills.text': undefined
+  'tips.combworkSkills.title': undefined
   'tips.commandName': { command: string | number }
   'tips.compactFocus.text': { key: string | number }
   'tips.compactFocus.title': undefined
@@ -246,12 +252,6 @@ interface HiveMessageValues {
   'tips.handoverSelf.title': undefined
   'tips.hardwareAcceleration.text': undefined
   'tips.hardwareAcceleration.title': undefined
-  'tips.hiveFolder.text': undefined
-  'tips.hiveFolder.title': undefined
-  'tips.hiveMerges.text': undefined
-  'tips.hiveMerges.title': undefined
-  'tips.hiveSkills.text': undefined
-  'tips.hiveSkills.title': undefined
   'tips.hooksMissing.text': undefined
   'tips.hooksMissing.title': undefined
   'tips.howDoYouWork.text': undefined

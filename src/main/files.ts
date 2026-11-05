@@ -31,7 +31,7 @@ const toRel = (root: string, abs: string): string => relative(root, abs).split(s
 const M = {
   outside: msg({ id: 'service.files.outside', defaultMessage: 'Path is outside the project', description: "An error in the Files tab: a file's path leads out of the project." }),
   exists: msg({ id: 'service.files.exists', defaultMessage: '"{name}" already exists', description: 'An error making or renaming a file or folder in the Files tab: one called {name} is already there.' }),
-  notKept: msg({ id: 'service.files.notKept', defaultMessage: 'Not one of the session attachments Combwork keeps.', description: "An error deleting a session's attachment (a file pasted or dropped into a session): it isn't one Hive keeps, or it is a link." }),
+  notKept: msg({ id: 'service.files.notKept', defaultMessage: 'Not one of the session attachments Combwork keeps.', description: "An error deleting a session's attachment (a file pasted or dropped into a session): it isn't one Combwork keeps, or it is a link." }),
   inUse: msg({ id: 'service.files.inUse', defaultMessage: 'Another program has this file open. Close it, then try again.', description: "An error deleting a session's attachment: another program has the file open, so Windows won't move it." })
 }
 

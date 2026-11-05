@@ -48,6 +48,17 @@ interface HiveMessageValues {
   'service.cardAttach.tooLarge': { name: string | number; max: string | number }
   'service.cardAttach.tooMuch': { files: number; total: string | number }
   'service.cardCleanup.stale': undefined
+  'service.combworkMove.busy': { profile: string | number }
+  'service.combworkMove.closed': undefined
+  'service.combworkMove.locked': { folder: string | number }
+  'service.combworkMove.otherOpen': { profile: string | number }
+  'service.combworkMove.phaseFailed': { what: string | number; error: string | number }
+  'service.combworkVcs.cantList': undefined
+  'service.combworkVcs.cantListWhy': { problem: string | number }
+  'service.combworkVcs.changed': undefined
+  'service.combworkVcs.exitCode': { code: string | number }
+  'service.combworkVcs.noRepo': undefined
+  'service.combworkVcs.rmFailed': { why: string | number }
   'service.files.badName': { name: string | number }
   'service.files.exists': { name: string | number }
   'service.files.existsIn': { root: string; name: string | number; folder: string | number }
@@ -151,17 +162,6 @@ interface HiveMessageValues {
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
-  'service.hiveMove.busy': { profile: string | number }
-  'service.hiveMove.closed': undefined
-  'service.hiveMove.locked': { folder: string | number }
-  'service.hiveMove.otherOpen': { profile: string | number }
-  'service.hiveMove.phaseFailed': { what: string | number; error: string | number }
-  'service.hiveVcs.cantList': undefined
-  'service.hiveVcs.cantListWhy': { problem: string | number }
-  'service.hiveVcs.changed': undefined
-  'service.hiveVcs.exitCode': { code: string | number }
-  'service.hiveVcs.noRepo': undefined
-  'service.hiveVcs.rmFailed': { why: string | number }
   'service.intent.noWorkflow': { card: string | number }
   'service.intent.queueNotAgents': undefined
   'service.keys.closed': undefined

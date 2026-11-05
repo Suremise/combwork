@@ -43,7 +43,7 @@ const T = {
   more: agentMsg({ id: 'notice.parked.more', text: '{n} more processes left running, not listed', note: "HI-2081: more processes an agent's launches left running than the check lists (n: how many more)." }),
   process: agentMsg({ id: 'notice.parked.process', text: 'process {pid}', note: 'HI-2111: a process left running whose command is not known, by its process id.' }),
   orphan: agentMsg({ id: 'notice.parked.orphan', text: 'its command left running: {label} (pid {pid})', note: "HI-2111: a process an agent's running launch's command left running, its parent gone (label: its command)." }),
-  state: agentMsg({ id: 'notice.parked.state', text: 'its state is {status}', note: "HI-2081: an agent the check can't take as parked: its status (status: Hive's code for it) isn't one it knows." }),
+  state: agentMsg({ id: 'notice.parked.state', text: 'its state is {status}', note: "HI-2081: an agent the check can't take as parked: its status (status: Combwork's code for it) isn't one it knows." }),
   silent: agentMsg({ id: 'notice.parked.silent', text: 'silent {minutes} min, its state unknown', note: "HI-2081: an agent the check can't take as parked: nothing heard from it for minutes." }),
   background: agentMsg({ id: 'notice.parked.background', text: '{n} background task(s)', note: "HI-2081: what keeps an agent from being parked: the tasks its CLI says run in the background (n: how many)." }),
   run: agentMsg({ id: 'notice.parked.run', text: '{title} (Progress run, {minutes} min)', note: "HI-2081: a Progress run still open in the paused workspace (title: the run's own title), and for how long." }),

@@ -1548,7 +1548,7 @@
       "pid": "plain"
     }
   },
-  "api.slot.heldThisHive": {
+  "api.slot.heldThisCombwork": {
     "placeholders": {}
   },
   "api.slot.kindArg": {

@@ -51,12 +51,12 @@ const T = {
   check: agentMsg({
     id: 'inbox.relay.check',
     text: "For you to check: {said} If it grants a change {asker} can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.",
-    note: "The Assistant's line when the user answered or approved an agent's question and nothing on the card says what is needed (HI-1734): Hive never reads consent into a reply. said: what the user did (inbox.relay.said); asker: the asking agent's name."
+    note: "The Assistant's line when the user answered or approved an agent's question and nothing on the card says what is needed (HI-1734): Combwork never reads consent into a reply. said: what the user did (inbox.relay.said); asker: the asking agent's name."
   })
 }
 
 const M = {
-  title: msg({ id: 'service.answerRelay.title', defaultMessage: '{card}: nobody else has your answer', description: "A notification's title (a banner, a Windows notification): the user answered an agent's question on card {card} (its key, such as HI-12), and the Hive Assistant, which could act on it, couldn't be told." })
+  title: msg({ id: 'service.answerRelay.title', defaultMessage: '{card}: nobody else has your answer', description: "A notification's title (a banner, a Windows notification): the user answered an agent's question on card {card} (its key, such as HI-12), and the Combwork Assistant, which could act on it, couldn't be told." })
 }
 
 /** Whether the Assistant can be told an answer and act on it now: its hive tools on, and Control letting it change cards. */

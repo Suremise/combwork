@@ -26,17 +26,17 @@
   },
   "git.repoLock.busy": {
     "text": "Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
-    "note": "An error: a merge or another change to a repository didn't start, because another Hive (its profile folder's name, {profile}) still held the repository's merge lock after Hive had waited for it.",
+    "note": "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it.",
     "audience": "both"
   },
   "git.repoLock.noGitDir": {
     "text": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
-    "note": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message.",
+    "note": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message.",
     "audience": "both"
   },
   "git.tool.missing": {
     "text": "Git isn't installed (or isn't on Combwork's PATH)",
-    "note": "Said wherever git is needed when Hive cannot run git. No full stop: some places add more after it.",
+    "note": "Said wherever git is needed when Combwork cannot run git. No full stop: some places add more after it.",
     "audience": "both"
   },
   "git.tool.tooOld": {

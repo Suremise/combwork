@@ -107,7 +107,7 @@ function changeRecord(account: string, limit: string, firing: string, fn: (r: Us
 const MOVED_TITLE = msg({
   id: 'main.usageMove.movedTitle',
   defaultMessage: '{count, plural, one {# agent moves} other {# agents move}} from {from} to {to}',
-  description: "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Hive moves its agents to another account ({to})."
+  description: "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Combwork moves its agents to another account ({to})."
 })
 const MOVED_BODY = msg({
   id: 'main.usageMove.movedBody',

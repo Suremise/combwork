@@ -51,7 +51,7 @@
   },
   "agents.limit.most": {
     "text": "A project can have up to {most, number} agents.",
-    "note": "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24).",
+    "note": "Why another agent can't be added to a project: it has as many as Combwork allows ({most}, 24).",
     "audience": "both"
   },
   "agents.limit.workflow": {
@@ -76,7 +76,7 @@
   },
   "agents.resume.hold.byHand": {
     "text": "Its slot ({slot}) is free: Resume takes it for {agent} again. Resume All and startup leave it, so free slots stay for new work.",
-    "note": "A conversation's note (#1434): the slot it ran in ({slot}: \"slot-b\") is free and as it left it, so the user's own Resume takes it again for its agent ({agent}); Resume All and Hive's startup don't.",
+    "note": "A conversation's note (#1434): the slot it ran in ({slot}: \"slot-b\") is free and as it left it, so the user's own Resume takes it again for its agent ({agent}); Resume All and Combwork's startup don't.",
     "audience": "both"
   },
   "agents.resume.hold.changed": {
@@ -86,7 +86,7 @@
   },
   "agents.resume.hold.draining": {
     "text": "This conversation's slot ({slot}) is still being handed back from its last session. Try again in a moment.",
-    "note": "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Hive hasn't finished taking the slot back. It can be resumed in a moment.",
+    "note": "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Combwork hasn't finished taking the slot back. It can be resumed in a moment.",
     "audience": "both"
   },
   "agents.resume.hold.gone": {

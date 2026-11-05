@@ -33,11 +33,11 @@
   },
   "copy.error.interrupted": {
     "text": "its reset was interrupted",
-    "note": "A check or review copy's error, kept on the copy, when its reset was taken over from a Hive that is gone (#1435)."
+    "note": "A check or review copy's error, kept on the copy, when its reset was taken over from a Combwork that is gone (#1435)."
   },
   "copy.error.notListed": {
     "text": "its folder is there but git does not list it as a worktree",
-    "note": "A copy's error: its folder exists but isn't a worktree git knows, so Hive leaves it alone."
+    "note": "A copy's error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone."
   },
   "copy.error.setupExit": {
     "text": "its setup exited with code {code}",
@@ -89,7 +89,7 @@
   },
   "copy.isolated.noSupervisor": {
     "text": "Combwork's process supervisor isn't running, so an isolated check can't be run",
-    "note": "hive-progress --isolated's refusal: Hive can't run the check in a job of its own (#1435)."
+    "note": "hive-progress --isolated's refusal: Combwork can't run the check in a job of its own (#1435)."
   },
   "copy.isolated.notLeased": {
     "text": "no check copy could be leased: {error}",

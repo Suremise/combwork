@@ -151,7 +151,7 @@ const namesOrgs = (id: ProviderId): boolean => providerDescriptor(id).capabiliti
 function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider> } {
   const caps = providerDescriptor(id).capabilities.connections
   const adapter = provider(id)
-  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw hiveError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Hive keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
+  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw hiveError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Combwork keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
   return { homeEnv: caps.homeEnv, shared: caps.shared, adapter }
 }
 
@@ -1133,7 +1133,7 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
   const st = requestTrust(id, workspace.path, projectsFor(a), true)
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
   // Removed, or its workspace closed, while Hive checked: Set Up opens nowhere (never its own folder instead).
-  if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
+  if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Combwork was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
   return answer ? setUpTarget(a, answer.pending) : undefined
 }
 
@@ -1342,7 +1342,7 @@ async function assertUsable(a: Account): Promise<void> {
     await assertRealFolder(accountFolder(a.id))
   } catch (e) {
     log.warn(`account ${a.id}'s folder can't be used: ${userText(String((e as Error).message ?? e))}`)
-    throw hiveError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Combwork made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.", description: "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made." }), { name: a.name }, { kind: 'conflict' })
+    throw hiveError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Combwork made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.", description: "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Combwork made." }), { name: a.name }, { kind: 'conflict' })
   }
 }
 
@@ -1772,10 +1772,10 @@ const LAUNCH = {
   none: msg({ id: 'main.connections.launch.none', defaultMessage: 'No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections and sign it in, then start {agent} again.', description: "Starting an agent ({agent}, its name) is refused: its workspace has no account on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Accounts & Connections names a section." }),
   offNoDefault: msg({ id: 'main.connections.launch.offNoDefault', defaultMessage: "{agent}'s account, {name}, is off in this workspace, and no other {cli} account is on. Turn one on in Settings → Accounts & Connections.", description: "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI." }),
   deleted: msg({ id: 'main.connections.launch.deleted', defaultMessage: "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.", description: 'Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.' }),
-  changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)." }),
+  changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Combwork started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)." }),
   otherProvider: msg({ id: 'main.connections.launch.otherProvider', defaultMessage: 'The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.', description: 'Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent\'s CLI ("Claude Code").' }),
   signedOut: msg({ id: 'main.connections.launch.signedOut', defaultMessage: '{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in." }),
-  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." }),
+  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Combwork checked who it is signed in as." }),
   noKey: msg({ id: 'main.connections.launch.noKey', defaultMessage: '{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its server account ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Accounts & Connections names a section." })
 }
 

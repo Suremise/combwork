@@ -5,7 +5,7 @@
   "slots.release.changed": "{slot}はその間に変わりました。書き込んでいるのは表示されたセッションではなくなっています。もう一度確認してください。",
   "slots.release.live": "{slot}に書き込んでいるセッションはこのCombworkでまだ実行中です。先にエージェントを停止するか、残したプロセスを終了または保持してください。",
   "slots.release.notEnded": "一覧のプロセスの一部がまだ実行中です。WindowsがCombworkによる終了を許可しなかったため、{slot}は解放されませんでした。もう一度試すか、終了せずに解放してください。",
-  "slots.release.otherHive": "{slot}は、まだ実行中の別のCombwork（プロセス{pid}）が保持しています。そちらで解放するか、先にそのCombworkを終了してください。",
+  "slots.release.otherCombwork": "{slot}は、まだ実行中の別のCombwork（プロセス{pid}）が保持しています。そちらで解放するか、先にそのCombworkを終了してください。",
   "slots.setting.bad": "そのようなスロット設定はCombworkにありません。",
   "slots.setting.badSize": "レビュー用とチェック用のコピーの数は{min, number}から{max, number}までの整数で指定してください。",
   "slots.setting.badText": "スロットのスクリプトやファイルの一覧は、{max, number}文字以内のテキストで指定してください。"

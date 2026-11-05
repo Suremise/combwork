@@ -231,9 +231,9 @@
     "text": "Links: {links}",
     "note": "A journal entry's links (type and ref)."
   },
-  "reply.journal.mark.byHive": {
+  "reply.journal.mark.byCombwork": {
     "text": "by Combwork",
-    "note": "A journal entry's mark: Hive recorded it."
+    "note": "A journal entry's mark: Combwork recorded it."
   },
   "reply.journal.mark.detail": {
     "text": "detail",
@@ -329,19 +329,19 @@
   },
   "reply.message.tells": {
     "text": "Combwork tells it {ways}",
-    "note": "cw_message_agent (#1497): how Hive tells the agent of the message (joined with reply.list.or)."
+    "note": "cw_message_agent (#1497): how Combwork tells the agent of the message (joined with reply.list.or)."
   },
   "reply.message.tells.checkpoints": {
     "text": "at its next tool call",
-    "note": "How Hive tells an agent of a message (#1432): at its next tool call."
+    "note": "How Combwork tells an agent of a message (#1432): at its next tool call."
   },
   "reply.message.tells.idleWakes": {
     "text": "once it is idle",
-    "note": "How Hive tells an agent of a message: once it is idle."
+    "note": "How Combwork tells an agent of a message: once it is idle."
   },
   "reply.message.tells.stopContinuation": {
     "text": "at its turn's end",
-    "note": "How Hive tells an agent of a message: at its turn's end."
+    "note": "How Combwork tells an agent of a message: at its turn's end."
   },
   "reply.next.done": {
     "text": "Done: nothing more on it.",
@@ -357,7 +357,7 @@
   },
   "reply.next.queue": {
     "text": "Next: Combwork's merge queue merges it.",
-    "note": "What comes next on a card (#1530): Hive's merge queue merges it."
+    "note": "What comes next on a card (#1530): Combwork's merge queue merges it."
   },
   "reply.next.review": {
     "text": "Next: a reviewer's verdict.",
@@ -465,7 +465,7 @@
   },
   "reply.queue.runBy": {
     "text": "run by {by}",
-    "note": "A merge queue's state: another Hive runs it."
+    "note": "A merge queue's state: another Combwork runs it."
   },
   "reply.queue.running": {
     "text": "running",
@@ -601,7 +601,7 @@
   },
   "reply.setting.shownAs": {
     "text": "The user sees it as: {shownAs}.",
-    "note": "cw_read_setting (#767): where the user sees it, in the language Hive shows them."
+    "note": "cw_read_setting (#767): where the user sees it, in the language Combwork shows them."
   },
   "reply.setting.where": {
     "text": "Where: {path}. Takes {takes}.",
@@ -613,11 +613,11 @@
   },
   "reply.skill.for": {
     "text": "for {audience, select, all {agents and the Assistant} assistant {the Assistant} other {agents}}",
-    "note": "Who a Hive skill is for."
+    "note": "Who a Combwork skill is for."
   },
-  "reply.skill.level.hive": {
+  "reply.skill.level.cw": {
     "text": "Combwork",
-    "note": "Where a skill comes from in cw_list_skills: Hive's own."
+    "note": "Where a skill comes from in cw_list_skills: Combwork's own."
   },
   "reply.skill.level.local": {
     "text": "local",
@@ -641,7 +641,7 @@
   },
   "reply.skill.nobody": {
     "text": "given to nobody: {problem}",
-    "note": "A Hive skill nobody gets (its header is broken or its audience unknown), and why."
+    "note": "A Combwork skill nobody gets (its header is broken or its audience unknown), and why."
   },
   "reply.skill.none": {
     "text": "No skills.",
@@ -695,9 +695,9 @@
     "text": "Yours: {slots}; release with its branch.",
     "note": "A release of a slot not held (#586): the ones the agent does hold or wait for."
   },
-  "reply.team.hive": {
+  "reply.team.cw": {
     "text": "Combwork",
-    "note": "What still runs that isn't an agent's: Hive's own."
+    "note": "What still runs that isn't an agent's: Combwork's own."
   },
   "reply.team.more": {
     "text": "…and {n} more.",

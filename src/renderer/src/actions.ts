@@ -371,8 +371,8 @@ async function detectedProvider(resolve: () => ProviderId, auto: () => boolean):
 
 /** Said when Hive hasn't finished finding which CLIs are installed. */
 const LOOKING = {
-  title: msg({ id: 'actions.provider.lookingTitle', defaultMessage: 'Still looking for the coding agents', description: "A warning's title: Hive hasn't finished finding which coding agent CLIs are installed." }),
-  message: msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Combwork is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Hive is still looking for the coding agent CLIs.' })
+  title: msg({ id: 'actions.provider.lookingTitle', defaultMessage: 'Still looking for the coding agents', description: "A warning's title: Combwork hasn't finished finding which coding agent CLIs are installed." }),
+  message: msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Combwork is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Combwork is still looking for the coding agent CLIs.' })
 }
 
 /**
@@ -380,9 +380,9 @@ const LOOKING = {
  * its lease kept; or released (the slot is made again at its next lease) when its line is gone or the user prefers.
  */
 async function goneSlot(path: string, agentId: string, gone: { agentName: string; path: string; branch: string; branchExists: boolean; slot?: string }): Promise<boolean> {
-  const release = { label: tr(msg({ id: 'actions.slot.release', defaultMessage: 'Release the Slot', description: "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it." })), value: 'release' }
+  const release = { label: tr(msg({ id: 'actions.slot.release', defaultMessage: 'Release the Slot', description: "Button: the agent gives up the slot whose folder is gone; Combwork makes the slot again the next time it lends it." })), value: 'release' }
   const choice = await choose({
-    title: tr(msg({ id: 'actions.slot.goneTitle', defaultMessage: 'The slot is gone', description: "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing." })),
+    title: tr(msg({ id: 'actions.slot.goneTitle', defaultMessage: 'The slot is gone', description: "Title of the question when the folder of a slot an agent holds (a working folder Combwork lends it for a card or lane) is missing." })),
     message: gone.branchExists
       ? tr(msg({ id: 'actions.slot.goneMessage', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?", description: "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path, branch: gone.branch })
       : tr(msg({ id: 'actions.slot.goneNoBranch', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Combwork makes it again the next time it lends it.", description: "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path }),
@@ -875,7 +875,7 @@ function freshWhyText(r: FreshRow): string {
     case 'background':
       return tr(msg({ id: 'actions.startFresh.why.background', defaultMessage: 'background tasks running: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent has background tasks running, so it keeps its conversation." }))
     case 'pending':
-      return tr(msg({ id: 'actions.startFresh.why.pending', defaultMessage: 'a prompt not taken yet: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): Hive typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation." }))
+      return tr(msg({ id: 'actions.startFresh.why.pending', defaultMessage: 'a prompt not taken yet: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): Combwork typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation." }))
     case 'lease':
       return tr(msg({ id: 'actions.startFresh.why.lease', defaultMessage: '{card, select, none {its lane is still in flight} other {{card} is still in flight}}: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent holds a slot for a card ({card}: \"AM-12\") or a lane (none) whose work isn't finished, so it keeps its conversation." }), { card: r.card ? cardLabelOf(get(), r.card) : 'none' })
     default:
@@ -1003,7 +1003,7 @@ export async function archiveCurrent(path: string | null = get().selectedProject
 /** Where a server is added (HI-2059): a project, or the Hive Assistant. */
 export type McpPlace = Pick<ProjectInfo, 'path' | 'name'> | 'assistant'
 
-const MCP_UPDATE_FAILED = msg({ id: 'actions.mcp.updateFailedAdded', defaultMessage: 'Could not update the server', description: "An error's title: adding an MCP server to a project or the Hive Assistant, or removing it, failed." })
+const MCP_UPDATE_FAILED = msg({ id: 'actions.mcp.updateFailedAdded', defaultMessage: 'Could not update the server', description: "An error's title: adding an MCP server to a project or the Combwork Assistant, or removing it, failed." })
 
 /**
  * Add server… (HI-2059): a picker of the workspace's servers not yet added to a project or the Hive Assistant, the one
@@ -1018,9 +1018,9 @@ export async function addMcpServer(place: McpPlace): Promise<boolean> {
   const ok = await confirm({
     title:
       place === 'assistant'
-        ? tr(msg({ id: 'mcp.add.titleAssistant', defaultMessage: 'Add a server for the Assistant', description: "Title of the Add server picker (HI-2059) in the Hive Assistant's view." }))
+        ? tr(msg({ id: 'mcp.add.titleAssistant', defaultMessage: 'Add a server for the Assistant', description: "Title of the Add server picker (HI-2059) in the Combwork Assistant's view." }))
         : tr(msg({ id: 'mcp.add.title', defaultMessage: 'Add a server to {project}', description: "Title of the Add server picker (HI-2059) in a project's MCP tab. {project} is the project." }), { project: place.name }),
-    message: tr(msg({ id: 'mcp.add.message', defaultMessage: 'The workspace’s servers not added here yet. Sessions started from now on get the one you add.', description: 'The Add server picker (HI-2059), above its search and list: the workspace servers not added to this project (or the Hive Assistant); new sessions start the one added.' })),
+    message: tr(msg({ id: 'mcp.add.message', defaultMessage: 'The workspace’s servers not added here yet. Sessions started from now on get the one you add.', description: 'The Add server picker (HI-2059), above its search and list: the workspace servers not added to this project (or the Combwork Assistant); new sessions start the one added.' })),
     content: createElement(McpServerPicker, { servers: can, onPick: (m: McpServerInfo | null) => (picked = m) }),
     wide: true,
     confirmLabel: tr(msg({ id: 'mcp.add.button', defaultMessage: 'Add', description: 'The Add server picker (HI-2059): the button that adds the chosen server.' })),
@@ -1057,8 +1057,8 @@ export async function chooseMcpPlaces(server: Pick<McpServerInfo, 'name' | 'def'
   let picks: Record<string, boolean> = Object.fromEntries(projects.map((p) => [p.path, initial.includes(p.path)]))
   let forAssistant = server.assistant
   const ok = await confirm({
-    title: tr(msg({ id: 'mcp.places.title', defaultMessage: 'Add {name} to…', description: 'Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Hive Assistant, an MCP server is added to. {name} is the server.' }), { name: server.name }),
-    message: tr(msg({ id: 'mcp.places.message', defaultMessage: 'Sessions started from now on get it wherever it is ticked; unticking removes it there. It runs:', description: 'The MCP view’s Add to… dialog (HI-2059), above the command the server runs and the projects (and the Hive Assistant) to tick.' })),
+    title: tr(msg({ id: 'mcp.places.title', defaultMessage: 'Add {name} to…', description: 'Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Combwork Assistant, an MCP server is added to. {name} is the server.' }), { name: server.name }),
+    message: tr(msg({ id: 'mcp.places.message', defaultMessage: 'Sessions started from now on get it wherever it is ticked; unticking removes it there. It runs:', description: 'The MCP view’s Add to… dialog (HI-2059), above the command the server runs and the projects (and the Combwork Assistant) to tick.' })),
     list: server.runs,
     content: createElement(McpProjectPicker, {
       projects,
@@ -1078,9 +1078,9 @@ export async function chooseMcpPlaces(server: Pick<McpServerInfo, 'name' | 'def'
   if (r?.failed.length) {
     const place = (p: string): string => (p === 'assistant' ? tr(MCP_ASSISTANT) : (projects.find((x) => samePath(x.path, p))?.name ?? basename(p)))
     const lines = [
-      ...(r.added.length ? [tr(msg({ id: 'mcp.places.addedIn', defaultMessage: 'Added: {places}', description: 'After Add to… (HI-2059) failed in part: the places the server was added to. {places} lists projects (and the Hive Assistant).' }), { places: fmt.list(r.added.map(place)) })] : []),
-      ...(r.removed.length ? [tr(msg({ id: 'mcp.places.removedFrom', defaultMessage: 'Removed: {places}', description: 'After Add to… (HI-2059) failed in part: the places the server was removed from. {places} lists projects (and the Hive Assistant).' }), { places: fmt.list(r.removed.map(place)) })] : []),
-      ...r.failed.map((f) => tr(msg({ id: 'mcp.places.failedIn', defaultMessage: 'Not changed in {place}: {error}', description: 'After Add to… (HI-2059) failed in part: a place where the change could not be written, and why ({error}, as Hive or Windows said it).' }), { place: place(f.place), error: f.error }))
+      ...(r.added.length ? [tr(msg({ id: 'mcp.places.addedIn', defaultMessage: 'Added: {places}', description: 'After Add to… (HI-2059) failed in part: the places the server was added to. {places} lists projects (and the Combwork Assistant).' }), { places: fmt.list(r.added.map(place)) })] : []),
+      ...(r.removed.length ? [tr(msg({ id: 'mcp.places.removedFrom', defaultMessage: 'Removed: {places}', description: 'After Add to… (HI-2059) failed in part: the places the server was removed from. {places} lists projects (and the Combwork Assistant).' }), { places: fmt.list(r.removed.map(place)) })] : []),
+      ...r.failed.map((f) => tr(msg({ id: 'mcp.places.failedIn', defaultMessage: 'Not changed in {place}: {error}', description: 'After Add to… (HI-2059) failed in part: a place where the change could not be written, and why ({error}, as Combwork or Windows said it).' }), { place: place(f.place), error: f.error }))
     ]
     notify('warning', tr(msg({ id: 'mcp.places.partial', defaultMessage: '{name} was changed in only some places', description: "A warning's title after the MCP view's Add to… (HI-2059): some of the places could not be written; the message says which changed and which didn't. {name} is the server." }), { name: server.name }), lines.join('\n'))
   }
@@ -1184,11 +1184,11 @@ export function mcpWhereText(server: Pick<McpServerInfo, 'def' | 'projects' | 'a
   const hidden = server.projects.filter((p) => !projects.some((x) => samePath(x.path, p))).length
   const on = hidden ? [...named, tr(msg({ id: 'mcp.where.hidden', defaultMessage: '{n, plural, one {# hidden project} other {# hidden projects}}', description: 'Where an MCP server is added (HI-2059), after the projects named: the hidden projects it is added to.' }), { n: hidden })] : named
   const assistant = !!server.def && server.assistant
-  if (on.length && assistant) return tr(msg({ id: 'mcp.where.addedSomeAndAssistant', defaultMessage: 'Added in {projects} and for the Assistant', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
-  if (assistant) return tr(msg({ id: 'mcp.where.addedAssistantOnly', defaultMessage: 'Added for the Assistant only', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: for the Hive Assistant, in no project.' }))
+  if (on.length && assistant) return tr(msg({ id: 'mcp.where.addedSomeAndAssistant', defaultMessage: 'Added in {projects} and for the Assistant', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Combwork Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
+  if (assistant) return tr(msg({ id: 'mcp.where.addedAssistantOnly', defaultMessage: 'Added for the Assistant only', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: for the Combwork Assistant, in no project.' }))
   return on.length
     ? tr(msg({ id: 'mcp.where.addedSome', defaultMessage: 'Added in {projects}', description: 'Where an MCP server is added (HI-2059), under it in the MCP view. {projects} lists the projects.' }), { projects: fmt.list(on) })
-    : tr(msg({ id: 'mcp.where.addedNone', defaultMessage: 'Not added anywhere', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: no project and not the Hive Assistant, so it runs nowhere.' }))
+    : tr(msg({ id: 'mcp.where.addedNone', defaultMessage: 'Not added anywhere', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: no project and not the Combwork Assistant, so it runs nowhere.' }))
 }
 
 
@@ -1208,7 +1208,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
       msg({
         id: 'mcp.addFile.messageAdded',
         defaultMessage: 'Adds {file} to the workspace (.combwork/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:',
-        description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .combwork/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.'
+        description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .combwork/mcp as it is; "MCP tab" and "Add to…" as Combwork shows them.'
       }),
       { file: basename(file), files: server.files }
     ),
@@ -1281,7 +1281,7 @@ export async function deleteMcpServer(server: Pick<McpServerInfo, 'name' | 'def'
   const ok = await confirm({
     title: tr(msg({ id: 'actions.mcp.deleteTitle', defaultMessage: 'Delete MCP server?', description: 'Title of the question before deleting a workspace MCP server.' })),
     message: tr(msg({ id: 'actions.mcp.deleteMessage', defaultMessage: 'Move {name}.json to the Recycle Bin, with its folder if it was added from a .zip? Projects will no longer be able to use it.', description: "The question before deleting a workspace MCP server: its file ({name}.json) goes to the Recycle Bin (Windows' name for it)." }), { name }),
-    detail: added ? tr(msg({ id: 'actions.mcp.deleteAdded', defaultMessage: '{where}: deleting it removes it there too.', description: 'The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as "Added in hive and for the Hive Assistant".' }), { where: mcpWhereText({ ...server, def: server.def ?? {} }, get().workspace?.projects ?? []) }) : undefined,
+    detail: added ? tr(msg({ id: 'actions.mcp.deleteAdded', defaultMessage: '{where}: deleting it removes it there too.', description: 'The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as "Added in hive and for the Combwork Assistant".' }), { where: mcpWhereText({ ...server, def: server.def ?? {} }, get().workspace?.projects ?? []) }) : undefined,
     confirmLabel: deleteLabel(),
     busyLabel: deletingLabel(),
     danger: true,
@@ -1468,7 +1468,7 @@ export function moveAgentPane(dir: CellDirection, path: string | null = get().se
 
 /** What a save says it did with the template's workflow (HI-1910): saved for the project's version control, kept from before. */
 const TW = {
-  saved: msg({ id: 'actions.template.workflowSaved', defaultMessage: "It holds this project's workflow for {platform}.", description: "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Hive names them)." }),
+  saved: msg({ id: 'actions.template.workflowSaved', defaultMessage: "It holds this project's workflow for {platform}.", description: "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Combwork names them)." }),
   kept: msg({ id: 'actions.template.workflowKept', defaultMessage: "{count, plural, one {The workflow for {platforms} it had is kept.} other {The workflows for {platforms} it had are kept.}}", description: "Under the notification that a template was saved over one of the same name (HI-1910): the workflow sections it had for {platforms} (None, Git: a list) are kept, {count} of them." }),
   changed: msg({ id: 'actions.template.workflowChanged', defaultMessage: 'The template "{template}" changed while it loaded, so its workflow wasn’t filled in. Load it again to see its workflow as it is now.', description: "A warning after loading a template (HI-1910): its workflow section changed between the Load dialog's preview and the load ({template}: its name), so the Workflow form isn't filled in with it." }),
   none: msg({ id: 'actions.template.workflowNone', defaultMessage: 'It holds no workflow.', description: "Under the notification that a template was saved (HI-1910): saved without the project's workflow, and it had none." })
@@ -1498,7 +1498,7 @@ export async function saveTemplate(path: string): Promise<void> {
     validate: (v) => (!v.trim() ? tr(msg({ id: 'actions.template.nameEmpty', defaultMessage: 'Enter a name.', description: "Why a template's name can't be used: it is empty." })) : v.trim().length > TEMPLATE_NAME_MAX ? tr(msg({ id: 'actions.template.nameTooLong', defaultMessage: 'At most {max} characters.', description: "Why a template's name can't be used: it is longer than {max} characters." }), { max: TEMPLATE_NAME_MAX }) : null),
     check: { label: tr(msg({ id: 'actions.template.everyProject', defaultMessage: 'For every project in the workspace (else for this project only)', description: "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's." })), initial: false, set: (v) => (workspaceScope = v) },
     check2: offerPatterns ? { label: tr(msg({ id: 'actions.template.usePatterns', defaultMessage: 'Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)', description: "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are." }), { example: p.agents.map((a) => a.name).find((n) => n.toUpperCase().startsWith(`${key}-`)) ?? `${key}-B1`, pattern: '{key}-B{n}' }), initial: true, set: (v) => (usePatterns = v) } : undefined,
-    check3: { label: tr(msg({ id: 'actions.template.includeWorkflow', defaultMessage: "Include this project's workflow (its rules for {platform}: review, checks by name, merging, stages; never its target branch, check commands or identity's name)", description: "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Hive names them), the rules only. Glossary: workflow, check, target branch, identity." }), { platform: tr(PLATFORM_NAME[platform]) }), initial: true, set: (v) => (includeWorkflow = v) }
+    check3: { label: tr(msg({ id: 'actions.template.includeWorkflow', defaultMessage: "Include this project's workflow (its rules for {platform}: review, checks by name, merging, stages; never its target branch, check commands or identity's name)", description: "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Combwork names them), the rules only. Glossary: workflow, check, target branch, identity." }), { platform: tr(PLATFORM_NAME[platform]) }), initial: true, set: (v) => (includeWorkflow = v) }
   })
   if (name === null) return
   const scope: TemplateScope = workspaceScope ? 'workspace' : 'project'
@@ -1838,7 +1838,7 @@ async function removeAllAgents_(path: string): Promise<void> {
         if (w && !w.deleted) unused++
         if (w?.deleted && w.branchKept) kept.push(tr(msg({ id: 'actions.removeAll.branchKept', defaultMessage: 'branch {branch} ({why}; its worktree was deleted)', description: "Remove All's report, in the list of worktrees kept: a branch ({branch}) kept, and why ({why}), though its worktree was deleted. Lower case: listed after \"Worktrees kept:\"." }), { branch: w.branch, why: w.reason ?? '' }))
         else if (w?.deleted) deleted.push(w.branch)
-        else if (deleteMerged && w) kept.push(w.reason ? tr(msg({ id: 'actions.removeAll.worktreeKept', defaultMessage: '{branch} ({why})', description: "Remove All's report, in the list of worktrees kept: a branch ({branch}) and why it was kept ({why})." }), { branch: w.branch, why: w.reason }) : tr(msg({ id: 'actions.removeAll.notChecked', defaultMessage: '{branch} (not checked)', description: "Remove All's report, in the list of worktrees kept: a branch ({branch}) Hive couldn't check." }), { branch: w.branch }))
+        else if (deleteMerged && w) kept.push(w.reason ? tr(msg({ id: 'actions.removeAll.worktreeKept', defaultMessage: '{branch} ({why})', description: "Remove All's report, in the list of worktrees kept: a branch ({branch}) and why it was kept ({why})." }), { branch: w.branch, why: w.reason }) : tr(msg({ id: 'actions.removeAll.notChecked', defaultMessage: '{branch} (not checked)', description: "Remove All's report, in the list of worktrees kept: a branch ({branch}) Combwork couldn't check." }), { branch: w.branch }))
       } catch (e) {
         throw new Error(errorMessage(e), { cause: e })
       } finally {
@@ -1892,7 +1892,7 @@ export async function releaseCarriedSlot(path: string, agentId: string): Promise
  * its Hive or run still lives, or when the slot changed meanwhile (the refusal stays in the dialog).
  */
 export async function releaseHeldSlot(path: string, slot: string): Promise<void> {
-  const w = await attempt(tr(msg({ id: 'actions.releaseHeld.readFailed', defaultMessage: "Could not read the slot's writer", description: "An error's title: Hive couldn't read who holds a slot, before Release Slot…'s question." })), () => call('slots:heldWriter', path, slot))
+  const w = await attempt(tr(msg({ id: 'actions.releaseHeld.readFailed', defaultMessage: "Could not read the slot's writer", description: "An error's title: Combwork couldn't read who holds a slot, before Release Slot…'s question." })), () => call('slots:heldWriter', path, slot))
   if (!w) return
   const agent = agentOf(project(path), w.agent)?.name ?? w.agent
   // Only Windows' own idle Sandbox broker left (HI-2309): releasing is safe, and it is left running unless asked.
@@ -1900,19 +1900,19 @@ export async function releaseHeldSlot(path: string, slot: string): Promise<void>
   let end = !!w.processes?.list.length && !idle
   const names = idle ? fmt.list(w.processes!.list.map((p) => p.name.replace(/\.exe$/i, '')), 'unit') : ''
   const ok = await confirm({
-    title: tr(msg({ id: 'actions.releaseHeld.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has." }), { agent, slot }),
+    title: tr(msg({ id: 'actions.releaseHeld.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Combwork doesn't know that everything it started has." }), { agent, slot }),
     message: idle
       ? tr(msg({ id: 'actions.releaseHeld.messageIdleBroker', defaultMessage: "{slot} is held by {names}, Windows' idle Sandbox broker, left by {agent}'s last session there (run {run}). No Sandbox is running, so releasing it is safe.", description: "Release Slot… (HI-2309): the slot ({slot}) is held only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer), which the agent's ({agent}) last session left; no Sandbox runs, so nothing can write in the slot through it. {run} is the session's run id (a code such as 3f9a1c…)." }), { slot, names, agent, run: w.run })
       : w.hive.self
-      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Combwork (process {pid}, running), but Combwork doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
-      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Combwork that is no longer running (process {pid}). Combwork can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.hive.pid }),
+      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Combwork (process {pid}, running), but Combwork doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Combwork; its processes were kept running or Combwork could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Combwork's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
+      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Combwork that is no longer running (process {pid}). Combwork can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Combwork that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Combwork's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.hive.pid }),
     ...(w.processes?.list.length ? { list: w.processes.list.map((p) => tr(msg({ id: 'actions.releaseHeld.process', defaultMessage: '{label} (process {pid})', description: "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})." }), { label: p.label, pid: p.pid })), listOnly: true } : {}),
     detail: idle
       ? tr(msg({ id: 'actions.releaseHeld.detailIdleBroker', defaultMessage: 'Released, the broker is left running: it is Windows’ own, and closes by itself.', description: "Release Slot… (HI-2309), under the question about a slot held only by Windows' idle Sandbox broker: releasing doesn't end it unless the box below is ticked." }))
       : w.processes?.list.length
       ? tr(msg({ id: 'actions.releaseHeld.detailListed', defaultMessage: '{n, plural, one {Combwork lists # process its session left running.} other {Combwork lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.', description: "Release Slot…: under the list of processes the agent's session left running ({n}: how many)." }), { n: w.processes.list.length + w.processes.more })
-      : tr(msg({ id: 'actions.releaseHeld.detailUnknown', defaultMessage: "Combwork doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.", description: "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run." })),
-    ...(w.processes?.list.length ? { check: { label: tr(msg({ id: 'actions.releaseHeld.endFirst', defaultMessage: 'End these processes first', description: "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot." })), initial: !idle, set: (v: boolean) => (end = v) } } : {}),
+      : tr(msg({ id: 'actions.releaseHeld.detailUnknown', defaultMessage: "Combwork doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.", description: "Release Slot…: Combwork lists no processes the agent's session left running, so it can't say whether any still run." })),
+    ...(w.processes?.list.length ? { check: { label: tr(msg({ id: 'actions.releaseHeld.endFirst', defaultMessage: 'End these processes first', description: "Release Slot…: a tick box, on by default: Combwork ends the listed processes before releasing the slot." })), initial: !idle, set: (v: boolean) => (end = v) } } : {}),
     confirmLabel: tr(msg({ id: 'actions.releaseHeld.confirm', defaultMessage: 'Release', description: 'Button: releases the slot.' })),
     danger: true,
     run: () => call('slots:releaseWriter', path, slot, w.run, end)

@@ -5,7 +5,7 @@
   "slots.release.changed": "{slot} 在此期间已变化：写入它的已不是显示的那个会话。请重新查看。",
   "slots.release.live": "写入 {slot} 的会话仍在这个 Combwork 中运行：请先停止智能体，或结束或保留它留下的仍在运行的进程。",
   "slots.release.notEnded": "列出的部分进程仍在运行：Windows 不允许 Combwork 结束它们，所以 {slot} 没有被释放。请重试，或者不结束它们直接释放。",
-  "slots.release.otherHive": "{slot} 被另一个仍在运行的 Combwork（进程 {pid}）占用：请在那里释放，或先退出那个 Combwork。",
+  "slots.release.otherCombwork": "{slot} 被另一个仍在运行的 Combwork（进程 {pid}）占用：请在那里释放，或先退出那个 Combwork。",
   "slots.setting.bad": "Combwork 没有这个槽位设置。",
   "slots.setting.badSize": "评审副本和检查副本的数量必须是 {min, number} 到 {max, number} 之间的整数。",
   "slots.setting.badText": "槽位脚本或文件列表必须是不超过 {max, number} 个字符的文本。"

@@ -24,13 +24,13 @@ const BUSY_SECONDS = 30
 /** Why Hive stopped typing into a setup task (KeysStopped's reason, English for the log), and how the window says it (#850). */
 const STOPPED = { closed: 'its terminal closed', busy: `it stayed busy for ${BUSY_SECONDS} seconds` } // i18n-ignore: the log's words; the toast says them with STOPPED_TEXT
 const STOPPED_TEXT = {
-  closed: msg({ id: 'service.providers.stoppedClosed', defaultMessage: 'its terminal closed', description: "Why Hive stopped typing a coding agent CLI's setup keys: its terminal closed. A clause, lower case (it follows \"as\")." }),
-  busy: msg({ id: 'service.providers.stoppedBusy', defaultMessage: '{seconds, plural, one {it stayed busy for # second} other {it stayed busy for # seconds}}', description: "Why Hive stopped typing a coding agent CLI's setup keys: it stayed busy for {seconds} seconds. A clause, lower case (it follows \"as\")." })
+  closed: msg({ id: 'service.providers.stoppedClosed', defaultMessage: 'its terminal closed', description: "Why Combwork stopped typing a coding agent CLI's setup keys: its terminal closed. A clause, lower case (it follows \"as\")." }),
+  busy: msg({ id: 'service.providers.stoppedBusy', defaultMessage: '{seconds, plural, one {it stayed busy for # second} other {it stayed busy for # seconds}}', description: "Why Combwork stopped typing a coding agent CLI's setup keys: it stayed busy for {seconds} seconds. A clause, lower case (it follows \"as\")." })
 }
 const stoppedText = (why: string): string => (why === STOPPED.closed ? tr(STOPPED_TEXT.closed) : why === STOPPED.busy ? tr(STOPPED_TEXT.busy, { seconds: BUSY_SECONDS }) : why)
 
 /** A CLI task's name in the window (its toasts): "Codex install", "Claude Code sign-in". */
-const TASK = msg({ id: 'service.providers.task', defaultMessage: '{task, select, install {{cli} install} update {{cli} update} login {{cli} sign-in} other {{cli} setup}}', description: "A coding agent CLI's task Hive runs in a terminal, as its notifications name it: {cli} is the CLI (\"Codex\"), {task} which task (install, update, sign-in, or another setup)." })
+const TASK = msg({ id: 'service.providers.task', defaultMessage: '{task, select, install {{cli} install} update {{cli} update} login {{cli} sign-in} other {{cli} setup}}', description: "A coding agent CLI's task Combwork runs in a terminal, as its notifications name it: {cli} is the CLI (\"Codex\"), {task} which task (install, update, sign-in, or another setup)." })
 
 const log = createLogger('providers')
 /** How many models' default efforts are kept per provider (observeDefaultEffort). */
@@ -190,8 +190,8 @@ class ProviderService {
   /** detected(), refusing when Hive is still looking: what calls it would otherwise commit to a guess (#506). */
   async settle(id?: ProviderId): Promise<void> {
     if (await this.detected(id)) return
-    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Combwork is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
-    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Combwork is still looking for {cli}. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name }, { kind: 'conflict' })
+    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Combwork is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Combwork hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
+    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Combwork is still looking for {cli}. Try again in a moment.', description: "An error: Combwork hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name }, { kind: 'conflict' })
   }
 
   /**
@@ -313,10 +313,10 @@ class ProviderService {
         // stays open for the user to do it.
         if (e instanceof PickNotFound) {
           log.warn(`${label}: couldn't find ${e.what}`)
-          toast('warning', tr(msg({ id: 'service.providers.pickNotFound', defaultMessage: "{task}: Combwork couldn't find {item}. Do it in the terminal, or update Combwork.", description: "A notification: Hive types the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal, and couldn't find the menu item {item} (the CLI's own words) on its screen." }), { task: shown(), item: e.what }))
+          toast('warning', tr(msg({ id: 'service.providers.pickNotFound', defaultMessage: "{task}: Combwork couldn't find {item}. Do it in the terminal, or update Combwork.", description: "A notification: Combwork types the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal, and couldn't find the menu item {item} (the CLI's own words) on its screen." }), { task: shown(), item: e.what }))
         } else if (e instanceof KeysStopped) {
           log.warn(`${label}: stopped typing: ${e.why}`)
-          if (hasPty(key)) toast('warning', tr(msg({ id: 'service.providers.keysStopped', defaultMessage: '{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.', description: "A notification: Hive stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")." }), { task: shown(), why: stoppedText(e.why) }))
+          if (hasPty(key)) toast('warning', tr(msg({ id: 'service.providers.keysStopped', defaultMessage: '{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.', description: "A notification: Combwork stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")." }), { task: shown(), why: stoppedText(e.why) }))
         } else throw e
       } finally {
         gate?.dispose()
@@ -411,7 +411,7 @@ class ProviderService {
       const cmd = adapter.loginCommand(info.path)
       return this.runTask(id, task, cmd.file, cmd.args, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
     }
-    if (!adapter.setupCommand) throw hiveError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Hive to run.' }), { cli: name }, { kind: 'invalid' })
+    if (!adapter.setupCommand) throw hiveError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Combwork to run.' }), { cli: name }, { kind: 'invalid' })
     const cmd = adapter.setupCommand(info.path)
     return this.runTask(id, task, cmd.file, cmd.args, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown)
   }

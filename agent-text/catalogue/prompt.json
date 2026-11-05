@@ -29,7 +29,7 @@
   },
   "prompt.card.skill.workOnCard": {
     "text": "Use the work-on-card skill.",
-    "note": "With Hive's tools: how to carry a card through is the work-on-card skill's, so the prompt only points there."
+    "note": "With Combwork's tools: how to carry a card through is the work-on-card skill's, so the prompt only points there."
   },
   "prompt.card.start": {
     "text": "Work on task {card} from the Combwork task board: {title}",
@@ -57,6 +57,6 @@
   },
   "prompt.context.readFirstNoTools": {
     "text": "Read these sections of the project's docs first: {list}.",
-    "note": "#818: as prompt.context.readFirst, for an agent without Hive's tools."
+    "note": "#818: as prompt.context.readFirst, for an agent without Combwork's tools."
   }
 }

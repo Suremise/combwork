@@ -18,7 +18,7 @@ import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from
  * records are said when read).
  */
 const A = {
-  fileWent: agentMsg({ id: 'skillCopy.source.fileWent', text: 'a file in it went while it was being copied', note: "A skill delivery's problem: a file of the skill's folder in the workspace went while Hive copied it." }),
+  fileWent: agentMsg({ id: 'skillCopy.source.fileWent', text: 'a file in it went while it was being copied', note: "A skill delivery's problem: a file of the skill's folder in the workspace went while Combwork copied it." }),
   folderGone: agentMsg({ id: 'skillCopy.source.folderGone', text: 'its folder in the workspace is gone', note: "A skill delivery's problem: the skill's folder in the workspace is gone." }),
   denied: agentMsg({ id: 'skillCopy.source.denied', text: 'its folder in the workspace could not be read (access denied)', note: "A skill delivery's problem: Windows refused to read the skill's folder in the workspace." }),
   notCopied: agentMsg({
@@ -26,19 +26,19 @@ const A = {
     text: 'it could not be copied{hasCode, select, yes { ({code})} other {}}',
     note: "A skill delivery's problem: making its copy failed (a disk full, a write that failed). hasCode: yes with the error's code (code: ENOSPC…)."
   }),
-  changedBeforeReplaced: agentMsg({ id: 'skillCopy.swap.changedBeforeReplaced', text: '{name} changed before it could be replaced', note: "Why a swap was abandoned (a skill's or mode's copy; name: its folder or file name): it was edited before Hive replaced it. Nothing was replaced." }),
-  changedWhileReplaced: agentMsg({ id: 'skillCopy.swap.changedWhileReplaced', text: '{name} changed while it was being replaced', note: 'Why a swap was abandoned: it was edited while Hive replaced it, and was put back as it was.' }),
-  putBackWhileReplaced: agentMsg({ id: 'skillCopy.swap.putBackWhileReplaced', text: '{name} was put back while it was being replaced', note: 'Why a swap was abandoned: something new took its place while Hive replaced it.' }),
+  changedBeforeReplaced: agentMsg({ id: 'skillCopy.swap.changedBeforeReplaced', text: '{name} changed before it could be replaced', note: "Why a swap was abandoned (a skill's or mode's copy; name: its folder or file name): it was edited before Combwork replaced it. Nothing was replaced." }),
+  changedWhileReplaced: agentMsg({ id: 'skillCopy.swap.changedWhileReplaced', text: '{name} changed while it was being replaced', note: 'Why a swap was abandoned: it was edited while Combwork replaced it, and was put back as it was.' }),
+  putBackWhileReplaced: agentMsg({ id: 'skillCopy.swap.putBackWhileReplaced', text: '{name} was put back while it was being replaced', note: 'Why a swap was abandoned: something new took its place while Combwork replaced it.' }),
   changedKeptBeside: agentMsg({
     id: 'skillCopy.swap.changedKeptBeside',
     text: '{name} changed while it was being replaced; the edited copy is kept beside it',
-    note: 'Why a swap was abandoned: it was edited while Hive replaced it; the edited copy is kept beside it as a -conflict- copy.'
+    note: 'Why a swap was abandoned: it was edited while Combwork replaced it; the edited copy is kept beside it as a -conflict- copy.'
   }),
-  changedBeforeRemoved: agentMsg({ id: 'skillCopy.swap.changedBeforeRemoved', text: '{name} changed before it could be removed', note: 'Why a removal was abandoned: it was edited before Hive removed it. Nothing was removed.' }),
-  changedWhileRemoved: agentMsg({ id: 'skillCopy.swap.changedWhileRemoved', text: '{name} changed while it was being removed', note: 'Why a removal was abandoned: it was edited while Hive removed it, and was put back (or kept as a -conflict- copy).' }),
-  overBytes: agentMsg({ id: 'skillCopy.tooBig.bytes', text: 'it is over {mb} MB', note: "Why a skill or mode is too big for Hive to check (HASH_LIMITS): mb is the limit in MB, a whole number. A delivery's problem and a kept revision's reason." }),
-  tooDeep: agentMsg({ id: 'skillCopy.tooBig.depth', text: 'it has folders more than {depth} deep', note: 'Why a skill or mode is too big for Hive to check (HASH_LIMITS): depth is the most folder levels.' }),
-  tooMany: agentMsg({ id: 'skillCopy.tooBig.entries', text: 'it has more than {entries} files and folders', note: 'Why a skill or mode is too big for Hive to check (HASH_LIMITS): entries is the most files and folders.' }),
+  changedBeforeRemoved: agentMsg({ id: 'skillCopy.swap.changedBeforeRemoved', text: '{name} changed before it could be removed', note: 'Why a removal was abandoned: it was edited before Combwork removed it. Nothing was removed.' }),
+  changedWhileRemoved: agentMsg({ id: 'skillCopy.swap.changedWhileRemoved', text: '{name} changed while it was being removed', note: 'Why a removal was abandoned: it was edited while Combwork removed it, and was put back (or kept as a -conflict- copy).' }),
+  overBytes: agentMsg({ id: 'skillCopy.tooBig.bytes', text: 'it is over {mb} MB', note: "Why a skill or mode is too big for Combwork to check (HASH_LIMITS): mb is the limit in MB, a whole number. A delivery's problem and a kept revision's reason." }),
+  tooDeep: agentMsg({ id: 'skillCopy.tooBig.depth', text: 'it has folders more than {depth} deep', note: 'Why a skill or mode is too big for Combwork to check (HASH_LIMITS): depth is the most folder levels.' }),
+  tooMany: agentMsg({ id: 'skillCopy.tooBig.entries', text: 'it has more than {entries} files and folders', note: 'Why a skill or mode is too big for Combwork to check (HASH_LIMITS): entries is the most files and folders.' }),
   tooBigToDeliver: agentMsg({ id: 'skillCopy.tooBig.deliver', text: 'it is too big for Combwork to check ({why})', note: "A launch's problem for a skill over HASH_LIMITS: why is one of skillCopy.tooBig.*." }),
   linksNotCopied: agentMsg({
     id: 'skillCopy.links.notCopied',
@@ -203,7 +203,7 @@ function unsettled<T>(path: string, bak: string | null, fallback: T): T {
  */
 export class KeptFileBusy extends HiveError {
   constructor(path: string) {
-    super(withValues(msg({ id: 'service.fsutil.keptBusy', defaultMessage: '{file} is being saved by something else: nothing was changed. Try again in a moment.', description: "An error: one of Hive's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Hive's change to it wasn't made." }), { file: path }), { kind: 'conflict' })
+    super(withValues(msg({ id: 'service.fsutil.keptBusy', defaultMessage: '{file} is being saved by something else: nothing was changed. Try again in a moment.', description: "An error: one of Combwork's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Combwork's change to it wasn't made." }), { file: path }), { kind: 'conflict' })
   }
 }
 
@@ -213,7 +213,7 @@ export class KeptFileBusy extends HiveError {
  */
 export class KeptFileUnreadable extends HiveError {
   constructor(path: string) {
-    super(withValues(msg({ id: 'service.fsutil.keptUnreadable', defaultMessage: "{file} couldn't be read: nothing was changed. Try again in a moment.", description: "An error: one of Hive's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Hive's change to it wasn't made and the file was left as it is." }), { file: path }), { kind: 'conflict' })
+    super(withValues(msg({ id: 'service.fsutil.keptUnreadable', defaultMessage: "{file} couldn't be read: nothing was changed. Try again in a moment.", description: "An error: one of Combwork's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Combwork's change to it wasn't made and the file was left as it is." }), { file: path }), { kind: 'conflict' })
   }
 }
 
@@ -1122,7 +1122,7 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
       revision = await contentHash(fresh)
     } catch (e) {
       if (e instanceof ContentTooLarge || e instanceof LinkNotCopied) throw e
-      throw new CopyFailed(withValues(msg({ id: 'service.fsutil.notCopied', defaultMessage: '{name} could not be copied', description: "An error putting back one of Hive's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced." }), { name }), { cause: e })
+      throw new CopyFailed(withValues(msg({ id: 'service.fsutil.notCopied', defaultMessage: '{name} could not be copied', description: "An error putting back one of Combwork's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced." }), { name }), { cause: e })
     }
     await o.prepare?.(fresh, revision)
   } catch (e) {

@@ -121,7 +121,7 @@ const A = {
   head: agentMsg({
     id: 'startView.head',
     text: 'Where things stand, {source, select, compact {after a compaction} resume {on resuming} other {at session start}} ({when} UTC): a snapshot from the board, lanes, agents and your journal. Check the live state before acting on it.',
-    note: "The state view's first line, after the fixed \"[Hive] \" (#1032). source: compact, resume or start (Claude Code's SessionStart source; clear and startup are a start). when: the time, \"2026-10-18 12:00\"."
+    note: "The state view's first line, after the fixed \"[Combwork] \" (#1032). source: compact, resume or start (Claude Code's SessionStart source; clear and startup are a start). when: the time, \"2026-10-18 12:00\"."
   }),
   foot: agentMsg({
     id: 'startView.foot',

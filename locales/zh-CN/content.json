@@ -83,7 +83,7 @@
   "content.templates.failed": "未做任何更改：{error}",
   "content.templates.fenced": "正在向此项目加载模板",
   "content.templates.gone": "该模板已不存在。",
-  "content.templates.hiveOnly": "Combwork 自带的模板无法修改：请将其复制到工作区或某个项目后再修改。",
+  "content.templates.combworkOnly": "Combwork 自带的模板无法修改：请将其复制到工作区或某个项目后再修改。",
   "content.templates.importNotJson": "它不是 Combwork 智能体模板（不是 JSON）。",
   "content.templates.importTooLarge": "它不是 Combwork 智能体模板（超过 {kb} KB）。",
   "content.templates.loading": "已有模板正在加载到此项目。",

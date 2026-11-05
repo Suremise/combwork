@@ -41,7 +41,7 @@ const GERMAN: Record<string, string> = {
   'git.validate.enterUrl': 'Gib eine URL ein',
   'git.validate.notEmail': 'Das ist keine E-Mail-Adresse',
   'service.gitRepo.badName': '{kind, select, tag {{hasName, select, yes {{name} ist kein gültiger Tag-Name.} other {Das ist kein gültiger Tag-Name.}}} other {{hasName, select, yes {{name} ist kein gültiger Branch-Name.} other {Das ist kein gültiger Branch-Name.}}}}',
-  'service.hiveVcs.noRepo': 'Kein Git-Repository enthält dieses Projekt.',
+  'service.combworkVcs.noRepo': 'Kein Git-Repository enthält dieses Projekt.',
   'service.attachments.badFolder': 'Kein Name eines Sitzungsordners.',
   'service.lanes.unknown': 'Unbekannte Lane {id}',
   'service.metrics.badRole': 'role muss agent, assistant, api oder viewer sein',

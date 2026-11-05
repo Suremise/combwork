@@ -25,7 +25,7 @@
   },
   "startView.head": {
     "text": "Where things stand, {source, select, compact {after a compaction} resume {on resuming} other {at session start}} ({when} UTC): a snapshot from the board, lanes, agents and your journal. Check the live state before acting on it.",
-    "note": "The state view's first line, after the fixed \"[Hive] \" (#1032). source: compact, resume or start (Claude Code's SessionStart source; clear and startup are a start). when: the time, \"2026-10-18 12:00\"."
+    "note": "The state view's first line, after the fixed \"[Combwork] \" (#1032). source: compact, resume or start (Claude Code's SessionStart source; clear and startup are a start). when: the time, \"2026-10-18 12:00\"."
   },
   "startView.line.asking": {
     "text": "{agent} ({project}) {status, select, signin {needs signing in} other {waits for the user}}{hasAsking, select, yes {: {asking}} other {}}",

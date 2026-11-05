@@ -45,11 +45,11 @@
   },
   "sessions.branch.delete": {
     "defaultMessage": "{scope, select, session {Delete with Its Sub-sessions… ({n, number})} other {Delete All… ({n, number})}}",
-    "description": "Menu item on a branch of the Sessions tree (a provider or an agent: All; a session: with the sessions it started): deletes the {n} sessions in it from Hive."
+    "description": "Menu item on a branch of the Sessions tree (a provider or an agent: All; a session: with the sessions it started): deletes the {n} sessions in it from Combwork."
   },
   "sessions.branch.nothingToArchive": {
     "defaultMessage": "Nothing of Combwork's to archive here",
-    "description": "Why Archive All is greyed out: no session in the branch is Hive's own (only Hive's sessions can be archived)."
+    "description": "Why Archive All is greyed out: no session in the branch is Combwork's own (only Combwork's sessions can be archived)."
   },
   "sessions.branch.unarchive": {
     "defaultMessage": "{scope, select, session {Unarchive with Its Sub-sessions ({n, number})} other {Unarchive All ({n, number})}}",
@@ -105,15 +105,15 @@
   },
   "sessions.bulk.failed": {
     "defaultMessage": "{action, select, archive {Could not archive the {kind, select, conversation {conversations} other {sessions}}} unarchive {Could not unarchive the {kind, select, conversation {conversations} other {sessions}}} other {Could not delete the {kind, select, conversation {conversations} other {sessions}}}}",
-    "description": "An error's title: archiving, unarchiving or deleting many sessions (the Hive Assistant's: conversations) failed."
+    "description": "An error's title: archiving, unarchiving or deleting many sessions (the Combwork Assistant's: conversations) failed."
   },
   "sessions.bulk.progress": {
     "defaultMessage": "{action, select, archive {{kind, select, conversation {Archiving {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Archiving {done, number} of {total, plural, one {# session} other {# sessions}}…}}} unarchive {{kind, select, conversation {Unarchiving {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Unarchiving {done, number} of {total, plural, one {# session} other {# sessions}}…}}} other {{kind, select, conversation {Deleting {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Deleting {done, number} of {total, plural, one {# session} other {# sessions}}…}}}}",
-    "description": "While many sessions are archived, unarchived or deleted at once (Clean Up, or a branch's Archive All): how many of them ({done}) of how many ({total}) it has been through so far. The Hive Assistant's: conversations."
+    "description": "While many sessions are archived, unarchived or deleted at once (Clean Up, or a branch's Archive All): how many of them ({done}) of how many ({total}) it has been through so far. The Combwork Assistant's: conversations."
   },
   "sessions.bulk.skipCount": {
     "defaultMessage": "{reason, select, live {{n, plural, one {# running} other {# running}}} inUse {{n, plural, one {# in use} other {# in use}}} reading {{n, plural, one {# being read by Combwork} other {# being read by Combwork}}} open {{n, plural, one {# open in another Combwork window} other {# open in other Combwork windows}}} external {{n, plural, one {# started outside Combwork} other {# started outside Combwork}}} shown {{n, plural, one {# open here} other {# open here}}} current {{n, plural, one {# current Assistant conversation} other {# current Assistant conversations}}} other {{n, plural, one {# failed} other {# failed}}}}",
-    "description": "How many sessions were passed over for one reason, listed after \"n skipped:\" (\"2 running, 1 in use\"). {reason} picks why: running, files in use, Hive is reading it, open in another Hive window, started outside Hive, open in this tab, the Hive Assistant's current conversation, or it failed (other)."
+    "description": "How many sessions were passed over for one reason, listed after \"n skipped:\" (\"2 running, 1 in use\"). {reason} picks why: running, files in use, Combwork is reading it, open in another Combwork window, started outside Combwork, open in this tab, the Combwork Assistant's current conversation, or it failed (other)."
   },
   "sessions.bulk.skipNote": {
     "defaultMessage": "{running, plural, =0 {Running sessions are skipped, and so are any whose files are in use; the result says which.} one {# running now is skipped, as are any whose files are in use; the result says which.} other {# running now are skipped, as are any whose files are in use; the result says which.}}",
@@ -121,7 +121,7 @@
   },
   "sessions.bulk.skipReason": {
     "defaultMessage": "{reason, select, live {running} inUse {in use} reading {being read by Combwork} open {open in another Combwork window} external {started outside Combwork} other {failed}}",
-    "description": "Why archiving, unarchiving or deleting passed over a session, in a few words (lower case): it is running, its files are in use, Hive is reading it, another Hive window has it open, it was started outside Hive, or it failed (other)."
+    "description": "Why archiving, unarchiving or deleting passed over a session, in a few words (lower case): it is running, its files are in use, Combwork is reading it, another Combwork window has it open, it was started outside Combwork, or it failed (other)."
   },
   "sessions.cards.deleted": {
     "defaultMessage": "This card was deleted.",
@@ -173,11 +173,11 @@
   },
   "sessions.cleanup.delete": {
     "defaultMessage": "Delete",
-    "description": "A choice in Clean Up (Sessions tab): delete the old sessions from Hive. Keep it short."
+    "description": "A choice in Clean Up (Sessions tab): delete the old sessions from Combwork. Keep it short."
   },
   "sessions.cleanup.deleteSummary": {
     "defaultMessage": "Archived ones too. Combwork's copies of their transcripts go to the Recycle Bin and Combwork stops listing them; what they used stays in the totals. Each CLI keeps its own transcript.",
-    "description": "Under the Delete choice in Clean Up: it takes archived sessions too; Hive's copies go to the Recycle Bin, usage stays counted, and the coding agents' CLIs keep their own transcripts."
+    "description": "Under the Delete choice in Clean Up: it takes archived sessions too; Combwork's copies go to the Recycle Bin, usage stays counted, and the coding agents' CLIs keep their own transcripts."
   },
   "sessions.cleanup.go": {
     "defaultMessage": "{action, select, archive {Archive} other {Delete}}",
@@ -201,7 +201,7 @@
   },
   "sessions.cleanup.skipReason": {
     "defaultMessage": "{reason, select, shown {open here} other {the Assistant's current conversation}}",
-    "description": "Why Clean Up passed over an old session, in a few words (lower case): its transcript is open in the Sessions tab, or it is the Hive Assistant's current conversation (other)."
+    "description": "Why Clean Up passed over an old session, in a few words (lower case): its transcript is open in the Sessions tab, or it is the Combwork Assistant's current conversation (other)."
   },
   "sessions.cleanup.skipped": {
     "defaultMessage": "Left alone: {skips}.",
@@ -213,15 +213,15 @@
   },
   "sessions.cleanup.title": {
     "defaultMessage": "{kind, select, conversation {Clean Up Old Conversations} other {Clean Up Old Sessions}}",
-    "description": "Title of the Sessions tab's Clean Up dialog (the Hive Assistant's: conversations): archives or deletes sessions older than an age."
+    "description": "Title of the Sessions tab's Clean Up dialog (the Combwork Assistant's: conversations): archives or deletes sessions older than an age."
   },
   "sessions.common.adopt": {
     "defaultMessage": "Adopt",
-    "description": "Button or menu item on a session started outside Hive: lets Hive manage it. Keep it short."
+    "description": "Button or menu item on a session started outside Combwork: lets Combwork manage it. Keep it short."
   },
   "sessions.common.adoptFailed": {
     "defaultMessage": "Could not adopt",
-    "description": "An error's title: adopting a session started outside Hive failed."
+    "description": "An error's title: adopting a session started outside Combwork failed."
   },
   "sessions.common.archive": {
     "defaultMessage": "Archive",
@@ -233,7 +233,7 @@
   },
   "sessions.common.delete": {
     "defaultMessage": "{kind, select, conversation {Delete conversation} other {Delete session}}",
-    "description": "Tooltip of a session's delete button (the Hive Assistant's: conversation)."
+    "description": "Tooltip of a session's delete button (the Combwork Assistant's: conversation)."
   },
   "sessions.common.expandAll": {
     "defaultMessage": "Expand All",
@@ -249,7 +249,7 @@
   },
   "sessions.common.noneYet": {
     "defaultMessage": "{kind, select, conversation {No conversations yet.} other {No sessions yet.}}",
-    "description": "The Sessions tab with no sessions (the Hive Assistant's: conversations)."
+    "description": "The Sessions tab with no sessions (the Combwork Assistant's: conversations)."
   },
   "sessions.common.rename": {
     "defaultMessage": "Rename",
@@ -285,31 +285,31 @@
   },
   "sessions.delete.button": {
     "defaultMessage": "Delete",
-    "description": "Button: deletes the session from Hive. Keep it short."
+    "description": "Button: deletes the session from Combwork. Keep it short."
+  },
+  "sessions.delete.detailCombwork": {
+    "defaultMessage": "Combwork's copies of its transcript go to the Recycle Bin and it no longer shows here; what it used stays in the totals. {cli} keeps its own transcript, so {cli}'s own resume list still has it.",
+    "description": "What deleting a session Combwork started does: Combwork's copies go to the Recycle Bin, its usage stays counted, and the CLI ({cli}: \"Claude Code\") keeps its own transcript."
   },
   "sessions.delete.detailExternal": {
     "defaultMessage": "Combwork stops listing it. {cli} keeps its transcript, so {cli}'s own resume list still has it.",
-    "description": "What deleting a session started outside Hive does: Hive stops listing it, and the CLI ({cli}: \"Claude Code\") keeps its transcript."
-  },
-  "sessions.delete.detailHive": {
-    "defaultMessage": "Combwork's copies of its transcript go to the Recycle Bin and it no longer shows here; what it used stays in the totals. {cli} keeps its own transcript, so {cli}'s own resume list still has it.",
-    "description": "What deleting a session Hive started does: Hive's copies go to the Recycle Bin, its usage stays counted, and the CLI ({cli}: \"Claude Code\") keeps its own transcript."
+    "description": "What deleting a session started outside Combwork does: Combwork stops listing it, and the CLI ({cli}: \"Claude Code\") keeps its transcript."
   },
   "sessions.delete.failed": {
     "defaultMessage": "{kind, select, conversation {Could not delete the conversation} other {Could not delete the session}}",
-    "description": "An error's title: deleting a session (the Hive Assistant's: a conversation) failed."
+    "description": "An error's title: deleting a session (the Combwork Assistant's: a conversation) failed."
   },
   "sessions.delete.message": {
     "defaultMessage": "Delete \"{name}\" from Combwork?",
-    "description": "The confirmation before deleting a session from Hive: its name ({name})."
+    "description": "The confirmation before deleting a session from Combwork: its name ({name})."
   },
   "sessions.delete.title": {
     "defaultMessage": "{kind, select, conversation {Delete conversation?} other {Delete session?}}",
-    "description": "Title of the confirmation before deleting a session (the Hive Assistant's: a conversation) from Hive."
+    "description": "Title of the confirmation before deleting a session (the Combwork Assistant's: a conversation) from Combwork."
   },
   "sessions.empty.select": {
     "defaultMessage": "{kind, select, conversation {Select a conversation to read its transcript.} other {Select a session to read its transcript.}}",
-    "description": "The Sessions tab's reading pane with nothing selected (the Hive Assistant's: conversation)."
+    "description": "The Sessions tab's reading pane with nothing selected (the Combwork Assistant's: conversation)."
   },
   "sessions.export.done": {
     "defaultMessage": "Transcript exported",
@@ -377,11 +377,11 @@
   },
   "sessions.list.cleanUp": {
     "defaultMessage": "{kind, select, conversation {Clean Up Old Conversations…} other {Clean Up Old Sessions…}}",
-    "description": "Tooltip of the Sessions tab's Clean Up button (the Hive Assistant's: conversations): archives or deletes sessions older than an age, after a dialog."
+    "description": "Tooltip of the Sessions tab's Clean Up button (the Combwork Assistant's: conversations): archives or deletes sessions older than an age, after a dialog."
   },
   "sessions.list.heading": {
     "defaultMessage": "{kind, select, conversation {Conversations} other {Sessions}}",
-    "description": "The heading of the Sessions tab's list (the Hive Assistant's: Conversations)."
+    "description": "The heading of the Sessions tab's list (the Combwork Assistant's: Conversations)."
   },
   "sessions.list.info": {
     "defaultMessage": "Every session of this project, by provider and agent, with the sessions each one started (such as Codex's guardian reviews) under it. Select one to read its transcript, including what came before each compaction; right-click a branch to archive or delete everything in it. Transcripts a CLI has deleted are read from Combwork's backup.",
@@ -389,19 +389,19 @@
   },
   "sessions.list.infoAssistant": {
     "defaultMessage": "Every conversation of this workspace's Assistant, by provider. Select one to read it in full, including what came before each compaction.",
-    "description": "The info tip of the Hive Assistant's conversations list. A compaction is when the CLI summarises the conversation to free context."
+    "description": "The info tip of the Combwork Assistant's conversations list. A compaction is when the CLI summarises the conversation to free context."
   },
   "sessions.list.new": {
     "defaultMessage": "{kind, select, conversation {New Conversation} other {New Session}}",
-    "description": "Tooltip of the Sessions tab's + button: starts a new session (the Hive Assistant's: conversation)."
+    "description": "Tooltip of the Sessions tab's + button: starts a new session (the Combwork Assistant's: conversation)."
   },
   "sessions.list.noneHere": {
     "defaultMessage": "{kind, select, conversation {No conversations here: tick Archived to see archived ones.} other {No sessions here: tick Archived to see archived ones.}}",
-    "description": "The Sessions list when every session is archived (the Hive Assistant's: conversations). Archived is the checkbox above it: use its translation."
+    "description": "The Sessions list when every session is archived (the Combwork Assistant's: conversations). Archived is the checkbox above it: use its translation."
   },
   "sessions.list.othersLoading": {
     "defaultMessage": "Looking for sessions started outside Combwork…",
-    "description": "Above the Sessions list while it shows Hive's own sessions and is still reading the sessions the CLIs keep for the project's folders (started in a terminal or an editor)."
+    "description": "Above the Sessions list while it shows Combwork's own sessions and is still reading the sessions the CLIs keep for the project's folders (started in a terminal or an editor)."
   },
   "sessions.list.refresh": {
     "defaultMessage": "Refresh",
@@ -409,7 +409,7 @@
   },
   "sessions.list.what": {
     "defaultMessage": "{kind, select, conversation {the conversations} other {the sessions}}",
-    "description": "What could not be loaded, in \"Could not load …\" (the Sessions tab's list; the Hive Assistant's: conversations). Lower case."
+    "description": "What could not be loaded, in \"Could not load …\" (the Sessions tab's list; the Combwork Assistant's: conversations). Lower case."
   },
   "sessions.marker.cantResume": {
     "defaultMessage": "can't resume",
@@ -425,11 +425,11 @@
   },
   "sessions.menu.delete": {
     "defaultMessage": "{kind, select, conversation {Delete Conversation…} other {Delete Session…}}",
-    "description": "Menu item on a session (the Hive Assistant's: a conversation): deletes it from Hive, after a confirmation."
+    "description": "Menu item on a session (the Combwork Assistant's: a conversation): deletes it from Combwork, after a confirmation."
   },
   "sessions.menu.purge": {
     "defaultMessage": "Purge Combwork's Files…",
-    "description": "Menu item on a session: lists, then removes, everything Hive keeps of it (its backups, attachments, old usage), never the coding agent's own files."
+    "description": "Menu item on a session: lists, then removes, everything Combwork keeps of it (its backups, attachments, old usage), never the coding agent's own files."
   },
   "sessions.menu.rename": {
     "defaultMessage": "Rename…",
@@ -441,7 +441,7 @@
   },
   "sessions.menu.showAssistant": {
     "defaultMessage": "Show the Assistant",
-    "description": "Menu item on the Hive Assistant's running conversation: opens its panel."
+    "description": "Menu item on the Combwork Assistant's running conversation: opens its panel."
   },
   "sessions.origin.agent": {
     "defaultMessage": "Agent {agent} ({id}).",
@@ -449,11 +449,11 @@
   },
   "sessions.origin.named": {
     "defaultMessage": "{is, select, slot {Slot · {name}} other {Home · {name}}}",
-    "description": "Where a session ran (the Sessions tab): in one of the project's slots (a working folder Hive lends to cards; {name} is its name, such as slot-b) or a reviewer's retired home ({name}: its folder's name, such as hr4). Glossary: slot."
+    "description": "Where a session ran (the Sessions tab): in one of the project's slots (a working folder Combwork lends to cards; {name} is its name, such as slot-b) or a reviewer's retired home ({name}: its folder's name, such as hr4). Glossary: slot."
   },
   "sessions.origin.noAgent": {
     "defaultMessage": "No agent recorded (adopted, or from before Combwork recorded agents).",
-    "description": "A session's origin hover (the Sessions tab): Hive has no record of which agent ran it."
+    "description": "A session's origin hover (the Sessions tab): Combwork has no record of which agent ran it."
   },
   "sessions.origin.projectFolder": {
     "defaultMessage": "Project folder",
@@ -473,7 +473,7 @@
   },
   "sessions.origin.removedUnnamed": {
     "defaultMessage": "Removed agent",
-    "description": "An agent that ran sessions and has since been removed, from before Hive kept agents' names (the Sessions tab)."
+    "description": "An agent that ran sessions and has since been removed, from before Combwork kept agents' names (the Sessions tab)."
   },
   "sessions.origin.worktree": {
     "defaultMessage": "Worktree · {branch}",
@@ -509,11 +509,11 @@
   },
   "sessions.row.backup": {
     "defaultMessage": "backup",
-    "description": "A badge on a session read from Hive's backup (the CLI deleted its own copy). Lower case; keep it short."
+    "description": "A badge on a session read from Combwork's backup (the CLI deleted its own copy). Lower case; keep it short."
   },
   "sessions.row.backupTip": {
     "defaultMessage": "{cli} no longer has this transcript; Combwork shows and resumes it from its backup.",
-    "description": "Hover of the backup badge: the CLI ({cli}) deleted the session's transcript, and Hive uses its own copy."
+    "description": "Hover of the backup badge: the CLI ({cli}) deleted the session's transcript, and Combwork uses its own copy."
   },
   "sessions.row.context": {
     "defaultMessage": "{tokens} context",
@@ -521,11 +521,11 @@
   },
   "sessions.row.external": {
     "defaultMessage": "external",
-    "description": "A badge on a session started outside Hive. Lower case; keep it short."
+    "description": "A badge on a session started outside Combwork. Lower case; keep it short."
   },
   "sessions.row.externalTip": {
     "defaultMessage": "Started outside Combwork (e.g. in VS Code or a terminal). Adopt it to manage it here.",
-    "description": "Hover of the external badge on a session started outside Hive. Adopt is a button: use its translation."
+    "description": "Hover of the external badge on a session started outside Combwork. Adopt is a button: use its translation."
   },
   "sessions.row.lastActive": {
     "defaultMessage": "Last active {when}",
@@ -545,7 +545,7 @@
   },
   "sessions.running.assistantTip": {
     "defaultMessage": "The Assistant is running this conversation. Show its panel.",
-    "description": "Tooltip of Show over the Hive Assistant's running conversation."
+    "description": "Tooltip of Show over the Combwork Assistant's running conversation."
   },
   "sessions.running.show": {
     "defaultMessage": "Show",
@@ -561,7 +561,7 @@
   },
   "sessions.search.count": {
     "defaultMessage": "{kind, select, conversation {{sessions, plural, one {# conversation} other {# conversations}}} other {{sessions, plural, one {# session} other {# sessions}}}}{hits, plural, =0 {} one { · #{more} match} other { · #{more} matches}}",
-    "description": "Under the Sessions tab's search box: how many sessions match (the Hive Assistant's: conversations), then how many matches in their transcripts ({more} is \"+\" when there are more than shown, else empty; none: leave it empty)."
+    "description": "Under the Sessions tab's search box: how many sessions match (the Combwork Assistant's: conversations), then how many matches in their transcripts ({more} is \"+\" when there are more than shown, else empty; none: leave it empty)."
   },
   "sessions.search.none": {
     "defaultMessage": "No matches",
@@ -569,7 +569,7 @@
   },
   "sessions.search.placeholder": {
     "defaultMessage": "{kind, select, conversation {Search conversations: names, dates, transcripts} other {Search sessions: names, dates, transcripts}}",
-    "description": "The Sessions tab's search box (the Hive Assistant's: conversations): what it searches."
+    "description": "The Sessions tab's search box (the Combwork Assistant's: conversations): what it searches."
   },
   "sessions.search.searching": {
     "defaultMessage": "Searching…",
@@ -581,11 +581,11 @@
   },
   "sessions.size.none": {
     "defaultMessage": "{kind, select, conversation {{cli} has no transcript file for this conversation} other {{cli} has no transcript file for this session}}{backup, select, yes { (Combwork keeps a backup of it)} other {}}.",
-    "description": "Hover of a session's transcript size when the CLI ({cli}) has no file for it; and when Hive has a backup of it, that it does."
+    "description": "Hover of a session's transcript size when the CLI ({cli}) has no file for it; and when Combwork has a backup of it, that it does."
   },
   "sessions.size.tip": {
     "defaultMessage": "Transcript: {size} on disk{limit, plural, =0 {} other { (flagged over # MB: Settings → Sessions)}}.{long, select, conversation { A long conversation slows down the CLI and Combwork, and compacting doesn't shrink the file. Start a new conversation (⋯ → New Conversation) to make it short again.} session { A long conversation slows down the CLI and Combwork, and compacting doesn't shrink the file. Hand the work over to a new conversation (Hand Over to…) to make it short again.} other {}}",
-    "description": "Hover of a session's transcript size ({size}: \"6.1 MB\"), the size it is flagged over ({limit} MB, set in Settings → Sessions; 0: leave it empty), and, when it is over (long: the Hive Assistant's conversation or an agent's session), what to do. \"New Conversation\" and \"Hand Over to…\" are commands: use their translations."
+    "description": "Hover of a session's transcript size ({size}: \"6.1 MB\"), the size it is flagged over ({limit} MB, set in Settings → Sessions; 0: leave it empty), and, when it is over (long: the Combwork Assistant's conversation or an agent's session), what to do. \"New Conversation\" and \"Hand Over to…\" are commands: use their translations."
   },
   "sessions.tool.copyInput": {
     "defaultMessage": "Copy Input",
@@ -653,7 +653,7 @@
   },
   "sessions.tree.notFromAgent": {
     "defaultMessage": "Not from an agent",
-    "description": "A group in the Sessions tab's list: sessions no agent ran (adopted, or from before Hive recorded agents)."
+    "description": "A group in the Sessions tab's list: sessions no agent ran (adopted, or from before Combwork recorded agents)."
   },
   "sessions.tree.sessions": {
     "defaultMessage": "{n, plural, one {# session} other {# sessions}}",

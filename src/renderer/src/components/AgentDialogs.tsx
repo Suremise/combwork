@@ -269,7 +269,7 @@ export function AddAgentDialog() {
         <ConnectionChoice id="add-agent-connection" value={connection} onChange={choose} onNew={setNewOn} />
         {!connection && ready.checking && (
           <div className="hint span2" data-connection-checking>
-            <Icon name="loading" spin /> {tr(msg({ id: 'agents.add.checkingConnection', defaultMessage: 'Finding out which coding agents are installed, to choose the first connection that can run…', description: 'Under the choice of connection in Add Agent (HI-2108) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Add waits until then.' }))}
+            <Icon name="loading" spin /> {tr(msg({ id: 'agents.add.checkingConnection', defaultMessage: 'Finding out which coding agents are installed, to choose the first connection that can run…', description: 'Under the choice of connection in Add Agent (HI-2108) while Combwork still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Add waits until then.' }))}
           </div>
         )}
         <label htmlFor="add-agent-note">{tr(NOTE)}</label>
@@ -285,7 +285,7 @@ export function AddAgentDialog() {
       <McpChoice value={mcp} offered={mcpOffered} where="project" onChange={setMcp} />
       <h3 className="agent-dialog-h">{tr(msg({ id: 'agents.add.where', defaultMessage: 'Where it works', description: 'A heading in the Add Agent dialog, above where the new agent works.' }))}</h3>
       <div className="faint agent-dialog-note" data-where-note>
-        {tr(msg({ id: 'agents.add.whereNote', defaultMessage: "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.", description: "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Hive lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot." }))}
+        {tr(msg({ id: 'agents.add.whereNote', defaultMessage: "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.", description: "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Combwork lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot." }))}
       </div>
       {newOn && (
         <ConnectionDialog
@@ -330,7 +330,7 @@ interface AgentFields {
 
 const DIALECT = {
   label: msg({ id: 'agents.dialect.label', defaultMessage: 'Dialect', description: "Agent Settings (HI-2444): the choice of the dialect file that fills the agent's model slot. Glossary: dialect." }),
-  auto: msg({ id: 'agents.dialect.auto', defaultMessage: 'Auto (the file for the model it runs)', description: "Agent Settings' Dialect choice: Hive picks the model file whose model ID is the one the agent runs. Glossary: dialect." }),
+  auto: msg({ id: 'agents.dialect.auto', defaultMessage: 'Auto (the file for the model it runs)', description: "Agent Settings' Dialect choice: Combwork picks the model file whose model ID is the one the agent runs. Glossary: dialect." }),
   model: msg({ id: 'agents.dialect.model', defaultMessage: '{name} (model {model})', description: "Agent Settings' Dialect choice: a model file, {name}, for model ID {model}. Glossary: dialect." }),
   copy: msg({ id: 'agents.dialect.copy', defaultMessage: '{name} (test copy)', description: "Agent Settings' Dialect choice: a test copy (a dialect file with no model), {name}, for trying wording on one agent. Glossary: test copy." }),
   missing: msg({ id: 'agents.dialect.missing', defaultMessage: '{path} (not there: Auto is used)', description: "Agent Settings' Dialect choice: the file chosen before is gone, so the agent uses Auto. {path} is its path. Glossary: dialect." }),
@@ -757,7 +757,7 @@ export function HandOverDialog() {
       </p>
       {!hiveTools && (
         <div className="banner warn">
-          <Icon name="warning" /> {tr(msg({ id: 'agents.handOver.needsTools', defaultMessage: 'This needs Combwork\'s tools in sessions. Turn on "Provide Combwork tools to sessions" in Settings → Agent API.', description: "The Continue with… dialog when sessions don't get Hive's tools: the setting to turn on (its name in quotes, and where: use their translated names)." }))}
+          <Icon name="warning" /> {tr(msg({ id: 'agents.handOver.needsTools', defaultMessage: 'This needs Combwork\'s tools in sessions. Turn on "Provide Combwork tools to sessions" in Settings → Agent API.', description: "The Continue with… dialog when sessions don't get Combwork's tools: the setting to turn on (its name in quotes, and where: use their translated names)." }))}
         </div>
       )}
       <div className="choice-list">
@@ -820,8 +820,8 @@ export function HandOverDialog() {
 // Merge
 // ---------------------------------------------------------------------------
 
-const QUEUE_LOOKUP = msg({ id: 'agents.mergeDialog.queueLookup', defaultMessage: 'Checking whether Combwork merges this branch’s card through the merge queue…', description: "Why Merge is off for a moment in the Merge dialog: Hive is reading whether its merge queue merges the branch's card. Glossary 2.5: merge queue." })
-const QUEUE_LOOKUP_FAILED = msg({ id: 'agents.mergeDialog.queueLookupFailed', defaultMessage: "Couldn't read whether Combwork merges this branch's card through the merge queue, so Merge stays off: {why}", description: "The Merge dialog when Hive couldn't read whether its merge queue merges the branch's card ({why}: the error). Merge is a button: keep it as Hive shows it." })
+const QUEUE_LOOKUP = msg({ id: 'agents.mergeDialog.queueLookup', defaultMessage: 'Checking whether Combwork merges this branch’s card through the merge queue…', description: "Why Merge is off for a moment in the Merge dialog: Combwork is reading whether its merge queue merges the branch's card. Glossary 2.5: merge queue." })
+const QUEUE_LOOKUP_FAILED = msg({ id: 'agents.mergeDialog.queueLookupFailed', defaultMessage: "Couldn't read whether Combwork merges this branch's card through the merge queue, so Merge stays off: {why}", description: "The Merge dialog when Combwork couldn't read whether its merge queue merges the branch's card ({why}: the error). Merge is a button: keep it as Combwork shows it." })
 
 export function MergeDialog() {
   useLanguage()
@@ -928,7 +928,7 @@ export function MergeDialog() {
   const merge = async (anyway = false): Promise<void> => {
     if (anyway && queueCard) {
       const ok = await confirm({
-        title: tr(msg({ id: 'agents.mergeDialog.anywayTitle', defaultMessage: 'Merge {card} outside the merge queue?', description: "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Hive's merge queue merges. Glossary 2.5: merge queue." }), { card: queueCard.key }),
+        title: tr(msg({ id: 'agents.mergeDialog.anywayTitle', defaultMessage: 'Merge {card} outside the merge queue?', description: "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Combwork's merge queue merges. Glossary 2.5: merge queue." }), { card: queueCard.key }),
         message: tr(msg({ id: 'agents.mergeDialog.anywayMessage', defaultMessage: "Combwork merges this card through its queue, after its merge checks pass on the merged result. Merging it here skips them. It is recorded on the card as an override, and the queue takes its entry out once it sees the merge.", description: "The confirmation before Merge anyway in the Merge dialog. Glossary 2.3: merge checks; 2.4: override." })),
         confirmLabel: tr(msg({ id: 'agents.mergeDialog.anywayConfirm', defaultMessage: 'Merge anyway', description: 'The button confirming Merge anyway (a merge outside the merge queue). Keep it short.' })),
         danger: true
@@ -991,7 +991,7 @@ export function MergeDialog() {
           </button>
           {!result?.conflicts && queueCard && (
             <button className="btn subtle" data-action="merge-anyway" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken} onClick={() => void merge(true)}>
-              {tr(msg({ id: 'agents.mergeDialog.anyway', defaultMessage: 'Merge anyway…', description: "A button in the Merge dialog when Hive's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)." }))}
+              {tr(msg({ id: 'agents.mergeDialog.anyway', defaultMessage: 'Merge anyway…', description: "A button in the Merge dialog when Combwork's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)." }))}
             </button>
           )}
           {!result?.conflicts && (
@@ -1012,7 +1012,7 @@ export function MergeDialog() {
           <Icon name="warning" />
           <span>{tr(QUEUE_LOOKUP_FAILED, { why: lookup.error ?? '' })}</span>
           <button type="button" className="btn small" onClick={() => setLookups((n) => n + 1)}>
-            {tr(msg({ id: 'agents.mergeDialog.queueRetry', defaultMessage: 'Retry', description: "A button in the Merge dialog after Hive couldn't read whether its merge queue merges the branch's card: reads it again." }))}
+            {tr(msg({ id: 'agents.mergeDialog.queueRetry', defaultMessage: 'Retry', description: "A button in the Merge dialog after Combwork couldn't read whether its merge queue merges the branch's card: reads it again." }))}
           </button>
         </div>
       )}
@@ -1031,7 +1031,7 @@ export function MergeDialog() {
       ) : result?.conflicts ? (
         <>
           <div className="banner warn">
-            <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.conflict', defaultMessage: 'Merging would conflict. Nothing was changed.', description: "The Merge dialog after a merge that would conflict: Hive tried it and changed nothing." }))}
+            <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.conflict', defaultMessage: 'Merging would conflict. Nothing was changed.', description: "The Merge dialog after a merge that would conflict: Combwork tried it and changed nothing." }))}
           </div>
           <p>{tr(msg({ id: 'agents.mergeDialog.conflictFiles', defaultMessage: 'These files were changed on both {branch} and {into}:', description: 'Above the files that would conflict: both branches ({branch}, the worktree\'s; {into}, the project folder\'s) changed them.' }), { branch: agent.tree.branch, into: status.into ?? '' })}</p>
           <ul className="conflict-list">

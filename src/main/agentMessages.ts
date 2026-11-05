@@ -7,7 +7,7 @@ const T = {
   notRunning: agentMsg({ id: 'inbox.message.notRunning', text: '{agent} isn\'t running.', note: '#530: a message left for an agent (cw_message_agent) refused: the agent isn\'t running. agent: its name.' }),
   noText: agentMsg({ id: 'inbox.message.noText', text: 'text is required', note: 'A message left for an agent refused: its text (the tool\'s argument, text) is empty.' }),
   tooLong: agentMsg({ id: 'inbox.message.tooLong', text: 'A message is at most {max} characters (this one has {n}).', note: 'A message left for an agent refused: too long. max: the most; n: its length.' }),
-  tooMany: agentMsg({ id: 'inbox.message.tooMany', text: '{agent} already has {max} messages waiting, the most Combwork keeps for an agent: wait until they are delivered (cw_agent_activity), or cancel them.', note: 'A message left for an agent refused: as many as Hive keeps for it already wait. agent: its name; max: how many.' })
+  tooMany: agentMsg({ id: 'inbox.message.tooMany', text: '{agent} already has {max} messages waiting, the most Combwork keeps for an agent: wait until they are delivered (cw_agent_activity), or cancel them.', note: 'A message left for an agent refused: as many as Combwork keeps for it already wait. agent: its name; max: how many.' })
 }
 
 /**

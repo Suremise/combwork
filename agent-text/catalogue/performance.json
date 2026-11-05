@@ -21,17 +21,17 @@
   },
   "performance.compare.partial.unattributed": {
     "text": "some losses couldn’t be attributed to a project",
-    "note": "What makes a Performance export partial, in \"The baseline is partial: {what}.\": measurements lost that Hive couldn't say were which project's. Lower case.",
+    "note": "What makes a Performance export partial, in \"The baseline is partial: {what}.\": measurements lost that Combwork couldn't say were which project's. Lower case.",
     "audience": "both"
   },
   "performance.providersNote.assistant": {
     "text": "The Assistant’s sessions are the workspace’s, not a project’s.",
-    "note": "Performance, under Provider usage for a project with the Hive Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's).",
+    "note": "Performance, under Provider usage for a project with the Combwork Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's).",
     "audience": "both"
   },
   "performance.providersNote.scripts": {
     "text": "Scripts start no sessions, so they have no provider usage.",
-    "note": "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Hive's API and run no coding agents).",
+    "note": "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Combwork's API and run no coding agents).",
     "audience": "both"
   }
 }

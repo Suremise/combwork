@@ -124,7 +124,7 @@ export async function turnOffTips(): Promise<void> {
   closeTip()
   try {
     set({ settings: await call('settings:update', { general: { showTips: false } }) })
-    notify('info', tr(msg({ id: 'tips.off.title', defaultMessage: 'Tips are off', description: 'A notice after "Don\'t show tips" on the tip card.' })), tr(msg({ id: 'tips.off.message', defaultMessage: 'Help → Tips… still has them, and Settings → General turns them back on.', description: 'More in the notice after the tips were turned off. Help → Tips… and Settings → General are names in Hive: keep them as Hive shows them.' })))
+    notify('info', tr(msg({ id: 'tips.off.title', defaultMessage: 'Tips are off', description: 'A notice after "Don\'t show tips" on the tip card.' })), tr(msg({ id: 'tips.off.message', defaultMessage: 'Help → Tips… still has them, and Settings → General turns them back on.', description: 'More in the notice after the tips were turned off. Help → Tips… and Settings → General are names in Combwork: keep them as Combwork shows them.' })))
   } catch {
     // The card is closed either way; the setting is still in Settings → General.
   }

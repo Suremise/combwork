@@ -77,6 +77,7 @@ interface HiveMessageValues {
   'content.templates.changedSince': undefined
   'content.templates.changedWhile': undefined
   'content.templates.checkFailed': { agent: string | number; folder: string | number; error: string | number }
+  'content.templates.combworkOnly': undefined
   'content.templates.connectionAmbiguous': { ref: string | number; ids: string | number }
   'content.templates.connectionChoices': { keys: string | number }
   'content.templates.connectionUnknown': { ref: string | number }
@@ -85,7 +86,6 @@ interface HiveMessageValues {
   'content.templates.failed': { error: string | number }
   'content.templates.fenced': undefined
   'content.templates.gone': undefined
-  'content.templates.hiveOnly': undefined
   'content.templates.importNotJson': undefined
   'content.templates.importTooLarge': { kb: string | number }
   'content.templates.loading': undefined

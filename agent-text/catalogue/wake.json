@@ -197,7 +197,7 @@
   },
   "wake.decision.line": {
     "text": "{cards} from the user: read {one, select, yes {it} other {them}} (cw_read_task) {reviewer, select, yes {before your next verdict on {n, plural, one {it} other {them}}.} other {and carry on from where you asked.}}",
-    "note": "#401: the line after \"[Hive] \" given to an agent waiting for the user (or a decision wake, #1266) when the user's decisions were recorded on its cards. cards: each card's decisions (notice.decision.card), joined by \", \"; one: yes for a single decision on one card; reviewer: yes when the agent only reviews those cards (HI-2261: told to carry on, a reviewer that had asked nothing made the decided change itself); n: how many cards."
+    "note": "#401: the line after \"[Combwork] \" given to an agent waiting for the user (or a decision wake, #1266) when the user's decisions were recorded on its cards. cards: each card's decisions (notice.decision.card), joined by \", \"; one: yes for a single decision on one card; reviewer: yes when the agent only reviews those cards (HI-2261: told to carry on, a reviewer that had asked nothing made the decided change itself); n: how many cards."
   },
   "wake.idle.reply": {
     "text": "Nothing waits on {card}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: cw_ask_user for the user, cw_loop_step with a design for the reviewer, or cw_submit once it is ready. Keep this watch only for something you asked for that Combwork doesn't track (a comment you requested): if you only watch it, {card} shows as stalled after {after}.",
@@ -307,9 +307,9 @@
     "text": "{card} is in {column}",
     "note": "A lane watch wake's event: a lane's card moved. card: \"HI-12\"; column: the board column's name (\"Review\")."
   },
-  "wake.lane.nextHiveStarts": {
+  "wake.lane.nextCombworkStarts": {
     "text": "Your lane's next card is {card} (\"{title}\"): Combwork starts it for you once your turn ends, so end your turn now",
-    "note": "HI-1990: a builder's Done wake, its lane's rules on: Hive starts the next card."
+    "note": "HI-1990: a builder's Done wake, its lane's rules on: Combwork starts the next card."
   },
   "wake.lane.nextStart": {
     "text": "Your lane's next card is {card} (\"{title}\"): start it now (cw_lane next, then cw_start_card); this card's own prompt doesn't narrow the lane",
@@ -365,7 +365,7 @@
   },
   "wake.lane.waitsForUser": {
     "text": "{card} waits for the user{who, select, agent { ({by} asks)} hive { (Combwork asks)} other {}}",
-    "note": "A lane watch wake's event (HI-1991): a new request for the user on a lane's card (what it asks follows). card: \"HI-12\"; who: agent (by: the asking agent's name), hive (Hive asked), or none (not known)."
+    "note": "A lane watch wake's event (HI-1991): a new request for the user on a lane's card (what it asks follows). card: \"HI-12\"; who: agent (by: the asking agent's name), hive (Combwork asked), or none (not known)."
   },
   "wake.limit.ask": {
     "text": "{rest, select, yes {for the rest, } other {}}tell the user (cw_notify) and ask what to do",
@@ -425,7 +425,7 @@
   },
   "wake.loop.said": {
     "text": ". {whose, select, reviewerAsks {The reviewer asks} builderReplies {The builder replies} builder {The builder} reviewer {The reviewer} other {Combwork}}: \"{text}\"",
-    "note": "#912, #1382: in a loop wake, what a request, step or Hive's note says (cut with … to fit), and whose it is."
+    "note": "#912, #1382: in a loop wake, what a request, step or Combwork's note says (cut with … to fit), and whose it is."
   },
   "wake.loop.step": {
     "text": "You review this card in its loop: check it and answer with cw_loop_step (ok, or gaps saying what's missing, and its id)",
@@ -577,11 +577,11 @@
   },
   "wake.watch.notEnded": {
     "text": "Could not end the watch ({why}): {error}",
-    "note": "HI-2197: an agent's watch not ended as a new conversation starts, or as Hive gives it a card in a slot (a start's reply): the change could not be saved. why: why it was being ended (the log's words); error: why it failed."
+    "note": "HI-2197: an agent's watch not ended as a new conversation starts, or as Combwork gives it a card in a slot (a start's reply): the change could not be saved. why: why it was being ended (the log's words); error: why it failed."
   },
   "wake.watch.notSaved": {
     "text": "Could not save the watch: {error}",
-    "note": "A watch refused: it could not be saved. error: why (the system's or Hive's own error, as it is)."
+    "note": "A watch refused: it could not be saved. error: why (the system's or Combwork's own error, as it is)."
   },
   "wake.watch.numberClash": {
     "text": "{n} is {key}'s number (#{n}), not {prefix}-{n}, which is another card. Name cards by key: \"{prefix}-{n}\" or \"{key}\".",
@@ -589,11 +589,11 @@
   },
   "wake.watch.tooBig": {
     "text": "Too many watches to keep in this workspace: wait for some to end",
-    "note": "An agent or lane watch refused: the watches would no longer fit the file Hive keeps them in."
+    "note": "An agent or lane watch refused: the watches would no longer fit the file Combwork keeps them in."
   },
   "wake.watch.tooMany": {
     "text": "This workspace already has {max} watches, the most Combwork keeps: wait for some to end",
-    "note": "An agent, lane or usage watch refused: the workspace has as many watches as Hive keeps. max: how many."
+    "note": "An agent, lane or usage watch refused: the workspace has as many watches as Combwork keeps. max: how many."
   },
   "wake.watch.usageLabel": {
     "text": "Waiting for usage: {accounts}",
@@ -605,7 +605,7 @@
   },
   "wake.watch.whilePlaced": {
     "text": "Combwork is giving you {card} in {slot}: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.",
-    "note": "HI-2197: a watch refused while Hive is placing a card of the agent's in a slot (a watch would hold that placement off). card: its key (\"HI-12\"); slot: the slot's name."
+    "note": "HI-2197: a watch refused while Combwork is placing a card of the agent's in a slot (a watch would hold that placement off). card: its key (\"HI-12\"); slot: the slot's name."
   },
   "wake.watch.withUsage": {
     "text": "{label}, and usage: {accounts}",
