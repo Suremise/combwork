@@ -78,7 +78,9 @@ The checks are positive and negative:
   launch started and left.
 - **Scratch outside the project** (#509): a reviewer asked for a probe script and a log of its output leaves the
   project as it was, makes no `.codex` folder in it and adds nothing beside it.
-- **Card loops**: at the round limit the builder asks the user. A finding that comes back is another round: the builder
+- **Card loops**: at the round limit (two real failed reviews in a lane of 2 rounds) Combwork has asked the user and
+  paused the lane: the builder says it waits for them, and sends no round three, bypasses nothing and answers nothing
+  itself (HI-2560). A finding that comes back is another round: the builder
   fixes it without asking, and the reviewer fails it marked as recurring. A finding the builder disputes stops the reviewer
   to ask. A builder fixing a failed card brings it back into Review for round two (also without it leaving Review), so the
   waiting reviewer is woken. A builder woken by one card passing while the other failed at the same moment acts on the
