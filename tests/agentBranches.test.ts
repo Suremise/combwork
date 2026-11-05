@@ -52,9 +52,9 @@ describe("a branch Combwork made for an agent", () => {
   })
 
   it("isn't a short form, nor any branch under the name Combwork had before 1.1 (HI-2593: nothing recognises those)", () => {
-    for (const b of ['cw/amb1', 'cw/amb1-2', 'cw\/amb1', 'cw\/Work/ambrosia/amb1', 'cw\/Work/ambrosia/amb1-2']) expect(agentBranchNumber(b, home, 'AMB1')).toBeNull()
-    expect(reusableBranches('cw\/Work/ambrosia/amb1', home, 'AMB1')).toEqual(['cw\/Work/ambrosia/amb1'])
-    expect(branchHere('cw\/Scratch/ambrosia/amb1', home)).toBeNull()
+    for (const b of ['cw/amb1', 'cw/amb1-2', 'hive/amb1', 'hive/Work/ambrosia/amb1', 'hive/Work/ambrosia/amb1-2']) expect(agentBranchNumber(b, home, 'AMB1')).toBeNull()
+    expect(reusableBranches('hive/Work/ambrosia/amb1', home, 'AMB1')).toEqual(['hive/Work/ambrosia/amb1'])
+    expect(branchHere('hive/Scratch/ambrosia/amb1', home)).toBeNull()
     // The full form's agent part follows git's rules: B--1's part is b-1.
     expect(agentBranch(home, 'B--1')).toBe('cw/Work/ambrosia/b-1')
     expect(agentBranchNumber('cw/Work/ambrosia/b-1', home, 'B--1')).toBe(0)
@@ -124,7 +124,7 @@ describe('a branch named after where its project was (branchHere, #1305)', () =>
   })
   it("not Combwork's full form: kept (a short form, a branch of the user's, one under its name before 1.1)", () => {
     expect(branchHere('cw/db1', tools)).toBeNull()
-    expect(branchHere('cw\/Scratch/juniper/jb1', tools)).toBeNull()
+    expect(branchHere('hive/Scratch/juniper/jb1', tools)).toBeNull()
     expect(branchHere('feature/login', tools)).toBeNull()
     expect(branchHere('cw/a/b/c/d', tools)).toBeNull()
   })
