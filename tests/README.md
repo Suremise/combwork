@@ -29,7 +29,7 @@ never by name.
 
 Two tests in `agentProcesses.test.ts` start the Microsoft Store's PowerShell 7 (the `WindowsApps` alias): the one that
 adopts what it runs (#543) and the one that follows it before it joins its package's job (#678). They are skipped
-unless `HIVE_TEST_STORE_PWSH=1` is set (#1027). Run from a Store PowerShell, which is every Codex agent's shell, they can
+unless `CW_TEST_STORE_PWSH=1` is set (#1027). Run from a Store PowerShell, which is every Codex agent's shell, they can
 end that shell and every other Store PowerShell on the PC, other agents' commands included; why is #1056. Opt in only
 where no one else's Store PowerShell runs (a Windows Sandbox, or a machine of your own with no Codex agents running).
 

@@ -44,7 +44,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47891), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47891), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -71,7 +71,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
       }
       globalThis.__focused = f
       if (f) {
-        // Back from minimised without taking the OS focus (the test copies never do: HIVE_TEST_QUIET).
+        // Back from minimised without taking the OS focus (the test copies never do: CW_TEST_QUIET).
         if (w.isMinimized()) w.showInactive()
         w.emit('focus')
       } else {

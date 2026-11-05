@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
 
   const HEIGHT = 800
   let viewport = 1700 // wide enough for every label (the 12 tabs need about 1000 px of strip, and 12 more to go back to them)
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }, viewport: { width: viewport, height: HEIGHT } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }, viewport: { width: viewport, height: HEIGHT } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
@@ -212,7 +212,7 @@ const check = (name, ok, extra = '') => {
   saved.window = narrowBounds
   saved.windows = (saved.windows ?? []).map((w) => ({ workspace: w.workspace, ...narrowBounds }))
   fs.writeFileSync(cfgFile, JSON.stringify(saved, null, 2))
-  const again = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }) })
+  const again = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }) })
   try {
     const p = await again.firstWindow()
     p.on('pageerror', (e) => check('no page errors (narrow start)', false, e.message))

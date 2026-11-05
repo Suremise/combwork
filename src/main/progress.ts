@@ -88,8 +88,8 @@ const key = (p: string): string => p.toLowerCase()
 
 /** The stored name of Hive's own runs (#1349); the window shows it in its language (`defaultName`). */
 // agent-protocol: a run's stored name, which the window words in its language
-export const HIVE_RUNS = 'Combwork (merge queue)' // i18n-ignore: a run's stored name, which agents read too
-/** Its name before HI-2463, which runs and facts stored then still hold: read as HIVE_RUNS. */
+export const CW_RUNS = 'Combwork (merge queue)' // i18n-ignore: a run's stored name, which agents read too
+/** Its name before HI-2463, which runs and facts stored then still hold: read as CW_RUNS. */
 // agent-protocol: a run's stored name from before HI-2463, read back
 export const LEGACY_HIVE_RUNS = 'Hive (merge queue)' // i18n-ignore: a run's stored name, as stored before HI-2463
 /** The stored name of a slot's warming runs (#1429), "Hive (slot slot-b)"; the window shows it in its language. */
@@ -108,7 +108,7 @@ const COPY_NAME = /^copy-\d{1,4}$/
  * (HI-1710), else the copies'; else the merge queue's.
  */
 const hiveName = (slot: string | null | undefined, copy: string | null | undefined, holder?: CopyHolder | null): Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'> =>
-  slot ? { agentName: slotRunsName(slot), defaultName: 'slot', slot } : copy ? (holder ? { agentName: holder.agentName, copy } : { agentName: COPIES_RUNS, defaultName: 'copy', copy }) : { agentName: HIVE_RUNS, defaultName: 'mergeQueue' }
+  slot ? { agentName: slotRunsName(slot), defaultName: 'slot', slot } : copy ? (holder ? { agentName: holder.agentName, copy } : { agentName: COPIES_RUNS, defaultName: 'copy', copy }) : { agentName: CW_RUNS, defaultName: 'mergeQueue' }
 /** A slot's name as a kept run may hold it (slots.ts names them so). */
 const SLOT_NAME = /^[\w.-]{1,60}$/
 

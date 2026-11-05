@@ -3,7 +3,7 @@ import { join } from 'path'
 import { refusalBody, type Refusal } from '../shared/workflow/refusals'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole } from '../shared/workflow/roles'
 import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
@@ -414,7 +414,7 @@ async function namesOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
     if (out.has(k) || !ws.path) continue
     // A project not there by that name (renamed a moment ago, or gone) is unknown, not one without agents.
     const p = join(ws.path, l.project)
-    const cfg = existsSync(join(p, HIVE_DIR, 'project.json')) ? await ws.projectConfig(p).catch(() => null) : null
+    const cfg = existsSync(join(p, CW_DIR, 'project.json')) ? await ws.projectConfig(p).catch(() => null) : null
     out.set(k, cfg ? new Map(projectAgents(cfg).map((a) => [a.id, a.name])) : null)
   }
   return out
@@ -1002,8 +1002,8 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
     const d = await G.dirty(folder)
     if (!Array.isArray(d) || d.length) throw new LaneError(409, say(A.uncommitted, { card: key, agent: builder.name }))
   }
-  const { runIntent, HIVE_LANE_START } = await import('./tasks')
-  const { reply } = await runIntent(wf, flying.number, HIVE_LANE_START, (w) => w.putBack(`#${flying.number}`, 'hive', { why: inDefaultDialect(() => say(A.putBackWhy, { by: s.by })) }), undefined, s.commit)
+  const { runIntent, CW_LANE_START } = await import('./tasks')
+  const { reply } = await runIntent(wf, flying.number, CW_LANE_START, (w) => w.putBack(`#${flying.number}`, 'hive', { why: inDefaultDialect(() => say(A.putBackWhy, { by: s.by })) }), undefined, s.commit)
   const r = reply as { ok?: boolean; refused?: boolean; message?: string }
   // agent-protocol: a refusal's message, said again in the reader's dialect by refusalBody
   if (r.refused) throw new LaneError(409, (r.refused && typeof (reply as Refusal).rule === 'string' && (reply as Refusal).values ? (refusalBody(reply as Refusal).message as string) : r.message) ?? say(A.notPutBack, { card: key }))

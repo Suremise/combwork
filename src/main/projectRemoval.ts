@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { copyFile, mkdir, readdir, readFile, rmdir } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
-import { HIVE_DIR, agentPtyKey, projectAgents } from '../shared/defaults'
+import { CW_DIR, agentPtyKey, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { forgetPtys } from './ptyHost'
 import type { AgentDef, ProjectFolderOf, ProjectRemoval, ProjectRemovalInfo, TaskCard } from '../shared/types'
@@ -309,7 +309,7 @@ interface Manifest {
 
 /** Writes the project's handovers and cards into <project>/.combwork/removed, with a manifest. */
 async function pack(ws: WorkspaceService, p: string, handovers: string[]): Promise<void> {
-  const dir = join(p, HIVE_DIR, REMOVED_DIR)
+  const dir = join(p, CW_DIR, REMOVED_DIR)
   // An older pack (removed before, restored without unpacking) makes way for this one.
   await removePath(dir)
   await mkdir(join(dir, 'handovers'), { recursive: true })
@@ -341,7 +341,7 @@ async function restoreTarget(dir: string, f: string, text: string): Promise<stri
  * the archived ones come back; anywhere else, copies with new numbers. The pack is deleted only once all is back.
  */
 async function unpack(ws: WorkspaceService, p: string): Promise<{ handovers: number; cards: number }> {
-  const dir = join(p, HIVE_DIR, REMOVED_DIR)
+  const dir = join(p, CW_DIR, REMOVED_DIR)
   const manifest = await readJson<Partial<Manifest> | null>(join(dir, 'manifest.json'), null)
   if (!manifest) return { handovers: 0, cards: 0 }
   let handovers = 0
@@ -370,7 +370,7 @@ export async function restoreProject(name: string): Promise<{ handovers: number;
   if (!existsSync(p)) throw new Error(tr(msg({ id: 'main.removal.folderGone', defaultMessage: 'The folder {folder} is no longer in the workspace. Put it back, or forget it.', description: 'An error restoring a project whose folder has gone. Forget is the button that stops listing it.' }), { folder: entry.name }))
   await ws.setHidden(entry.name, null)
   // If unpacking fails, the project is back and its pack stays: its banner offers to restore it again.
-  const result = entry.mode === 'removed' && existsSync(join(p, HIVE_DIR, REMOVED_DIR)) ? await unpack(ws, p) : { handovers: 0, cards: await restoreProjectCards(ws, entry.name) }
+  const result = entry.mode === 'removed' && existsSync(join(p, CW_DIR, REMOVED_DIR)) ? await unpack(ws, p) : { handovers: 0, cards: await restoreProjectCards(ws, entry.name) }
   await ws.ensureProject(p)
   log.info(`Restored ${userText(entry.name)}`)
   await ws.refresh()
@@ -382,7 +382,7 @@ export async function takeRemovedData(projectPath: string, keep: boolean): Promi
   const ws = workspace
   const p = ws.assertProject(projectPath)
   const result = keep ? await unpack(ws, p) : { handovers: 0, cards: 0 }
-  if (!keep) await removePath(join(p, HIVE_DIR, REMOVED_DIR))
+  if (!keep) await removePath(join(p, CW_DIR, REMOVED_DIR))
   await ws.refresh()
   return result
 }

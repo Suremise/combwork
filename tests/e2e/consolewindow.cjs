@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -253,7 +253,7 @@ const check = (name, ok, extra = '') => {
     // until it does there is no row (#723). The read is slowed here so it always comes last, and the checks wait for the
     // newest recording's row rather than reading once.
     await app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'console:recordings=1500'
+      process.env.CW_TEST_SLOW_IPC = 'console:recordings=1500'
     })
     await openDiagnostics()
     const offer = page.locator('.diagnostics-recording')
@@ -283,7 +283,7 @@ const check = (name, ok, extra = '') => {
     check('a recording with text is never offered', !!(await lib.until(notOffered, HUNG_MS)), JSON.stringify(await page.locator('.diagnostics-recording').allTextContents()))
     check("…nor the last open's row while its read is pending (#723)", staleOffer === 0, `a checkbox showed in ${staleOffer} looks`)
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
+      delete process.env.CW_TEST_SLOW_IPC
     })
     await page.keyboard.press('Escape')
     await lib.until(async () => (await page.locator('.diagnostics-preview').count()) === 0, HUNG_MS)
@@ -319,7 +319,7 @@ const check = (name, ok, extra = '') => {
     const refusedBefore = notStarted()
     const filesBefore = new Set(fs.readdirSync(recordingsDir))
     await app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'console:record=1500*1'
+      process.env.CW_TEST_SLOW_IPC = 'console:record=1500*1'
     })
     await dc.locator('.dc-record').click()
     await dc.locator('.dc-record-start').click()

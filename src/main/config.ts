@@ -43,11 +43,11 @@ export function parseUiState(text: string | null): UiState {
 }
 
 /**
- * Whether a test copy starts with tips off (HIVE_TEST_TIPS=off, which every test copy is given), so no tip card covers
+ * Whether a test copy starts with tips off (CW_TEST_TIPS=off, which every test copy is given), so no tip card covers
  * what a suite clicks: unpackaged builds and quiet packaged ones (takesTestSeams, #1599), never the installed app.
  */
 export function testTipsOff(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): boolean {
-  return takesTestSeams(env, packaged) && env.HIVE_TEST_TIPS === 'off'
+  return takesTestSeams(env, packaged) && env.CW_TEST_TIPS === 'off'
 }
 
 /** App-level configuration stored in %APPDATA%/Combwork/config.json (the profile folder, profileFolders.ts). */

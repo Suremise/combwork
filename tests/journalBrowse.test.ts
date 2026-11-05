@@ -185,10 +185,10 @@ describe('Forget everything about X', () => {
 describe('the windows are told', () => {
   // The deleted journal goes to the test's own trash folder, never the Recycle Bin (#414).
   beforeAll(() => {
-    process.env.HIVE_TEST_TRASH_DIR = join(base, 'trash')
+    process.env.CW_TEST_TRASH_DIR = join(base, 'trash')
   })
   afterAll(() => {
-    delete process.env.HIVE_TEST_TRASH_DIR
+    delete process.env.CW_TEST_TRASH_DIR
   })
   it('of a write, an edit, a delete, a forget and the journal deleted', async () => {
     const h = home()

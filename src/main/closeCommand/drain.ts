@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { ASSISTANT_DIR } from '../../shared/assistant'
-import { HIVE_DIR } from '../../shared/defaults'
+import { CW_DIR } from '../../shared/defaults'
 import { boardFile, boardOpen } from '../boardStore'
 import { onWriteEnded, writesAt } from '../dbWrites'
 import { journalFile, journalOpen } from '../journal'
@@ -31,7 +31,7 @@ export const storeDrainDeps: DrainDeps = { writes: writesAt, boardOpen, journalO
  */
 export function drainWorkspace(path: string, place: string, o: { ms?: number; cancelled?: AbortSignal; deps?: DrainDeps } = {}): Promise<DrainResult> {
   const deps = o.deps ?? storeDrainDeps
-  const home = join(path, HIVE_DIR, ASSISTANT_DIR)
+  const home = join(path, CW_DIR, ASSISTANT_DIR)
   const files = [boardFile(path), journalFile(home)]
   const leftNow = (): string[] => {
     const left: string[] = []

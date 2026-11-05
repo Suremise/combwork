@@ -45,7 +45,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   g(lib.WORK, 'clone', '-q', remote, other)
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
 
-  const { app, page } = await lib.launch({ userData, env: { ...claude, HIVE_API_PORT: lib.port(47880), GIT_CONFIG_GLOBAL: globalConfig }, viewport: { width: 1500, height: 900 } })
+  const { app, page } = await lib.launch({ userData, env: { ...claude, CW_API_PORT: lib.port(47880), GIT_CONFIG_GLOBAL: globalConfig }, viewport: { width: 1500, height: 900 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)

@@ -47,7 +47,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -87,7 +87,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     }
     const asBuilder = (p, body) => call(tokens.builder, p, body)
     const asReviewer = (p, body) => call(tokens.reviewer, p, body)
-    // The agent's shell (the fake's "shell:" step), as hive-progress runs in a session.
+    // The agent's shell (the fake's "shell:" step), as cw-progress runs in a session.
     const shells = () => {
       const f = path.join(claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -162,7 +162,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     const first = gitIn(slot, 'rev-parse', 'HEAD')
 
     // --- Its check fails: the run says it blocks review for A.
-    const failedRun = await shell(builder.id, `cd /d "${slot}" && hive-progress --check quick`)
+    const failedRun = await shell(builder.id, `cd /d "${slot}" && cw-progress --check quick`)
     check('the check fails', failedRun?.code === 1, JSON.stringify(failedRun))
     const blocks = panel.locator('.progress-run-blocks')
     check('…and its row says it blocks review for the card', !!(await until(async () => ((await blocks.first().textContent().catch(() => '')) ?? '') === `Blocks review for ${keyA}`, HUNG_MS)), await blocks.first().textContent().catch(() => ''))
@@ -178,7 +178,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
 
     // --- The check passes, the submit goes through: the notch clears with the move.
     fs.writeFileSync(path.join(slot, 'ok.txt'), 'yes\n')
-    const passedRun = await shell(builder.id, `cd /d "${slot}" && hive-progress --check quick`)
+    const passedRun = await shell(builder.id, `cd /d "${slot}" && cw-progress --check quick`)
     check('the check passes', passedRun?.code === 0, JSON.stringify(passedRun))
     await until(async () => (await inv('tasks:work', a))?.checks.some((c) => c.name === 'quick' && c.result === 'passed' && c.counted), HUNG_MS)
     const submitted = await asBuilder(`/v1/tasks/${encodeURIComponent(keyA)}/submit`, { summary: 'Round 1 ready' })
@@ -242,7 +242,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
   const restartRecord = path.join(userData, 'restart.json')
   const offered = fs.existsSync(restartRecord)
   console.log(`INFO restart record before the restart: ${offered ? 'yes' : 'no'}`)
-  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_LANG: 'de' }) })
+  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_LANG: 'de' }) })
   try {
     const page = await de.firstWindow()
     page.on('pageerror', (e) => check('no page errors in German', false, e.message))

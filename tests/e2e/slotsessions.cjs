@@ -48,7 +48,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
   let h = null
   const start = async () => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)

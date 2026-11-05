@@ -37,7 +37,7 @@ export const MAX_WORKING_IN = 32
 export interface JobHostOptions {
   /** How long it gets to start, and then to answer each request. */
   waitMs: () => number
-  /** Test copies' modes (HIVE_TEST_PROCESS_TRACKER: fail, silent, mute); '' otherwise. */
+  /** Test copies' modes (CW_TEST_PROCESS_TRACKER: fail, silent, mute); '' otherwise. */
   testMode: () => string
   log: { warn: (msg: string, e?: unknown) => void }
   /** A process joined a job, or was taken into one ("new"). */
@@ -1459,11 +1459,11 @@ function psArgs(script: string): string[] {
   return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')] // i18n-ignore: PowerShell's arguments
 }
 
-/** Test copies' helper that is ready but never answers (HIVE_TEST_PROCESS_TRACKER=mute): it notes each request it reads. */
+/** Test copies' helper that is ready but never answers (CW_TEST_PROCESS_TRACKER=mute): it notes each request it reads. */
 const MUTE_SCRIPT = `
 $null = [Console]::In.ReadLine()
 [Console]::Out.WriteLine('ready')
-while ($null -ne ($line = [Console]::In.ReadLine())) { if ($env:HIVE_TEST_TRACKER_HEARD) { [IO.File]::AppendAllText($env:HIVE_TEST_TRACKER_HEARD, $line + [Environment]::NewLine) } }
+while ($null -ne ($line = [Console]::In.ReadLine())) { if ($env:CW_TEST_TRACKER_HEARD) { [IO.File]::AppendAllText($env:CW_TEST_TRACKER_HEARD, $line + [Environment]::NewLine) } }
 `
 
 export interface JobList {
@@ -1521,7 +1521,7 @@ export class JobHost {
   private start(): Promise<boolean> {
     if (this.closed) return Promise.resolve(false)
     if (this.ready) return this.ready
-    // Test copies (unpackaged): HIVE_TEST_PROCESS_TRACKER=fail acts out a PC where PowerShell refuses the helper.
+    // Test copies (unpackaged): CW_TEST_PROCESS_TRACKER=fail acts out a PC where PowerShell refuses the helper.
     if (this.opts.testMode() === 'fail') {
       this.opts.onFailed({ kind: 'test' })
       this.failed = true
@@ -1532,8 +1532,8 @@ export class JobHost {
       let p: ChildProcessWithoutNullStreams
       let direct = false
       try {
-        // Test copies: HIVE_TEST_PROCESS_TRACKER=silent acts out a helper that starts but never says it is ready, =mute
-        // one that is ready but never answers (each request it reads noted in HIVE_TEST_TRACKER_HEARD), until its input closes.
+        // Test copies: CW_TEST_PROCESS_TRACKER=silent acts out a helper that starts but never says it is ready, =mute
+        // one that is ready but never answers (each request it reads noted in CW_TEST_TRACKER_HEARD), until its input closes.
         // The test modes' PowerShell is Hive's own child (no keeper: ended with Hive, the silent one included); the
         // helper is started through its launcher, to outlive Hive (helperLaunch).
         const mode = this.opts.testMode()

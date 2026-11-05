@@ -2,7 +2,7 @@ import { join, relative, resolve, sep, dirname, basename } from 'path'
 import { mkdir, readdir, readFile, rename, stat, writeFile } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
 import { handoverHeader, handoverProject, handoverSession, type HandoverAuthor } from '../shared/hiveGuidance'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { isProjectId } from '../shared/projectIds'
 import type { NoteFile } from '../shared/types'
 import { hashText, insideReal, readKeptJson, retryWhileSaving, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
@@ -140,7 +140,7 @@ function workspaceAt(ws: WorkspaceService): WorkspaceAt | null {
   const path = ws.path
   if (!path) return null
   const life = ws.lifetime
-  return { ws, shared: join(path, HIVE_DIR, 'shared'), owners: join(path, HIVE_DIR, 'handover-owners.json'), open: () => !life.aborted && ws.lifetime === life && ws.path === path }
+  return { ws, shared: join(path, CW_DIR, 'shared'), owners: join(path, CW_DIR, 'handover-owners.json'), open: () => !life.aborted && ws.lifetime === life && ws.path === path }
 }
 function stillOpen(at: WorkspaceAt): void {
   if (!at.open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })

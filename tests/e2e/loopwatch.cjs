@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_NOTIFY_LOG: notifyLog, HIVE_TEST_LOOP_GRACE_MS: '3000', HIVE_TEST_WAKE_TAKE_MS: '2000' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_LOOP_GRACE_MS: '3000', CW_TEST_WAKE_TAKE_MS: '2000' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -103,7 +103,7 @@ const check = (name, ok, extra = '') => {
     }
   }
   // The card as `#N`, its workspace number: a plain number reading as another card's key is refused (HI-2197).
-  const wait = (n, extra) => `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${n}`], ...extra, wake: true })}`
+  const wait = (n, extra) => `cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${n}`], ...extra, wake: true })}`
   // As its checks read it, the card by number (it names it by key too, #1219: checked below).
   const rawStalled = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.stalled ?? null
   const stalledOf = async (n) => lib.unkey(await rawStalled(n))
@@ -203,7 +203,7 @@ const check = (name, ok, extra = '') => {
   const c3 = (await inv('tasks:create', { title: 'Asks the user', project: 'alpha' })).number
   const started = await inv('tasks:move', c3, 'doing', { agent: builder.id })
   check('#3 starts on the builder', !!started.moved, JSON.stringify(started))
-  script('Builder', [`hive cw_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Keep the old greeting?' })}`])
+  script('Builder', [`cw cw_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Keep the old greeting?' })}`])
   await say(builder.id, wait(c3, { changes: ['comment'] }))
   check('the builder watches #3', !!(await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)), await why(builder.id))
   await inv('tasks:comment', c3, 'Which greeting should it keep?')
@@ -225,7 +225,7 @@ const check = (name, ok, extra = '') => {
   const before = limitWakes().length
   // Its grace checks so far (loops:checks: counted once a check has decided its mark): the next is the one after its turn ends.
   const checksBefore = await inv('loops:checks', alpha, reviewer.id)
-  await say(reviewer.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${dep}`, `#${next}`], changes: ['column'], limitMinutes: 1, wake: true })}`)
+  await say(reviewer.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${dep}`, `#${next}`], changes: ['column'], limitMinutes: 1, wake: true })}`)
   check('the reviewer watches the card and the one waiting on it', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
   // The watch's limit is a minute: the wait is bounded at twice that.
   check('its limit passes: woken, then idle with no watch', !!(await until(async () => limitWakes().length > before && ['ready', 'finished'].includes((await live(reviewer.id))?.status) && !(await live(reviewer.id))?.watch, 120000)), `${JSON.stringify(limitWakes().map((w) => w.text))} ${await why(reviewer.id)}`)

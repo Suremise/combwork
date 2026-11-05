@@ -15,7 +15,7 @@ import { upgradedExclude } from '../src/main/nameUpgradeProjects'
 import { EXCLUDE_COMMENT } from '../src/shared/hiveFolderMove'
 
 /** Hive's .combwork/.gitignore before #1106 added the usage history's lines. */
-const HIVE_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
+const OLD_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
 const USAGE = '# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n'
 const NAMES = "# The names upgrade's record on this machine (HI-2587)\ncombwork-names.json\n"
 
@@ -34,19 +34,19 @@ describe('the wording of the files Combwork writes (HI-2580)', () => {
 describe("the .combwork folder's .gitignore", () => {
   it("Hive's is rewritten once: Combwork's head, the board's lines for combwork.db, the record kept out", () => {
     const head = BOARD_GITIGNORE.split('\n')[0]
-    expect(upgradedGitignore(HIVE_GITIGNORE)).toBe(`${head}\ncombwork.db\ncombwork.db-*\nbackups/\n${NAMES}`)
-    expect(upgradedGitignore(`${HIVE_GITIGNORE}${USAGE}`)).toBe(`${head}\ncombwork.db\ncombwork.db-*\nbackups/\n${USAGE}${NAMES}`)
+    expect(upgradedGitignore(OLD_GITIGNORE)).toBe(`${head}\ncombwork.db\ncombwork.db-*\nbackups/\n${NAMES}`)
+    expect(upgradedGitignore(`${OLD_GITIGNORE}${USAGE}`)).toBe(`${head}\ncombwork.db\ncombwork.db-*\nbackups/\n${USAGE}${NAMES}`)
     // CRLF kept.
-    const crlf = upgradedGitignore(HIVE_GITIGNORE.replace(/\n/g, '\r\n'))
+    const crlf = upgradedGitignore(OLD_GITIGNORE.replace(/\n/g, '\r\n'))
     expect(crlf).toBe(`${head}\ncombwork.db\ncombwork.db-*\nbackups/\n${NAMES}`.replace(/\n/g, '\r\n'))
     // Then nothing more: the next open writes nothing.
-    expect(upgradedGitignore(upgradedGitignore(HIVE_GITIGNORE)!)).toBeNull()
+    expect(upgradedGitignore(upgradedGitignore(OLD_GITIGNORE)!)).toBeNull()
     expect(upgradedGitignore(BOARD_GITIGNORE)).toBeNull()
   })
 
   it("the user's own is left, and Hive's head is no longer Combwork's for the usage lines", () => {
     expect(upgradedGitignore('# mine\nhive.db\n')).toBeNull()
-    expect(withUsageIgnore(HIVE_GITIGNORE)).toBeNull()
+    expect(withUsageIgnore(OLD_GITIGNORE)).toBeNull()
     expect(withUsageIgnore('# mine\nhive.db\n')).toBeNull()
   })
 

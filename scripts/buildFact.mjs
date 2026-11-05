@@ -58,7 +58,7 @@ export function workspaceOf(root, env = process.env) {
   }
 }
 
-/** The token a session's hive tools use: its token file's (it changes each launch), never HIVE_API_TOKEN (HI-2262). */
+/** The token a session's hive tools use: its token file's (it changes each launch), never a token variable (HI-2262). */
 function tokenOf(env) {
   try {
     if (env.CW_API_TOKEN_FILE) return JSON.parse(readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token || null

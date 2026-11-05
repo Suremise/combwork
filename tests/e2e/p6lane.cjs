@@ -18,7 +18,7 @@
 // Screenshots in both themes, in English and German: the step, the board, Branches & remotes, the Pulse hovers, the
 // legend, the old rules mark, the save's warning, the offer, and each Version Control section of a Git and a None
 // project. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// The Merge queue section read slowly (HIVE_TEST_SLOW_IPC) is NOT RUN on a packaged build (HIVE_EXE), where the rest
+// The Merge queue section read slowly (CW_TEST_SLOW_IPC) is NOT RUN on a packaged build (CW_EXE), where the rest
 // runs (#1578).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -298,7 +298,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
       check('…both agents run, with their tokens', !!ok, JSON.stringify(tokens))
     }
 
-    // The builder's shell (the fake's "shell:" step), as hive-progress runs in its session (p5lane's).
+    // The builder's shell (the fake's "shell:" step), as cw-progress runs in its session (p5lane's).
     const shells = () => {
       const file = path.join(fx.claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -313,11 +313,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
       if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
     }
     const counted = (x) => x.kind === 'CheckRan' && x.data?.counted === true
-    /** The quick check through hive-progress on the card's revision now (passing): a new counted CheckRan on it. */
+    /** The quick check through cw-progress on the card's revision now (passing): a new counted CheckRan on it. */
     const quickCheck = async (n) => {
       q.steer(fx, 'pass')
       const before = (await h.facts(n)).filter(counted).length
-      await shell(`hive-progress --check typecheck --card ${await keyOf(n)}`)
+      await shell(`cw-progress --check typecheck --card ${await keyOf(n)}`)
       return !!(await waitHung(async () => (await h.facts(n)).filter(counted).length > before))
     }
     const commit = (file) => {
@@ -358,7 +358,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const line = s1.body?.data?.line
     check("One starts in the lane's slot, on its line", s1.status === 200 && !!line && !!(await onLine(s1)), JSON.stringify(s1.body))
     const rev1 = commit('one.txt')
-    check("One's quick check through hive-progress --check is counted", await quickCheck(c1))
+    check("One's quick check through cw-progress --check is counted", await quickCheck(c1))
     const sub1 = await intent('b1', c1, 'submit', { summary: 'one ready' })
     check('One submitted: Review', sub1.status === 200 && (await card(c1)).column === 'review', JSON.stringify(sub1.body))
     const k1 = await keyOf(c1)
@@ -621,15 +621,15 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const queueTab = page.locator('.git-sections [data-section="queue"]')
     check('None, a Git card still in flight: the Merge queue section stays', (await queueTab.count()) === 1, JSON.stringify(await page.locator('.git-sections [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section')))))
     if ((await queueTab.count()) === 1) {
-      if (q.devSeam('the Merge queue section read slowly (HIVE_TEST_SLOW_IPC)')) {
+      if (q.devSeam('the Merge queue section read slowly (CW_TEST_SLOW_IPC)')) {
         // Read slowly (as under load): the section says it's reading, never nothing.
-        await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'queue:list=3000' })
+        await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'queue:list=3000' })
         await section('workflow')
         await section('queue')
         const reading = page.locator('.git-body [data-queue-reading]')
         check('the Merge queue section, while its queues are read, says so', !!(await waitHung(async () => (await reading.count()) === 1 && (await text(reading)) === 'Reading the merge queues…')), (await page.locator('.git-body').innerHTML().catch(() => '')).slice(0, 600))
         await page.locator('.vc-view').screenshot({ path: path.join(fx.shots, 'p6lane-vc-none-queue-reading-en-dark.png') })
-        await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+        await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
       }
       // Then the old queue as the board has it, with its history: the repository gone takes none of it away.
       const body = page.locator('.git-body')

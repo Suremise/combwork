@@ -24,8 +24,8 @@ export const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System3
 const CONNECT_MS = 30_000
 
 const GATE_SCRIPT = `
-$pipe = $env:HIVE_GATE_PIPE; $file = $env:HIVE_GATE_FILE; $argline = $env:HIVE_GATE_ARGS
-foreach ($n in @('HIVE_GATE_PIPE', 'HIVE_GATE_FILE', 'HIVE_GATE_ARGS')) { [Environment]::SetEnvironmentVariable($n, $null) }
+$pipe = $env:CW_GATE_PIPE; $file = $env:CW_GATE_FILE; $argline = $env:CW_GATE_ARGS
+foreach ($n in @('CW_GATE_PIPE', 'CW_GATE_FILE', 'CW_GATE_ARGS')) { [Environment]::SetEnvironmentVariable($n, $null) }
 $word = $null
 $why = 'Combwork gave no word to start it'
 try {
@@ -114,7 +114,7 @@ export function launchGate(file: string, args: string[] | string, env: Record<st
   return {
     file: POWERSHELL,
     args: GATE_ARGS,
-    env: { ...env, HIVE_GATE_PIPE: name, HIVE_GATE_FILE: file, HIVE_GATE_ARGS: typeof args === 'string' ? args : commandLineOf(args) },
+    env: { ...env, CW_GATE_PIPE: name, CW_GATE_FILE: file, CW_GATE_ARGS: typeof args === 'string' ? args : commandLineOf(args) },
     open(word) {
       void word
         .catch((e: unknown): GateWord => ({ go: false, reason: e instanceof Error ? e.message : String(e) }))

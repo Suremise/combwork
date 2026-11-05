@@ -79,7 +79,7 @@ const queueOptions = (fx, over = {}) => ({ review: 'agent', noSelfReview: true, 
  * unless `keepOptions`. The page's helpers: inv, card, facts, kinds.
  */
 async function startHive(fx, { port, env = {}, keepOptions = false } = {}) {
-  const { app, page, inv } = await lib.launch({ userData: fx.userData, env: { HIVE_API_PORT: String(port), CLAUDE_CONFIG_DIR: fx.claudeHome, HIVE_TEST_TIPS: 'off', ...env } })
+  const { app, page, inv } = await lib.launch({ userData: fx.userData, env: { CW_API_PORT: String(port), CLAUDE_CONFIG_DIR: fx.claudeHome, CW_TEST_TIPS: 'off', ...env } })
   await lib.openWorkspace(inv, page, fx.ws)
   if (!keepOptions) await inv('workflow:setOptions', fx.alpha, { preset: null, options: queueOptions(fx) })
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
@@ -286,12 +286,12 @@ function mergeOn(fx, branch, revision, message) {
 }
 
 /**
- * Whether a part needing one of the dev build's test seams runs (#1578): a packaged Combwork (HIVE_EXE, the Sandbox checks)
- * ignores HIVE_TEST_… and refuses the test channels, so there the part says NOT RUN and the suite's other checks stand.
+ * Whether a part needing one of the dev build's test seams runs (#1578): a packaged Combwork (CW_EXE, the Sandbox checks)
+ * ignores CW_TEST_… and refuses the test channels, so there the part says NOT RUN and the suite's other checks stand.
  */
 function devSeam(what) {
-  if (!process.env.HIVE_EXE) return true
-  console.log(`NOT RUN ${what}: it needs a test seam of the dev build, and HIVE_EXE is a packaged one`)
+  if (!process.env.CW_EXE) return true
+  console.log(`NOT RUN ${what}: it needs a test seam of the dev build, and CW_EXE is a packaged one`)
   return false
 }
 

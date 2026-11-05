@@ -16,8 +16,8 @@ const base = tempDir('hive-agentmcp-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
 // seam, HI-1755; connections are on for everyone since HI-1774).
-process.env.HIVE_USER_DATA = join(base, 'profile')
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_USER_DATA = join(base, 'profile')
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 // Never the user's own CLI homes: the Codex and Copilot adapters read their config to turn the user's servers off.
 process.env.CODEX_HOME = join(base, 'codex-home')

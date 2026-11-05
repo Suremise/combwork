@@ -3,7 +3,7 @@ import { readdir, readFile, rename, rm, stat } from 'original-fs/promises'
 import { join } from 'path'
 import { JOURNAL_BUILDS } from '../shared/advanced'
 import { BUILD_MARKERS_DIR, buildFactDetail, buildFactOf, buildFactSummary, type BuildFact } from '../shared/buildFacts'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { advanced } from './advanced'
 import { journalFact, journalSettingsOf } from './journalService'
 import { inScope } from '../shared/journal'
@@ -60,7 +60,7 @@ const CLAIM_STALE_MS = 10 * 60_000
 export async function pickUpBuilds(ws: WorkspaceService): Promise<number> {
   const path = ws.path
   if (!path) return 0
-  const dir = join(path, HIVE_DIR, BUILD_MARKERS_DIR)
+  const dir = join(path, CW_DIR, BUILD_MARKERS_DIR)
   const same = (): boolean => ws.path === path
   let names: string[]
   try {

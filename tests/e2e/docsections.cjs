@@ -1,4 +1,4 @@
-// Documents by section (#817), through the real Agent API and hive-mcp.js: a project agent outlines and reads its own
+// Documents by section (#817), through the real Agent API and cw-mcp.js: a project agent outlines and reads its own
 // project's Markdown in the folder it works in (its worktree's copy), not another project's (403, as its sessions);
 // the workspace token reads any project's (the project folder's copy) and shared notes (shared:<path>); a section by
 // slug or text comes with its subsections; a repeated heading is ambiguous (409, listing both slugs) and an unknown one
@@ -50,7 +50,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -160,11 +160,11 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     r = await outline(agentToken, { path: 'shared:../outside.md' })
     check('a shared path outside the notes: refused', r.status === 400, JSON.stringify(r))
 
-    // --- Through hive-mcp.js, as the agent's tools: lean text.
+    // --- Through cw-mcp.js, as the agent's tools: lean text.
     const tool = (name, args) => {
       const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-        env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(agentToken), CW_PROJECT: 'alpha', HIVE_AGENT_ID: agent.id }),
+        env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(agentToken), CW_PROJECT: 'alpha', CW_AGENT_ID: agent.id }),
         timeout: 60000
       }).toString()
       const res = JSON.parse(out.split('\n')[0]).result

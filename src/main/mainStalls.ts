@@ -297,9 +297,9 @@ export function watchMainStalls(): void {
   startWatchdog()
   const delays = monitorEventLoopDelay({ resolution: 20 })
   delays.enable()
-  // Tests (unpackaged builds): HIVE_TEST_STALL_QUIET_MS shortens the minute between warnings, so a stall at start
+  // Tests (unpackaged builds): CW_TEST_STALL_QUIET_MS shortens the minute between warnings, so a stall at start
   // doesn't hide the one a suite makes.
-  const quietMs = (!app.isPackaged && Number(process.env.HIVE_TEST_STALL_QUIET_MS)) || STALL_TIMING.quietMs
+  const quietMs = (!app.isPackaged && Number(process.env.CW_TEST_STALL_QUIET_MS)) || STALL_TIMING.quietMs
   const thread = (process as { threadCpuUsage?: () => { user: number; system: number } }).threadCpuUsage
   const watch = stallWatcher({
     now: () => stallClock.mono(),

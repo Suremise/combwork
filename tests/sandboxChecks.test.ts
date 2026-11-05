@@ -50,7 +50,7 @@ function scratch(name: string, fail: Json = {}) {
     read: (): Json => JSON.parse(fs.readFileSync(state, 'utf8')),
     patch: (fn: (s: Json) => void) => { const s = JSON.parse(fs.readFileSync(state, 'utf8')); fn(s); fs.writeFileSync(state, JSON.stringify(s)) },
     /** The runner's environment: the run context's allowlist, the fakes, and `vars`. */
-    env: (vars: Json = {}) => ({ ...baseEnv(), WSB_STUB: STUB, WSB_STUB_STATE: state, WSB_STOP_RETRY_MS: '10', HIVE_SANDBOX_TEST_SETTINGS_MS: '0', ...vars })
+    env: (vars: Json = {}) => ({ ...baseEnv(), WSB_STUB: STUB, WSB_STUB_STATE: state, WSB_STOP_RETRY_MS: '10', CW_SANDBOX_TEST_SETTINGS_MS: '0', ...vars })
   }
 }
 const stops = (s: Json, by: string) => s.calls.filter((c: Json[string][]) => c[0] === 'stop' && c[2] === by).length
@@ -144,7 +144,7 @@ function runChecks(name: string, guest: Json[], extra: string[] = [], vars: Json
   fs.writeFileSync(path.join(git, 'cmd', 'git.exe'), 'MZ')
   const report = path.join(s.dir, 'report')
   const r = runner(['--installer', path.join(s.dir, 'builds', 'hive', 'Hive-Setup-0.6.0.exe'), '--previous', previous, '--server', FAKE_SERVER, '--report', report, '--git', git, ...extra],
-    s.env({ HIVE_SANDBOX_CHECKS_ROOT: path.join(s.dir, 'sandbox'), ...vars }))
+    s.env({ CW_SANDBOX_CHECKS_ROOT: path.join(s.dir, 'sandbox'), ...vars }))
   const calls: Json[string][][] = s.read().calls
   const guests: string[] = calls.filter((c) => c[0] === 'run').map((c) => c[1])
   const starts: Json[] = calls.filter((c) => c[0] === 'start').map((c) => c[1])
@@ -164,7 +164,7 @@ function oneNotRunLine({ r, log }: { r: { stdout: string }; log: string }) {
 }
 
 test('what the server gets: hive\'s own scripts and fakes mapped from this checkout, its run folders in hive-test\\sandbox, nothing else of the shell', () => {
-  const run = runChecks('server-env', [], [], { HIVE_SANDBOX_CHECKS_ROOT: undefined, HIVE_API_TOKEN: 'from-the-shell' })
+  const run = runChecks('server-env', [], [], { CW_SANDBOX_CHECKS_ROOT: undefined, CW_API_TOKEN: 'from-the-shell' })
   assert.strictEqual(run.r.status, 1, run.r.stdout + run.r.stderr) // the fake drivers write no results: checks fail
   const repo = path.resolve(__dirname, '..')
   const env = run.calls.find((c) => c[0] === 'env')?.[1]
@@ -173,7 +173,7 @@ test('what the server gets: hive\'s own scripts and fakes mapped from this check
     WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(repo, 'node_modules', 'playwright-core')}`, `hive-tests=${path.join(repo, 'tests')}`, `git=${run.git}`].join(';'),
     WSB_MCP_ENABLED: '1',
     WSB_ALLOWED_ROOTS: '',
-    HIVE_API_TOKEN: null
+    CW_API_TOKEN: null
   })
   const build = path.join(run.s.dir, 'builds', 'hive')
   // Git only in the clean install's Sandbox (HI-2592), for its git project.

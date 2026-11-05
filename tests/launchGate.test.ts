@@ -45,7 +45,7 @@ describe.runIf(process.platform === 'win32')('a launch held at its gate', () => 
   const since = Date.now()
   const children: ChildProcess[] = []
   const env: Record<string, string> = {}
-  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !k.startsWith('HIVE_')) env[k] = v
+  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !k.startsWith('CW_')) env[k] = v
   // A stand-in CLI: the moment it runs, it notes that it ran and starts a detached, hidden server (its pid noted);
   // then it prints its arguments and exits with 7 a moment later. With --stay, it notes its own pid instead, starts
   // nothing and runs until ended, as a CLI does.

@@ -5,7 +5,7 @@
 // runner and a scenario run, and in a second worktree (a git worktree of this one's HEAD with its uncommitted changes,
 // made for the check in this invocation's own folder and removed after unless --keep: tempWorktrees.mjs, #207, so two
 // checkers at once never remove each other's) two e2e runners. One run in each worktree is started with the
-// environment of an agent's shell inside an outer hive-progress (NO_COLOR, CW_PROGRESS_WRAPPED, a Combwork Agent API
+// environment of an agent's shell inside an outer cw-progress (NO_COLOR, CW_PROGRESS_WRAPPED, a Combwork Agent API
 // token…) and a shell's git and Node settings pointing elsewhere (GIT_DIR and GIT_WORK_TREE at a decoy repository,
 // NODE_OPTIONS loading a script that notes each Node process it starts in), the other with a plain one; the checker's
 // own environment points git at the decoy too, for its own setup (#208). Checked, each round: every run passes; each
@@ -13,7 +13,7 @@
 // build lock), stamped as its source (by its runs, or by another checker's started in the same worktree, #282); no build lock is left held; each e2e run's record names its own worktree's code;
 // and the decoy is untouched and no Node process but the runners themselves got the NODE_OPTIONS (#208). --repeat N
 // runs N rounds, stopping at the first that fails. Before the rounds, in the second worktree with no dev build yet: a
-// packaged run (HIVE_EXE) whose suites can't run on it makes no build, writes its record (not valid, each suite NOT
+// packaged run (CW_EXE) whose suites can't run on it makes no build, writes its record (not valid, each suite NOT
 // RUN with why) and fails (#1591).
 //
 // --heavy checks the machine-wide limit on heavy runs instead (slots.mjs), in a pool of slots of its own (so real runs
@@ -29,7 +29,7 @@
 //
 // After the rounds (or alone, with --lane-wait): a run that waits for a test lane while its source changes (#735). In
 // the second worktree, an e2e run (--build --record) and a scenario run start while every lane of a pool of their own
-// is held (HIVE_TEST_LANES_DIR, with folders and ports of their own, #1127: real runs neither wait for it, make it
+// is held (CW_TEST_LANES_DIR, with folders and ports of their own, #1127: real runs neither wait for it, make it
 // wait nor answer on its ports); once both
 // say they wait, a source file is added there, then lanes are let go. Checked: both waited, then built the source as
 // it was once they had a lane, after the wait; both pass; the e2e record names that source and is valid; the build
@@ -63,7 +63,7 @@ const SUITES = ['isolation', 'about', 'bridgereport', 'busy']
 const SCENARIO = 'work-on-card'
 /** This invocation's own folder (tempWorktrees.mjs): its worktrees, decoy, heavy-run pool; no other checker's. */
 const RUN = invocationDir()
-/** An agent's shell in Combwork running the tests through hive-progress, and a person's own settings. */
+/** An agent's shell in Combwork running the tests through cw-progress, and a person's own settings. */
 const AGENT_SHELL = {
   NO_COLOR: '1',
   FORCE_COLOR: '1',
@@ -71,11 +71,11 @@ const AGENT_SHELL = {
   CW_PROGRESS_RUN_AS_NODE: '1',
   CW_PROGRESS_DATA: join(RUN, 'leaked-progress'),
   CW_API_URL: 'http://127.0.0.1:9',
-  HIVE_API_TOKEN: 'leaked-token',
+  CW_API_TOKEN: 'leaked-token',
   CW_PROJECT: 'hive',
   CLAUDE_CONFIG_DIR: join(RUN, 'leaked-claude'),
   ELECTRON_RUN_AS_NODE: '1',
-  HIVE_TEST_SLOW_IPC: 'tasks:list=1'
+  CW_TEST_SLOW_IPC: 'tasks:list=1'
 }
 /**
  * A shell's git and Node settings pointing elsewhere (#208): a decoy repository the runs' git must never use, and a
@@ -196,10 +196,10 @@ async function heavyRound(k, worktrees) {
   })
   await new Promise((r) => api.listen(0, '127.0.0.1', r))
   // No side slot (HI-2070): these runs are small (two suites, twice), and queue for the heavy slots as heavy runs do.
-  // The agent's token in its file, as a session has it (HI-2262: never HIVE_API_TOKEN).
+  // The agent's token in its file, as a session has it (HI-2262: never CW_API_TOKEN).
   const tokenFile = join(RUN, 'agent-token.json')
   writeFileSync(tokenFile, JSON.stringify({ token: 'agent-token' }))
-  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_TEST_SIDE_SLOTS: '0', CW_API_URL: `http://127.0.0.1:${api.address().port}`, CW_API_TOKEN_FILE: tokenFile }
+  const env = { CW_TEST_HEAVY_DIR: pool, CW_TEST_HEAVY_SLOTS: '2', CW_TEST_SIDE_SLOTS: '0', CW_API_URL: `http://127.0.0.1:${api.address().port}`, CW_API_TOKEN_FILE: tokenFile }
   const slots = () => (existsSync(pool) ? readdirSync(pool).filter((f) => /^slot-\d+\.json$/.test(f)).length : 0)
   const waiting = () => (existsSync(pool) ? readdirSync(pool).filter((f) => f.startsWith('wait-')).length : 0)
   // Heavy by repeating: two quick suites, twice.
@@ -231,7 +231,7 @@ async function heavyRound(k, worktrees) {
 
     // The side slot (HI-2070): with both heavy slots held (by this checker), a small run takes the side slot without
     // waiting, while a heavy run (more than three suites' repeats) is refused at once: it never takes the side slot.
-    const sided = { ...env, HIVE_TEST_SIDE_SLOTS: '1' }
+    const sided = { ...env, CW_TEST_SIDE_SLOTS: '1' }
     const gates = [await trySlot(pool, { slots: 2, owner: process.pid, what: 'the checker, 1', root }), await trySlot(pool, { slots: 2, owner: process.pid, what: 'the checker, 2', root })]
     try {
       let sideHeld = false
@@ -248,16 +248,16 @@ async function heavyRound(k, worktrees) {
 
     // A run killed while it holds a slot: with one slot, the next run takes it without waiting.
     let child
-    const killed = start({ name: 'killed', cwd: root, script: 'tests/e2e/run.mjs', args, env: { ...env, HIVE_TEST_HEAVY_SLOTS: '1' }, started: (p) => (child = p) })
+    const killed = start({ name: 'killed', cwd: root, script: 'tests/e2e/run.mjs', args, env: { ...env, CW_TEST_HEAVY_SLOTS: '1' }, started: (p) => (child = p) })
     const held = await until(() => slots() === 1, 60_000)
     endChildTree(child)
     await killed
-    const next = await start({ name: 'after a killed run', cwd: root, script: 'tests/e2e/run.mjs', args, env: { ...env, HIVE_TEST_HEAVY_SLOTS: '1' } })
+    const next = await start({ name: 'after a killed run', cwd: root, script: 'tests/e2e/run.mjs', args, env: { ...env, CW_TEST_HEAVY_SLOTS: '1' } })
     check("a killed run's slot is taken by the next run without waiting", held && next.code === 0 && !/Waiting for a test slot/.test(next.out), `held ${held}, exit ${next.code}`)
 
     // The merge slot holder's run goes first (#558). The only slot is this checker's; two runs wait for it, then the
     // run of the agent that holds the merge slot (HB, says the stand-in) asks last and takes it when it is let go.
-    const single = { ...env, HIVE_TEST_HEAVY_SLOTS: '1', CW_PROJECT: 'hive' }
+    const single = { ...env, CW_TEST_HEAVY_SLOTS: '1', CW_PROJECT: 'hive' }
     const run = (i, agent, started) => start({ name: `${agent}, worktree ${i + 1}`, cwd: worktrees[i], script: 'tests/e2e/run.mjs', args, env: { ...single, CW_AGENT: agent }, started })
     const slotFile = () => readdirSync(pool).find((f) => /^slot-\d+\.json$/.test(f))
     let gate = await trySlot(pool, { slots: 1, what: 'the checker', root })
@@ -292,7 +292,7 @@ async function heavyRound(k, worktrees) {
     // A heavy scenario run inside a suite (#211): its parent (this checker, standing in for an e2e run) holds the only slot.
     const parent = await trySlot(pool, { slots: 1, what: 'the parent e2e run', root })
     try {
-      const one = { ...env, HIVE_TEST_HEAVY_SLOTS: '1' }
+      const one = { ...env, CW_TEST_HEAVY_SLOTS: '1' }
       const scenarios = ['--repeat', '2', '--only', SCENARIO, '--no-wait', '--no-progress']
       // What a suite's agent shell keeps of its run context (E2E_RUN_*).
       // Its parent's run holds the CPU slot it runs in: E2E_RUN_SLOTS says so (HI-2070).
@@ -333,7 +333,7 @@ async function laneWaitCheck(wt) {
   mkdirSync(pool, { recursive: true })
   // Every lane held by this checker (a claim holds while its process runs), so both runs wait.
   for (let k = 0; k < LANES; k++) writeFileSync(join(pool, `lane-${k}.json`), JSON.stringify({ pid: process.pid, at: Date.now(), what: 'the checker' }))
-  const env = { HIVE_TEST_LANES_DIR: pool, HIVE_E2E_DIR: join(RUN, 'lane-work', 'e2e') }
+  const env = { CW_TEST_LANES_DIR: pool, CW_E2E_DIR: join(RUN, 'lane-work', 'e2e') }
   const probe = join(wt, 'src', 'main', 'lane-wait-probe.ts')
   rmSync(probe, { force: true })
   // What each run has said so far, as it says it.
@@ -409,16 +409,16 @@ async function laneWaitCheck(wt) {
 }
 
 /**
- * A packaged run (HIVE_EXE) of suites none of which can run on it, in the second worktree before anything builds it
+ * A packaged run (CW_EXE) of suites none of which can run on it, in the second worktree before anything builds it
  * (#1591): no dev build is made or needed, and the run still writes its record, not valid ("nothing was tested"), with
- * each suite NOT RUN and why, and fails. HIVE_EXE names no file: a run that started a Combwork would fail on it.
+ * each suite NOT RUN and why, and fails. CW_EXE names no file: a run that started a Combwork would fail on it.
  */
 async function packagedNothingCheck(wt) {
   console.log('\n--- A packaged run where no suite chosen can run, with no dev build (#1591)')
   const built = join(wt, 'out', 'main', 'index.js')
   check('the second worktree has no dev build yet', !existsSync(built), built)
   const work = join(RUN, 'packaged-work', 'e2e')
-  const r = await start({ name: 'packaged, nothing runnable', cwd: wt, script: 'tests/e2e/run.mjs', args: ['cardloop', 'wakepaste-codex', '--build', '--record', '--no-progress'], polluted: false, env: { HIVE_EXE: join(RUN, 'no-such', 'Hive.exe'), HIVE_E2E_DIR: work } })
+  const r = await start({ name: 'packaged, nothing runnable', cwd: wt, script: 'tests/e2e/run.mjs', args: ['cardloop', 'wakepaste-codex', '--build', '--record', '--no-progress'], polluted: false, env: { CW_EXE: join(RUN, 'no-such', 'Hive.exe'), CW_E2E_DIR: work } })
   check(`${r.name}: fails (nothing was tested)`, r.code === 1, `exit ${r.code}\n${r.out.slice(-800)}`)
   check(`${r.name}: makes no dev build`, !/^Building \(the dev build/m.test(r.out) && !/No dev build/.test(r.out) && !existsSync(built), r.out.slice(0, 800))
   const logs = /Logs: `?([^`\r\n]+?)`?$/m.exec(r.out)?.[1]?.trim()

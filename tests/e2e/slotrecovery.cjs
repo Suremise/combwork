@@ -1,5 +1,5 @@
 // Cards on slots across a restart (#1438, HR1's round 1): what a card's start owes (its line made in its slot, its builder
-// placed there) is done from durable state by the next start's pass, once. Combwork ends at once (HIVE_TEST_SLOT_CRASH, no
+// placed there) is done from durable state by the next start's pass, once. Combwork ends at once (CW_TEST_SLOT_CRASH, no
 // quit handler) at each point, and the next start recovers:
 // 1. `afterAction`: the start's slot action marked done, nothing of it done: the restart makes the line and places B1;
 // 2. `inPrepare`: the line checked out, its `SlotPrepared` not written: the restart records it (nothing switched twice);
@@ -47,7 +47,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
   let h = null
   /** Combwork started on the workspace (`crash`: the point it ends at, once there). */
   const start = async (crash) => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...(crash ? { HIVE_TEST_SLOT_CRASH: crash } : {}) } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...(crash ? { CW_TEST_SLOT_CRASH: crash } : {}) } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)

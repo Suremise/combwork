@@ -23,7 +23,7 @@ const check = (name, ok, extra = '') => {
   lib.enableProviders(userData)
 
   const start = async () => {
-    const r = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47918) } })
+    const r = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47918) } })
     r.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(r.app, r.page, { width: 1400, height: 850 })
     return r

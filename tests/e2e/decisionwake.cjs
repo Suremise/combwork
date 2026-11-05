@@ -42,7 +42,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // A short settle (15 s in Combwork), so the decisions recorded together are still told together, quickly.
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_DECISION_SETTLE_MS: '2500', HIVE_TEST_MCP_LOG: mcpLog })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_DECISION_SETTLE_MS: '2500', CW_TEST_MCP_LOG: mcpLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => {
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('tasks:update', n, { column: 'doing', agent: agent.id })
   // What it does when Combwork's line comes: reads the card's decisions, as work-on-card says.
-  fs.writeFileSync(path.join(claudeHome, 'fake-wakes-Asker.txt'), `hive cw_read_task {"number":${n}}\nhive cw_read_task {"number":${n}}\nhive cw_read_task {"number":${n}}\n`)
+  fs.writeFileSync(path.join(claudeHome, 'fake-wakes-Asker.txt'), `cw cw_read_task {"number":${n}}\nhive cw_read_task {"number":${n}}\nhive cw_read_task {"number":${n}}\n`)
   await inv('session:start', alpha, { agentId: agent.id })
   check('the agent starts', !!(await until(() => idle(agent.id), HUNG_MS)))
   // Its own turns, typed once it takes prompts and waited for to their end (#729: an idle wait returned before the fake,

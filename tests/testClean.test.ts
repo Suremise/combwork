@@ -965,7 +965,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
   it('never a CLI test home, in one or holding one, whatever the area', () => {
     const { testRoot, homes } = roots()
     const tmp2 = temp('hive-cleardir-home-')
-    // A test home inside the scratch area (HIVE_TEST_CODEX_HOME pointed there): still refused, and its parent too.
+    // A test home inside the scratch area (CW_TEST_CODEX_HOME pointed there): still refused, and its parent too.
     const home = join(testRoot, 'scratch', 'my-codex')
     tree(testRoot, { 'scratch/my-codex/auth.json': 0 })
     for (const p of [...homes, join(homes[0], 'sessions'), home, join(home, 'x')]) expect(() => clearDir(p, { board: { cards: [] }, temp: tmp2, testRoot, homes: [...homes, home] }), p).toThrow(/CLI test home/)

@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -88,7 +88,7 @@ const check = (name, ok, extra = '') => {
   const [n1, n5, n6] = [await named(c1), await named(c5), await named(c6)]
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(n1), n1)
   // The builder registers its lane (card-loop does): Reviewer reviews its cards. Card 4 is in no lane.
-  const lane = (who) => `hive cw_lane ${JSON.stringify({ action: 'start', cards: [c1, c2, c3, c5, c6], reviewer: who })}`
+  const lane = (who) => `cw cw_lane ${JSON.stringify({ action: 'start', cards: [c1, c2, c3, c5, c6], reviewer: who })}`
   await say(builder.id, lane('Reviewer'))
   check('the lane is registered', !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === reviewer.id), 15000)))
   await until(() => idle(builder.id), 15000)
@@ -123,7 +123,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
 
   // The reviewer waits with its own watch: one line, its watch's, not two.
-  await say(reviewer.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c2], column: 'review', wake: true })}`)
+  await say(reviewer.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c2], column: 'review', wake: true })}`)
   check('the reviewer watches the next card', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)))
   await say(builder.id, `boardmove ${c2} review`)
   check("its own watch wakes it", !!(await until(async () => wakes('Reviewer').length === 3, 20000)) && /Your card watch has ended/.test(wakes('Reviewer')[2]), JSON.stringify(wakes('Reviewer')))
@@ -134,7 +134,7 @@ const check = (name, ok, extra = '') => {
   // The builder waits for Passed alone; a failed verdict sends the card back to Doing (HI-1946), which that watch doesn't
   // count: Combwork wakes the builder, once. Put in Review again, the passing verdict then moves it to Passed: the watch tells
   // it, and Combwork doesn't too.
-  await say(builder.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c2], column: 'passed', wake: true })}`)
+  await say(builder.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c2], column: 'passed', wake: true })}`)
   check('the builder watches for Passed alone', !!(await until(async () => (await live(builder.id))?.status === 'watching', 15000)))
   await say(reviewer.id, `boardreview ${c2} start then boardreview ${c2} failed`)
   check('a failed verdict its Passed watch misses still wakes the builder', !!(await until(async () => wakes('Builder').length === 3, 20000)) && /failed it\. This is your card in its loop/.test(wakes('Builder')[2]), JSON.stringify(wakes('Builder')))
@@ -185,11 +185,11 @@ const check = (name, ok, extra = '') => {
   // HI-2428 (HI-2410): the reviewer starts its review, asks its builder with cw_request_builder and ends its turn with
   // no watch; the builder answers with a comment alone (cw_update_task with only a comment) at once, then posts the
   // result later as a plain comment. Each wakes the reviewer.
-  await say(other.id, `boardreview ${c5} start then hive cw_request_builder ${JSON.stringify({ card: n5, text: 'Please post a full npm test record.' })}`)
+  await say(other.id, `boardreview ${c5} start then cw cw_request_builder ${JSON.stringify({ card: n5, text: 'Please post a full npm test record.' })}`)
   check("the reviewer's request wakes the builder", !!(await until(async () => wakes('Builder').some((x) => x.includes('Please post a full npm test record.')), 20000)), JSON.stringify(wakes('Builder').slice(-2)))
   await until(async () => (await idle(other.id)) && (await idle(builder.id)), 15000)
   const otherBefore = wakes('Other').length
-  await say(builder.id, `hive cw_update_task ${JSON.stringify({ number: c5, comment: "@Other: you're right, running it now." })}`)
+  await say(builder.id, `cw cw_update_task ${JSON.stringify({ number: c5, comment: "@Other: you're right, running it now." })}`)
   check("the builder's first answer, a comment alone, wakes the reviewer", !!(await until(async () => wakes('Other').length === otherBefore + 1, 20000)) && wakes('Other')[otherBefore].includes(`The builder replies: "@Other: you're right, running it now."`), JSON.stringify(wakes('Other').slice(otherBefore)))
   await until(async () => (await idle(other.id)) && (await idle(builder.id)), 15000)
   await say(builder.id, `boardcomment ${c5}`)
@@ -214,12 +214,12 @@ const check = (name, ok, extra = '') => {
   const n7 = await named(c7)
   // The first lane has a card in flight, so a new list would queue: it is abandoned first.
   for (const l of (await inv('lanes:list')).filter((x) => x.state === 'active' || x.state === 'paused')) await inv('lanes:end', l.id, true)
-  await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [c7], reviewer: 'Other' })}`)
+  await say(builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [c7], reviewer: 'Other' })}`)
   const lane2 = await until(async () => (await inv('lanes:list')).find((l) => l.state === 'active' && l.cards.some((c) => c.number === c7)), 15000)
   check('a second lane starts with a new card', !!lane2)
   await until(() => idle(builder.id), 15000)
   const watchLanes = async () => {
-    await say(reviewer.id, `hive cw_wait_for_tasks ${JSON.stringify({ lanes: ['all'], wake: true })}`)
+    await say(reviewer.id, `cw cw_wait_for_tasks ${JSON.stringify({ lanes: ['all'], wake: true })}`)
     return !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000))
   }
   check('Reviewer watches the lanes', await watchLanes())
@@ -231,7 +231,7 @@ const check = (name, ok, extra = '') => {
   check("its builder's comment on the card still blocked wakes it (reblocked)", !!(await until(async () => wakes('Reviewer').length === 6, 20000)) && wakes('Reviewer')[5].includes(`${n7} is still blocked, with news: "Screenshots for your OK"`), JSON.stringify(wakes('Reviewer').slice(5)))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
   // Other, the new lane's reviewer, waits for the card in Review; the lane is abandoned with the card still in Doing.
-  await say(other.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c7], column: 'review', wake: true })}`)
+  await say(other.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c7], column: 'review', wake: true })}`)
   check('Other waits for the card in Review', !!(await until(async () => (await live(other.id))?.status === 'watching', 15000)))
   await inv('lanes:end', lane2.id, true)
   check("an abandoned lane ends its reviewer's card watch, saying there's nothing more to wait for", !!(await until(async () => wakes('Other').length === otherSeen + 1, 20000)) && wakes('Other')[otherSeen] === `[CW] ${n7}'s lane was abandoned (your watch on it ended). Your card watch has ended: there is nothing more to wait for on it. Don't watch it again; end your turn unless you have other work.`, JSON.stringify(wakes('Other').slice(otherSeen)))

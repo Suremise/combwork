@@ -52,7 +52,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
   // The Assistant off: a test copy never starts it.
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   // The dev build: B1 is made through a test channel a packaged build refuses.
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -128,7 +128,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${tokens[who]}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
-    // The builder's shell (the fake's "shell:" step), as hive-progress runs in its session.
+    // The builder's shell (the fake's "shell:" step), as cw-progress runs in its session.
     const shells = () => {
       const f = path.join(claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -158,11 +158,11 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       if (!ran) throw new Error(`B1 didn't run "${cmd}" (its line was taken with a wake each time)`)
       return ran
     }
-    /** The quick check through hive-progress on the card's revision now: true once a new counted CheckRan is on the card. */
+    /** The quick check through cw-progress on the card's revision now: true once a new counted CheckRan is on the card. */
     const counted = (f) => f.kind === 'CheckRan' && f.data?.counted === true
     const quickCheck = async (n) => {
       const before = (await facts(n)).filter(counted).length
-      await shell(`hive-progress --check typecheck --card ${await keyOf(n)}`)
+      await shell(`cw-progress --check typecheck --card ${await keyOf(n)}`)
       return !!(await until(async () => (await facts(n)).filter(counted).length > before, HUNG_MS))
     }
     const commit = (file) => {
@@ -176,7 +176,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     /** A card built in B1's worktree (one commit, `file`), its quick check counted, submitted, reviewed and passed. */
     const build = async (n, file) => {
       const rev = commit(file)
-      check(`${await keyOf(n)}'s quick check through hive-progress --check is counted`, await quickCheck(n))
+      check(`${await keyOf(n)}'s quick check through cw-progress --check is counted`, await quickCheck(n))
       const sub = await intent('b1', n, 'submit', { summary: `${file} ready` })
       check(`${await keyOf(n)} submitted: Review`, sub.status === 200 && (await card(n)).column === 'review', JSON.stringify(sub.body))
       check(`${await keyOf(n)}'s change is only its own work`, (await submittedFiles(n)) === JSON.stringify([file]), await submittedFiles(n))

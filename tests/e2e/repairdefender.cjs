@@ -1,6 +1,6 @@
 // Repair a Moved Workspace moves Combwork's Defender exclusions to the new folders (#1302), on fixtures only:
-// HIVE_TEST_ANTIVIRUS stands in for every PowerShell call (the probe, and the elevated add and move on a simulated
-// exclusion list) and HIVE_TEST_ANTIVIRUS_LOG records them, so this suite never reads or changes the machine's Defender
+// CW_TEST_ANTIVIRUS stands in for every PowerShell call (the probe, and the elevated add and move on a simulated
+// exclusion list) and CW_TEST_ANTIVIRUS_LOG records them, so this suite never reads or changes the machine's Defender
 // settings nor raises an administrator prompt. Before: workspace Scratch, whose worktrees folder the user had excluded
 // themselves; Combwork's Add excludes the workspace. Moved to Tools, Repair's table has a Microsoft Defender group: the
 // workspace's row moves Combwork's exclusion (the box under the table, ticked), the worktrees' is the user's own (named, never
@@ -71,8 +71,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   lib.gitProject(path.join(scratch.ws, 'alpha'))
   fs.mkdirSync(scratch.trees, { recursive: true })
-  const env = { ...lib.fakeClaude(userData, home, [path.join(scratch.ws, 'alpha')]), HIVE_TEST_ANTIVIRUS: fixture, HIVE_TEST_ANTIVIRUS_LOG: callLog }
-  const launch = (lang) => lib.launch({ userData, env: { ...env, ...(lang ? { HIVE_LANG: lang } : {}) }, viewport: { width: 1400, height: 950 } })
+  const env = { ...lib.fakeClaude(userData, home, [path.join(scratch.ws, 'alpha')]), CW_TEST_ANTIVIRUS: fixture, CW_TEST_ANTIVIRUS_LOG: callLog }
+  const launch = (lang) => lib.launch({ userData, env: { ...env, ...(lang ? { CW_LANG: lang } : {}) }, viewport: { width: 1400, height: 950 } })
 
   // The repair dialog, from the banner; openRepair waits for its Defender rows too.
   const openDialog = async (page) => {
@@ -130,7 +130,7 @@ const check = (name, ok, extra = '') => {
       const before = changes().length
       // Defender's read held (slow): the plan shows, but Repair waits for it, so the box's default can't be skipped.
       await app.evaluate(() => {
-        process.env.HIVE_TEST_SLOW_IPC = 'workspace:moveDefender=6000*1'
+        process.env.CW_TEST_SLOW_IPC = 'workspace:moveDefender=6000*1'
       })
       const dialog = await openDialog(page)
       const waiting = () =>

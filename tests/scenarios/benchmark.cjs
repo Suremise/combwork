@@ -152,12 +152,12 @@ function logMeasures(calls, lists) {
 }
 
 /** What Combwork itself records as a tool call (its start view, src/main/metrics.ts START_VIEW_METRIC): in no server's log. */
-const HIVE_OWN_CALLS = new Set(['session start view'])
+const CW_OWN_CALLS = new Set(['session start view'])
 
 /** The hive tool calls the servers reported, Combwork's own records left out. */
 function servedCalls(r) {
   let n = 0
-  for (const part of [...Object.values(r?.projects ?? {}), ...(r?.workspace ? [r.workspace] : [])]) for (const m of part.mcp ?? []) if (!HIVE_OWN_CALLS.has(m.tool)) n += m.count
+  for (const part of [...Object.values(r?.projects ?? {}), ...(r?.workspace ? [r.workspace] : [])]) for (const m of part.mcp ?? []) if (!CW_OWN_CALLS.has(m.tool)) n += m.count
   return n
 }
 

@@ -1,5 +1,5 @@
 // How long the board's reads and writes take on a copy of a real board (#1209's timings, for the cards' storage cards to
-// compare before and after a change): HIVE_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal) into tempDir() (the file
+// compare before and after a change): CW_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal) into tempDir() (the file
 // itself is never opened), upgrades the copy and prints the median of each. Skipped without it. It uses only the board's
 // public calls, so the same file runs on an older commit for the "before".
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 
-const source = process.env.HIVE_BOARD_BENCH_DB
+const source = process.env.CW_BOARD_BENCH_DB
 const base = tempDir('hive-board-bench-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

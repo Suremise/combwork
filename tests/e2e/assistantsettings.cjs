@@ -3,8 +3,8 @@
 // change with old → new and an Undo button (#1283), and Undo puts the old value back (the change struck through, undone).
 // A project's setting changes in Project Settings. Its own Control and other sensitive settings are refused and listed as
 // not done; with Change settings turned off while it runs, a change is refused at once. Change settings is a switch
-// under Control, off by default. The Assistant runs the fake Claude Code (fake-claude/), whose "hive TOOL {json}" calls a
-// tool through the real hive MCP server. Screenshots in both themes. Dev build, throwaway profile, workspace and
+// under Control, off by default. The Assistant runs the fake Claude Code (fake-claude/), whose "cw TOOL {json}" calls a
+// tool through the real Combwork MCP server. Screenshots in both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47912), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47912), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
   check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', 20000)))
 
   // --- A change: Settings shows it, the panel lists it with Undo.
-  check('it changes a setting', await say('skill tune-settings then hive cw_update_setting {"id":"sessions.transcriptWarnMB","value":50}'))
+  check('it changes a setting', await say('skill tune-settings then cw cw_update_setting {"id":"sessions.transcriptWarnMB","value":50}'))
   check('…which is now 50 MB', (await settings()).sessions.transcriptWarnMB === 50, String((await settings()).sessions.transcriptWarnMB))
   // The list opens from "Done by the Assistant (n)" at the watch line's end (#979: closed until then).
   const doneLink = panel.locator('.assistant-done-link')
@@ -133,7 +133,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'assistantsettings-reverted.png') })
 
   // --- A project's setting: Project Settings has it.
-  check("it changes a project's setting", await say('hive cw_update_setting {"id":"project.compactSuggestTokens","value":300000,"project":"alpha"}'))
+  check("it changes a project's setting", await say('cw cw_update_setting {"id":"project.compactSuggestTokens","value":300000,"project":"alpha"}'))
   const alphaCfg = async () => (await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === alpha.toLowerCase()).config
   check("alpha's Suggest compacting above is 300000", (await alphaCfg()).compactSuggestTokens === 300000, String((await alphaCfg()).compactSuggestTokens))
 
@@ -173,7 +173,7 @@ const check = (name, ok, extra = '') => {
         return set.call(this, k, v)
       }
     }, projectFile.toLowerCase())
-  /** Until a change has queued for the project's lock behind the user's held write (the fake's call starts a hive MCP server first, seconds under load); then stops counting. */
+  /** Until a change has queued for the project's lock behind the user's held write (the fake's call starts a Combwork MCP server first, seconds under load); then stops counting. */
   const queuedForLock = async () => {
     const queued = !!(await lib.until(() => app.evaluate(() => global.__hiveTestQueued > 0), 30000))
     await app.evaluate(() => {
@@ -194,7 +194,7 @@ const check = (name, ok, extra = '') => {
   await userWrite(400000)
   check("the user's write holds the project's lock", !!(await held()))
   await watchLockQueue()
-  const queued = say('hive cw_update_setting {"id":"project.compactSuggestTokens","value":500000,"project":"alpha"}')
+  const queued = say('cw cw_update_setting {"id":"project.compactSuggestTokens","value":500000,"project":"alpha"}')
   check("the Assistant's change waits behind the user's write", await queuedForLock())
   await inv('settings:update', { assistant: { changeSettings: false } })
   await release()
@@ -213,7 +213,7 @@ const check = (name, ok, extra = '') => {
   const refusedBefore = (await inv('assistant:actions')).filter((a) => !a.ok).length
   await watchLockQueue()
   // Typed, not said: its turn never ends (the session is stopped under it).
-  await typeLine('hive cw_update_setting {"id":"project.compactSuggestTokens","value":500000,"project":"alpha"}')
+  await typeLine('cw cw_update_setting {"id":"project.compactSuggestTokens","value":500000,"project":"alpha"}')
   check("the old session's change waits behind the user's write", await queuedForLock())
   await inv('session:stop', home, 'assistant')
   await lib.until(async () => !(await live()), 15000)
@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
   // HI-2481: Undo waits behind the user's newer edit, checks it under the lock and keeps it.
   await inv('settings:update', { assistant: { changeSettings: true } })
   const beforeUndoRace = new Set((await inv('assistant:changes')).flatMap((g) => g.changes.map((c) => c.id)))
-  check('it changes the project setting again', await say('hive cw_update_setting {"id":"project.compactSuggestTokens","value":300000,"project":"alpha"}'))
+  check('it changes the project setting again', await say('cw cw_update_setting {"id":"project.compactSuggestTokens","value":300000,"project":"alpha"}'))
   const latest = (await inv('assistant:changes')).flatMap((g) => g.changes).find((c) => !beforeUndoRace.has(c.id) && c.kind === 'setting' && c.project === 'alpha')
   check('…listed for Undo', !!latest, JSON.stringify(latest))
   await holdNextWrite()
@@ -244,7 +244,7 @@ const check = (name, ok, extra = '') => {
   check("…and the user's newer edit stays", (await alphaCfg()).compactSuggestTokens === 450000, String((await alphaCfg()).compactSuggestTokens))
 
   // --- A table: the board's column colours, changed and undone.
-  check('it changes a column colour', await say('hive cw_update_setting {"id":"board.colors","value":{"doing":"#ff0000"}}'))
+  check('it changes a column colour', await say('cw cw_update_setting {"id":"board.colors","value":{"doing":"#ff0000"}}'))
   check('…Doing is red, the others as they were', (await settings()).board.colors.doing === '#ff0000' && (await settings()).board.colors.todo !== '#ff0000')
   const colours = panel.locator('.assistant-action', { hasText: 'Column colours' }).first()
   const colourChange = /Column colours: doing: #[0-9a-f]{6} → doing: #ff0000/
@@ -255,7 +255,7 @@ const check = (name, ok, extra = '') => {
 
   // --- A fallback list: a label-only change is listed by that entry, old and new (#317).
   await inv('settings:setProviderFallback', 'claude-code', 'models', [{ value: 'opus', label: 'Opus' }, { value: 'sonnet', label: 'Sonnet' }])
-  check('it renames a fallback model', await say('hive cw_update_setting {"id":"claude-code.modelFallback","value":[{"value":"opus","label":"Opus (big)"},{"value":"sonnet","label":"Sonnet"}]}'))
+  check('it renames a fallback model', await say('cw cw_update_setting {"id":"claude-code.modelFallback","value":[{"value":"opus","label":"Opus (big)"},{"value":"sonnet","label":"Sonnet"}]}'))
   const renamed = panel.locator('.assistant-action', { hasText: 'Models (fallback)' }).first()
   const relabel = /opus: Opus → opus: Opus \(big\)/
   const renamedText = await showsText('the renamed model', renamed, relabel)
@@ -264,7 +264,7 @@ const check = (name, ok, extra = '') => {
   // --- A provider's prices: null puts back Combwork's, a shipped model removed from the table too (#315); Undo removes it again.
   const removedNow = async () => JSON.stringify((await settings()).providers['claude-code'].pricesRemoved ?? [])
   await inv('settings:setProviderPrices', 'claude-code', {}, ['claude-opus-4-8'])
-  check('it resets the API prices', await say('hive cw_update_setting {"id":"claude-code.prices","value":null}'))
+  check('it resets the API prices', await say('cw cw_update_setting {"id":"claude-code.prices","value":null}'))
   check("…and the removed model has Combwork's price again", (await removedNow()) === '[]', await removedNow())
   const reset = panel.locator('.assistant-action', { hasText: 'API prices' }).first()
   const putBack = /claude-opus-4-8: removed → claude-opus-4-8: Combwork's price/
@@ -274,16 +274,16 @@ const check = (name, ok, extra = '') => {
   check('…and Undo removes it again', !!(await lib.until(async () => (await removedNow()) === '["claude-opus-4-8"]', HUNG_MS)), await removedNow())
 
   // --- Refused: its own Control, and what Combwork runs.
-  check('it tries to raise its own Control', await say('hive cw_update_setting {"id":"assistant.control","value":"look"}'))
+  check('it tries to raise its own Control', await say('cw cw_update_setting {"id":"assistant.control","value":"look"}'))
   check('…which stays as it was', (await settings()).assistant.control === 'projects')
   const controlRefused = panel.locator('.assistant-action.failed', { hasText: 'Change Settings → Assistant → Control' })
   check('…listed as not done', !!(await shows('the refused Control change', async () => (await controlRefused.count()) === 1)), `${await controlRefused.count()} rows`)
-  check('it tries to change a CLI path', await say('hive cw_update_setting {"id":"claude-code.executablePath","value":"C:\\\\evil.exe"}'))
+  check('it tries to change a CLI path', await say('cw cw_update_setting {"id":"claude-code.executablePath","value":"C:\\\\evil.exe"}'))
   check("…which stays as it was", (await settings()).providers['claude-code'].executablePath.endsWith('fake-claude.cmd'))
 
   // --- Turned off while it runs: refused at once.
   await inv('settings:update', { assistant: { changeSettings: false } })
-  check('with Change settings off, it tries again', await say('hive cw_update_setting {"id":"sessions.transcriptWarnMB","value":60}'))
+  check('with Change settings off, it tries again', await say('cw cw_update_setting {"id":"sessions.transcriptWarnMB","value":60}'))
   check('…and nothing changes', (await settings()).sessions.transcriptWarnMB === 20)
   check('…listed as not done, saying why', !!(await shows('the refused change', async () => (await panel.locator('.assistant-action.failed', { hasText: 'Change Settings → Sessions → Warn when a transcript is over' }).count()) >= 1)))
 

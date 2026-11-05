@@ -1,7 +1,7 @@
 # Scenario baseline, 3 October 2026
 
 **Fixtures v5** (`scenarios.cjs`), with evidence only of what ran:
-- **Hive calls**: the hive MCP server's own log of executed calls. Transcript names count as mentions only.
+- **Combwork calls**: the Combwork MCP server's own log of executed calls. Transcript names count as mentions only.
 - **Skill reads**: a successful read showing the skill.
 - **Tokens**: the actual values are checked for in tool output and replies.
 
@@ -9,7 +9,7 @@
 - the source commit;
 - a fingerprint of everything uncommitted (the diff and the contents of untracked files), taken when the run starts and
   checked again at its end;
-- the running Hive's guidance and skill revisions before setup;
+- the running Combwork's guidance and skill revisions before setup;
 - what the session itself was given at launch (its guidance and delivered skills).
 
 v3 adds checks that an edited skill was delivered as edited and a deleted one wasn't delivered.
@@ -18,7 +18,7 @@ v3 adds checks that an edited skill was delivered as edited and a deleted one wa
 - **Fake Claude Code**: fixtures v5, all 26 pass (`results/2026-10-03T18-21-32-fake`, kept as the baseline
   `baselines/fake-claude.json`); guidance revision `63db94808e669a5e`.
 - **Fake Codex**: fixtures v5, all 26 pass (`results/2026-10-03T18-28-52-fake-codex`, baseline
-  `baselines/fake-codex.json`). Its board steps and tool calls go through the real hive MCP server, so its benchmark
+  `baselines/fake-codex.json`). Its board steps and tool calls go through the real Combwork MCP server, so its benchmark
   measures their replies.
 - **Codex** (a model): fixtures v2 (below). No model trial has run under v5 yet; one would be its first benchmark.
 
@@ -846,7 +846,7 @@ polite closing ("Please let me know if you need anything else", "Tell me if anyt
 ## Merging through the merge slot: fakes, Codex (its default model, `gpt-5.6-luna`), fixtures v51 (v52 once merged with main), 11 October 2026
 
 #374 checks that merge-ready's merge slot is used, from what ran rather than mentions. The evidence:
-- Hive's own record (`HIVE_TEST_MERGE_SLOT_LOG`, development builds only): each change to the slots (who holds one,
+- Hive's own record (`CW_TEST_MERGE_SLOT_LOG`, development builds only): each change to the slots (who holds one,
   told so or not, and who waits) and each claim or release as Hive resolved it (the branch, and what it did), timed.
 - The checks' own runs: check.js records each run's start (commit, base, any merge in progress, and the tree it
   checked: the tracked files as they are on disk, staged or not) and its end with the result. What went into a merge is

@@ -157,9 +157,9 @@ class ProviderService {
 
   /**
    * How long a launch or a new agent waits for detection before it is refused (detected, settle). Tests only (unpackaged
-   * builds): HIVE_TEST_DETECT_WAIT_MS shortens it.
+   * builds): CW_TEST_DETECT_WAIT_MS shortens it.
    */
-  detectWaitMs = (!app.isPackaged && Number(process.env.HIVE_TEST_DETECT_WAIT_MS)) || 20_000
+  detectWaitMs = (!app.isPackaged && Number(process.env.CW_TEST_DETECT_WAIT_MS)) || 20_000
 
   /**
    * Waits until Hive knows (#506): with no `id`, Automatic's provider (every turned-on provider has answered, found or
@@ -217,8 +217,8 @@ class ProviderService {
     const latestWanted = checkLatest ?? (isProviderEnabled(config.settings, id) && providerSettings(config.settings, id).checkUpdatesOnLaunch)
     let next: AgentInstallInfo
     try {
-      // Tests only (unpackaged builds): HIVE_TEST_SLOW_DETECT="claude-code=6000" holds that provider's detection (#506).
-      const slow = app.isPackaged ? 0 : Number((process.env.HIVE_TEST_SLOW_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1) ?? 0)
+      // Tests only (unpackaged builds): CW_TEST_SLOW_DETECT="claude-code=6000" holds that provider's detection (#506).
+      const slow = app.isPackaged ? 0 : Number((process.env.CW_TEST_SLOW_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1) ?? 0)
       if (slow > 0) await new Promise((r) => setTimeout(r, slow))
       const found = await adapter.locate()
       // Its folder on the PATH of what Hive starts, so its sessions and terminals find the CLI Provider Setup found (#1103).

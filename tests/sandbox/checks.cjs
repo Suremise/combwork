@@ -13,7 +13,7 @@
  * --previous-rc (HI-2587): a 1.1 release candidate (RC2), partly converted to Combwork's names, for scenario 10: the upgrade
  * from it, run beside 1.0.0's (scenario 4) whenever it is given, so the names upgrade is checked from both.
  *
- * --hive (or HIVE_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
+ * --hive (or CW_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
  * <hive>\dist other than --installer, so pass the main checkout from a worktree. Both installers must sit under one
  * folder (not a drive root), which is mapped read-only at C:\build. This checkout's tests folder (the scripts in
  * tests\sandbox\inside and the e2e fake CLIs) and its playwright-core are mapped read-only too; Node is this one's folder.
@@ -144,13 +144,13 @@ function plan(argv) {
   if (only !== undefined && !KINDS.includes(only)) throw new Error(`--only is ${KINDS.join(' or ')}, not "${only}"`)
   const sac = opt('--smart-app-control')
   if (argv.includes('--smart-app-control') && sac !== 'off') throw new Error(`--smart-app-control takes only "off" (turned off inside the Sandbox; leave it out to keep Windows' setting), not ${sac === undefined ? 'nothing' : `"${sac}"`}`)
-  const hive = path.resolve(opt('--hive', process.env.HIVE_REPO || REPO))
+  const hive = path.resolve(opt('--hive', process.env.CW_REPO || REPO))
   const serverOpt = opt('--server', process.env.WSB_SERVER)
   const serverJs = serverOpt ? path.resolve(serverOpt) : serverCandidates(hive).find(f => fs.existsSync(f))
   if (!serverJs) throw new Error(`No windows-sandbox server found (looked in ${serverCandidates(hive).join(' and ')}): pass --server <its server.js> (or WSB_SERVER), or install it from Combwork's MCP catalogue`)
   if (!fs.existsSync(serverJs)) throw new Error(`--server ${serverJs} doesn't exist: name the windows-sandbox server's server.js`)
   const installer = opt('--installer') && path.resolve(opt('--installer'))
-  // The edge cases' second installer (HI-2460): built with HIVE_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
+  // The edge cases' second installer (HI-2460): built with CW_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
   const short = opt('--short') && path.resolve(opt('--short'))
   if (!installer || !fs.existsSync(installer) || !versionOf(installer)) throw new Error('--installer must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
   // By default the release checks' three kinds (the clean install's since HI-2592); the install by hand over the previous release (manual, HI-2460) and the
@@ -162,7 +162,7 @@ function plan(argv) {
   const ran = only ? [only] : ['fresh', 'upgrade', 'clean', ...(previousRc ? ['upgrade-rc'] : [])]
   let previous = opt('--previous') && path.resolve(opt('--previous'))
   const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges')
-  if (ran.includes('edges') && (!short || !fs.existsSync(short))) throw new Error('--only edges needs --short <an installer built with HIVE_TEST_SHORT_LEGACY_WAIT=1>, beside --installer')
+  if (ran.includes('edges') && (!short || !fs.existsSync(short))) throw new Error('--only edges needs --short <an installer built with CW_TEST_SHORT_LEGACY_WAIT=1>, beside --installer')
   if (!previous && overOld) {
     const dist = path.join(hive, 'dist')
     const cands = fs.existsSync(dist) ? fs.readdirSync(dist).filter(f => versionOf(f)).map(f => path.join(dist, f)).filter(f => f.toLowerCase() !== installer.toLowerCase()) : []
@@ -302,7 +302,7 @@ function steps(srv, ctx) {
 const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, clean: 9, 'upgrade-rc': 10 }
 // How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
 // unit tests, whose fake server shows nothing, set it to 0.
-const SETTINGS_OPEN_MS = Number(process.env.HIVE_SANDBOX_TEST_SETTINGS_MS ?? 6000)
+const SETTINGS_OPEN_MS = Number(process.env.CW_SANDBOX_TEST_SETTINGS_MS ?? 6000)
 
 async function main(argv) {
   const t0 = Date.now()
@@ -330,7 +330,7 @@ async function main(argv) {
       WSB_ALLOWED_ROOTS: '', // the build folder comes as an MCP root (inSandbox), not from the config
       WSB_ROOTS_FROM_CWD: '',
       WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(REPO, 'node_modules', 'playwright-core')}`, `hive-tests=${path.join(REPO, 'tests')}`, ...(p.git ? [`git=${p.git}`] : [])].join(';'),
-      WSB_SANDBOX_ROOT: process.env.HIVE_SANDBOX_CHECKS_ROOT || SANDBOX_ROOT,
+      WSB_SANDBOX_ROOT: process.env.CW_SANDBOX_CHECKS_ROOT || SANDBOX_ROOT,
       WSB_STUB: process.env.WSB_STUB,
       WSB_STUB_STATE: process.env.WSB_STUB_STATE
     })

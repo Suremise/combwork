@@ -47,7 +47,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
   cfg.settings.assistant = { ...cfg.settings.assistant, tellReplies: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -121,7 +121,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check("card 1's start: built in slot-a", s1.status === 200 && same(s1.body?.data?.folder, slotA), JSON.stringify(s1.body))
     await until(() => idle(alpha, b1.id))
     await until(() => idle(aHome, 'assistant'))
-    await lib.typeLine(inv, lib.ptyKey(aHome, 'assistant'), home, null, 'hive cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}', { live: () => liveIn(aHome, 'assistant') })
+    await lib.typeLine(inv, lib.ptyKey(aHome, 'assistant'), home, null, 'cw cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}', { live: () => liveIn(aHome, 'assistant') })
     check('the Assistant watches the lanes', !!(await until(async () => (await liveIn(aHome, 'assistant'))?.status === 'watching')))
 
     // ---- B1's turn ends on a dialog of its CLI's own, under its empty input box: it takes the keys.

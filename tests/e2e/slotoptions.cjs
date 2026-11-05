@@ -5,7 +5,7 @@
 // - G11 = project folder hides G15 but shows G17, and A shared pool saves there; G1b = 2 with a pool saves;
 // - the setup script set in Slots and copies is the one the next warming run uses (a marker file in the slot), and the
 //   slots list shows the lent slot with its card; the copies' size saves; two fields saved while the first save is slow
-//   (HIVE_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
+//   (CW_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
 // - the copied files inherit Combwork's slot default, then the workspace's (set to none in its Workspace defaults, Settings → Version Control), then the
 //   default, each saying where it comes from (HI-1765); Project Settings opens on General, with no slot rows;
 // - a project saved by a P6 build with Pair (G15 stored Off, the one-time step not run yet) reads as Pair, not Custom,
@@ -13,7 +13,7 @@
 // Screenshots of the Slots and copies group and the G11/G15/G17 rows, light and dark, in English and German.
 // Dev build, throwaway profile and workspace.
 // Dev build only (#1578): B1's slot is lent through slots:test, and a write is held with a test seam
-// (HIVE_TEST_SLOW_IPC).
+// (CW_TEST_SLOW_IPC).
 const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const fs = require('fs')
@@ -145,7 +145,7 @@ function board(sql, ...args) {
     // Two fields changed while the first save is still on its way (HR5's round 1: the second save sent the slots as the
     // window last read them, losing the first): both stay, with the archive script another window set meanwhile.
     await app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'slots:setSetting=2500*1'
+      process.env.CW_TEST_SLOW_IPC = 'slots:setSetting=2500*1'
     })
     const archiveField = slotsGroup.locator('[data-slot-option="archive"] input')
     const copyField = slotsGroup.locator('[data-slot-option="copy"] textarea')
@@ -156,7 +156,7 @@ function board(sql, ...args) {
     await copyField.blur()
     check('two fields saved at once both stay, with another window’s change', !!(await until(() => projectJson().slots?.archive === 'echo archived' && projectJson().slots?.copy === '.env.test' && projectJson().slots?.setup === 'npm ci --other-window', HUNG_MS)), JSON.stringify(projectJson().slots))
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
+      delete process.env.CW_TEST_SLOW_IPC
     })
     // Emptied, the setup script is this project's "none" over its setup command from before 1.0; Inherit uses that again.
     await inv('project:updateConfig', fx.alpha, { worktreeSetup: 'npm ci --old' })
@@ -175,17 +175,17 @@ function board(sql, ...args) {
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
     check('…and inherits again', !!(await until(async () => !('setup' in (projectJson().slots ?? {})) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup', HUNG_MS)), JSON.stringify(projectJson().slots))
     // Focused, untouched, Enter (HR5's HI-1765 round 2): the field takes a value set elsewhere, and Enter saves nothing.
-    // The next save is made to fail (HIVE_TEST_FAIL_IPC, once): the probe's own save after it fails only if Enter sent none.
+    // The next save is made to fail (CW_TEST_FAIL_IPC, once): the probe's own save after it fails only if Enter sent none.
     await setupField.focus()
     await inv('slots:setSetting', fx.alpha, 'setup', 'npm ci --elsewhere')
     check('a focused, untouched field takes a value set elsewhere', !!(await until(async () => (await setupField.inputValue()) === 'npm ci --elsewhere', HUNG_MS)), await setupField.inputValue())
     await app.evaluate(() => {
-      process.env.HIVE_TEST_FAIL_IPC = 'slots:setSetting*1'
+      process.env.CW_TEST_FAIL_IPC = 'slots:setSetting*1'
     })
     await setupField.press('Enter')
     const probe = await page.evaluate((p) => window.combwork.invoke('slots:setSetting', p, 'setup', 'npm ci --elsewhere').then(() => 'saved', () => 'failed'), fx.alpha)
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_FAIL_IPC
+      delete process.env.CW_TEST_FAIL_IPC
     })
     check('…and Enter saves nothing', probe === 'failed' && projectJson().slots?.setup === 'npm ci --elsewhere', `${probe} ${JSON.stringify(projectJson().slots)}`)
     // Typed, Enter: saved.

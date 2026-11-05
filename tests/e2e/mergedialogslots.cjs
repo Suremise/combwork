@@ -7,7 +7,7 @@
 //   dialog says it is that card's work, with a link to the card, and Merge asks first; once confirmed the merge is
 //   observed outside the rules (Integrated, by outside, with the rules it skipped) and the card is Done.
 // - both dialogs start from the project's merge style (HI-1765): Squash when it squashes, a merge commit when it
-//   merges or rebases, and a choice made before the style is read (held by HIVE_TEST_SLOW_IPC) stays.
+//   merges or rebases, and a choice made before the style is read (held by CW_TEST_SLOW_IPC) stays.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1578): slot-a is lent through slots:test, and B2 is a 0.9 worktree agent on purpose (the Merge
 // dialog on an agent's branch); a packaged build refuses both test channels.
@@ -80,14 +80,14 @@ const git = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, 
     await until(async () => (await dialog.count()) === 0, HUNG_MS)
     // The project's style read late: Merge chosen before it arrives stays chosen.
     await h.app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'workflow:form=2000*1'
+      process.env.CW_TEST_SLOW_IPC = 'workflow:form=2000*1'
     })
     await row(slotLine).locator('[data-action="merge-branch"]').click()
     await until(async () => (await dialog.locator('.choice-list[data-merge-style="reading"]').count()) === 1, HUNG_MS)
     await dialog.locator('.choice-list label.choice').first().click()
     check('…and Merge chosen before the style is read stays chosen', !!(await until(async () => (await styleShown(dialog)) !== null, HUNG_MS)) && (await styleShown(dialog)) === 'merge', String(await styleShown(dialog)))
     await h.app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
+      delete process.env.CW_TEST_SLOW_IPC
     })
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     await until(async () => (await dialog.count()) === 0, HUNG_MS)

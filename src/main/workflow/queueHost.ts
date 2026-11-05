@@ -358,21 +358,21 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
   return cfg
 }
 
-/** The points of an advance a test copy can crash at (HIVE_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d). */
+/** The points of an advance a test copy can crash at (CW_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d). */
 const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback']
 let raced = false
 
 /**
- * Test copies (unpackaged) only. `HIVE_TEST_QUEUE_CRASH=<point>` ends Hive at once at that point of an advance (S33c,
+ * Test copies (unpackaged) only. `CW_TEST_QUEUE_CRASH=<point>` ends Hive at once at that point of an advance (S33c,
  * S34d: the next start's recovery reads the journal); no quit handler runs, nothing is released.
- * `HIVE_TEST_QUEUE_RACE=beforeRef` moves the target, as another git client would, just before the swap (a rollback).
+ * `CW_TEST_QUEUE_RACE=beforeRef` moves the target, as another git client would, just before the swap (a rollback).
  */
 function testHooks(projectPath: string, target: string): QueueHooks {
   const hooks: QueueHooks = {}
-  const crash = process.env.HIVE_TEST_QUEUE_CRASH
+  const crash = process.env.CW_TEST_QUEUE_CRASH
   const point = CRASH_POINTS.find((p) => p === crash)
   if (point) hooks[point] = () => (exitBy('app.exit', `a test crash at the merge queue's ${point}`, () => app.exit(1)), new Promise<void>(() => undefined))
-  if (process.env.HIVE_TEST_QUEUE_RACE === 'beforeRef' && point !== 'beforeRef') {
+  if (process.env.CW_TEST_QUEUE_RACE === 'beforeRef' && point !== 'beforeRef') {
     hooks.beforeRef = async () => {
       // Once per run of Hive: the entry tested again on the moved target then merges.
       if (raced) return

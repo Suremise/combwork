@@ -81,7 +81,7 @@ const gone = (pid) => lib.until(() => !alive(pid), HUNG_MS, 200)
 /** Starts a copy of Combwork on the profile, its workspace restored. */
 async function start() {
   const launchedAt = Date.now()
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...claudeEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   identities.push(...lib.identify([app.process().pid]))
   const page = await app.firstWindow()
@@ -178,7 +178,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', reviewer: 'Reviewer', name: 'restart lane', cards: [laneCard] })
     check('a lane runs, Builder and Reviewer its agents', lane.status === 200, JSON.stringify(lane))
     await say(agents.Worker, 'holduntil go-worker')
-    await say(agents.Watcher, `hive cw_wait_for_tasks {"cards":[${watched}],"wake":true,"limitMinutes":60}`)
+    await say(agents.Watcher, `cw cw_wait_for_tasks {"cards":[${watched}],"wake":true,"limitMinutes":60}`)
     check('Worker works and Watcher watches its card', !!(await lib.until(async () => (await c.live(agents.Worker.id))?.status === 'working' && (await c.live(agents.Watcher.id))?.status === 'watching', HUNG_MS, 300)))
     // A second workspace in a window of its own, its agent working too.
     const nextWindow = c.app.waitForEvent('window')

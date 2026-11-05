@@ -2,7 +2,7 @@
 // wrote before under Hive's names keeps its words (only a leading [Hive] becomes [CW], with a note on how the names
 // map), stored tool names are read as the current ones, and no unknown hive_ name is made up into a tool.
 import { describe, expect, it } from 'vitest'
-import { currentToolName, HIVE_TOOLS, isReservedServerName, LEGACY_TOOLS_SERVER, TOOLS_SERVER } from '../src/shared/assistantTools'
+import { currentToolName, CW_TOOLS, isReservedServerName, LEGACY_TOOLS_SERVER, TOOLS_SERVER } from '../src/shared/assistantTools'
 import { DOORBELL_PREFIX, isDoorbell, LEGACY_NOTICE_PREFIX, namesOldProtocol, NOTICE_PREFIX, withCurrentNames } from '../src/shared/doorbell'
 
 const NOTE = '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__combwork__, and hive-progress is cw-progress.)'
@@ -11,7 +11,7 @@ describe('the renamed names (HI-2463)', () => {
   it('every tool is cw_, under the combwork server, and hive stays reserved', () => {
     expect(TOOLS_SERVER).toBe('combwork')
     expect(LEGACY_TOOLS_SERVER).toBe('hive')
-    expect(HIVE_TOOLS.every((t) => /^cw_[a-z_]+$/.test(t))).toBe(true)
+    expect(CW_TOOLS.every((t) => /^cw_[a-z_]+$/.test(t))).toBe(true)
     for (const name of ['combwork', 'hive', ' Hive ', 'COMBWORK']) expect(isReservedServerName(name), name).toBe(true)
     for (const name of ['hive2', 'cw', 'combwork-tools', '']) expect(isReservedServerName(name), name).toBe(false)
   })

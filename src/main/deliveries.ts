@@ -5,7 +5,7 @@ import { app } from 'electron'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { NOTICE_PREFIX } from '../shared/doorbell'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import {
   DELIVERY_BODY_MAX_CHARS,
   DELIVERY_EXPIRY_HOURS,
@@ -132,9 +132,9 @@ export const setFileBudgetForTests = (bytes: number): void => {
   fileBudget = bytes
 }
 
-/** How long until a delivery is overdue: OVERDUE_MINUTES, or an unpackaged test build's (HIVE_TEST_DELIVERY_OVERDUE_MS). */
+/** How long until a delivery is overdue: OVERDUE_MINUTES, or an unpackaged test build's (CW_TEST_DELIVERY_OVERDUE_MS). */
 export const overdueMs = (): number => {
-  const t = !app.isPackaged ? Number(process.env.HIVE_TEST_DELIVERY_OVERDUE_MS) : NaN
+  const t = !app.isPackaged ? Number(process.env.CW_TEST_DELIVERY_OVERDUE_MS) : NaN
   return Number.isFinite(t) && t > 0 ? t : OVERDUE_MINUTES * 60_000
 }
 
@@ -263,7 +263,7 @@ const loadingKeys = new Map<string, string>()
 type HostPlace = { host: string; workspace: string; scope: string; key: string }
 const keyOf = (host: string): string => host.toLowerCase()
 /** A host's deliveries file before #1018: moved into its workspace's database the first time, then kept as a backup. */
-const fileOf = (host: string): string => join(host, HIVE_DIR, 'deliveries.json')
+const fileOf = (host: string): string => join(host, CW_DIR, 'deliveries.json')
 
 /**
  * Where a host's deliveries are kept (#1018): its workspace's database (a project's workspace is its parent folder; the
@@ -273,17 +273,17 @@ const fileOf = (host: string): string => join(host, HIVE_DIR, 'deliveries.json')
 async function hostPlace(host: string): Promise<{ workspace: string; scope: string }> {
   const h = resolve(host)
   const parent = dirname(h)
-  if (basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === HIVE_DIR) return { workspace: dirname(parent), scope: 'assistant' }
+  if (basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === CW_DIR) return { workspace: dirname(parent), scope: 'assistant' }
   const ws = workspaceFor(h)
   const known = ws ? (await ws.projectIds().catch(() => null))?.byPath.get(h.toLowerCase()) : undefined
-  const saved = known ?? (await readJson<{ id?: unknown } | null>(join(h, HIVE_DIR, 'project.json'), null))?.id
+  const saved = known ?? (await readJson<{ id?: unknown } | null>(join(h, CW_DIR, 'project.json'), null))?.id
   return { workspace: parent, scope: typeof saved === 'string' && saved ? saved : `folder:${basename(h).toLowerCase()}` }
 }
 /** The workspace a host's deliveries are kept in (hostPlace's, without its scope). */
 function hostWorkspace(host: string): string {
   const h = resolve(host)
   const parent = dirname(h)
-  return basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === HIVE_DIR ? dirname(parent) : parent
+  return basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === CW_DIR ? dirname(parent) : parent
 }
 /** A host's workspace's real location, as the host's path enters here (recorded by what it starts: #1395). */
 const workspaceKeyOf = (host: string): string => placeKey(hostWorkspace(host))

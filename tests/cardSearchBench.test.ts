@@ -1,4 +1,4 @@
-// The board's full-text search on a copy of a real board (#1237): HIVE_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal)
+// The board's full-text search on a copy of a real board (#1237): CW_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal)
 // into tempDir() (the file itself is never opened), upgrades the copy, and prints what the index costs and saves: its
 // size and build time, a search through it against reading every card and matching in memory (as `GET /v1/tasks` would
 // without it) and against the window's filter of cards it already holds, and a card's edit with and without its
@@ -10,7 +10,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const source = process.env.HIVE_BOARD_BENCH_DB
+const source = process.env.CW_BOARD_BENCH_DB
 const base = tempDir('hive-search-bench-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

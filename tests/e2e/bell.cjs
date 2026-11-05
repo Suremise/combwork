@@ -20,7 +20,7 @@ const check = (name, ok, extra = '') => {
 
 ;(async () => {
   fs.rmSync(userData, { recursive: true, force: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897), HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

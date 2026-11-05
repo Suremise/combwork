@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -91,7 +91,7 @@ const check = (name, ok, extra = '') => {
 
     // --- 1. A lane ends with every agent idle: one nudge.
     const a = (await inv('tasks:create', { title: 'Greeting says Hi', project: 'alpha', agent: builder.id, column: 'doing' })).number
-    await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [a], reviewer: 'Reviewer', name: 'greetings' })}`)
+    await say(builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [a], reviewer: 'Reviewer', name: 'greetings' })}`)
     const lane = await until(async () => (await inv('lanes:list')).find((l) => l.state === 'active' && l.cards.length === 1), HUNG_MS)
     check('the lane runs', !!lane, JSON.stringify(await inv('lanes:list')))
     await until(() => idle(builder.id), HUNG_MS)
@@ -152,7 +152,7 @@ const check = (name, ok, extra = '') => {
       return waited
     }
     const b = (await inv('tasks:create', { title: 'Greeting says Hello', project: 'alpha', agent: builder.id, column: 'doing' })).number
-    await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [b], reviewer: 'Reviewer', name: 'hellos' })}`)
+    await say(builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [b], reviewer: 'Reviewer', name: 'hellos' })}`)
     const lane2 = await until(async () => (await inv('lanes:list')).find((l) => l.state === 'active' && l.cards.some((x) => x.number === b)), HUNG_MS)
     await until(() => idle(builder.id), HUNG_MS)
     const laneWaited = await finishing('lane-go', () => inv('tasks:update', b, { column: 'done' }), () => `lane:${lane2.id}`)

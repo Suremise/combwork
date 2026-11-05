@@ -316,11 +316,11 @@ else {
     await launch('run4', out)
     const { child, grandchild } = pidsIn(out)
     expect((await launchEnded('run4'))?.processes).toHaveLength(2)
-    process.env.HIVE_TEST_JOB_KILL_FAILS = '1'
+    process.env.CW_TEST_JOB_KILL_FAILS = '1'
     try {
       await expect(settleLeftovers(dir, 'a1', 'end')).rejects.toThrow(/2 processes are still running/)
     } finally {
-      delete process.env.HIVE_TEST_JOB_KILL_FAILS
+      delete process.env.CW_TEST_JOB_KILL_FAILS
     }
     expect(leftoversOf(dir, 'a1').processes).toHaveLength(2)
     expect(events.at(-1)).toMatchObject({ type: 'agent-leftovers', leftovers: { agentId: 'a1', processes: [{}, {}] } })
@@ -360,8 +360,8 @@ else {
   })()
   // The two tests that start it run only when asked (#1027): run from a Store PowerShell (every Codex agent's shell),
   // they can end that shell and every other Store PowerShell on the PC, other agents' commands included. Why is #1056.
-  const storePwshWanted = process.env.HIVE_TEST_STORE_PWSH === '1'
-  const STORE_PWSH_OFF = "starts the Store's PowerShell, which can end other agents' Store PowerShells (#1027, why: #1056): HIVE_TEST_STORE_PWSH=1 runs it"
+  const storePwshWanted = process.env.CW_TEST_STORE_PWSH === '1'
+  const STORE_PWSH_OFF = "starts the Store's PowerShell, which can end other agents' Store PowerShells (#1027, why: #1056): CW_TEST_STORE_PWSH=1 runs it"
   it.runIf(hasStorePwsh)("adopts the Store's PowerShell and what it runs, left running by a CLI that has exited", async (ctx) => {
     if (!storePwshWanted) ctx.skip(STORE_PWSH_OFF)
     const { launchEnded, settleLeftovers, trackLaunch } = await import('../src/main/agentProcesses')

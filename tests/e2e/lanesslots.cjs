@@ -67,7 +67,7 @@ const lines = (file) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   // For the Japanese screenshots, taken in a second start of the same profile (tests run in English, #767).
   let laneId = null
@@ -159,7 +159,7 @@ const lines = (file) => {
     check('R1 reviews in copy-1', started.status === 200 && !!copy && copy.endsWith('copy-1'), JSON.stringify(started.body))
     await until(async () => ['ready', 'finished'].includes((await live(r1.id))?.status), HUNG_MS)
     // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
-    await lib.typeLine(inv, lib.ptyKey(alpha, r1.id), home, null, `shell: cd /d "${copy}" && hive-progress --check quick`, { live: () => live(r1.id) })
+    await lib.typeLine(inv, lib.ptyKey(alpha, r1.id), home, null, `shell: cd /d "${copy}" && cw-progress --check quick`, { live: () => live(r1.id) })
     const checkRun = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.check === 'quick' && r.card === c1 && r.copy === 'copy-1' && r.state !== 'running'), HUNG_MS)
     check("the check ran in copy-1, linked to the card and its revision", !!checkRun && checkRun.revision === rev && same(lines(checkLog).at(-1), copy), JSON.stringify({ checkRun, ran: lines(checkLog) }))
     await tab('runs').click()
@@ -232,13 +232,13 @@ const lines = (file) => {
     await app.close().catch(() => undefined)
   }
 
-  // --- The same in Japanese: the profile started again with HIVE_LANG=ja; the lane's hover and the copy's run.
+  // --- The same in Japanese: the profile started again with CW_LANG=ja; the lane's hover and the copy's run.
   if (laneId && runId && !failed) {
     // B1 was in a running lane as the first start quit, so the quit recorded it to resume (restart.json in the profile)
     // and this start would offer it: that toast, shown or not depending on the reload, covered the lane row (HI-1955).
     // Resuming isn't this pass's subject: it starts with nothing to resume.
     fs.rmSync(path.join(userData, 'restart.json'), { force: true })
-    const ja = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_LANG: 'ja' } })
+    const ja = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_LANG: 'ja' } })
     try {
       ja.page.on('pageerror', (e) => check('no page errors (ja)', false, e.message))
       await lib.openWorkspace(ja.inv, ja.page, ws)

@@ -1,5 +1,5 @@
 // Deliveries (#647): what the Assistant leaves for an agent is a saved record with an id and a state, on fake Claude Code
-// agents (fake-claude/) and the Assistant's hive tools (hive-mcp.js with its token). A message for a working agent is
+// agents (fake-claude/) and the Assistant's hive tools (cw-mcp.js with its token). A message for a working agent is
 // queued and saved for the project (in the workspace's .combwork/combwork.db, #1018), its pane shows "✉ 1 unread"; the agent fetches it mid-turn with
 // cw_inbox (received, so it isn't typed after) and acks it (acked); one typed into it is offered, and received once its
 // CLI takes the line (#649), then acked; one not acked in time shows as overdue; cw_agent_activity gives each one's state
@@ -36,7 +36,7 @@ const saved = () => deliveriesOf(alpha)
 
 /** Starts Combwork on the suite's profile and workspace; its helpers. */
 async function start() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_DELIVERY_OVERDUE_MS: String(OVERDUE_MS) })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_DELIVERY_OVERDUE_MS: String(OVERDUE_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -106,7 +106,7 @@ async function start() {
   const tool = (name, args) => {
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-      env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }),
+      env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }),
       timeout: 60000
     }).toString()
     const r = JSON.parse(out.split('\n')[0]).result
@@ -117,7 +117,7 @@ async function start() {
   const paneText = async () => (await page.locator('.pane-header-bar', { hasText: 'Builder' }).locator('.pane-more').getAttribute('aria-description').catch(() => null)) ?? ''
 
   // --- 1. Queued for a working agent: saved, shown in its pane, in its activity.
-  await say(builder.id, 'waitfile deliveries-go1 then hive cw_inbox {} holduntil deliveries-go2')
+  await say(builder.id, 'waitfile deliveries-go1 then cw cw_inbox {} holduntil deliveries-go2')
   check('the builder works', !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', HUNG_MS)))
   const left = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', text: 'Rebase on main before the next card.' })
   check('a message for the working builder is queued, with its id', !left.isError && left.text.startsWith('Queued for Builder (m1, working)'), left.text)
@@ -142,14 +142,14 @@ async function start() {
 
   // --- 3. Acked: the agent says it acted on m1; m2 isn't, and becomes overdue.
   await until(() => idle(builder.id), HUNG_MS)
-  await say(builder.id, 'hive cw_inbox {"ack":["m1"]}')
+  await say(builder.id, 'cw cw_inbox {"ack":["m1"]}')
   check('cw_inbox ack says what it acked', !!(await until(() => toolResults(sessionId).includes('Acked m1.'), HUNG_MS)), JSON.stringify(toolResults(sessionId).slice(-2)))
   check('…and the Assistant sees it acked, with its times', !!(await until(() => delivery('m1')?.state === 'acked', HUNG_MS)) && ['created', 'received', 'acked'].every((k) => !!delivery('m1')?.[k]) && !delivery('m1')?.overdue, JSON.stringify(delivery('m1')))
   check('m2, not acked in time, is overdue: in its activity', !!(await until(() => delivery('m2')?.overdue === true, HUNG_MS)), JSON.stringify(delivery('m2')))
   check("…and in the builder's pane", !!(await until(async () => /1 overdue/.test(await paneText()), HUNG_MS)), await paneText())
   await page.screenshot({ path: path.join(lib.WORK, 'deliveries-overdue.png') })
   await until(() => idle(builder.id), HUNG_MS)
-  await say(builder.id, 'hive cw_inbox {"ack":["m2"]}')
+  await say(builder.id, 'cw cw_inbox {"ack":["m2"]}')
   check('acked, it is no longer overdue', !!(await until(async () => delivery('m2')?.state === 'acked' && !(await paneText()), HUNG_MS)), JSON.stringify(delivery('m2')))
 
   // --- 4. The Assistant's launch ends with a message waiting: refused, and shown (#645); it stays so across a restart.

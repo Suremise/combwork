@@ -3,15 +3,15 @@
 // hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
 // (#1278); a lane is started from the board (#1280), lent a slot that B1 then works in. Card 1: the builder starts it
 // on its line in the slot (the next card's start refused meanwhile: one card at a time), commits, runs the quick check
-// through hive-progress --check (counted), submits; the reviewer starts its review and passes it; the builder merges
+// through cw-progress --check (counted), submits; the reviewer starts its review and passes it; the builder merges
 // it (a merge commit) and reports the merge, which done.contained checks: Done, and only then does the next card start,
 // on a line of its own from main (card 1's, merged, deleted). Cards 2 and 3 are squash-merged in a row: card 3 starts
 // while B1 is busy and its slot is left as it is until B1 is quiet, then its line is made from main; each card's change
 // is only its own and no branch is moved (LineMoved is a 0.9 worktree's, §16.19.2). Card 4 is squash-merged after a
 // commit made past its approval: card 5 starts on its own line, and card 4's line, holding work that isn't in main, is
 // kept (looked at once card 5, merged, has its line deleted after card 6 starts: a pass that deleted it had looked at
-// card 4's first). Each check's run through hive-progress --check is counted. A screenshot at each stage, once the window shows
-// it. Dev build (or HIVE_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// card 4's first). Each check's run through cw-progress --check is counted. A screenshot at each stage, once the window shows
+// it. Dev build (or CW_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -52,8 +52,8 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   // The Assistant off (S54): a test copy never starts it.
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  // The dev build, or the packaged Combwork HIVE_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' } })
+  // The dev build, or the packaged Combwork CW_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -139,7 +139,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${tokens[who]}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
-    // The builder's shell (the fake's "shell:" step), as hive-progress runs in its session.
+    // The builder's shell (the fake's "shell:" step), as cw-progress runs in its session.
     const shells = () => {
       const f = path.join(claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -163,11 +163,11 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       if (!ran) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
       return ran
     }
-    /** The quick check through hive-progress on the card's revision now: true once a new counted CheckRan is on the card. */
+    /** The quick check through cw-progress on the card's revision now: true once a new counted CheckRan is on the card. */
     const counted = (f) => f.kind === 'CheckRan' && f.data?.counted === true
     const quickCheck = async (n) => {
       const before = (await facts(n)).filter(counted).length
-      await shell(`hive-progress --check typecheck --card ${await keyOf(n)}`)
+      await shell(`cw-progress --check typecheck --card ${await keyOf(n)}`)
       return !!(await until(async () => (await facts(n)).filter(counted).length > before, HUNG_MS))
     }
     const commit = (file) => {
@@ -181,7 +181,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     /** A card built in B1's worktree (one commit, `file`), its quick check counted, submitted, reviewed and passed. */
     const build = async (n, file) => {
       const rev = commit(file)
-      check(`${await keyOf(n)}'s quick check through hive-progress --check is counted`, await quickCheck(n))
+      check(`${await keyOf(n)}'s quick check through cw-progress --check is counted`, await quickCheck(n))
       const sub = await intent('b1', n, 'submit', { summary: `${file} ready` })
       check(`${await keyOf(n)} submitted: Review`, sub.status === 200 && (await card(n)).column === 'review', JSON.stringify(sub.body))
       check(`${await keyOf(n)}'s change is only its own work`, (await submittedFiles(n)) === JSON.stringify([file]), await submittedFiles(n))

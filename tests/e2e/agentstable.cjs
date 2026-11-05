@@ -41,7 +41,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...cenv, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...cenv, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -98,7 +98,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
 
   check('B1 works', (await say('B1', 'work 600', 'working')) > 0)
   check('B2 waits on a background task', (await say('B2', 'background 600', 'background')) > 0)
-  check('R1 watches B1’s card', (await say('R1', `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1], column: 'review', wake: true, limitMinutes: 60 })}`, 'watching')) > 0)
+  check('R1 watches B1’s card', (await say('R1', `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1], column: 'review', wake: true, limitMinutes: 60 })}`, 'watching')) > 0)
   check('R2 is idle', (await status('R2')) === 'ready')
 
   const shoot = async (name, clip) => {

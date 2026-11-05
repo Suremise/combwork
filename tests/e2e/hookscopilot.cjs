@@ -2,8 +2,8 @@
 // before this a Copilot agent whose hooks stopped arriving was never flagged. Now its events.jsonl names each turn (an
 // interactionId), and a worked turn no hook came after is flagged. The real Copilot CLI, offline against the scripted
 // stand-in model (fake-copilot-api.cjs), in a home of the suite's own; Combwork loses its hooks while a file is there
-// (HIVE_TEST_DROP_HOOKS: a Copilot hook can't be stopped at Copilot's end), and holds its checks while another is
-// (HIVE_TEST_HOOKS_HOLD), so each turn is over before any check looks. Combwork's bound at 3 s.
+// (CW_TEST_DROP_HOOKS: a Copilot hook can't be stopped at Copilot's end), and holds its checks while another is
+// (CW_TEST_HOOKS_HOLD), so each turn is over before any check looks. Combwork's bound at 3 s.
 // - a healthy quick turn is never flagged; with its hooks lost, a quick marked turn is: "transcript", naming that turn's
 //   interactionId, never the healthy one's;
 // - its hooks back, the next turn's hook clears it.
@@ -59,7 +59,7 @@ const jsonl = (file) => {
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.hooks.missingSeconds': 3 } }, null, 2))
 
   const api = await startFakeCopilotApi({ log: apiLog })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47847), HIVE_TEST_TIPS: 'off', HIVE_TEST_HOOKS_HOLD: hold, HIVE_TEST_DROP_HOOKS: drop, ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47847), CW_TEST_TIPS: 'off', CW_TEST_HOOKS_HOLD: hold, CW_TEST_DROP_HOOKS: drop, ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
   // The folder is trusted already: Copilot goes straight to loading.
   fs.writeFileSync(path.join(copilotHome, 'config.json'), JSON.stringify({ trustedFolders: [proj] }, null, 2))
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })

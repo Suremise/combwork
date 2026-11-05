@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -61,7 +61,7 @@ const check = (name, ok, extra = '') => {
     // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
-  const watch = (cards, extra) => `hive cw_wait_for_tasks ${JSON.stringify({ cards, ...extra, wake: true })}`
+  const watch = (cards, extra) => `cw cw_wait_for_tasks ${JSON.stringify({ cards, ...extra, wake: true })}`
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
 
@@ -131,7 +131,7 @@ const check = (name, ok, extra = '') => {
   // A card in Review that its watching reviewer hasn't started on shows as stalled once it has waited 15 min (#521): in
   // its lane's row in the Progress panel. The window's clock is moved on 20 min (main's isn't: nothing else changes).
   await until(() => idle(reviewer.id), 15000)
-  await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [c3], reviewer: 'Reviewer' })}`)
+  await say(builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [c3], reviewer: 'Reviewer' })}`)
   await say(reviewer.id, watch([c3], { changes: ['verdict'] }))
   await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)
   await page.locator('.progress-rail').click()
@@ -174,7 +174,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', c3, { blocked: '' })
   check('unblocked, the lane says it is stalled again', !!(await until(async () => (await marker.count()) === 1, 15000)))
   await until(() => idle(reviewer.id), 15000)
-  await say(reviewer.id, `hive cw_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Should the icon be a bee?' })}`)
+  await say(reviewer.id, `cw cw_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Should the icon be a bee?' })}`)
   check('the reviewer asks the user (For you)', !!(await until(async () => (await inv('tasks:forYou', 'alpha')).items.some((i) => i.card === c3 && i.asker === reviewer.id), 15000)), JSON.stringify((await inv('tasks:forYou', 'alpha')).items))
   await until(() => idle(reviewer.id), 15000)
   await say(reviewer.id, watch([c3], { changes: ['verdict'] }))

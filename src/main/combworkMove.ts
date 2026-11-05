@@ -3,7 +3,7 @@ import { lstat, mkdir, readFile, readdir, realpath, rename, writeFile } from 'or
 import { createHash, randomUUID } from 'crypto'
 import { join, resolve } from 'path'
 import { Worker } from 'worker_threads'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { ASSISTANT_DIR } from '../shared/assistant'
 import { LEGACY_HIVE_DIR, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../shared/hiveFolderMove'
 import { msg, tr, type Msg } from '../shared/i18n'
@@ -91,7 +91,7 @@ const M = {
 }
 
 const legacy = (host: string): string => join(host, LEGACY_HIVE_DIR)
-const current = (host: string): string => join(host, HIVE_DIR)
+const current = (host: string): string => join(host, CW_DIR)
 const lower = (p: string): string => resolve(p).toLowerCase()
 const under = (p: string, root: string): boolean => {
   const a = lower(p)
@@ -125,7 +125,7 @@ async function movedHost(host: string): Promise<boolean> {
     const st = await lstat(dir)
     if (st.isSymbolicLink() || !st.isDirectory()) return false
     const [realDir, realHost] = await Promise.all([realpath(dir), realpath(host)])
-    return realDir.toLowerCase() === join(realHost, HIVE_DIR).toLowerCase()
+    return realDir.toLowerCase() === join(realHost, CW_DIR).toLowerCase()
   } catch {
     return false
   }

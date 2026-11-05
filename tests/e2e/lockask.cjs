@@ -41,7 +41,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   // What Asker does once it has read the go-ahead (its inbox, after Combwork's doorbell): the edit again, as Codex does.
   fs.writeFileSync(path.join(codexHome, 'fake-wakes-Asker.txt'), 'patch x.txt\n')
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

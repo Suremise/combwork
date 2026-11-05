@@ -122,7 +122,7 @@ function state() {
 
   // --- Reads that fail while a result is shown (HR1's round 1): said as stale, with Retry, never passed off as current.
   const failing = (v) => app.evaluate((_, x) => {
-    process.env.HIVE_TEST_FAIL_IPC = x
+    process.env.CW_TEST_FAIL_IPC = x
   }, v)
   const stale = page.locator('[data-compare-stale]')
   await failing('git:compare*1')

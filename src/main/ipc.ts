@@ -83,7 +83,7 @@ import type { DialectFile } from '../shared/dialects'
 import { trash } from './trash'
 import { checkMoved, finishPending, movePlan, repairMove } from './workspaceMove'
 import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agentWorktree'
-import { HIVE_DIR, projectAgents as agentsOf } from '../shared/defaults'
+import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
 import { apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
@@ -484,7 +484,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
   const dialectsChanged = (): void => contextWorkspace()?.emit({ type: 'dialects-changed' })
   // A file picked to import is its window's and workspace's: gone with either (HR1 on HI-2444's design; a window's
   // close is index.ts's, where the app's window events are).
-  WorkspaceService.closingListeners.add((path) => forgetPicks({ hiveDir: join(path, HIVE_DIR) }))
+  WorkspaceService.closingListeners.add((path) => forgetPicks({ hiveDir: join(path, CW_DIR) }))
   /** The window the current request came from. */
   const win = (): BrowserWindow => {
     const w = contextWorkspace()?.window
@@ -1851,8 +1851,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
   }
 
   // Tests only (unpackaged builds), so a suite can see what the window does while an action runs or fails:
-  // HIVE_TEST_SLOW_IPC="tasks:start=1500,git:diff=1500*1" delays those calls (`*n`: only the first n), and
-  // HIVE_TEST_FAIL_IPC="git:status*1" makes them fail, and HIVE_TEST_BLOCK_IPC="app:info=1500*1" holds the main process
+  // CW_TEST_SLOW_IPC="tasks:start=1500,git:diff=1500*1" delays those calls (`*n`: only the first n), and
+  // CW_TEST_FAIL_IPC="git:status*1" makes them fail, and CW_TEST_BLOCK_IPC="app:info=1500*1" holds the main process
   // that long in them (a stall, #1109).
   // A suite may change them while Hive runs (in the main process): they are read again when they change.
   type TestCalls = { from: string; calls: Map<string, { ms: number; left: number }> }
@@ -1883,12 +1883,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       // console's page calls only the console's channels, in the workspace of the window it belongs to (#637).
       const w = windowOf(e.sender) ?? (CONSOLE_WINDOW_CHANNELS.has(channel) ? consoleOwner(e.sender) : null)
       if (!w || e.senderFrame?.parent) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Hive's window (security, never shown)
-      slow = testCalls('HIVE_TEST_SLOW_IPC', slow)
-      failing = testCalls('HIVE_TEST_FAIL_IPC', failing)
-      blocking = testCalls('HIVE_TEST_BLOCK_IPC', blocking)
+      slow = testCalls('CW_TEST_SLOW_IPC', slow)
+      failing = testCalls('CW_TEST_FAIL_IPC', failing)
+      blocking = testCalls('CW_TEST_BLOCK_IPC', blocking)
       const delay = take(slow, channel)
       if (delay?.ms) await new Promise((r) => setTimeout(r, delay.ms))
-      if (take(failing, channel)) throw new Error(`${channel} failed (HIVE_TEST_FAIL_IPC)`) // i18n-ignore: test-only
+      if (take(failing, channel)) throw new Error(`${channel} failed (CW_TEST_FAIL_IPC)`) // i18n-ignore: test-only
       // Named in a "main process was busy" warning that it overlaps (mainStalls.ts).
       const done = beginWork(`ipc ${channel}`) // i18n-ignore: a line of combwork.log, in English
       // Everything the call does is for that window's workspace (and from that window: the console's subscriptions).

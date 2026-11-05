@@ -303,14 +303,14 @@ const notifyTargetOf = (t: any): unknown => (t && typeof t === 'object' && t.age
 /** The session's workspace: with several Hive windows open, the API answers for this one. */
 const WORKSPACE = process.env.CW_WORKSPACE || ''
 /** The Hive Assistant's session gets the tools to run agents, as far as its control level allows. */
-const ASSISTANT = process.env.HIVE_ROLE === 'assistant'
-const CONTROL = process.env.HIVE_ASSISTANT_CONTROL || 'projects'
+const ASSISTANT = process.env.CW_ROLE === 'assistant'
+const CONTROL = process.env.CW_ASSISTANT_CONTROL || 'projects'
 /** Settings → Assistant → Control → Change settings: cw_update_setting is offered only then. */
-const CHANGE_SETTINGS = process.env.HIVE_ASSISTANT_SETTINGS === '1'
+const CHANGE_SETTINGS = process.env.CW_ASSISTANT_SETTINGS === '1'
 /** Settings → Assistant → Journal on (#1031): its journal's tools are offered only then. */
-const JOURNAL = process.env.HIVE_JOURNAL === '1'
+const JOURNAL = process.env.CW_JOURNAL === '1'
 /** Settings → Agent API → Let agents read the developer console: cw_console is offered only then (#636). */
-const DEV_CONSOLE = process.env.HIVE_DEV_CONSOLE === '1'
+const DEV_CONSOLE = process.env.CW_DEV_CONSOLE === '1'
 
 /** Seconds from Hive's environment for this server: a whole number above 0, else the default. */
 const envSeconds = (name: string, fallback: number): number => {
@@ -318,12 +318,12 @@ const envSeconds = (name: string, fallback: number): number => {
   return Number.isInteger(n) && n > 0 ? n : fallback
 }
 /** Settings → Advanced (#367), as Hive gave them at launch: how long a call's reply may take, and the longest waits. */
-const REPLY_SECONDS = envSeconds('HIVE_REPLY_SECONDS', REPLY_MS / 1000)
-const CARD_WAIT_MAX = envSeconds('HIVE_WAIT_MAX_SECONDS', WAIT_MAX_SECONDS)
-const AGENT_WAIT_MAX = envSeconds('HIVE_AGENT_WAIT_MAX_SECONDS', AGENT_WAIT_MAX_SECONDS)
+const REPLY_SECONDS = envSeconds('CW_REPLY_SECONDS', REPLY_MS / 1000)
+const CARD_WAIT_MAX = envSeconds('CW_WAIT_MAX_SECONDS', WAIT_MAX_SECONDS)
+const AGENT_WAIT_MAX = envSeconds('CW_AGENT_WAIT_MAX_SECONDS', AGENT_WAIT_MAX_SECONDS)
 
 /**
- * The token from its file, never from HIVE_API_TOKEN (HI-2262: sessions no longer get it; one a CLI hands on from
+ * The token from its file, never from a token variable (HI-2262: sessions no longer get it; one a CLI hands on from
  * elsewhere would be another caller's, and for the Assistant the Agent API's, so Hive would take it for someone else).
  */
 function token(): string {
@@ -611,7 +611,7 @@ const tools: Tool[] = [
     },
     // Hive writes the header (project, author, session, date) from the agent these tools belong to.
     run: async (a) => {
-      const r = (await api('POST', '/v1/shared/handovers', { title: a.title, content: a.content, project: a.project || PROJECT, ...(process.env.HIVE_AGENT_ID ? { agent: process.env.HIVE_AGENT_ID, agentProject: PROJECT } : {}) })) as { path: string; suggest?: string }
+      const r = (await api('POST', '/v1/shared/handovers', { title: a.title, content: a.content, project: a.project || PROJECT, ...(process.env.CW_AGENT_ID ? { agent: process.env.CW_AGENT_ID, agentProject: PROJECT } : {}) })) as { path: string; suggest?: string }
       // Its path in the shared notes, as cw_read_shared_note takes it; for the Assistant with its journal off, once,
       // the journal to suggest (#1032).
       return say(T['createHandover.reply.saved'], { path: r.path.replace(/\\/g, '/').replace(/^.*\/\.combwork\/shared\//, ''), hasSuggest: r.suggest ? 'yes' : 'no', suggest: r.suggest ?? '' })
@@ -929,7 +929,7 @@ const tools: Tool[] = [
         return named({ names: Object.assign({}, ...list.map((l) => l.names ?? {})) }, () => lanesText(list, !!a.all))
       }
       // An agent's lane is its project's, with itself as the builder (start) or the reviewer (join).
-      const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.HIVE_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.HIVE_AGENT_ID } : {}) }
+      const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.CW_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.CW_AGENT_ID } : {}) }
       if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
@@ -1369,13 +1369,13 @@ const offered = tools.filter((t) => (t.name !== 'cw_console' || DEV_CONSOLE) && 
 const FULL = new Set(alwaysLoaded(ASSISTANT))
 
 // The Assistant's journal rule while its journal is on (#1032): the kinds it may store come from Hive.
-const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.HIVE_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
+const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.CW_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
 // The skills the session isn't given (#1431: switched off in Skills), which its instructions don't name.
-const SKILLS_OFF = new Set((process.env.HIVE_SKILLS_OFF ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean))
-const INSTRUCTIONS = hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0', SKILLS_OFF, JOURNAL_SCOPE)
+const SKILLS_OFF = new Set((process.env.CW_SKILLS_OFF ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean))
+const INSTRUCTIONS = hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.CW_PROGRESS_COMMANDS !== '0', SKILLS_OFF, JOURNAL_SCOPE)
 
 /** A project agent given Hive's tools without its guidance (#1285: Settings → Advanced, Hive's guidance for agents). */
-const GUIDED = ASSISTANT || process.env.HIVE_GUIDANCE !== '0'
+const GUIDED = ASSISTANT || process.env.CW_GUIDANCE !== '0'
 
 async function instructions(): Promise<string> {
   if (!GUIDED) return ''
@@ -1391,7 +1391,7 @@ async function instructions(): Promise<string> {
 }
 
 /**
- * Tests only (Hive passes HIVE_TEST_MCP_LOG to this server in development builds): each tool call this server ran, with
+ * Tests only (Hive passes CW_TEST_MCP_LOG to this server in development builds): each tool call this server ran, with
  * whose it was, whether it worked and its reply's size as the model got it (HI-2186), so tests (tests/scenarios) see what
  * was executed, not what a transcript mentions, and whose work it was. A call that worked keeps the start of its reply
  * (HI-2238): what it said, such as a batch's refusals, read with the call it answered, whichever CLI or script made it.
@@ -1413,11 +1413,11 @@ let testSeq = 0
  * when there is no test log.
  */
 function testLine(fields: Record<string, unknown>): string | undefined {
-  const file = process.env.HIVE_TEST_MCP_LOG
+  const file = process.env.CW_TEST_MCP_LOG
   if (!file) return undefined
   const id = fields.kind === 'reported' ? undefined : `${process.pid}.${++testSeq}`
   try {
-    const line = { at: new Date().toISOString(), role: ASSISTANT ? 'assistant' : 'agent', project: PROJECT, agent: process.env.HIVE_AGENT_ID ?? null, ...(id ? { id } : {}), ...fields }
+    const line = { at: new Date().toISOString(), role: ASSISTANT ? 'assistant' : 'agent', project: PROJECT, agent: process.env.CW_AGENT_ID ?? null, ...(id ? { id } : {}), ...fields }
     appendFileSync(file, JSON.stringify(line) + '\n')
   } catch {
     // A test log that can't be written doesn't change the call.

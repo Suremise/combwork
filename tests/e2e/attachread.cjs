@@ -59,7 +59,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv, 'codex')
@@ -118,7 +118,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     }
     const ask = async (p, id, args) => {
       const before = (await replies(p, id)).length
-      const sent = await lib.sendPrompt(inv, lib.ptyKey(p, id), `hive cw_read_attachment ${JSON.stringify(args)}`, { submitted: async () => (await replies(p, id)).length > before })
+      const sent = await lib.sendPrompt(inv, lib.ptyKey(p, id), `cw cw_read_attachment ${JSON.stringify(args)}`, { submitted: async () => (await replies(p, id)).length > before })
       return sent ? (await until(async () => (await replies(p, id))[before], HUNG_MS)) ?? null : null
     }
     const body = (reply) => reply.slice(reply.indexOf('\n\n') + 2)

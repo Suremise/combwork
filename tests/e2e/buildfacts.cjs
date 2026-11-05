@@ -43,7 +43,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(repo)
-  let { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT) }, viewport: { width: 1400, height: 900 } })
+  let { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT) }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -88,7 +88,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     check('with Combwork closed, the build is left for it', left.startsWith("Build left for Combwork's journal (baseline)"), left)
     check('…as one marker in the workspace', fs.existsSync(markers) && fs.readdirSync(markers).filter((n) => n.endsWith('.json')).length === 1)
     // Opened in German this time: the journal stores the line in English, and the window shows it in the user's language.
-    ;({ app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_LANG: 'de' }, viewport: { width: 1400, height: 900 } }))
+    ;({ app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CW_LANG: 'de' }, viewport: { width: 1400, height: 900 } }))
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
     check('opening the workspace records it', !!(await lib.until(async () => (await builds(inv)).length === 2, HUNG_MS)), JSON.stringify(await builds(inv)))

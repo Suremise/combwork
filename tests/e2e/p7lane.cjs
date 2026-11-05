@@ -113,7 +113,7 @@ function prepare() {
 }
 
 async function startHive(env = {}) {
-  const { app, page, inv } = await lib.launch({ userData: fx.userData, viewport: { width: 1500, height: 950 }, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: fx.claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off', ...env } })
+  const { app, page, inv } = await lib.launch({ userData: fx.userData, viewport: { width: 1500, height: 950 }, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: fx.claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', ...env } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.waitForProvider(inv)
   await lib.waitForProvider(inv, 'codex')
@@ -360,7 +360,7 @@ function helpers(h) {
     const checksIn = async (b, n) => {
       q.steer(fx, 'pass')
       const k = (await x.card(n)).key
-      for (const name of ['typecheck', 'test']) await x.shell(alpha, b, `hive-progress --check ${name} --card ${k}`)
+      for (const name of ['typecheck', 'test']) await x.shell(alpha, b, `cw-progress --check ${name} --card ${k}`)
       return until(async () => ((await counted(n)).length >= 2 ? counted(n) : null), HUNG_MS)
     }
     const rev1 = commitIn(slotA.folder, { 'one.txt': 'one\n' }, 'Lane one: first')
@@ -375,7 +375,7 @@ function helpers(h) {
     must(`…start review leases it a review copy at the revision (${rev1.slice(0, 7)})`, review.status === 200 && !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev1, JSON.stringify(review.body))
     check("…its session stays in the project folder", same((await x.live(alpha, r1.id))?.cwd, alpha))
     q.steer(fx, 'pass')
-    const ran = await x.shell(alpha, r1, `cd /d "${copy}" && hive-progress --check typecheck`)
+    const ran = await x.shell(alpha, r1, `cd /d "${copy}" && cw-progress --check typecheck`)
     const copyRun = await until(async () => (await x.runs()).find((r) => r.card === a1 && r.copy === path.basename(copy) && r.state !== 'running'), HUNG_MS)
     check('…its check in the copy is a check of the card at the revision', !!ran && !!copyRun && copyRun.revision === rev1, JSON.stringify({ ran, copyRun }))
     Object.assign(kept, { copyRun: copyRun?.id })
@@ -509,7 +509,7 @@ function helpers(h) {
       commitIn(slotB, { 'two.txt': 'two\n' }, 'Lane two: only')
       q.steer(fx, 'pass')
       const k = (await x.card(kept.c1)).key
-      for (const name of ['typecheck', 'test']) await x.shell(alpha, b2, `hive-progress --check ${name} --card ${k}`)
+      for (const name of ['typecheck', 'test']) await x.shell(alpha, b2, `cw-progress --check ${name} --card ${k}`)
       await inv('session:start', alpha, { agentId: kept.r2.id }).catch(() => undefined)
       check('lane 2 carries on after the restart: submitted, reviewed, passed', (await x.intent(alpha, b2, kept.c1, 'submit', { summary: 'two: ready' })).status === 200 && (await x.intent(alpha, kept.r2, kept.c1, 'start-review')).status === 200 && (await x.intent(alpha, kept.r2, kept.c1, 'verdict', { pass: true, comment: 'two: passed' })).status === 200)
       check('…merged: Done, the lane ended', (await x.done(kept.c1)) && !!(await until(async () => !!(await x.lane(kept.l2))?.endedAt, HUNG_MS)))

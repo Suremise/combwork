@@ -15,7 +15,7 @@ export const KEEP_RUNS = 10
  * Beyond KEEP_RUNS, every run that started in the last KEEP_HOURS is kept too (#1595: with several lanes testing, ten
  * newer runs came within the hour, before a reviewer opened the run a builder cited), as long as the run folders under
  * a root come to no more than KEEP_MB: past it, the oldest passing runs the window keeps go first, then the failed
- * ones. Never one of the newest KEEP_RUNS. HIVE_E2E_KEEP_HOURS and HIVE_E2E_KEEP_MB change them (logRetention).
+ * ones. Never one of the newest KEEP_RUNS. CW_E2E_KEEP_HOURS and CW_E2E_KEEP_MB change them (logRetention).
  */
 export const KEEP_HOURS = 24
 export const KEEP_MB = 2048
@@ -229,7 +229,7 @@ export function runDirsInOrder(names) {
 }
 
 /**
- * The window and size cap from the environment (KEEP_HOURS, KEEP_MB): HIVE_E2E_KEEP_HOURS and HIVE_E2E_KEEP_MB, each a
+ * The window and size cap from the environment (KEEP_HOURS, KEEP_MB): CW_E2E_KEEP_HOURS and CW_E2E_KEEP_MB, each a
  * number of 0 or more (0 hours: only the newest KEEP_RUNS and failed runs; 0 MB: nothing past KEEP_RUNS by size). A
  * value that isn't one keeps the default and is named in `bad`. Returns { keepMs, maxBytes, bad }.
  */
@@ -243,7 +243,7 @@ export function logRetention(env = process.env) {
     bad.push(`${name}=${raw}`)
     return fallback
   }
-  return { keepMs: read('HIVE_E2E_KEEP_HOURS', KEEP_HOURS) * 3_600_000, maxBytes: read('HIVE_E2E_KEEP_MB', KEEP_MB) * 1024 * 1024, bad }
+  return { keepMs: read('CW_E2E_KEEP_HOURS', KEEP_HOURS) * 3_600_000, maxBytes: read('CW_E2E_KEEP_MB', KEEP_MB) * 1024 * 1024, bad }
 }
 
 /** When a run started (ms), from its folder's name (local time), or null. */

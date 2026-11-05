@@ -35,7 +35,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
   // An override made for an older Claude Code, one that isn't valid, and one this Combwork doesn't know.
   fs.writeFileSync(file, JSON.stringify({ format: 1, values: { 'claude-code.trust.prompt': 'trust (this|the) folder', 'cw.mcp.replySeconds': 'soon', 'hive.someday': 1 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.0', value: 'trust (this|the) folder' } } }, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claudeEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

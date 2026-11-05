@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.assistant = { ...cfg.settings.assistant, typingPause: 4, enterEndsPause: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
     // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
-  const watchOn = (name, extra = {}) => `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: name }], wake: true, ...extra })}`
+  const watchOn = (name, extra = {}) => `cw cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: name }], wake: true, ...extra })}`
   /** Lets a fake's turn go on (holduntil NAME) or ask (askwhen NAME): the file it waits for, in its home. */
   const go = (name) => fs.writeFileSync(path.join(claudeHome, name), '')
   /**
@@ -120,7 +120,7 @@ const check = (name, ok, extra = '') => {
   // …and that answer ends a watch it had, saying so, the busy agent asked about again included (#1530, HR2's rounds 1-2).
   await say(watcher.id, watchOn('Slow'))
   await until(async () => (await live(watcher.id))?.status === 'watching', HUNG_MS)
-  await say(watcher.id, `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Slow' }, { project: 'alpha', agent: 'Worker' }], wake: true })}`)
+  await say(watcher.id, `cw cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Slow' }, { project: 'alpha', agent: 'Worker' }], wake: true })}`)
   await until(async () => ((await lastWaitReply(watcher.id)) ?? '').startsWith('Already: ') && (await idle(watcher.id)), HUNG_MS)
   const ended = await lastWaitReply(watcher.id)
   check("…and ends a watch it had, saying so: every agent it followed", (ended ?? '').startsWith('Already: Worker (alpha) is idle') && (ended ?? '').endsWith(" Your watch on Slow (alpha) has ended: watch again, passing every agent you're following.") && !(await live(watcher.id))?.watch, ended)
@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
   await say(worker.id, 'holduntil agentwatch-cancelled')
   await until(async () => (await live(worker.id))?.status === 'working', HUNG_MS)
   await watchWorker('cancel')
-  await say(watcher.id, 'hive cw_wait_for_agents {"cancel":true}')
+  await say(watcher.id, 'cw cw_wait_for_agents {"cancel":true}')
   await until(async () => (await lastWaitReply(watcher.id)) === 'Cancelled your agent watch.' && (await idle(watcher.id)), HUNG_MS)
   check('cancel ends the agent watch', (await lastWaitReply(watcher.id)) === 'Cancelled your agent watch.' && !(await live(watcher.id))?.watch, await lastWaitReply(watcher.id))
   go('agentwatch-cancelled')

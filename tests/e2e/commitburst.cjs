@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   let h = null
   try {
-    h = await lib.launch({ userData: path.join(lib.WORK, 'commitburst-profile'), env: { HIVE_API_PORT: lib.port(47901) } })
+    h = await lib.launch({ userData: path.join(lib.WORK, 'commitburst-profile'), env: { CW_API_PORT: lib.port(47901) } })
     const errors = []
     h.page.on('pageerror', (e) => errors.push(e.message))
     await lib.appReady(h.page)

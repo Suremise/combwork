@@ -318,7 +318,7 @@ function laneOf(root, p) {
  * { items, removed: [{ rel, size }], failed: [{ rel, error }], freed, stopped }.
  */
 // The lanes it prunes, root's e2e/lanes/<k> and scenarios/lanes/<k>, are the machine pool's, so the claims that protect
-// them are the machine pool's too (#1133): a runner with a pool of its own (HIVE_TEST_LANES_DIR: the concurrency check's
+// them are the machine pool's too (#1133): a runner with a pool of its own (CW_TEST_LANES_DIR: the concurrency check's
 // waiting runs) read its own pool's claims, found lanes 0 and 1 free there as it ended, and removed the machine lanes'
 // folders under other worktrees' running suites (their fake CLIs' homes, which no process held open; the fakes died).
 export async function clean({ root = runContext.TEST_ROOT, lanesDir = runContext.MACHINE_LANES_DIR, days = PRUNE_DAYS, dryRun = false, budgetMs = Infinity, ev, now = Date.now(), alive = processAlive, owner = process.pid, acquire = acquireCodexHome } = {}) {

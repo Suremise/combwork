@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto'
 export const SIGNALLED = 129
 
 /**
- * The launcher (run by Node): waits for its input's first line, then runs the command it was given (HIVE_QUEUE_LAUNCH,
+ * The launcher (run by Node): waits for its input's first line, then runs the command it was given (CW_QUEUE_LAUNCH,
  * JSON: command, args, shell, verbatim: Windows' arguments as given, a shell's command line) with its own output and what follows on its input, and exits with its code. Its input
  * closing before that line (Hive gone, or the launch given up) ends it with nothing run.
  */
@@ -23,11 +23,11 @@ process.stdin.on('data', (d) => {
   const i = got.indexOf('\\n')
   if (i < 0) return
   started = true
-  const spec = JSON.parse(process.env.HIVE_QUEUE_LAUNCH)
-  delete process.env.HIVE_QUEUE_LAUNCH
-  if (process.env.HIVE_QUEUE_RUN_AS_NODE !== undefined) process.env.ELECTRON_RUN_AS_NODE = process.env.HIVE_QUEUE_RUN_AS_NODE
+  const spec = JSON.parse(process.env.CW_QUEUE_LAUNCH)
+  delete process.env.CW_QUEUE_LAUNCH
+  if (process.env.CW_QUEUE_RUN_AS_NODE !== undefined) process.env.ELECTRON_RUN_AS_NODE = process.env.CW_QUEUE_RUN_AS_NODE
   else delete process.env.ELECTRON_RUN_AS_NODE
-  delete process.env.HIVE_QUEUE_RUN_AS_NODE
+  delete process.env.CW_QUEUE_RUN_AS_NODE
   const c = require('child_process').spawn(spec.command, spec.args, { stdio: ['pipe', 'inherit', 'inherit'], shell: !!spec.shell, windowsVerbatimArguments: !!spec.verbatim, windowsHide: true })
   c.stdin.on('error', () => {})
   const rest = got.slice(i + 1)
@@ -60,9 +60,9 @@ export function startLauncher(spec: { command: string; args: readonly string[]; 
   const env = opts.env ?? process.env
   // HI-2020: the launch's own mark for "the command never started" (launcherNotStarted), unknown to the command.
   const nonce = randomUUID()
-  const launchEnv: NodeJS.ProcessEnv = { ...env, ELECTRON_RUN_AS_NODE: '1', HIVE_QUEUE_LAUNCH: JSON.stringify({ ...spec, nonce }) }
-  if (env.ELECTRON_RUN_AS_NODE !== undefined) launchEnv.HIVE_QUEUE_RUN_AS_NODE = env.ELECTRON_RUN_AS_NODE
-  else delete launchEnv.HIVE_QUEUE_RUN_AS_NODE
+  const launchEnv: NodeJS.ProcessEnv = { ...env, ELECTRON_RUN_AS_NODE: '1', CW_QUEUE_LAUNCH: JSON.stringify({ ...spec, nonce }) }
+  if (env.ELECTRON_RUN_AS_NODE !== undefined) launchEnv.CW_QUEUE_RUN_AS_NODE = env.ELECTRON_RUN_AS_NODE
+  else delete launchEnv.CW_QUEUE_RUN_AS_NODE
   const after = Date.now()
   const child = spawn(process.execPath, ['-e', LAUNCHER], { cwd: opts.cwd, env: launchEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: true })
   return { child, after, before: Date.now(), nonce }

@@ -98,12 +98,12 @@ const check = (name, ok, extra = '') => {
 
   // A pair switched while a slow read is out: the new pair is what shows.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'benchmarks:read=2000*2'
+    process.env.CW_TEST_SLOW_IPC = 'benchmarks:read=2000*2'
   })
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'fake, fixtures v5 (smaller but wrong)' })
   await lib.sleep(200)
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = ''
+    process.env.CW_TEST_SLOW_IPC = ''
   })
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'fake, fixtures v5 (smaller replies)' })
   await lib.sleep(3000) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.

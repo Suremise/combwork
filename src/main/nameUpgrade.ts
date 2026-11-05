@@ -1,7 +1,7 @@
 import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { join } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { msg, type Msg } from '../shared/i18n'
 import { boardFileNeeded, moveBoardFile, NEW_DB_FILE } from './boardFileMove'
 import { writeTextAtomic } from './fsutil'
@@ -51,7 +51,7 @@ const M = {
  * by its own record, whatever the workspace's says). Both are this machine's: the workspace's is in its .gitignore, a
  * project's `.combwork` is out of git whole.
  */
-const recordOf = (host: string): string => join(host, HIVE_DIR, NAMES_DONE_FILE)
+const recordOf = (host: string): string => join(host, CW_DIR, NAMES_DONE_FILE)
 
 async function recorded(host: string): Promise<boolean> {
   try {
@@ -63,7 +63,7 @@ async function recorded(host: string): Promise<boolean> {
 
 /** Writes a host's record (its `.combwork` there): only under the move's lock, after the other processes' refusal (combworkMove.ts). */
 export const record = async (host: string): Promise<void> => {
-  if (existsSync(join(host, HIVE_DIR))) await writeTextAtomic(recordOf(host), JSON.stringify({ version: NAMES_VERSION, at: new Date().toISOString() }) + '\n')
+  if (existsSync(join(host, CW_DIR))) await writeTextAtomic(recordOf(host), JSON.stringify({ version: NAMES_VERSION, at: new Date().toISOString() }) + '\n')
 }
 
 /** Whether a project's own steps have run (its record): looked at as a project comes into an open workspace. */
@@ -71,7 +71,7 @@ export const projectNamesDone = (host: string): Promise<boolean> => recorded(hos
 
 /** Whether a workspace may still have anything under an old name: looked at cheaply, on every open. */
 export async function workspaceNeeds(ws: string): Promise<boolean> {
-  const dir = join(ws, HIVE_DIR)
+  const dir = join(ws, CW_DIR)
   if (!existsSync(dir)) return false
   return (await boardFileNeeded(dir)) || !(await recorded(ws))
 }
@@ -90,7 +90,7 @@ export interface UpgradeOptions {
 
 /** The steps (under the move's lock, nothing of the workspace open): each throws a HiveError naming it when it can't. */
 export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<void> {
-  const dir = join(ws, HIVE_DIR)
+  const dir = join(ws, CW_DIR)
   if (o.only) {
     const only = o.only
     return step('projects', o.stop, async () => {

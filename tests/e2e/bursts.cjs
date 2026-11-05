@@ -1,6 +1,6 @@
 // Agents finishing together: one chime, and one Windows notification naming them ("3 agents finished": alpha (2),
-// beta (1)); an agent asking for input is told at once, on its own. The test build runs quiet (HIVE_TEST_QUIET) and
-// records each notification it would show to HIVE_TEST_NOTIFY_LOG; the chimes are counted in the page. The agents are the fake
+// beta (1)); an agent asking for input is told at once, on its own. The test build runs quiet (CW_TEST_QUIET) and
+// records each notification it would show to CW_TEST_NOTIFY_LOG; the chimes are counted in the page. The agents are the fake
 // Claude Code. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -40,7 +40,7 @@ const until = async (fn, ms = 10000) => {
 
   const notifyLog = path.join(lib.WORK, 'bursts-notify.log')
   fs.rmSync(notifyLog, { force: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47902), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_QUIET: '1', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47902), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

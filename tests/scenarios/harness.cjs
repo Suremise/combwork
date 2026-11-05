@@ -1,9 +1,9 @@
 // Runs one scenario (scenarios.cjs) through Combwork's dev build: a throwaway profile and workspace, a CLI home that is
 // never the user's own, the scenario's cards, notes, handovers and skill changes; the agent or the Assistant started
 // with its prompt; then what it actually did:
-// - the hive tool calls the hive MCP server ran (its test log, HIVE_TEST_MCP_LOG: executed, with whether each worked);
+// - the Combwork tool calls the Combwork MCP server ran (its test log, CW_TEST_MCP_LOG: executed, with whether each worked);
 // - the Combwork skills it read (a successful Skill call, or a read whose result is that skill's own text);
-// - every tool call in its transcript (Combwork's parser), names of hive tools it only mentions kept apart;
+// - every tool call in its transcript (Combwork's parser), names of Combwork tools it only mentions kept apart;
 // - the board, notes and files afterwards (the Agent API and the disk), its usage, and whether any API token showed up
 //   in what it printed or said;
 // - what Combwork's own parts cost during the turn (its performance metrics, before the launch and after the turn: the
@@ -70,7 +70,7 @@ const PROVIDERS = {
   fake: { provider: 'claude-code', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-claude', 'fake-claude.cmd'), mode: 'bypassPermissions' },
   // The fake Codex, in a throwaway home of its own (never the signed-in test home).
   'fake-codex': { provider: 'codex', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-codex', 'fake-codex.cmd'), mode: 'full-access' },
-  // Accept edits, with the hive tools, commands and skills allowed on the command line (its connection's extra arguments):
+  // Accept edits, with the Combwork tools, commands and skills allowed on the command line (its connection's extra arguments):
   // it never asks, and needs no bypass mode (which Claude Code asks to accept once). One value after `=`: the option
   // takes a list, and as separate words it also took the first task Combwork passes last, so an agent started on a card sat
   // idle (#498).
@@ -127,7 +127,7 @@ function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
 
 /**
  * Every token a scenario's Combwork issued, for scoring and masking (HI-2262, HR1's rounds 1 and 2): the workspace's
- * (`apiToken`), then each line of its issuance record (`file`, HIVE_TEST_TOKEN_LOG: Combwork appends each hook, agent and
+ * (`apiToken`), then each line of its issuance record (`file`, CW_TEST_TOKEN_LOG: Combwork appends each hook, agent and
  * Assistant token as it makes it, before any session can hold it), so a token whose launch ended and whose files went
  * long before the scoring is known. The record is evidence the result needs: missing, unreadable or with a line that
  * isn't `{ kind, token }` it throws, and the scenario fails rather than scoring with tokens left out.
@@ -137,7 +137,7 @@ function knownTokens(file, apiToken) {
   try {
     text = fs.readFileSync(file, 'utf8')
   } catch (e) {
-    throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) can't be read (${e?.code ?? 'error'}): the leak check can't be scored`, { cause: e })
+    throw new Error(`the token record (CW_TEST_TOKEN_LOG) can't be read (${e?.code ?? 'error'}): the leak check can't be scored`, { cause: e })
   }
   const issued = text.split(/\r?\n/).filter((l) => l.trim()).map((line, i) => {
     let t = null
@@ -146,7 +146,7 @@ function knownTokens(file, apiToken) {
     } catch {
       // not JSON: said below
     }
-    if (!t || !['hook', 'agent', 'assistant'].includes(t.kind) || typeof t.token !== 'string' || !/^[0-9a-f]{32,}$/.test(t.token)) throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) has a malformed line ${i + 1}: the leak check can't be scored`)
+    if (!t || !['hook', 'agent', 'assistant'].includes(t.kind) || typeof t.token !== 'string' || !/^[0-9a-f]{32,}$/.test(t.token)) throw new Error(`the token record (CW_TEST_TOKEN_LOG) has a malformed line ${i + 1}: the leak check can't be scored`)
     return { kind: t.kind, token: t.token }
   })
   if (typeof apiToken !== 'string' || apiToken.length < 16) throw new Error("no workspace token: the leak check can't be scored")
@@ -164,7 +164,7 @@ function retainedObserved(observed, tokens) {
 
 /**
  * What a session's transcript shows: every tool call (name, summary, input, result, error), the Combwork skills it read,
- * the hive tools it names (mentions: a transcript isn't proof a call ran; the server's log is), and its last reply.
+ * the Combwork tools it names (mentions: a transcript isn't proof a call ran; the server's log is), and its last reply.
  * A skill counts as read only when the read worked and shows the skill: a Skill call for it that didn't fail, or a
  * tool (not a writer) given its SKILL.md whose result has the skill's own `name:` line. That line may come JSON-escaped
  * (a Codex code-mode script's exec_command result carries the file as `"output":"---\r\nname: x\r\n…"`), so the result
@@ -181,7 +181,7 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
     if (t.isError || WRITERS.test(t.name)) continue
     for (const n of skillNames) {
       if (skillsRead.includes(n)) continue
-      const viaTool = /^skill$/i.test(t.name) && new RegExp(`(^|[":\\s])(hive:)?${escape(n)}(\\b|$)`).test(t.input)
+      const viaTool = /^skill$/i.test(t.name) && new RegExp(`(^|[":\\s])(combwork:)?${escape(n)}(\\b|$)`).test(t.input)
       const nameLine = new RegExp(`(^|\\s)name:\\s*["']?${escape(n)}["']?\\s*$`, 'm')
       const viaRead = new RegExp(`skills[\\\\/]+${COPY_PREFIX}${escape(n)}[\\\\/]+SKILL\\.md`, 'i').test(t.input) && (nameLine.test(t.result) || nameLine.test(unescaped(t.result)))
       if (viaTool || viaRead) skillsRead.push(n)
@@ -207,7 +207,7 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
       }
     }
   }
-  // Names of hive tools in the transcript: a direct call (mcp__combwork__x, combwork.x, Combwork's "combwork · x"), or one written in a
+  // Names of Combwork tools in the transcript: a direct call (mcp__combwork__x, combwork.x, Combwork's "combwork · x"), or one written in a
   // Codex script (tools.mcp__combwork__x(...)), which may or may not have run: a script whose calls were read from its
   // rollout (HI-2235) is a `script` item, its calls tools of their own.
   const hiveName = (name) => /(?:^|[_.\s])(cw_[a-z]+(?:_[a-z]+)*)$/.exec(name)?.[1]
@@ -236,7 +236,7 @@ function skillRefsOf(dir, names) {
 }
 
 /**
- * Whether Combwork's metrics count every hive call the bridges logged. Both sides are the whole run: the log has every call
+ * Whether Combwork's metrics count every Combwork call the bridges logged. Both sides are the whole run: the log has every call
  * since the launch, setup's too, and the metrics read covers the run's own workspace from before its setup. (Against the
  * scenario's baseline instead, a setup call reported before it would be in the log but not the difference, #527.) A
  * fake's `direct` board change went through no bridge, so nothing reports it.
@@ -246,14 +246,14 @@ function allCallsReported(logged, metrics) {
 }
 
 /**
- * The calls the hive MCP servers ran, from their test log: [{ tool, role, project, agent, ok, error, args, mode, chars,
+ * The calls the Combwork MCP servers ran, from their test log: [{ tool, role, project, agent, ok, error, args, mode, chars,
  * bytes }]. Its other lines (HI-2186: `kind: 'list'`, a server's tool list) are left out: readMcpLists has those.
  */
 function readMcpLog(file) {
   return readJsonLines(file).filter((l) => l.kind === undefined)
 }
 
-/** The tool lists the hive MCP servers sent (HI-2186), one a server: [{ at, role, project, agent, tools, bytes, chars }]. */
+/** The tool lists the Combwork MCP servers sent (HI-2186), one a server: [{ at, role, project, agent, tools, bytes, chars }]. */
 function readMcpLists(file) {
   return readJsonLines(file).filter((l) => l.kind === 'list')
 }
@@ -466,9 +466,9 @@ async function runScenario(sc, providerKey, opts = {}) {
   const fakeHome = path.join(root, 'claude-home')
   const fakeCodexHome = path.join(root, 'codex-home')
   const mcpLog = path.join(root, 'mcp-calls.jsonl')
-  // Every token its Combwork issues (HIVE_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
+  // Every token its Combwork issues (CW_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
   const tokenLog = path.join(root, 'tokens.jsonl')
-  // Each change to the merge slots, with its time (HIVE_TEST_MERGE_SLOT_LOG, #374): who held one and who waited, when.
+  // Each change to the merge slots, with its time (CW_TEST_MERGE_SLOT_LOG, #374): who held one and who waited, when.
   const slotLog = path.join(root, 'merge-slots.jsonl')
   // Each state view Combwork gave the Assistant at a session start (#1032), as Combwork's development builds record them.
   const startViewLog = path.join(root, 'start-views.jsonl')
@@ -542,12 +542,12 @@ async function runScenario(sc, providerKey, opts = {}) {
   try {
     // Each CLI's home is a test one: the fake's per run, the real Claude Code's and Codex's signed-in test homes.
     env = {
-      HIVE_API_PORT: String(port),
-      HIVE_TEST_TIPS: 'off',
-      HIVE_TEST_MCP_LOG: mcpLog,
-      HIVE_TEST_TOKEN_LOG: tokenLog,
-      HIVE_TEST_MERGE_SLOT_LOG: slotLog,
-      HIVE_TEST_START_VIEW_LOG: startViewLog,
+      CW_API_PORT: String(port),
+      CW_TEST_TIPS: 'off',
+      CW_TEST_MCP_LOG: mcpLog,
+      CW_TEST_TOKEN_LOG: tokenLog,
+      CW_TEST_MERGE_SLOT_LOG: slotLog,
+      CW_TEST_START_VIEW_LOG: startViewLog,
       CLAUDE_CONFIG_DIR: providerKey === 'claude-code' ? CLAUDE_TEST_HOME : fakeHome,
       CODEX_HOME: providerKey === 'fake-codex' ? fakeCodexHome : lib.CODEX_HOME,
       // The real Codex runs its commands in Windows PowerShell, not the Store's PowerShell 7 (#584, lib.cjs).
@@ -642,7 +642,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       },
       /**
        * alpha's merge slot as another of its running agents ('implementer') uses it: claim or release with that agent's
-       * own Agent API token (each agent's in the profile's agent-api folder, as its hive tools read it).
+       * own Agent API token (each agent's in the profile's agent-api folder, as its Combwork tools read it).
        */
       slot: async (key, action, body = {}) => {
         const file = path.join(userData, 'agent-api', `${require('crypto').createHash('sha256').update(`${alpha.toLowerCase()}#${ctx.agents[key].id}`).digest('hex').slice(0, 16)}.json`)
@@ -686,12 +686,12 @@ async function runScenario(sc, providerKey, opts = {}) {
       },
       /**
        * Leaves one of alpha's agents ('coder') a message as the Assistant does (#650): cw_message_agent through the real
-       * hive MCP server with the Assistant's own token (the Assistant started first if it isn't); `extra`: more of the tool's
+       * Combwork MCP server with the Assistant's own token (the Assistant started first if it isn't); `extra`: more of the tool's
        * arguments (#652: `card`). Its reply's text.
        */
       assistantMessage: async (key, text, extra = {}) => ctx.assistantTool('cw_message_agent', { project: 'alpha', agent: ctx.agents[key].name, text, ...extra }),
       /**
-       * Calls a hive tool as the Assistant does: through the real hive MCP server with the Assistant's own token (the
+       * Calls a Combwork tool as the Assistant does: through the real Combwork MCP server with the Assistant's own token (the
        * Assistant started first if it isn't), its journal's tools offered (#1032). The reply's text.
        */
       assistantTool: async (name, args) => {
@@ -699,7 +699,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         const tokenFile = path.join(userData, 'assistant-api', `${require('crypto').createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
         const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
           input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-          env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents', HIVE_JOURNAL: '1', CW_API_TOKEN_FILE: tokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }),
+          env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'agents', CW_JOURNAL: '1', CW_API_TOKEN_FILE: tokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }),
           timeout: 60000
         }).toString()
         return JSON.parse(out.split('\n')[0]).result?.content?.[0]?.text ?? ''
@@ -733,7 +733,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === host.toLowerCase() && s.agentId === agentId)
     // Combwork's performance metrics before the launch (the run's own workspace: everything in it is this run's).
     const metricsFrom = new Date(started - 2 * 3600_000).toISOString()
-    // Each snapshot's request, from just before it was sent to just after its answer (HI-2186): a hive call is in the
+    // Each snapshot's request, from just before it was sent to just after its answer (HI-2186): a Combwork call is in the
     // measured window when its report reached Combwork after the first and before the last (benchmark.cjs splitOf).
     const snapshots = { before: null, after: null }
     const snapshot = async (side) => {
@@ -749,7 +749,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // A change made inside the measured window (a skill edited after the snapshot, before the launch), for scenarios
     // that compare the skill service's work on unchanged and changed revisions.
     if (sc.beforeLaunch) await sc.beforeLaunch(ctx)
-    // Combwork's log as the session under test starts: its hive tools connecting is counted from here.
+    // Combwork's log as the session under test starts: its Combwork tools connecting is counted from here.
     const launchMark = lib.hiveLogLines(userData).length
     // A subject Combwork starts itself (HI-2046: a reviewer given a card that reached Review outside a lane): its launch is
     // the session under test, and Combwork's line its prompt.
@@ -907,7 +907,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (!endedAtLaunch && !(hiveLine && !p.fake) && !atLaunch) {
       turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
-      // Real Claude Code: its first prompt waits for its hive tools, as Combwork's own first line does (HI-1148).
+      // Real Claude Code: its first prompt waits for its Combwork tools, as Combwork's own first line does (HI-1148).
       const ready = p.provider === 'claude-code' ? () => lib.hiveToolsConnected(userData, agentId, launchMark) : null
       if (!(await lib.sendPrompt(inv, key, text, { submitted, ready, waitMs: 20000 }))) {
         // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
@@ -1016,7 +1016,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     const states = await ctx.statesSeen(statesFrom).catch(() => [])
     observed.turnWatch = states.length ? (states.findLast((x) => x.status === 'watching')?.watch ?? null) : observed.status === 'watching' ? observed.watch : null
     // What Combwork woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
-    // cw_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script):
+    // cw_inbox call read, the inbox's own items after the doorbell. Codex calls Combwork tools from its code tool (Script):
     // its read is the cw_inbox call the script made (HI-2235); with the script's calls unknown, the doorbell's line.
     observed.wakeLines = code.items.flatMap((x, i) => {
       const line = String(x.kind === 'user' ? (x.text ?? '') : '').trim()
@@ -1026,7 +1026,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       return [String(read?.tool.result ?? line).trim().slice(0, 1000)]
     })
     observed.guidance = result.guidance
-    // What the hive servers ran: the subject's own calls, and everyone's (an agent the Assistant started).
+    // What the Combwork MCP servers ran: the subject's own calls, and everyone's (an agent the Assistant started).
     observed.allHiveCalls = readMcpLog(mcpLog)
     observed.mcpLists = readMcpLists(mcpLog)
     observed.mcpReports = readJsonLines(mcpLog).filter((l) => l.kind === 'reported')
@@ -1065,7 +1065,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     const partial = []
     if (!metricsBefore || !metricsAfter) partial.push('Combwork’s metrics weren’t read')
     if (metricsAfter && metricsAfter.recording === false) partial.push('recording was off')
-    if (!allReported) partial.push('not every hive call was reported')
+    if (!allReported) partial.push('not every Combwork call was reported')
     const dropped = Math.max(0, (metricsAfter?.dropped ?? 0) - (metricsBefore?.dropped ?? 0))
     if (dropped) partial.push(`${dropped} measurements dropped`)
     if (metricsAfter?.coverage?.evictedThrough) partial.push('history removed for space')

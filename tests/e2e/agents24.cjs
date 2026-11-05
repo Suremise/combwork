@@ -1,5 +1,5 @@
 // 24 agents at once (#562), on fake Claude Code agents: this workspace's Maximum agents (HI-2001) raised to 24, its 24 agents
-// added and all started (a 25th refused); 23 of them each reporting a run through hive-progress, which the Progress
+// added and all started (a 25th refused); 23 of them each reporting a run through cw-progress, which the Progress
 // panel lists (the folded strip's bars and "+N" counting them all), while the 24th watches every working agent (more
 // than the 20 a watch took before), woken when they finish; Settings → Advanced's note on what more agents cost,
 // measuring the 24 running agents' memory. Screenshots of the session, the panel and the note. Dev build, throwaway
@@ -42,7 +42,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -82,10 +82,10 @@ const check = (name, ok, extra = '') => {
     check('all 24 start', !!ready, JSON.stringify((await lives()).map((s) => s.status)))
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-1-running.png') })
 
-    // --- 23 of them each report a run through hive-progress; the 24th watches them all.
+    // --- 23 of them each report a run through cw-progress; the 24th watches them all.
     const workers = agents.slice(0, N - 1)
     const watcher = agents[N - 1]
-    for (const [i, a] of workers.entries()) await say(a.id, `shell: hive-progress --title "Run ${i + 1}" -- node "${holder}" "${release}"`)
+    for (const [i, a] of workers.entries()) await say(a.id, `shell: cw-progress --title "Run ${i + 1}" -- node "${holder}" "${release}"`)
     check('23 runs open in the Progress panel, one per agent', !!(await until(async () => (await openRuns()).length === N - 1, HUNG_MS)), String((await openRuns()).length))
     const runs = await openRuns()
     check('…each its own agent', new Set(runs.map((r) => r.agentName)).size === N - 1, runs.map((r) => r.agentName).join(','))
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-2-progress.png') })
 
     // Every working agent, no names: 23 (a watch took at most 20 before #562).
-    await say(watcher.id, `hive cw_wait_for_agents ${JSON.stringify({ wake: true })}`)
+    await say(watcher.id, `cw cw_wait_for_agents ${JSON.stringify({ wake: true })}`)
     check('the 24th watches every working agent', !!(await until(async () => (await live(watcher.id))?.status === 'watching', HUNG_MS)), (await live(watcher.id))?.status)
     const status = (await api('GET', '/v1/projects/crowd')).body?.agents?.find((a) => a.name === `W${N}`)
     check('…all 23 of them', status?.watching?.agents?.length === N - 1, JSON.stringify(status?.watching))

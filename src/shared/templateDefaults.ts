@@ -44,7 +44,7 @@ export function presetWorkflow(id: SuggestedPreset, reviewerMode?: ReviewerMode,
 }
 
 /** Hive's templates, in the order they are listed. */
-export const HIVE_TEMPLATES: readonly HiveTemplate[] = [
+export const CW_TEMPLATES: readonly HiveTemplate[] = [
   hive(
     'solo.json',
     msg({ id: 'assistant.hiveTemplates.solo', defaultMessage: 'Solo', description: "Name of one of Hive's own agent templates: one builder (glossary: builder). Like the preset Solo." }),
@@ -101,7 +101,7 @@ export const HIVE_TEMPLATES: readonly HiveTemplate[] = [
 ]
 
 /** One of Hive's templates by its file name, or undefined. */
-export const hiveTemplate = (file: string): HiveTemplate | undefined => HIVE_TEMPLATES.find((t) => t.file === file)
+export const hiveTemplate = (file: string): HiveTemplate | undefined => CW_TEMPLATES.find((t) => t.file === file)
 
 /**
  * A listed template's name and description as the window shows them: Hive's own in the window's language now (main

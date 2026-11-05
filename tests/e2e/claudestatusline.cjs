@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(script, "let d = ''\nprocess.stdin.on('data', (c) => (d += c)).on('end', () => {\n  let m = '?'\n  try { m = JSON.parse(d).model.display_name } catch {}\n  process.stdout.write('MYLINE ' + m)\n})\n")
   fs.writeFileSync(path.join(claudeHome.home, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: `node "${script.split('\\').join('/')}"`, padding: 0 } }))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claudeHome.env })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claudeHome.env })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

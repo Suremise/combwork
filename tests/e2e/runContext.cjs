@@ -2,10 +2,10 @@
 // alone on the machine or inherit whatever environment they were started from.
 //
 // - The environment, here: every child a test starts (a suite, a test copy of Combwork, the hive MCP server, the
-//   hive-progress wrapper) gets an environment built from an allowlist (ALLOW: Windows' own variables, the user's
+//   cw-progress wrapper) gets an environment built from an allowlist (ALLOW: Windows' own variables, the user's
 //   folders, the network's proxy and certificates) plus what the context sets itself (a profile, quiet, ports, the
 //   suite's folders, CLI homes). Nothing else from the parent: not the variables of the Combwork session it was started
-//   from (HIVE_API_TOKEN…, HIVE_PROGRESS_*), not NO_COLOR or FORCE_COLOR, not ELECTRON_RUN_AS_NODE, not CLAUDE_* or
+//   from (CW_API_TOKEN…, CW_PROGRESS_*), not NO_COLOR or FORCE_COLOR, not ELECTRON_RUN_AS_NODE, not CLAUDE_* or
 //   ANTHROPIC_* (the real tier uses the CLIs' own sign-in). Test settings a person may set for a run are passed on by
 //   name (PASS_ENV); a new one is added there, with what it is for. tests/e2esuites.test.ts fails for a suite or the
 //   scenario harness that builds a child's environment from process.env.
@@ -14,12 +14,12 @@
 //   call without env inherits (GIT_DIR and GIT_WORK_TREE would point their git at another repository, NODE_OPTIONS
 //   reach the build). The unit test fails for a child_process call there without env. Not a child, the runners'
 //   progress reporting (tests/progressReport.mts) keeps reading the shell's Combwork variables: it reports to that Combwork.
-// - Folders: the work folder (WORK: the lane's, which the runner gives each suite as HIVE_E2E_DIR) and the CLI test
+// - Folders: the work folder (WORK: the lane's, which the runner gives each suite as CW_E2E_DIR) and the CLI test
 //   homes (CODEX_HOME, CLAUDE_TEST_HOME). What a test copy of Combwork deletes goes to its trash folder in the suite's
-//   (HIVE_TEST_TRASH_DIR, `<work>	rash`, #414), never the user's Recycle Bin, and goes with the suite's folder.
+//   (CW_TEST_TRASH_DIR, `<work>	rash`, #414), never the user's Recycle Bin, and goes with the suite's folder.
 // - The temp folder (TEMP, TMP, TMPDIR in ALLOW): the run's own in hive-test\tmp, which the runner sets before it
 //   starts anything (tests/tempDir.ts startRunTemp, HI-2102), never %TEMP%.
-// - Ports and lane folders: lanes.mjs (each runner claims a lane); each suite's port is HIVE_E2E_PORT, from its runner.
+// - Ports and lane folders: lanes.mjs (each runner claims a lane); each suite's port is CW_E2E_PORT, from its runner.
 // - The build: build.mjs, under a lock per worktree, so runners started together build it once.
 // - Load: slots.mjs, at most a few heavy runs at once on the machine (HEAVY_DIR); the others queue.
 const fs = require('fs')
@@ -30,25 +30,25 @@ const LOCAL = process.env.LOCALAPPDATA || os.tmpdir()
 /** Everything the tests keep on this machine. */
 const TEST_ROOT = path.join(LOCAL, 'hive-test')
 /**
- * Where runners claim their lanes (lanes.mjs): e2e and scenario runs take them from the same pool. HIVE_TEST_LANES_DIR
+ * Where runners claim their lanes (lanes.mjs): e2e and scenario runs take them from the same pool. CW_TEST_LANES_DIR
  * gives a pool of its own, for checking a run that waits for a lane (concurrency.mjs, #735) without holding real runs'.
  */
 /** The machine's lanes (e2e-lanes); also where the one pool of its own in use is held (lanes.mjs holdOwnPool, #1127). */
 const MACHINE_LANES_DIR = path.join(TEST_ROOT, 'e2e-lanes')
-const LANES_DIR = process.env.HIVE_TEST_LANES_DIR || MACHINE_LANES_DIR
+const LANES_DIR = process.env.CW_TEST_LANES_DIR || MACHINE_LANES_DIR
 /** Whether LANES_DIR is a pool of its own, whose lanes take ports above the machine pool's (lanes.mjs lanesFirst, #1127). */
-const OWN_LANES = !!process.env.HIVE_TEST_LANES_DIR
+const OWN_LANES = !!process.env.CW_TEST_LANES_DIR
 /**
- * Where heavy runs claim their slots (slots.mjs): one pool for the machine. HIVE_TEST_HEAVY_DIR gives a pool of its own,
- * for checking the queue (concurrency.mjs --heavy) without waiting behind real runs; HIVE_TEST_HEAVY_SLOTS, how many.
+ * Where heavy runs claim their slots (slots.mjs): one pool for the machine. CW_TEST_HEAVY_DIR gives a pool of its own,
+ * for checking the queue (concurrency.mjs --heavy) without waiting behind real runs; CW_TEST_HEAVY_SLOTS, how many.
  */
-const HEAVY_DIR = process.env.HIVE_TEST_HEAVY_DIR || path.join(TEST_ROOT, 'heavy-slots')
+const HEAVY_DIR = process.env.CW_TEST_HEAVY_DIR || path.join(TEST_ROOT, 'heavy-slots')
 /** Where suites keep their profiles, workspaces and screenshots: the runner's lane folder, else (a suite run on its own) e2e. */
-const WORK = process.env.HIVE_E2E_DIR || path.join(TEST_ROOT, 'e2e')
+const WORK = process.env.CW_E2E_DIR || path.join(TEST_ROOT, 'e2e')
 /** The Codex home the Codex suites and model trials use (signed in once by hand: see tests/e2e/README.md). */
-const CODEX_HOME = process.env.HIVE_TEST_CODEX_HOME || path.join(TEST_ROOT, 'codex')
+const CODEX_HOME = process.env.CW_TEST_CODEX_HOME || path.join(TEST_ROOT, 'codex')
 /** The Claude Code home the model trials use, beside the Codex one (signed in once by hand: see tests/scenarios/README.md). */
-const CLAUDE_TEST_HOME = process.env.HIVE_TEST_CLAUDE_HOME || path.join(path.dirname(CODEX_HOME), 'claude')
+const CLAUDE_TEST_HOME = process.env.CW_TEST_CLAUDE_HOME || path.join(path.dirname(CODEX_HOME), 'claude')
 
 /**
  * What a child gets from the environment it is started from, by name (any case: Windows' names are). Windows and the
@@ -69,28 +69,28 @@ const ALLOW = [
 
 /**
  * Test settings a person running the tests may set, passed from the runner to its suites (and read there): nothing
- * else of theirs reaches a suite. Not HIVE_E2E_NATIVE: carddialog's native window checks take over the screen, so
+ * else of theirs reaches a suite. Not CW_E2E_NATIVE: carddialog's native window checks take over the screen, so
  * they run only when the suite is run on its own.
  */
 const PASS_ENV = {
-  HIVE_TEST_CODEX_HOME: 'another Codex test home (CODEX_HOME above)',
-  HIVE_TEST_CLAUDE_HOME: 'another Claude Code test home (CLAUDE_TEST_HOME above)',
-  HIVE_TEST_QUIET: '0 shows the test copies of Combwork (taking focus, notifying), to watch a run',
-  HIVE_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
-  HIVE_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's hive-progress",
-  HIVE_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the Sandbox upgrade checks, #1227)',
-  HIVE_E2E_HIVE09: "boardupgrade's 0.9 Hive: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
+  CW_TEST_CODEX_HOME: 'another Codex test home (CODEX_HOME above)',
+  CW_TEST_CLAUDE_HOME: 'another Claude Code test home (CLAUDE_TEST_HOME above)',
+  CW_TEST_QUIET: '0 shows the test copies of Combwork (taking focus, notifying), to watch a run',
+  CW_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
+  CW_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's cw-progress",
+  CW_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the Sandbox upgrade checks, #1227)',
+  CW_E2E_V09: "boardupgrade's 0.9 Hive: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
   REPLYSIZE_OUT: "replysize's report file, in the work folder"
 }
 
 /**
  * What the runner sets for each suite, carried from a suite into the test copies of Combwork it starts: a runner started
- * inside a suite (progressreport runs one in its Combwork's agent shell, which drops HIVE_ variables) knows from these that
+ * inside a suite (progressreport runs one in its Combwork's agent shell, which drops CW_ variables) knows from these that
  * it is nested, and which ports and folders to keep clear of (runner.mjs); which kinds of test slot its run holds for
  * what runs inside it (E2E_RUN_SLOTS, slots.mjs heldCredit, HI-2070); and where those copies note the CLIs they
- * selected (HIVE_TEST_CLI_LOG, in the suite's folder: the run record's real CLIs, #365).
+ * selected (CW_TEST_CLI_LOG, in the suite's folder: the run record's real CLIs, #365).
  */
-const CARRIED = ['E2E_RUN_SUITE', 'E2E_RUN_DIR', 'E2E_RUN_PORT', 'E2E_RUN_SLOTS', 'HIVE_TEST_CLI_LOG']
+const CARRIED = ['E2E_RUN_SUITE', 'E2E_RUN_DIR', 'E2E_RUN_PORT', 'E2E_RUN_SLOTS', 'CW_TEST_CLI_LOG']
 
 /** The variables of `parent` named in `names` (any case), under their own spelling. */
 function pick(parent, names) {
@@ -110,10 +110,10 @@ function apply(env, vars) {
 }
 
 /**
- * PATH without the folders of the hive-progress shims the user's copies of Combwork install (`%APPDATA%\Combwork\bin`, `Combwork-Dev\bin`,
+ * PATH without the folders of the cw-progress shims the user's copies of Combwork install (`%APPDATA%\Combwork\bin`, `Combwork-Dev\bin`,
  * and before HI-2461 `Hive\bin`, `Hive-Dev\bin`),
  * which an agent's session has on its PATH (#1253): they run the installed Combwork.exe (or the main checkout's dev build), so
- * a test's `hive-progress` would start another Combwork than its own, and report to the user's. A test Combwork puts its own
+ * a test's `cw-progress` would start another Combwork than its own, and report to the user's. A test Combwork puts its own
  * shims on its sessions' PATH.
  */
 function withoutHiveShims(env, parent) {
@@ -132,7 +132,7 @@ function baseEnv(parent = process.env) {
 }
 
 /**
- * A child that is part of Combwork but not a copy of it (the hive MCP server, the hive-progress wrapper, a bridge): the
+ * A child that is part of Combwork but not a copy of it (the hive MCP server, the cw-progress wrapper, a bridge): the
  * allowlist and `vars` (the Agent API URL and token it should use, ELECTRON_RUN_AS_NODE where Electron runs it as Node).
  */
 function childEnv(vars = {}, parent = process.env) {
@@ -143,7 +143,7 @@ function childEnv(vars = {}, parent = process.env) {
 const built = new WeakSet()
 
 /** Where the test copies of Combwork a suite starts put what they delete (#414): its work folder's `trash`. */
-const trashDir = (parent = process.env) => path.join(parent.HIVE_E2E_DIR || WORK, 'trash')
+const trashDir = (parent = process.env) => path.join(parent.CW_E2E_DIR || WORK, 'trash')
 
 /**
  * The CLI homes a test copy of Combwork gets unless its suite gives it others (#382): empty folders in its work folder's
@@ -153,7 +153,7 @@ const trashDir = (parent = process.env) => path.join(parent.HIVE_E2E_DIR || WORK
  * Claude Code's, its own, the Codex test home) in hiveEnv's vars.
  */
 function cliHomes(parent = process.env) {
-  const base = path.join(parent.HIVE_E2E_DIR || WORK, 'cli-homes')
+  const base = path.join(parent.CW_E2E_DIR || WORK, 'cli-homes')
   return { CLAUDE_CONFIG_DIR: path.join(base, 'claude'), CODEX_HOME: path.join(base, 'codex'), COPILOT_HOME: path.join(base, 'copilot'), GH_CONFIG_DIR: path.join(base, 'gh') }
 }
 
@@ -165,7 +165,7 @@ function cliHomes(parent = process.env) {
 const TEST_GIT_IDENTITY = { name: 'Hive Test', email: 'hive-test@example.invalid' }
 
 /** A suite's global git config (#1466): its work folder's `gitconfig`, which lib.cjs writes (writeGitConfig). */
-const gitConfig = (parent = process.env) => path.join(parent.HIVE_E2E_DIR || WORK, 'gitconfig')
+const gitConfig = (parent = process.env) => path.join(parent.CW_E2E_DIR || WORK, 'gitconfig')
 
 /**
  * Writes a work folder's global git config: the test identity, and line endings as they are stored (core.autocrlf
@@ -216,29 +216,29 @@ function isUserCliHome(dir, parent = process.env) {
 }
 
 /**
- * A test copy of Combwork's environment: the allowlist; quiet (unless HIVE_TEST_QUIET=0 was set for the run) and with tips
- * off (a profile that sets Show a tip turns them on); in English (HIVE_LANG=en, #767: suites find the window by its English
- * text, and dates and numbers format the same on any Windows; `vars` can set another language); its trash folder (HIVE_TEST_TRASH_DIR: the suite's, #414, so it
+ * A test copy of Combwork's environment: the allowlist; quiet (unless CW_TEST_QUIET=0 was set for the run) and with tips
+ * off (a profile that sets Show a tip turns them on); in English (CW_LANG=en, #767: suites find the window by its English
+ * text, and dates and numbers format the same on any Windows; `vars` can set another language); its trash folder (CW_TEST_TRASH_DIR: the suite's, #414, so it
  * never uses the user's Recycle Bin); the CLI homes (CLAUDE_CONFIG_DIR, CODEX_HOME, COPILOT_HOME, GH_CONFIG_DIR: empty
  * folders of the suite's, cliHomes, #382, #452, so it never reads the user's); its git's config (GIT_CONFIG_GLOBAL: the
  * work folder's, with the test identity and line endings, gitConfig, #1466; GIT_CONFIG_NOSYSTEM), so its git never reads
  * the user's ~/.gitconfig or the machine's, and matches its suite's (gitEnv); the suite's Agent API port from its runner
- * (HIVE_E2E_PORT), and the CARRIED variables; then `vars` (its profile, HIVE_USER_DATA, always; a port, test CLI homes,
+ * (CW_E2E_PORT), and the CARRIED variables; then `vars` (its profile, CW_USER_DATA, always; a port, test CLI homes,
  * test hooks), where undefined removes one (lib.cjs refuses to start a test Combwork without each home or a global git config).
  */
 function hiveEnv(vars = {}, parent = process.env) {
   const env = baseEnv(parent)
-  env.HIVE_TEST_QUIET = parent.HIVE_TEST_QUIET === '0' ? '0' : '1'
-  env.HIVE_TEST_TIPS = 'off'
+  env.CW_TEST_QUIET = parent.CW_TEST_QUIET === '0' ? '0' : '1'
+  env.CW_TEST_TIPS = 'off'
   // Its CLI test home stands in for a connection where its workspace has none on (HI-1755's seam, DEV_SEAMS): suites
   // launch agents as before connections; the connections suites set it to '0' to test the real rule.
-  env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
-  env.HIVE_LANG = 'en'
-  env.HIVE_TEST_TRASH_DIR = trashDir(parent)
+  env.CW_TEST_CLI_HOME_CONNECTION = '1'
+  env.CW_LANG = 'en'
+  env.CW_TEST_TRASH_DIR = trashDir(parent)
   Object.assign(env, cliHomes(parent))
   env.GIT_CONFIG_GLOBAL = gitConfig(parent)
   env.GIT_CONFIG_NOSYSTEM = '1'
-  if (parent.HIVE_E2E_PORT) env.HIVE_API_PORT = parent.HIVE_E2E_PORT
+  if (parent.CW_E2E_PORT) env.CW_API_PORT = parent.CW_E2E_PORT
   Object.assign(env, pick(parent, CARRIED))
   apply(env, vars)
   built.add(env)
@@ -250,19 +250,19 @@ const isHiveEnv = (env) => !!env && built.has(env)
 
 /**
  * A suite's environment, from its runner: the allowlist, the PASS_ENV settings, and its run context: its folder
- * (HIVE_E2E_DIR, which WORK reads), its Agent API port (HIVE_E2E_PORT, lib.port()), and the same said without the
- * HIVE_ prefix (E2E_RUN_*), which survive into a test Combwork's agent shells; the kinds of test slot its run holds or was
+ * (CW_E2E_DIR, which WORK reads), its Agent API port (CW_E2E_PORT, lib.port()), and the same said without the
+ * CW_ prefix (E2E_RUN_*), which survive into a test Combwork's agent shells; the kinds of test slot its run holds or was
  * given for what runs inside it (slots: E2E_RUN_SLOTS, slots.mjs creditFor, HI-2070: none from a light run); and the
- * file its test copies of Combwork note the CLIs they selected in (cliLog: HIVE_TEST_CLI_LOG, #365).
+ * file its test copies of Combwork note the CLIs they selected in (cliLog: CW_TEST_CLI_LOG, #365).
  */
 function suiteEnv({ name, port = null, work = null, runDir, cliLog = null, slots = '' }, parent = process.env) {
   const env = apply(baseEnv(parent), pick(parent, Object.keys(PASS_ENV)))
   env.E2E_RUN_SLOTS = slots
-  if (work) env.HIVE_E2E_DIR = work
-  if (cliLog) env.HIVE_TEST_CLI_LOG = cliLog
+  if (work) env.CW_E2E_DIR = work
+  if (cliLog) env.CW_TEST_CLI_LOG = cliLog
   if (port) {
-    env.HIVE_E2E_PORT = String(port)
-    env.HIVE_API_PORT = String(port)
+    env.CW_E2E_PORT = String(port)
+    env.CW_API_PORT = String(port)
     env.E2E_RUN_PORT = String(port)
   }
   env.E2E_RUN_SUITE = name

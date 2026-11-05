@@ -1387,7 +1387,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
 
 describe("a lane builder whose watch a decision's notice ended, and that ends its turn without another (HI-1693)", () => {
   it("isn't flagged as not watching; the reviewer's verdict reaches it through its loop wake, and only then, its move again, is it flagged when it sits idle", async () => {
-    process.env.HIVE_TEST_LOOP_GRACE_MS = '0'
+    process.env.CW_TEST_LOOP_GRACE_MS = '0'
     const loopCheck = await import('../src/main/loopCheck')
     const { emit } = await import('../src/main/events')
     loopCheck.initLoopCheck()

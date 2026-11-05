@@ -1,4 +1,4 @@
-// Dev build only (HI-1842): its archived card comes due within HIVE_TEST_DAY_MS's short day, a test seam a packaged
+// Dev build only (HI-1842): its archived card comes due within CW_TEST_DAY_MS's short day, a test seam a packaged
 // build ignores.
 // Card attachments (HI-1700): an image pasted into a card dialog's comment box is a draft (a chip, a link at the caret,
 // nothing stored), and Post keeps it with the card: shown inline in the comment and in the card's Attachments list, kept
@@ -9,7 +9,7 @@
 // remembered; the card dialog's Show in Attachments opening Card attachments at its card, whatever its filter, without
 // changing the tab remembered; Pane attachments when the cards keep no files yet. Archived cards' attachments cleaned up
 // (HI-1842): Project Settings → Storage's choice, Clean Up Now's list and its removal, open and Done cards kept (NOT RUN on a
-// packaged build: it makes a day short, HIVE_TEST_DAY_MS). Screenshots in both themes. Dev build, throwaway
+// packaged build: it makes a day short, CW_TEST_DAY_MS). Screenshots in both themes. Dev build, throwaway
 // profile and workspace (two plain-folder projects).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -44,7 +44,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   fs.writeFileSync(sessionFile, lib.samplePng(48, 32))
   // The fake Claude Code, for the Assistant's session (its token, for a refused change).
   const cenv = lib.fakeClaude(userData, claudeHome, [alpha, beta, ws])
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_TEST_DAY_MS: '300', ...cenv }, viewport: { width: 1400, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_DAY_MS: '300', ...cenv }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await inv('settings:update', { agentApi: { enabled: true } })
@@ -344,9 +344,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const denied = await post({ title: 'Not allowed', project: 'alpha', attachments: [shot] }, asToken)
     check("the Assistant's change refused at Look copies nothing and leaves nothing", denied.status === 403 && staged().length === 0 && (await inv('tasks:list')).length === before, JSON.stringify({ status: denied.status, staged: staged() }))
     await inv('session:stop', assistantHome, 'assistant').catch(() => undefined)
-    if (q.devSeam("archived cards' attachments cleaned up (HI-1842: a day made short, HIVE_TEST_DAY_MS)")) {
+    if (q.devSeam("archived cards' attachments cleaned up (HI-1842: a day made short, CW_TEST_DAY_MS)")) {
       // --- Archived cards' attachments cleaned up (HI-1842): Project Settings → Storage's choice (here 3 days, a day being
-      // HIVE_TEST_DAY_MS long), then Clean Up Now lists the archived card once it is due and sends its files to the suite's
+      // CW_TEST_DAY_MS long), then Clean Up Now lists the archived card once it is due and sends its files to the suite's
       // trash, with Combwork's comment on it; an open card and a Done card keep theirs. Round 2 (HR5): Move applies the list
       // the dialog showed (a plan kept by main), and a file changed on disk while the dialog was open stays, said so.
       // Each its own bytes: a card keeps the same bytes once.

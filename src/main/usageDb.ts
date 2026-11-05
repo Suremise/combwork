@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { join } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import type { CompactionEvent, ProviderId } from '../shared/types'
 import type { BaselineDay, LedgerRow, UsageSummary } from '../shared/usageLedger'
 import type { UsageRow, UsageTimeline } from '../shared/usageTimeline'
@@ -34,7 +34,7 @@ import { transaction, type Migration } from './db'
  */
 
 export const USAGE_FILE = 'usage.db'
-export const usageFile = (workspacePath: string): string => join(workspacePath, HIVE_DIR, USAGE_FILE)
+export const usageFile = (workspacePath: string): string => join(workspacePath, CW_DIR, USAGE_FILE)
 
 export const USAGE_MIGRATIONS: Migration[] = [
   {

@@ -48,7 +48,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -233,7 +233,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("…and the Assistant's idle session is woken and reads it, whole, as the builder's request", !!(await until(() => asks().slice(asksBefore).some((t) => t.includes("Builder (alpha) asks you on ") && t.includes('<<<Please put this card On Hold: the user said so.>>>')), HUNG_MS)), JSON.stringify(asks().slice(asksBefore)))
     await inv('session:stop', home, 'assistant')
 
-    // An agent's hive tool: cw_start_card runs the start intent. Called through hive-mcp.js with the builder's own
+    // An agent's hive tool: cw_start_card runs the start intent. Called through cw-mcp.js with the builder's own
     // hive server settings (from its launch), not typed into its pane, where Combwork's own wakes may be typed meanwhile.
     const builderHive = await hiveOf(builder.id)
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {

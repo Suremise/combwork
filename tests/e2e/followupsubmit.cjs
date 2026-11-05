@@ -8,7 +8,7 @@
 // - E1's start review again takes the follow-up: copy-1 is reset to it (the earlier lease returned), and its pass there
 //   moves the card on; a verdict on the earlier submission is refused;
 // - E1's own move of a card in Review back to Doing leaves it B1's (no "Given to E1").
-// Dev build (or HIVE_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build (or CW_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
@@ -50,7 +50,7 @@ const lines = (file) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -117,7 +117,7 @@ const lines = (file) => {
     const wakesBefore = lines(wakes).length
     const before = (await submits()).length
     const args = { card: key, summary: 'The change E1 asked for: a is 3.', followUp: true }
-    const sent = await lib.sendPrompt(inv, lib.ptyKey(alpha, b1.id), `hive cw_submit ${JSON.stringify(args)}`, { submitted: async () => (await submits()).length > before })
+    const sent = await lib.sendPrompt(inv, lib.ptyKey(alpha, b1.id), `cw cw_submit ${JSON.stringify(args)}`, { submitted: async () => (await submits()).length > before })
     const reply = sent ? await until(async () => (await submits())[before], HUNG_MS) : null
     check('B1 submits the follow-up with cw_submit followUp', !!reply && !/refused|error/i.test(reply), String(reply))
     const now = await card(n)

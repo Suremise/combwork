@@ -4,7 +4,7 @@
 // result revision ("HI-12 · typecheck · a3f2c1d"), with its output in a bounded log file (Show log).
 //
 // - The environment is a session command's (the app passes `childEnv()`), never Hive's own: no ELECTRON_RUN_AS_NODE and
-//   none of a session's HIVE_* variables (`checkEnv`). Hidden; ended with its whole tree at its time limit (Settings →
+//   none of a session's CW_* variables (`checkEnv`). Hidden; ended with its whole tree at its time limit (Settings →
 //   Advanced, `cw.queue.checkMinutes`).
 // - Green means proved: the queue brackets each check (`bracketStart`/`bracketEnd`) and writes `CheckRan` at the test
 //   merge's revision, counted only if the folder was at exactly that revision and clean at the start and the end, and
@@ -112,12 +112,12 @@ const OUTPUT_CHARS = 8000
 /** Environment variables a check never gets, whatever its base has (compared without case, as Windows does). */
 const NEVER = new Set(['ELECTRON_RUN_AS_NODE', 'ELECTRON_NO_ATTACH_CONSOLE', 'CHROME_CRASHPAD_PIPE_NAME'])
 
-/** A check's environment: its base without Electron's switches and without any HIVE_* variable (a session's identity). */
+/** A check's environment: its base without Electron's switches and without any CW_* variable (a session's identity). */
 export function checkEnv(base: Record<string, string | undefined>): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(base)) {
     const K = k.toUpperCase()
-    if (v === undefined || NEVER.has(K) || K.startsWith('HIVE_') || K.startsWith('CW_')) continue
+    if (v === undefined || NEVER.has(K) || K.startsWith('CW_')) continue
     out[k] = v
   }
   return out

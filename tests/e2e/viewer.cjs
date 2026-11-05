@@ -95,7 +95,7 @@ function stream(token) {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, devConsole: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -343,7 +343,7 @@ function stream(token) {
   // than a title (120) and a command (200) are kept, the credential early in its arguments (round 2's finding); one with
   // a title of its own.
   const longArgs = `Authorization: Bearer ${apiToken} ${SECRET} ${'z'.repeat(150)}`
-  await inv('session:start', alpha, { agentId: added.body?.agent?.id, prompt: `shell: hive-progress -- cmd /c echo ${longArgs} then shell: hive-progress --title "viewer check" -- cmd /c echo ${SECRET}` })
+  await inv('session:start', alpha, { agentId: added.body?.agent?.id, prompt: `shell: cw-progress -- cmd /c echo ${longArgs} then shell: cw-progress --title "viewer check" -- cmd /c echo ${SECRET}` })
   const runnerRuns = () => inv('progress:list').then((list) => list.filter((r) => r.agentName === 'Runner' && r.state === 'passed'))
   check('the wrapped commands report their runs', !!(await lib.until(async () => (await runnerRuns()).length === 2, HUNG_MS)), JSON.stringify(await runnerRuns()))
   const wrapped = (await runnerRuns()).find((r) => r.title !== 'viewer check')

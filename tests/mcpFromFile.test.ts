@@ -76,21 +76,21 @@ function withLink(entries: Record<string, Uint8Array>, link: string): Uint8Array
 }
 
 describe('Add MCP Server from File', () => {
-  const was = process.env.HIVE_TEST_TRASH_DIR
+  const was = process.env.CW_TEST_TRASH_DIR
   beforeEach(async () => {
     const dir = join(base, `case-${++cases}`)
     const wsPath = join(dir, 'ws')
     mcpDir = join(wsPath, '.combwork', 'mcp')
     trashDir = join(dir, 'trash')
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
     mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     w = createWorkspaceService()
     await w.open(wsPath)
   })
   afterEach(async () => {
     await disposeWorkspaceService(w)
-    if (was === undefined) delete process.env.HIVE_TEST_TRASH_DIR
-    else process.env.HIVE_TEST_TRASH_DIR = was
+    if (was === undefined) delete process.env.CW_TEST_TRASH_DIR
+    else process.env.CW_TEST_TRASH_DIR = was
   })
 
   /** github, added from a .json (off): what the cases replacing or editing it start from. */

@@ -410,9 +410,9 @@ export function waitMaxSeconds(kind: 'cards' | 'agents'): number {
 /** What the hive MCP server needs of the advanced settings, as its environment (it runs outside Hive: Node built-ins only). */
 export function mcpAdvancedEnv(): Record<string, string> {
   return {
-    HIVE_REPLY_SECONDS: String(advanced.number('cw.mcp.replySeconds')),
-    HIVE_WAIT_MAX_SECONDS: String(waitMaxSeconds('cards')),
-    HIVE_AGENT_WAIT_MAX_SECONDS: String(waitMaxSeconds('agents'))
+    CW_REPLY_SECONDS: String(advanced.number('cw.mcp.replySeconds')),
+    CW_WAIT_MAX_SECONDS: String(waitMaxSeconds('cards')),
+    CW_AGENT_WAIT_MAX_SECONDS: String(waitMaxSeconds('agents'))
   }
 }
 

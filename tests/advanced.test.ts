@@ -762,13 +762,13 @@ describe('the adapters and the hive MCP server use them', () => {
     // The hive MCP server's reply timeout and waits, kept a minute under Codex's tool timeout.
     await advanced.set('cw.mcp.replySeconds', 600)
     await advanced.set('cw.wait.cardMaxSeconds', 3000)
-    expect(mcpAdvancedEnv()).toEqual({ HIVE_REPLY_SECONDS: '600', HIVE_WAIT_MAX_SECONDS: '1740', HIVE_AGENT_WAIT_MAX_SECONDS: '600' })
+    expect(mcpAdvancedEnv()).toEqual({ CW_REPLY_SECONDS: '600', CW_WAIT_MAX_SECONDS: '1740', CW_AGENT_WAIT_MAX_SECONDS: '600' })
     await advanced.set('codex.mcp.toolTimeoutSeconds', null)
     expect(waitMaxSeconds('cards')).toBe(840)
   })
 
   it('defaults to what Combwork did before: 840 and 600 s waits, 300 s replies', () => {
-    expect(mcpAdvancedEnv()).toEqual({ HIVE_REPLY_SECONDS: '300', HIVE_WAIT_MAX_SECONDS: '840', HIVE_AGENT_WAIT_MAX_SECONDS: '600' })
+    expect(mcpAdvancedEnv()).toEqual({ CW_REPLY_SECONDS: '300', CW_WAIT_MAX_SECONDS: '840', CW_AGENT_WAIT_MAX_SECONDS: '600' })
   })
 })
 

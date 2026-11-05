@@ -4,7 +4,7 @@
 import { lstat, mkdir, readdir, readFile, rename, rmdir } from 'original-fs/promises'
 import { extname, join, relative, sep } from 'path'
 import { ATTACHMENTS_DIR, OLD_ATTACHMENTS_DIR, isSessionFolder, movedAttachmentPath } from '../shared/attachments'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { insideReal, writeJsonAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
@@ -35,7 +35,7 @@ export async function attachmentsDir(host: string): Promise<string> {
     moves.set(key, move)
   }
   await move
-  return join(host, HIVE_DIR, ATTACHMENTS_DIR)
+  return join(host, CW_DIR, ATTACHMENTS_DIR)
 }
 
 /** Tests only: forgets which hosts were moved, so a test can move one again (as a restart would). */
@@ -60,7 +60,7 @@ const SESSION_FOLDER = /^(?!\.{1,2}$)[\w.-]+$/
 export async function ownAttachmentsFolder(host: string, sessionFolder?: string): Promise<string> {
   if (sessionFolder !== undefined && !SESSION_FOLDER.test(sessionFolder)) throw hiveError(msg({ id: 'service.attachments.badFolder', defaultMessage: 'Not a session folder name.', description: "An error: a name given for a session's attachments folder isn't one Hive makes (a session id)." }), undefined, { kind: 'invalid' })
   const root = await attachmentsDir(host)
-  const chain = [join(host, HIVE_DIR), root, ...(sessionFolder !== undefined ? [join(root, sessionFolder)] : [])]
+  const chain = [join(host, CW_DIR), root, ...(sessionFolder !== undefined ? [join(root, sessionFolder)] : [])]
   for (const p of chain) {
     if (!(await lstat(p).catch(() => null))) await mkdir(p).catch((e: NodeJS.ErrnoException) => (e.code === 'EEXIST' ? undefined : Promise.reject(e)))
     if (!(await isOwnFolder(host, p))) {
@@ -101,7 +101,7 @@ export async function freeName(dir: string, name: string, suffix: (i: number) =>
  * it is with what it holds.
  */
 async function moveOldFolder(host: string): Promise<void> {
-  const hive = join(host, HIVE_DIR)
+  const hive = join(host, CW_DIR)
   const old = join(hive, OLD_ATTACHMENTS_DIR)
   if (!(await lstat(old).catch(() => null))) return
   if (!(await isOwnFolder(host, hive)) || !(await isOwnFolder(host, old))) return log.warn(`${userText(old)} is a link or not a folder: Combwork leaves it alone`)

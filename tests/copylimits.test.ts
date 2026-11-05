@@ -52,17 +52,17 @@ type Delivery = { revision: string | null; problem?: string; lasting?: true }
 // check read HASH_LIMITS as they go, so the same limits are kept over a tenth of the files and a 1 MB file. At Combwork's own
 // 2000 entries and 64 MB a test wrote and copied 2000 files or 65 MB, and under a loaded full run one passed even its
 // 180 s bound. The real values are checked below, before they are lowered.
-const HIVE_LIMITS = { ...HASH_LIMITS }
+const CW_LIMITS = { ...HASH_LIMITS }
 const LIMITS = { entries: 200, depth: HASH_LIMITS.depth, bytes: 1024 * 1024 }
 beforeAll(() => {
   Object.assign(HASH_LIMITS, LIMITS)
 })
 afterAll(() => {
-  Object.assign(HASH_LIMITS, HIVE_LIMITS)
+  Object.assign(HASH_LIMITS, CW_LIMITS)
 })
 
 it("Combwork's own limits, lowered for this file: 2000 entries, 12 folders deep, 64 MB", () => {
-  expect(HIVE_LIMITS).toEqual({ entries: 2000, depth: 12, bytes: 64 * MB })
+  expect(CW_LIMITS).toEqual({ entries: 2000, depth: 12, bytes: 64 * MB })
 })
 
 const base = tempDir('hive-copy-limits-')

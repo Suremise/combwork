@@ -32,10 +32,10 @@ advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
 beforeAll(() => {
-  process.env.HIVE_TEST_TRASH_DIR = trashDir
+  process.env.CW_TEST_TRASH_DIR = trashDir
 })
 afterAll(async () => {
-  delete process.env.HIVE_TEST_TRASH_DIR
+  delete process.env.CW_TEST_TRASH_DIR
   advanced.stop()
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()

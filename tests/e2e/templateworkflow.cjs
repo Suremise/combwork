@@ -53,7 +53,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47793), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 950 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47793), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)

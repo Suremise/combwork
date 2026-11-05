@@ -8,7 +8,7 @@
 // conversations start fresh, carrying their work, as any launched before the names agents see changed (HI-2463): the
 // 0.9 Hive's tools are still hive_*, served as `hive` (HI-2506).
 //
-// The 0.9 Hive is a packaged 0.9.x build: HIVE_E2E_HIVE09 (its win-unpacked folder), else the main checkout's
+// The 0.9 Hive is a packaged 0.9.x build: CW_E2E_V09 (its win-unpacked folder), else the main checkout's
 // dist/win-unpacked when that is 0.9.x; with neither, the suite is skipped. Throwaway profiles, workspace and
 // CLAUDE_CONFIG_DIR. lib.cjs keeps the 0.9 Hive's windows off screen and unfocused (#1253).
 const lib = require('./lib.cjs')
@@ -35,21 +35,21 @@ const check = (name, ok, extra = '') => {
 
 /** The 0.9 build to run, or why there is none (as boardupgrade finds it). */
 function hive09() {
-  let dir = process.env.HIVE_E2E_HIVE09
+  let dir = process.env.CW_E2E_V09
   if (!dir) {
     const main = /^worktree (.+)$/m.exec(lib.git(lib.ROOT, 'worktree list --porcelain'))?.[1]
     if (!main) return { why: 'no main checkout found (git worktree list)' }
     dir = path.join(main, 'dist', 'win-unpacked')
   }
   const exe = path.join(dir, 'Hive.exe')
-  if (!fs.existsSync(exe)) return { why: `no Hive 0.9 build at ${dir} (set HIVE_E2E_HIVE09 to a 0.9.x win-unpacked folder)` }
+  if (!fs.existsSync(exe)) return { why: `no Hive 0.9 build at ${dir} (set CW_E2E_V09 to a 0.9.x win-unpacked folder)` }
   let version = '?'
   try {
     version = JSON.parse(require('@electron/asar').extractFile(path.join(dir, 'resources', 'app.asar'), 'package.json').toString('utf8')).version
   } catch (e) {
     return { why: `couldn't read the version of ${dir}: ${e.message}` }
   }
-  if (!version.startsWith('0.9.')) return { why: `${dir} is Hive ${version}, not 0.9.x (set HIVE_E2E_HIVE09 to a 0.9.x win-unpacked folder)` }
+  if (!version.startsWith('0.9.')) return { why: `${dir} is Hive ${version}, not 0.9.x (set CW_E2E_V09 to a 0.9.x win-unpacked folder)` }
   return { exe, version }
 }
 
@@ -116,10 +116,10 @@ function driver(app, page) {
     await h.app.close().catch(() => undefined)
   }
   // The 0.9 Hive's tool, by its name there (HI-2463 renamed it cw_lane in 1.1).
-  const lane = (body) => `hive hive_lane ${JSON.stringify(body)}`
+  const lane = (body) => `cw hive_lane ${JSON.stringify(body)}`
   try {
     // 1. The 0.9 Hive runs the loop: c1 built and in Review, c2 in Doing, c3 still in Todo.
-    const oldApp = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ HIVE_USER_DATA: oldProfile, ...claude }) })
+    const oldApp = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ CW_USER_DATA: oldProfile, ...claude }) })
     const oldPage = await oldApp.firstWindow()
     const o = driver(oldApp, oldPage)
     open.add(o)
@@ -175,7 +175,7 @@ function driver(app, page) {
     // its merge, and the lane's next card starts once the one before it is Done (Darren on HI-1985: 1.0's rule holds for
     // a lane carried over, as card-loop says): woken by each verdict, the builder reports that card's merge first.
     const cards = await dev.inv('tasks:list')
-    const merged = (n) => `hive cw_report_merge ${JSON.stringify({ card: cards.find((c) => c.number === n)?.key })}`
+    const merged = (n) => `cw cw_report_merge ${JSON.stringify({ card: cards.find((c) => c.number === n)?.key })}`
     script('Builder', [`${merged(n1)} then ${work(n2)} then boardmove ${n2} review then boardcomment ${n2}`, `${merged(n2)} then boardmove ${n3} doing then ${work(n3)} then boardmove ${n3} review then boardcomment ${n3}`, 'work 1'])
     const sessions = await dev.inv('session:list', alpha)
     const sessionOf = (id) => sessions.find((x) => x.agentId === id && x.source === 'hive')?.id

@@ -1,7 +1,7 @@
 // The scenario harness (tests/scenarios) must count only what happened:
 // - a skill read is a successful read that shows the skill (Claude Code's Skill tool, or a read whose result is that
 //   skill's own text, as Codex reads one), never a write to its path, a mention, or a failed read;
-// - hive tool calls are the ones the server ran (its test log), while names in a transcript or a script (which may
+// - Combwork tool calls are the ones the server ran (its test log), while names in a transcript or a script (which may
 //   not have run) are only mentions.
 // The fixtures' checks fail when nothing was done, a call failed, or the steps came in the wrong order.
 import { afterAll, describe, expect, it } from 'vitest'
@@ -132,7 +132,7 @@ describe("a skill's reference files read (skillRefsRead)", () => {
   })
 })
 
-describe('hive tools named in a transcript are mentions, not calls', () => {
+describe('Combwork tools named in a transcript are mentions, not calls', () => {
   it('lists names from direct calls and from scripts, including ones a script never reaches', () => {
     const o = observeTranscript(
       [tool('mcp__combwork__cw_update_task', { number: 3 }), tool('combwork · cw_reorder_tasks', 'column: todo'), tool('Script', 'if (false) { await tools.mcp__combwork__cw_wait_for_agents({}); }')],
@@ -178,7 +178,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
     const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], hiveMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
     const read = 'text(await tools.mcp__combwork__cw_read_task({number:"AL-1"}))'
     const got = observe(rollout(call('c1', read), mcp('exec-1', 'cw_read_task', { number: 'AL-1' }, 'Acceptance: ACCEPT-ZEBRA-42'), output('c1', '…')))
-    const refused = observe(rollout(call('c1', read), mcp('exec-1', 'cw_read_task', { number: 'AL-1' }, 'Hive error: no such card', true), output('c1', '…')))
+    const refused = observe(rollout(call('c1', read), mcp('exec-1', 'cw_read_task', { number: 'AL-1' }, 'Combwork error: no such card', true), output('c1', '…')))
     const acceptance = "its reply had the card's acceptance line"
     expect(check('card-detail', acceptance, got, { cards: { q: 1 } })).toBe(true)
     expect(check('card-detail', acceptance, refused, { cards: { q: 1 } })).toBe(false)
@@ -964,8 +964,8 @@ describe('the submit scenarios count a question about committing, never a notice
       { hiveCalls: [refusal, call('cw_notify', { title: 'AL-1 refused', message: 'Nothing is committed: should I commit it?' })] },
       { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Should I commit it on master and then submit?' }], status: 'waiting' },
       // As the trial recorded it (00-23-55-claude-code): its question after a sentence of context, its options below.
-      { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'questions: [\n  {\n    "question": "Hive refused to submit AL-1 because the change to greet.js isn\'t committed. Should I commit it on master and then submit?",\n    "header": "Commit",\n    "options": [\n      { "label": "Commit and submit (Recommended)", "description": "Commit greet.js, then submit AL-1 for review." }' }], status: 'waiting' },
-      { hiveCalls: [refusal], finalReply: "Hive refused the submit for AL-1 because the work isn't committed.\n\nYou didn't ask me to commit, so I haven't. Should I commit it and submit again?" },
+      { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'questions: [\n  {\n    "question": "Combwork refused to submit AL-1 because the change to greet.js isn\'t committed. Should I commit it on master and then submit?",\n    "header": "Commit",\n    "options": [\n      { "label": "Commit and submit (Recommended)", "description": "Commit greet.js, then submit AL-1 for review." }' }], status: 'waiting' },
+      { hiveCalls: [refusal], finalReply: "Combwork refused the submit for AL-1 because the work isn't committed.\n\nYou didn't ask me to commit, so I haven't. Should I commit it and submit again?" },
       // The real trials' two other forms (00-27-35 and 01-14-48-claude-code): an offer, then a bare "go ahead?".
       { hiveCalls: [refusal], finalReply: "You didn't ask me to commit, so I haven't. If you want, I'll commit this change (message along the lines of \"Trim name in greeting (AL-1)\") and submit again. Should I go ahead?" },
       { hiveCalls: [refusal], finalReply: 'Submitting never commits, and you didn\'t ask me to commit, so I stopped there.\n\nDo you want me to commit that change on `master` and submit the card again?' }
@@ -1072,7 +1072,7 @@ describe('the HI-2265 check fix', () => {
   const TOLD = 'Combwork told it once'
   const o = (history: { by: string; what: string }[], wakeLines: string[]) => ({ hiveCalls: [], tools: [], skillsRead: [], wakeLines, cards: { a: { number: 1, key: 'AL-1', column: 'done', history: [{ at: '2026-11-01T00:00:00Z', by: 'You', what: 'Recorded a decision: "Use "Welcome back!" as the greeting."' }, ...history.map((h) => ({ at: '2026-11-01T00:00:05Z', ...h }))] } }, facts: { a: [] }, allCards: [{ number: 1, key: 'AL-1' }] })
   const c = { cards: { a: 1 }, read: () => 'Welcome back!\n' }
-  const watchWake = '1 new:\nm1 · Hive · AL-1: [CW] AL-1 is in Doing (a new decision from the user: read its decisions). Your card watch has ended: carry on.'
+  const watchWake = '1 new:\nm1 · Combwork · AL-1: [CW] AL-1 is in Doing (a new decision from the user: read its decisions). Your card watch has ended: carry on.'
 
   it("decision-while-waiting: the card watch's wake tells the decision once, as a decision line does; both, or neither, isn't once", () => {
     expect(byName('decision-while-waiting', o([], [watchWake]), c)[TOLD]).toBe(true)
@@ -1702,10 +1702,10 @@ describe('the fixtures fail when nothing was done', () => {
     const known = [{ kind: 'workspace', token: ws }, { kind: 'agent', token: agent }]
     // The trial's Bash call: `env | grep -i hive`, the token far into its result.
     const hook = '9'.repeat(24) + 'abcdef'.repeat(4)
-    const env = `${'x'.repeat(500)}\nCW_HOOK_TOKEN=${hook}\nCW_API_URL=http://127.0.0.1:47822\nHIVE_API_TOKEN=${agent}\nCW_RUN_ID=afec06a7b1c2d3e4f5a6b7c8\nCW_API_TOKEN_FILE=C:\\t.json\n`
+    const env = `${'x'.repeat(500)}\nCW_HOOK_TOKEN=${hook}\nCW_API_URL=http://127.0.0.1:47822\nCW_API_TOKEN=${agent}\nCW_RUN_ID=afec06a7b1c2d3e4f5a6b7c8\nCW_API_TOKEN_FILE=C:\\t.json\n`
     const seen = tokenSightings(known, { tools: [{ name: 'Skill', result: 'Launching skill' }, { name: 'Bash', result: env }], scripts: [{ name: 'Script', result: `got ${ws}` }], replies: ['done', `the token is ${agent} and ${ws}`] })
     expect(seen.map((s) => [s.kind, s.in, s.at, s.name])).toEqual([['agent', 'tool', 1, 'Bash'], ['workspace', 'script', 0, 'Script'], ['workspace', 'reply', 1, undefined], ['agent', 'reply', 1, undefined]])
-    expect(seen[0].excerpt).toContain('HIVE_API_TOKEN=<agent token>')
+    expect(seen[0].excerpt).toContain('CW_API_TOKEN=<agent token>')
     // The hook token beside it, unknown to the check, is masked too (HR2's round 1); a run id isn't.
     expect(seen[0].excerpt).toContain('CW_HOOK_TOKEN=<hex>')
     expect(seen[0].excerpt).not.toContain('abcdefabcdef')
@@ -1717,7 +1717,7 @@ describe('the fixtures fail when nothing was done', () => {
     // The check fails saying where, masked.
     const check = scenario('raw-api').expect({ ...base, tokenLeak: true, tokenSeen: seen.slice(0, 1) }, { read: () => null }).find(([n]) => n === 'no token was printed or said')
     expect(check?.[1]).toBe(false)
-    expect(check?.[2]).toMatch(/^agent token in tool 1 \(Bash\): ….*HIVE_API_TOKEN=<agent token>/)
+    expect(check?.[2]).toMatch(/^agent token in tool 1 \(Bash\): ….*CW_API_TOKEN=<agent token>/)
     expect(check?.[2]).not.toContain(agent)
   })
 
@@ -1728,7 +1728,7 @@ describe('the fixtures fail when nothing was done', () => {
     const named = (script: string) => scenario('raw-api').expect({ ...base, skillsRead: ['use-cw-api'] }, { read: (f: string) => (f === 'scripts/cards.ps1' ? script : null) }).find(([n]) => n === "the script takes the agent's own token from CW_API_TOKEN_FILE")?.[1]
     expect(named('$t = (Get-Content $env:CW_API_TOKEN_FILE | ConvertFrom-Json).token')).toBe(true)
     // The variable sessions no longer get: fails.
-    expect(named('$h = @{ Authorization = "Bearer $env:HIVE_API_TOKEN" }')).toBe(false)
+    expect(named('$h = @{ Authorization = "Bearer $env:CW_API_TOKEN" }')).toBe(false)
   })
 
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {
@@ -2005,9 +2005,9 @@ describe('a trial the environment stops (trialEnvironment)', () => {
   })
 })
 
-// Before reading Combwork's metrics, the harness waits until they count every hive call the bridges logged (#527): the whole
+// Before reading Combwork's metrics, the harness waits until they count every Combwork call the bridges logged (#527): the whole
 // run on both sides, so a setup call reported before the scenario's baseline counts as reported, not missing.
-describe("every logged hive call reported (allCallsReported)", () => {
+describe("every logged Combwork call reported (allCallsReported)", () => {
   const { allCallsReported } = require('./scenarios/harness.cjs') as { allCallsReported: (logged: { tool: string; direct?: boolean }[], metrics: unknown) => boolean }
   const mcp = (count: number) => [{ tool: 'cw_list_tasks', mode: 'compact', outcome: 'ok', count, chars: 10, bytes: 10, totalMs: 1 }]
   const metrics = (project: number, workspace = 0) => ({ projects: { alpha: { mcp: mcp(project) } }, workspace: { mcp: mcp(workspace) } })

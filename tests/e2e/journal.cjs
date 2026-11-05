@@ -3,7 +3,7 @@
 // out-of-range box saving nothing, HI-2345), the journal turned off (the
 // entries kept) and on again are saved in the workspace's workspace.json; Delete Journal… asks, then the file goes to the
 // trash, and the copy starts with tips off. Both themes. No agents (its tools are measured in replysize). Dev build, or
-// a packaged one with HIVE_EXE (#1599: its deletion goes to the suite's trash folder too). Throwaway profile and workspace.
+// a packaged one with CW_EXE (#1599: its deletion goes to the suite's trash folder too). Throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -33,7 +33,7 @@ const saved = () => {
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    // A test copy starts with tips off (HIVE_TEST_TIPS=off), packaged with HIVE_EXE too (#1599).
+    // A test copy starts with tips off (CW_TEST_TIPS=off), packaged with CW_EXE too (#1599).
     check('tips are off in a test copy, and no tip card shows', (await inv('settings:get')).general.showTips === false && (await page.locator('.tip-card').count()) === 0)
     const openSection = async () => {
       await page.keyboard.press('Control+,')

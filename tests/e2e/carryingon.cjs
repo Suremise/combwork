@@ -55,7 +55,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.writeFileSync(path.join(claudeHome, 'fake-follow-notices.txt'), '')
   fs.writeFileSync(path.join(codexHome, 'fake-follow-notices.txt'), '')
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -108,7 +108,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const tool = (name, args) => {
       const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-        env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }),
+        env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }),
         timeout: 60000
       }).toString()
       const r = JSON.parse(out.split('\n')[0]).result
@@ -192,7 +192,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await setSwitch('idleWakes', false)
     const n = (await inv('tasks:create', { title: 'Carry on', project: 'alpha', agent: codex.id })).number
     await inv('tasks:update', n, { column: 'doing', agent: codex.id })
-    await say(codex.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Claude' })}`)
+    await say(codex.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Claude' })}`)
     check('the lane is registered', !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === claude.id), HUNG_MS)))
     await until(() => idle(codex.id), HUNG_MS)
     const before = wakes(claude).length
@@ -208,7 +208,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // shows it unread, and Deliver Now there types its line once.
     const asst = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase())
     // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
-    await lib.typeLine(inv, lib.ptyKey(home, 'assistant'), claudeHome, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`, { live: asst })
+    await lib.typeLine(inv, lib.ptyKey(home, 'assistant'), claudeHome, null, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`, { live: asst })
     check('the Assistant watches the card', !!(await until(async () => (await asst())?.status === 'watching', HUNG_MS)), (await asst())?.status)
     await inv('tasks:comment', n, 'A note for the watch.')
     const asstUnread = async () => (await asst())?.inbox?.unread ?? []

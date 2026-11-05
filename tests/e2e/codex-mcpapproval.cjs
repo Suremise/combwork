@@ -78,7 +78,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
 
 ;(async () => {
   prepare()
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   try {
     const page = await app.firstWindow()

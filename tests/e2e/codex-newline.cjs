@@ -50,7 +50,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
   // Send prompts as typed on; a long wait for the line to be drawn (a model's turn may hold Codex busy a moment).
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { [AS_TYPED]: true, 'codex.prompt.drawnSeconds': 30 } }, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

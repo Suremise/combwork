@@ -78,7 +78,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47923), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47923), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -173,7 +173,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   }
   // The whole list's first read held (its session:list, asked before Combwork's own), so the note stays while it is shot.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'session:list=20000*1'
+    process.env.CW_TEST_SLOW_IPC = 'session:list=20000*1'
   })
   await page.locator('.tab', { hasText: 'Sessions' }).click()
   const note = page.locator('.sessions-scope[data-loading="others"]')
@@ -181,7 +181,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   await narrowShots('loading', note)
   check('…and goes once they are read', !!(await lib.until(async () => (await note.count()) === 0, HELD_LIST_HUNG_MS)))
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_SLOW_IPC
+    delete process.env.CW_TEST_SLOW_IPC
   })
   const tree = page.locator('.sessions-tree')
   const row = (name) => page.locator('.sessions-tree .session-row', { hasText: name })

@@ -8,7 +8,7 @@
 // now in every project; a status change alone never finds a card's agents again or reads the session lists beyond their
 // cadence. A card whose builder went on to its next card (its session's record keeping this one) has nobody on it. A
 // card's Activity whose agents come back after the window went elsewhere (another view, another workspace) doesn't open
-// (HR5's round 1: activity:cardAgents made slow, HIVE_TEST_SLOW_IPC). Both themes. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile,
+// (HR5's round 1: activity:cardAgents made slow, CW_TEST_SLOW_IPC). Both themes. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile,
 // workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -57,7 +57,7 @@ const AGENTS = [
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_TEST_SLOW_IPC: 'activity:cardAgents=2500', ...claude })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_SLOW_IPC: 'activity:cardAgents=2500', ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const shots = path.join(lib.WORK, 'activityworkspace-shots')
   fs.rmSync(shots, { recursive: true, force: true })
@@ -250,7 +250,7 @@ const AGENTS = [
     await laneRow.locator('.progress-lane-top').click({ button: 'right' })
     await lib.menuEntry(page, 'Show in Activity').click()
     check("a lane's Show in Activity: the workspace level on its builder", !!(await fresh(async () => JSON.stringify(await groups()) === JSON.stringify(['beta:hb1']) && /1 agent/.test(await head.locator('.activity-pick').first().innerText().catch(() => '')))), JSON.stringify(await groups()))
-    // A run of beta's HB1 (its own token, as hive-progress sends it), its details' Show in Activity.
+    // A run of beta's HB1 (its own token, as cw-progress sends it), its details' Show in Activity.
     const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     const token = launches.filter((l) => same(l.env?.CW_PROJECT ?? '', beta) || same(l.cwd, slotA)).at(-1)?.token
     const res = await fetch(`http://127.0.0.1:${PORT}/v1/progress`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'e2e: activity run' }) })

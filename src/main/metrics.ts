@@ -11,7 +11,7 @@ import { englishText } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import type { WorkspaceService } from './workspace'
-import { currentToolName, HIVE_TOOLS } from '../shared/assistantTools'
+import { currentToolName, CW_TOOLS } from '../shared/assistantTools'
 import { PROVIDERS } from '../shared/providers'
 import {
   addTiming,
@@ -35,7 +35,7 @@ import {
   type TrendPoint
 } from '../shared/metrics'
 import type { LaunchWorkflow } from '../shared/workflow/roles'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 
 /**
  * Hive's performance metrics, one store per open workspace (shared/metrics.ts has the contract). Recording is a few
@@ -147,7 +147,7 @@ export function knownRoute(template: string): void {
 }
 /** The Assistant's state view at a session start (#1032), measured as a reply of Hive's own beside the tools'. */
 export const START_VIEW_METRIC = 'session start view' // i18n-ignore: a metrics key, shown as a tool name in the developer's Performance view
-const TOOLS = new Set<string>([...HIVE_TOOLS, START_VIEW_METRIC])
+const TOOLS = new Set<string>([...CW_TOOLS, START_VIEW_METRIC])
 const PROVIDER_IDS = new Set<string>(PROVIDERS.map((p) => p.id))
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 const ROLES = new Set(['agent', 'assistant', 'api', 'viewer', 'unknown'])
@@ -746,7 +746,7 @@ const fileKey = (file: string): string => (process.platform === 'win32' ? resolv
 // The workspace's database replaced (the upgrade to 1.0, a restore): its store reads what the file has now.
 // Under every spelling of the workspace, by the place each store's handle recorded as it entered (#1456).
 onDbReplaced((workspacePath, place) => {
-  const key = fileKey(join(workspacePath, HIVE_DIR, 'metrics', 'metrics.json'))
+  const key = fileKey(join(workspacePath, CW_DIR, 'metrics', 'metrics.json'))
   for (const store of new Set([...byFile].filter(([k, o]) => k === key || o.place === place).map(([, o]) => o.store))) store.reread()
 })
 /** Saves started by a workspace closing, still going (quitting waits for them). */
@@ -785,7 +785,7 @@ export function metricsHandle(w: WorkspaceService | null | undefined): MetricsHa
   const had = stores.get(w)
   if (had && had.lifetime === w.lifetime) return had
   const lifetime = w.lifetime
-  const file = join(w.path, HIVE_DIR, 'metrics', 'metrics.json')
+  const file = join(w.path, CW_DIR, 'metrics', 'metrics.json')
   const key = fileKey(file)
   // The same file's store if one is still here (saving after its workspace closed): reused, under this lifetime.
   const shared = byFile.get(key)

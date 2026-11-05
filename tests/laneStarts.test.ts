@@ -326,7 +326,7 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
     builder('ready', 'b6')
     const { startTask } = await import('../src/main/taskStart')
     let seen: string | null = null
-    const refused = await run(() => startTask(n, { kind: 'agent', agentId: 'b6' }, tasks.HIVE_LANE_START, undefined, undefined, (now) => {
+    const refused = await run(() => startTask(n, { kind: 'agent', agentId: 'b6' }, tasks.CW_LANE_START, undefined, undefined, (now) => {
       seen = now.column
       throw new Error('its lane changed meanwhile')
     })).then(() => null, (e: Error) => e.message)

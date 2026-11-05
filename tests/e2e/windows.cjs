@@ -37,7 +37,7 @@ function api(method, p, headers = {}) {
 }
 
 async function start() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   app.on('window', (p) => p.on('pageerror', (e) => console.log('FAIL page error', e.message)))
   return app

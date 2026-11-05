@@ -29,7 +29,7 @@ function launcherOf() {
 
 /** The run context's PATH for a test copy with Git's launcher folder and no other folder that holds git. */
 function pathWithLauncher(launcher) {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   const rest = (env[key] ?? '').split(path.delimiter).filter((d) => d && !['git.exe', 'git.com'].some((g) => fs.existsSync(path.join(d.replace(/^"|"$/g, ''), g))))
   return [path.dirname(launcher), ...rest].join(path.delimiter)

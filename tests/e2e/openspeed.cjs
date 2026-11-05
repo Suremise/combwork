@@ -33,7 +33,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
     fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
     fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${name}-1`, name: 'Coder' }, { id: `a-${name}-2`, name: 'Reviewer' }] }))
   }
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47700) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47700) } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
     // Its first open sets it up (its .combwork, the bundled skills and modes copied in): the timed open is an ordinary one.

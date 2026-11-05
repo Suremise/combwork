@@ -352,10 +352,10 @@ describe('the size cap, as little as it takes (#1031 round 1)', () => {
 describe('deleting the journal', () => {
   const trashDir = join(base, 'trash')
   beforeAll(() => {
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
   })
   afterAll(() => {
-    delete process.env.HIVE_TEST_TRASH_DIR
+    delete process.env.CW_TEST_TRASH_DIR
   })
   it('closes it and moves its files to the Recycle Bin; a new one starts empty', async () => {
     const h = home()

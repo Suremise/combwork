@@ -38,7 +38,7 @@ const tools = {
     current = crypto.randomUUID()
     // What the runner gave it: its settings, and one variable of the shell's that it mustn't pass on.
     const env = n => process.env[n] ?? null
-    s.calls.push(['env', { WSB_SANDBOX_ROOT: env('WSB_SANDBOX_ROOT'), WSB_TOOL_DIRS: env('WSB_TOOL_DIRS'), WSB_MCP_ENABLED: env('WSB_MCP_ENABLED'), WSB_ALLOWED_ROOTS: env('WSB_ALLOWED_ROOTS'), HIVE_API_TOKEN: env('HIVE_API_TOKEN') }])
+    s.calls.push(['env', { WSB_SANDBOX_ROOT: env('WSB_SANDBOX_ROOT'), WSB_TOOL_DIRS: env('WSB_TOOL_DIRS'), WSB_MCP_ENABLED: env('WSB_MCP_ENABLED'), WSB_ALLOWED_ROOTS: env('WSB_ALLOWED_ROOTS'), CW_API_TOKEN: env('CW_API_TOKEN') }])
     s.calls.push(['start', args])
     s.sandboxes.push(current)
     write(s)

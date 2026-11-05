@@ -51,7 +51,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
   await new Promise((r) => stub.listen(0, '127.0.0.1', r))
   const port = stub.address().port
 
-  const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 950 } })
+  const { app, page } = await lib.launch({ userData, env: { ...env, CW_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const consoleText = []

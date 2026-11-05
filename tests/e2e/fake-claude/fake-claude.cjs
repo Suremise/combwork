@@ -18,12 +18,12 @@
 //   N seconds; its task notification then starts a turn by itself, as in Claude Code. "subagent N" (once or more)
 //   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "pad N" adds N KB to the
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
-//   It connects the launch's hive MCP server as it starts (#865: the real server, which tells Combwork it has connected);
+//   It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected);
 //   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
 //   its session doesn't start (no SessionStart: Combwork sees it starting) until fake-start-go-<agent> (HI-1707: never ready).
 //   "holduntil NAME": the turn doesn't end until the test makes a file NAME in its home (CLAUDE_CONFIG_DIR).
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
-//   "waitfile NAME" as a step ("waitfile go then hive cw_inbox {}"): the steps after it wait for that file.
+//   "waitfile NAME" as a step ("waitfile go then cw cw_inbox {}"): the steps after it wait for that file.
 //   "shell: <command line>" runs a command in cmd with the session's environment (fake-shell.jsonl records it; its
 //   standard error so far is in its agent's file while it runs, shellStderr.cjs, HI-1816).
 //   "planusage F W": its status line reports the plan's limits as Claude Code's does (rate_limits: the 5-hour at F%,
@@ -32,7 +32,7 @@
 //   detached, hidden node started by a short-lived detached one that has exited by then (linger.cjs; their pids in
 //   fake-linger.jsonl in its home; each ends by itself after two minutes, in case). With fake-linger-at-start.txt (N) in
 //   its home, it leaves N the moment it starts, before anything else. "progress-linger" leaves a command running
-//   through the session's hive-progress shim, as a Codex agent once did (#542): cmd → hive-progress → a lingering node
+//   through the session's cw-progress shim, as a Codex agent once did (#542): cmd → cw-progress → a lingering node
 //   (linger.cjs; its pid in fake-progress-linger.jsonl in its home), and ends its turn once that node runs (#1100: as
 //   an agent's command has started by then; fake-progress-delay-ms.txt in its home (N) starts it N ms late, as under load).
 //   "progress-linger nowait" ends its turn at once, the command still to start (#1134). "hidden-linger" leaves one as
@@ -40,11 +40,11 @@
 //   "devapp" leaves a dev copy of an Electron app running, as an agent's dev launch of Combwork did (#614): Electron's
 //   executable with Playwright's --inspect=0 --remote-debugging-port=0 and a copy of devapp in its home (a hidden window; quits after two
 //   minutes, in case), started through a detached node that exits at once (linger.cjs); its pid in fake-devapp.jsonl.
-//   "boardmove N COLUMN" moves card N as cw_update_task does (the hive tools' API, token and agent, from
+//   "boardmove N COLUMN" moves card N as cw_update_task does (the Combwork tools' API, token and agent, from
 //   --mcp-config) and records the answer in fake-calls.jsonl; "boardreview N ACTION [COLUMN]" reviews it the same way
-//   (review: start, passed or failed; a column with the verdict), and "boardcomment N" comments on it. All are written to the transcript as the hive tool
-//   call they stand for (mcp__combwork__cw_update_task), as Claude Code writes an MCP call. "hive TOOL {json}" calls a
-//   hive tool through the real hive MCP server of the launch's --mcp-config (fake-bridge.cjs: logged and measured by
+//   (review: start, passed or failed; a column with the verdict), and "boardcomment N" comments on it. All are written to the transcript as the Combwork tool
+//   call they stand for (mcp__combwork__cw_update_task), as Claude Code writes an MCP call. "cw TOOL {json}" calls a
+//   Combwork tool through the real Combwork MCP server of the launch's --mcp-config (fake-bridge.cjs: logged and measured by
 //   Combwork's performance metrics as a real call is), written to the transcript as that MCP call and its reply. Combwork's
 //   doorbell ("[CW] New in your inbox: …", #650) it follows as a model does: it reads its inbox with cw_inbox (and
 //   acks it too when it follows notices, below). New work (a task, a handover) it read is its prompt; what else it read
@@ -56,7 +56,7 @@
 //   Claude Code (#597; fake-slow-input-<agent>.paused says it has stopped): what arrived meanwhile comes in one read,
 //   taken as Claude Code 2.1.296 takes one that isn't a bracketed paste: a paste, in which a Ctrl+U or an Enter is
 //   kept as text (not sent), and after which the next Enter is lost too. "skill NAME" reads a skill
-//   as Claude Code's Skill tool does: a Skill call in the transcript ("hive:NAME"), answered with the skill's SKILL.md
+//   as Claude Code's Skill tool does: a Skill call in the transcript ("combwork:NAME", as Combwork's plugin names it), answered with the skill's SKILL.md
 //   from the launch's plugin folder (an error when it has none).
 // - "/compact [focus]" compacts as Claude Code does: PreCompact, a compaction boundary in the transcript after 1 s (N
 //   seconds when the focus has "hold N"), then PostCompact. With no messages yet it says "Not enough messages to compact."
@@ -135,7 +135,7 @@ const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
 const { spawn } = require('child_process')
-const { callHiveTool, connectHive, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
+const { callOwnTool, connectOwnServer, parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
 const { shellStderrFile } = require('./shellStderr.cjs')
 
 const args = process.argv.slice(2)
@@ -312,7 +312,7 @@ function runMode() {
 // What it was started with, for suites that check the launch: the options, Claude Code's own variables and the
 // Agent API token Combwork gave it.
 // A server connection's (HI-1772): its ANTHROPIC_* variables too, a dummy key among them (a disposable test log).
-// Its dialect's file (HI-2443: CW_DIALECT_FILE, CW_DIALECT), which hive-progress in its shell reads.
+// Its dialect's file (HI-2443: CW_DIALECT_FILE, CW_DIALECT), which cw-progress in its shell reads.
 const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('HIVE_API_TOKEN') || k.startsWith('CW_API_TOKEN') || k.startsWith('CW_DIALECT') || k === 'CW_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
 // The agent's own token, as its launch's file held it at the start (HI-2262: the session has the file, never the token
 // in its environment; read now, as the file goes when the run ends). Null without one.
@@ -528,22 +528,22 @@ function followsNotices() {
 
 /** Acts on a notice as a model that follows them: reads its inbox (cw_inbox), then acks the ids it listed. */
 async function readInbox() {
-  const listed = await hiveCall('cw_inbox', {})
+  const listed = await ownCall('cw_inbox', {})
   const ids = [...new Set([...String(listed?.text ?? '').matchAll(/\bm\d+\b/g)].map((m) => m[0]))]
-  if (ids.length) await hiveCall('cw_inbox', { ack: ids })
+  if (ids.length) await ownCall('cw_inbox', { ack: ids })
 }
 
 /**
- * Combwork's doorbell (#650): it reads its inbox (cw_inbox, through the hive MCP server, a call in its transcript), as a
+ * Combwork's doorbell (#650): it reads its inbox (cw_inbox, through the Combwork MCP server, a call in its transcript), as a
  * model does; one that follows Combwork's notices acks what it read too. What it read: its items' texts in one line, or null
- * when it has no hive server to ask.
+ * when it has no Combwork MCP server to ask.
  */
 async function followDoorbell() {
   if (!opts['--mcp-config']) return null
-  const r = await hiveCall('cw_inbox', {})
+  const r = await ownCall('cw_inbox', {})
   if (r.isError) return null
   const rows = inboxRows(r.text)
-  if (rows.length && followsNotices()) await hiveCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
+  if (rows.length && followsNotices()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
   return rows.map((x) => x.text).join(' ')
 }
 
@@ -696,11 +696,11 @@ async function runPrompt(text, enter = null) {
     if (review) await boardPatch(Number(review[1]), { review: review[2].toLowerCase(), ...(review[3] ? { column: review[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) })
     const comment = /\bboardcomment\s+(\d+)/i.exec(step)
     if (comment) await boardPatch(Number(comment[1]), { comment: 'Fake: done, see the files.' })
-    const call = parseHiveStep(step)
-    if (call) await hiveCall(call.tool, call.args)
+    const call = parseToolStep(step)
+    if (call) await ownCall(call.tool, call.args)
     if (/\bcheckpoint\b/i.test(step)) await checkpoint()
     if (/\bratelimited\b/i.test(step)) await rateLimited()
-    // "shell: <command line>": runs it in cmd with the session's environment (PATH, HIVE_*), as an agent's shell
+    // "shell: <command line>": runs it in cmd with the session's environment (PATH, CW_*), as an agent's shell
     // would; the agent, command, exit code and output go to fake-shell.jsonl in its home.
     const sh = /\bshell:\s*(.+)$/i.exec(step)
     if (sh) await shell(sh[1].trim())
@@ -847,8 +847,8 @@ function readSkill(name) {
   const id = `toolu_skill_${randomUUID().slice(0, 8)}`
   const file = path.join(opts['--plugin-dir'] ?? '', 'skills', name, 'SKILL.md')
   const text = opts['--plugin-dir'] && fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
-  write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Skill', input: { skill: `hive:${name}` } }], usage: { input_tokens: 10, output_tokens: 5 } } })
-  write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: text ?? `Unknown skill: hive:${name}`, is_error: text === null }] } })
+  write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Skill', input: { skill: `combwork:${name}` } }], usage: { input_tokens: 10, output_tokens: 5 } } })
+  write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: text ?? `Unknown skill: combwork:${name}`, is_error: text === null }] } })
 }
 
 /**
@@ -877,13 +877,13 @@ function ownServer() {
   return servers.combwork ?? servers.hive ?? null
 }
 
-/** Calls a hive tool through the launch's own hive MCP server; the call and its reply go in the transcript. */
-async function hiveCall(tool, input) {
+/** Calls a Combwork tool through the launch's own Combwork MCP server; the call and its reply go in the transcript. */
+async function ownCall(tool, input) {
   const id = `toolu_hive_${randomUUID().slice(0, 8)}`
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: `mcp__combwork__${tool}`, input }], usage: { input_tokens: 10, output_tokens: 5 } } })
   let r
   try {
-    r = await callHiveTool(ownServer(), tool, input)
+    r = await callOwnTool(ownServer(), tool, input)
   } catch (e) {
     r = { text: String(e), isError: true }
   }
@@ -891,7 +891,7 @@ async function hiveCall(tool, input) {
   return r
 }
 
-/** Changes card n as cw_update_task does: the hive tools' API, with this agent's token; the call is in the transcript. */
+/** Changes card n as cw_update_task does: the Combwork tools' API, with this agent's token; the call is in the transcript. */
 async function boardPatch(n, change) {
   const id = `toolu_board_${randomUUID().slice(0, 8)}`
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'mcp__combwork__cw_update_task', input: { number: n, ...change } }], usage: { input_tokens: 10, output_tokens: 5 } } })
@@ -910,11 +910,11 @@ async function boardPatch(n, change) {
   }
   fs.appendFileSync(path.join(home, 'fake-calls.jsonl'), JSON.stringify(record) + '\n')
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: JSON.stringify(record.body ?? record.error ?? null), is_error: record.status !== 200 }] } })
-  // Where Combwork's hive server logs the calls it runs (tests only), this call is logged too, as the server would; `direct`:
-  // no hive server ran it, so none reports it to Combwork's metrics.
+  // Where Combwork's MCP server logs the calls it runs (tests only), this call is logged too, as the server would; `direct`:
+  // no Combwork MCP server ran it, so none reports it to Combwork's metrics.
   try {
     const env = cwEnv(ownServer().env)
-    if (env.HIVE_TEST_MCP_LOG) fs.appendFileSync(env.HIVE_TEST_MCP_LOG, JSON.stringify({ at: new Date().toISOString(), tool: 'cw_update_task', role: env.HIVE_ROLE === 'assistant' ? 'assistant' : 'agent', project: env.CW_PROJECT, agent: env.HIVE_AGENT_ID ?? null, ok: record.status === 200, args: JSON.stringify({ number: n, ...change }), direct: true }) + '\n')
+    if (env.CW_TEST_MCP_LOG) fs.appendFileSync(env.CW_TEST_MCP_LOG, JSON.stringify({ at: new Date().toISOString(), tool: 'cw_update_task', role: env.CW_ROLE === 'assistant' ? 'assistant' : 'agent', project: env.CW_PROJECT, agent: env.CW_AGENT_ID ?? null, ok: record.status === 200, args: JSON.stringify({ number: n, ...change }), direct: true }) + '\n')
   } catch {
     // No log.
   }
@@ -1407,7 +1407,7 @@ function leaveAppRunning() {
 }
 
 /**
- * "progress-linger": a command left running through the session's hive-progress shim (on its PATH), not waited for to end
+ * "progress-linger": a command left running through the session's cw-progress shim (on its PATH), not waited for to end
  * (#542). The turn goes on until its node runs (it writes its pid; two minutes at most, in case): what the agent started is
  * there when its turn ends, so the running marker written after the turn's status has it (#1100: under load the three
  * processes took longer to start than the turn, and the marker, written two seconds after the turn ended and then only
@@ -1418,7 +1418,7 @@ async function leaveProgressRunning(wait = true) {
   const q = (x) => `"${x}"`
   const pids = path.join(home, 'fake-progress-linger.jsonl')
   const had = fs.existsSync(pids) ? fs.readFileSync(pids, 'utf8').length : 0
-  const command = ['hive-progress', '--title', q('Left running'), '--', q(process.execPath), q(path.join(__dirname, 'linger.cjs')), 'linger', q(pids), process.env.CW_AGENT || 'agent'].join(' ')
+  const command = ['cw-progress', '--title', q('Left running'), '--', q(process.execPath), q(path.join(__dirname, 'linger.cjs')), 'linger', q(pids), process.env.CW_AGENT || 'agent'].join(' ')
   const delayFile = path.join(home, 'fake-progress-delay-ms.txt')
   const delay = fs.existsSync(delayFile) ? Number(fs.readFileSync(delayFile, 'utf8')) || 0 : 0
   const start = () => spawn('cmd.exe', ['/d', '/s', '/c', q(command)], { cwd, env: process.env, detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true }).unref()
@@ -1459,16 +1459,16 @@ async function main() {
     if (take('fake-title-untimed')) fs.appendFileSync(transcript, JSON.stringify({ type: 'custom-title', customTitle: opts['--name'], sessionId }) + '\n')
     else write({ type: 'custom-title', customTitle: opts['--name'] })
   }
-  // Its MCP servers connect as it starts, beside its session (#865): the launch's hive server, through the real server,
+  // Its MCP servers connect as it starts, beside its session (#865): the launch's Combwork MCP server, through the real server,
   // which tells Combwork. With fake-mcp-hold-<agent> in its home, not until the test makes fake-mcp-go-<agent>, as a
   // resumed Claude Code connects them after its SessionStart.
-  const hive = opts['--mcp-config'] ? ownServer() : null
+  const server = opts['--mcp-config'] ? ownServer() : null
   const held = take('fake-mcp-hold')
     ? (async () => {
         while (!take('fake-mcp-go')) await sleep(100)
       })()
     : null
-  void connectHive(hive, held)
+  void connectOwnServer(server, held)
   if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
   promptLine()

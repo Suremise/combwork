@@ -31,7 +31,7 @@
 //   --pre-merge     a heavy run checking a merge goes first in the queue for a test slot (#558). Not needed in the
 //                   session of an agent holding the merge slot: such a run goes first anyway (slots.mjs holdsMergeSlot).
 // Needs a dev build. A suite fails when it exits non-zero or prints a line starting with FAIL. Each suite gets its own
-// Agent API port (HIVE_E2E_PORT, read through lib.port()), so suites can run side by side; each runner claims a lane
+// Agent API port (CW_E2E_PORT, read through lib.port()), so suites can run side by side; each runner claims a lane
 // (lanes.mjs: ports and suite folders of its own), so runners in different worktrees can run at the same time.
 // Run in a Combwork agent's session, it shows in that Combwork's Progress panel, one step per suite (../progressReport.mts).
 // Each suite's environment comes from the run context (runContext.cjs): an allowlist and the suite's own folder and
@@ -83,7 +83,7 @@ if (opts.fingerprint) {
 // nobody needs a shell delete on a computed path; it refuses anything else and evidence (evidence.cjs clearDir).
 if (opts.clearDir) {
   try {
-    const board = process.env.HIVE_TEST_NO_BOARD === '1' ? { cards: [] } : { tasksDir: findBoard(root) }
+    const board = process.env.CW_TEST_NO_BOARD === '1' ? { cards: [] } : { tasksDir: findBoard(root) }
     console.log(`Emptied ${clearDir(opts.clearDir, { board })}`)
     process.exit(0)
   } catch (e) {
@@ -94,10 +94,10 @@ if (opts.clearDir) {
 
 // What may be deleted (#253, evidence.cjs): never what a card that isn't Done cites. That needs the board: without it
 // nothing a run made could be removed, and runs would pile up copies of their suites' folders (#285), so it doesn't
-// start. HIVE_TEST_NO_BOARD=1 says there is no board (a checkout outside a Combwork workspace): nothing is evidence then.
+// start. CW_TEST_NO_BOARD=1 says there is no board (a checkout outside a Combwork workspace): nothing is evidence then.
 const evidence = evidenceFor(root)
 if (!evidence.ok) {
-  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
+  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set CW_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
   process.exit(2)
 }
 // The run's own temp folder in hive-test\tmp (HI-2102): its suites, Playwright's playwright-artifacts-* folders, the
@@ -131,13 +131,13 @@ if (!chosen.length) {
   console.log(`\nNo suite to run${opts.affected ? ' for these changes' : ''}.`)
   process.exit(0)
 }
-// A packaged build (HIVE_EXE, the Sandbox checks): a suite that can't run on one would test the dev build and pass for
+// A packaged build (CW_EXE, the Sandbox checks): a suite that can't run on one would test the dev build and pass for
 // it, so it is NOT RUN, with why, in the output and the record (#1591, runner.mjs suiteDevOnly: the suite and the
 // helpers it uses). The parts of a suite that runs which need the dev build say NOT RUN themselves (queueFixture
 // devSeam). A run where none can run tested nothing: it fails, with its record saying so.
-const packagedExe = process.env.HIVE_EXE || null
+const packagedExe = process.env.CW_EXE || null
 const { devOnly, nothingRan } = packagedPlan(chosen, here, packagedExe)
-if (packagedExe) console.log(`Packaged build: ${packagedExe} (HIVE_EXE)${devOnly.size ? `. NOT RUN, as they would test the dev build: ${devOnly.size} of ${chosen.length} suites (each said with why)` : ''}.\n`)
+if (packagedExe) console.log(`Packaged build: ${packagedExe} (CW_EXE)${devOnly.size ? `. NOT RUN, as they would test the dev build: ${devOnly.size} of ${chosen.length} suites (each said with why)` : ''}.\n`)
 
 // --- A heavy run (more than a few suites, or a repeat) waits for a test slot: at most a few go at once on this machine,
 // across every worktree (slots.mjs), so runs don't slow each other until tests time out; a small one (a few suites
@@ -234,7 +234,7 @@ const runBuild = () => {
   devBuild(root)
 }
 // Only the installer's suites: they test dist/win-unpacked, not out/ (needsDevBuild), so out/ isn't looked at (#274).
-// Nor when none can run on the packaged build HIVE_EXE names: nothing would use it, and the run's record is still due.
+// Nor when none can run on the packaged build CW_EXE names: nothing would use it, and the run's record is still due.
 const runnable = chosen.filter((s) => !devOnly.has(s.name))
 const devBuildNeeded = !nothingRan && needsDevBuild(runnable)
 let buildCheck = { stale: false, built: false, waited: false, why: null }
@@ -262,7 +262,7 @@ if (packagedStale) console.warn(`Warning: ${packagedStale}: the installer's suit
 
 /**
  * Where the suites keep their profiles, workspaces and screenshots: the lane's folder (the logs stay in lib.WORK). A
- * runner inside a suite uses nested/ in its parent's (E2E_RUN_DIR: Combwork drops HIVE_E2E_DIR from an agent's shell).
+ * runner inside a suite uses nested/ in its parent's (E2E_RUN_DIR: Combwork drops CW_E2E_DIR from an agent's shell).
  */
 const suiteWork = lane ? laneWork(lib.WORK, lane.lane) : process.env.E2E_RUN_DIR ? join(process.env.E2E_RUN_DIR, 'nested') : null
 // Each slot has its own port, from the lane's: the CLI lane takes the one below the first slot's.
@@ -271,9 +271,9 @@ if (lane) console.log(`Lane ${lane.lane}: ports ${lane.first}–${lane.last}\n  
 
 /**
  * A suite's environment (runContext.suiteEnv): the allowlist and the test settings passed on by name, nothing else of
- * the runner's (an agent session's HIVE_ variables, HIVE_PROGRESS_*, NO_COLOR…); its lane's folder, and side by side
+ * the runner's (an agent session's CW_ variables, CW_PROGRESS_*, NO_COLOR…); its lane's folder, and side by side
  * its own Agent API port (suites read it with lib.port(); the test copies they start get it through lib.hiveEnv). The
- * same said without the HIVE_ prefix (E2E_RUN_*), which Combwork keeps in its sessions: a runner started in an agent's
+ * same said without the CW_ prefix (E2E_RUN_*), which Combwork keeps in its sessions: a runner started in an agent's
  * shell inside the suite's Combwork (progressreport does) knows it is inside a suite, and which port to keep clear of.
  */
 const suiteEnv = (name, port, dir) => {
@@ -331,7 +331,7 @@ const run = (name, port) =>
       // result line says that one.
       const windows = windowsCodesIn(out).filter((w) => w !== describeExit(code))
       const outcome = { ...suiteOutcome({ code, out }), clis: suiteClis(dir), windows }
-      // What a suite's agents left running from its folder (a command through hive-progress, a server: #542) would hold
+      // What a suite's agents left running from its folder (a command through cw-progress, a server: #542) would hold
       // the folder and outlive the run: stopped, by command line (its folder, started since the suite did), never by name.
       // Its test copies of Combwork first (HI-1453): those it recorded, as the processes recorded. One not recorded is the
       // folder's sweep's below (#542), which takes what names the folder and started since the suite did.
@@ -583,7 +583,7 @@ if (opts.record) {
 finishRunDirs(runs.map((r) => r.logDir))
 // A pruned run's kept suite folders go with it, in lanes this runner may work in (its own, still held, or an idle one
 // it claims); in a lane another runner holds they are left for the clean-up (evidence.cjs releaseKept). Runs of the
-// last day are kept too, up to a size (#1595: HIVE_E2E_KEEP_HOURS, HIVE_E2E_KEEP_MB).
+// last day are kept too, up to a size (#1595: CW_E2E_KEEP_HOURS, CW_E2E_KEEP_MB).
 const retention = logRetention()
 if (retention.bad.length) console.log(`\nIgnored ${retention.bad.join(', ')}: not a number of 0 or more (the default is used).`)
 // The runs to prune are listed with one look at the board, and each is looked at afresh just before it goes (HI-2364).

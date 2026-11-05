@@ -113,7 +113,7 @@ async function openSetup(app, page, lang = 'en') {
   }
   // In German: the install note is German (#1404), the button's name and Copied are translated; the command is as it is.
   {
-    const { app, page } = await lib.launch({ userData, env: { HIVE_LANG: 'de' }, viewport: { width: 1200, height: 860 } })
+    const { app, page } = await lib.launch({ userData, env: { CW_LANG: 'de' }, viewport: { width: 1200, height: 860 } })
     try {
       const setup = await openSetup(app, page, 'de')
       await setup.locator('.setup-tab', { hasText: 'Claude Code' }).click()

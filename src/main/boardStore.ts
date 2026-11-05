@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
 import type { StatementSync } from 'node:sqlite'
 import { app } from 'electron'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
 import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
@@ -382,7 +382,7 @@ const boards = new Map<string, Board>()
 export const boardTestHooks: {
   failPut: ((n: number) => boolean) | null
   refuseRename: ((from: string) => boolean) | null
-  /** The 1.0 upgrade's question answered before it is asked (as HIVE_TEST_BOARD_UPGRADE does for a test copy). */
+  /** The 1.0 upgrade's question answered before it is asked (as CW_TEST_BOARD_UPGRADE does for a test copy). */
   upgradeAnswer: 'yes' | 'no' | null
   /** Runs while the upgrade holds the file's exclusive lock, its steps committed. */
   whileUpgrading: (() => void) | null
@@ -625,7 +625,7 @@ const textHash = (text: string): string => createHash('sha256').update(text).dig
  */
 export function setAsideFiles(ws: WorkspaceService): { file: string; number: number; text: string | null }[] {
   if (!ws.path) return []
-  const dir = join(ws.path, HIVE_DIR, SET_ASIDE)
+  const dir = join(ws.path, CW_DIR, SET_ASIDE)
   let names: string[]
   try {
     names = readdirSync(dir).filter((f) => SET_ASIDE_NAME.test(f))
@@ -654,7 +654,7 @@ export function setAsideFiles(ws: WorkspaceService): { file: string; number: num
 /** The path of a set-aside file named by the window: only a name of the folder's own form, never a path out of it. */
 export function setAsideFile(ws: WorkspaceService, file: string): string | null {
   if (!ws.path || !SET_ASIDE_NAME.test(file)) return null
-  const p = join(ws.path, HIVE_DIR, SET_ASIDE, file)
+  const p = join(ws.path, CW_DIR, SET_ASIDE, file)
   return existsSync(p) ? p : null
 }
 
@@ -670,7 +670,7 @@ export function setAsideAdded(ws: WorkspaceService, file: string, text: string):
     added.add(textHash(text))
     setMeta(db, 'setAsideAdded', JSON.stringify([...added]))
   })
-  const dir = join(ws.path!, HIVE_DIR, SET_ASIDE)
+  const dir = join(ws.path!, CW_DIR, SET_ASIDE)
   afterBoardWrite(ws, () => removeAdded(dir, file))
 }
 
@@ -714,7 +714,7 @@ function boardOf(path: string, transient = false): Board {
     if (!transient) assertPlaceAdmitted(open.place)
     return open
   }
-  if (!transient) assertAdmitted(join(path, HIVE_DIR, DB_FILE))
+  if (!transient) assertAdmitted(join(path, CW_DIR, DB_FILE))
   const failed = failures.get(key)?.error
   if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
@@ -743,7 +743,7 @@ export async function untilBoardOpenable(path: string, signal: AbortSignal): Pro
     boardTestHooks.openableWait?.(path)
     log.warn(`the board of ${userText(path)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its ${DB_FILE}-shm, as just after a Combwork ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
   }
-  const waited = await untilOpenable(join(path, HIVE_DIR, DB_FILE), { onWait, signal })
+  const waited = await untilOpenable(join(path, CW_DIR, DB_FILE), { onWait, signal })
   if (waiting) log.info(`the board of ${userText(path)}: ${signal.aborted ? 'its wait ended with its open' : 'openable'} after ${Math.round(waited)} ms`)
 }
 
@@ -757,13 +757,13 @@ function openBoard(path: string, upgrade: boolean): Board {
   // The folder's `.combwork` where it really is, now: what every later write and removal for this board uses (#1402), the
   // file itself opened by its spelling (the same file at this instant; db.ts knows it by that).
   const real = realPath(path)
-  const hive = join(real, HIVE_DIR)
+  const hive = join(real, CW_DIR)
   let db: Db | null = null
   try {
-    db = openDb(join(path, HIVE_DIR, DB_FILE), {
+    db = openDb(join(path, CW_DIR, DB_FILE), {
       migrations: BOARD_MIGRATIONS,
       appVersion: appVersion(),
-      backupDir: join(path, HIVE_DIR, BACKUPS),
+      backupDir: join(path, CW_DIR, BACKUPS),
       approve: (p) => upgrade || upgradeAnswer(p) === 'yes',
       beforeGroup: () => {
         if (othersPresent(hive, presenceId()).length) throw new OtherHiveError()
@@ -835,24 +835,24 @@ class OtherHiveError extends Error {
 }
 
 /**
- * A test copy's answer to the upgrade's question, given before it is asked (HIVE_TEST_BOARD_UPGRADE=yes|no, unpackaged
+ * A test copy's answer to the upgrade's question, given before it is asked (CW_TEST_BOARD_UPGRADE=yes|no, unpackaged
  * builds only; the e2e suites' boards made by 0.9), or a unit test's hook. Anything else: the user is asked.
  */
 function upgradeAnswer(p: PendingGroup): 'yes' | 'no' | null {
   if (p.group !== UPGRADE_GROUP_ID) return null
   if (boardTestHooks.upgradeAnswer) return boardTestHooks.upgradeAnswer
-  const env = process.env.HIVE_TEST_BOARD_UPGRADE
+  const env = process.env.CW_TEST_BOARD_UPGRADE
   if (packaged() || (env !== 'yes' && env !== 'no')) return null
   return env
 }
 
 /**
- * For the S60 suite (unpackaged builds only): HIVE_TEST_UPGRADE_HOLD=<ms>;<file> keeps the upgrade's exclusive lock that
+ * For the S60 suite (unpackaged builds only): CW_TEST_UPGRADE_HOLD=<ms>;<file> keeps the upgrade's exclusive lock that
  * long once its steps are committed, after writing <file>, so the suite can start a 0.9 Hive during the upgrade. Main's
  * thread waits meanwhile, as it would on a slow disk.
  */
 function holdForTest(): void {
-  const hold = packaged() ? undefined : process.env.HIVE_TEST_UPGRADE_HOLD
+  const hold = packaged() ? undefined : process.env.CW_TEST_UPGRADE_HOLD
   if (!hold) return
   const [ms, file] = hold.split(';')
   if (file) writeFileSync(file, new Date().toISOString(), 'utf8')
@@ -1924,7 +1924,7 @@ export const boardOpen = (workspacePath: string): boolean => boards.has(keyOf(wo
 export const inBoardWrite = (workspacePath: string): boolean => inWrite(keyOf(workspacePath))
 
 /** The board's file (for the log, diagnostics and tests). */
-export const boardFile = (workspacePath: string): string => join(workspacePath, HIVE_DIR, DB_FILE)
+export const boardFile = (workspacePath: string): string => join(workspacePath, CW_DIR, DB_FILE)
 
 /** Whether the board is shown read-only: saved by a newer Hive, or waiting for its upgrade to 1.0. */
 export const boardReadOnly = (ws: WorkspaceService): boolean => (ws.path ? !writable(boardOf(ws.path).db) : false)
@@ -1950,7 +1950,7 @@ const FIRST_10 = Math.min(...BOARD_MIGRATIONS.filter((m) => m.group === UPGRADE_
  * db.ts keeps those with the ordinary copies anyway.
  */
 const copy09 = (path: string): { file: string; version: number; at: string } | undefined =>
-  backupsOf(join(path, HIVE_DIR, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID))
+  backupsOf(join(path, CW_DIR, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID))
     .filter((c) => c.version < FIRST_10)
     .at(-1)
 
@@ -2060,9 +2060,9 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const from09 = pending.from < FIRST_10
     // The group runs with the file locked to one connection: the checkpoints' worker lets go of it first (HI-1691),
     // awaited before the close, so nothing opens it again between the close and the upgrade's open.
-    await checkpointsReleased(join(path, HIVE_DIR, DB_FILE))
+    await checkpointsReleased(join(path, CW_DIR, DB_FILE))
     // Opened for keeps: only while a window holds it (#1395), checked after that wait, nothing awaited since.
-    assertAdmitted(join(path, HIVE_DIR, DB_FILE))
+    assertAdmitted(join(path, CW_DIR, DB_FILE))
     closeBoard(path)
     try {
       openBoard(path, true)
@@ -2104,7 +2104,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
  */
 export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: () => number): Promise<{ saved: string; restored: string }> {
   const path = pathOf(ws)
-  const hive = join(path, HIVE_DIR)
+  const hive = join(path, CW_DIR)
   const file = join(hive, DB_FILE)
   // Counted as a write (HI-1368): a close command waits for it.
   const out = await countedWrite(path, () => withFileLock(boardLock(path), async () => {

@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
 }
 
 ;(async () => {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
@@ -178,7 +178,7 @@ const check = (name, ok, extra = '') => {
   // once the copy's row is in the tree the paste has done what it does after that reload.
   await page.keyboard.press('Control+C')
   await row('dist').click()
-  await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'files:list=5000' })
+  await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'files:list=5000' })
   await page.keyboard.press('Control+V')
   await lib.until(() => exists('dist/from explorer.txt'), HUNG_MS)
   // Checked and clicked in one go in the window: was the paste still reloading dist at the click?
@@ -191,7 +191,7 @@ const check = (name, ok, extra = '') => {
   const pastedRow = await lib.until(async () => (await row('dist/from explorer.txt').count()) === 1, HUNG_MS)
   const kept = await page.locator('.file-row.selected').evaluateAll((els) => els.map((e) => e.getAttribute('data-rel')))
   check('…and the clicked row keeps the selection once the paste ends', !!pastedRow && JSON.stringify(kept) === JSON.stringify(['.gitignore']), JSON.stringify({ pastedRow: !!pastedRow, kept }))
-  await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = '' })
+  await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = '' })
 
   // Live update from outside Combwork.
   w('made-outside.txt', 'hi')

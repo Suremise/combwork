@@ -2,7 +2,7 @@
 // sign-in (fake-signin.json in its test home: each turn ends with StopFailure authentication_failed, `auth status` says
 // signed out): the agents show "needs sign-in", one notification is recorded for all of them, "/login" in one agent's
 // terminal carries that agent on by itself and ends it for all, and Resume (n) carries on the others with a short prompt.
-// A later expiry is told again. Quiet test build (HIVE_TEST_NOTIFY_LOG), throwaway profile, workspace and test home;
+// A later expiry is told again. Quiet test build (CW_TEST_NOTIFY_LOG), throwaway profile, workspace and test home;
 // no real sign-in is touched.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -42,7 +42,7 @@ const until = async (fn, ms = 10000) => {
 
   const notifyLog = path.join(lib.WORK, 'signin-notify.log')
   fs.rmSync(notifyLog, { force: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47919), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_QUIET: '1', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47919), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

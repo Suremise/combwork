@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { lstat, opendir, readdir, rm, rmdir } from 'original-fs/promises'
 import { ASSISTANT_NAME } from '../shared/assistant'
-import { HIVE_DIR, assertSessionId, isSessionId, projectAgents } from '../shared/defaults'
+import { CW_DIR, assertSessionId, isSessionId, projectAgents } from '../shared/defaults'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { planCleanup, planPurge, type CleanupFacts, type CleanupSession, type PurgeFacts, type PurgeFile, type PurgeSession } from '../shared/storage'
 import { utf8Bytes } from '../shared/metrics'
@@ -199,7 +199,7 @@ function startMeasuring(projectPath: string, refresh: boolean): Measuring {
 
 async function measure(projectPath: string, refresh: boolean, signal: AbortSignal): Promise<ProjectStorage> {
   const assistant = workspace.isAssistantHome(projectPath)
-  const hive = join(projectPath, HIVE_DIR)
+  const hive = join(projectPath, CW_DIR)
   const cache = refresh ? 'refresh' : 'use'
   // Backups grow in place, so they are always measured afresh (a few files).
   const backups = await folderSize(join(hive, 'sessions'), 'none', signal)
@@ -420,7 +420,7 @@ async function purgeFacts(host: string): Promise<PurgeFacts> {
   const liveNames = new Set(sessions.projectStates(host).flatMap((s) => [s.sessionId, `run-${s.runId}`]).filter(Boolean).map((n) => n.toLowerCase()))
   const files: PurgeFacts['files'] = []
   for (const folder of ['sessions', 'archive'] as const) {
-    const dir = join(host, HIVE_DIR, folder)
+    const dir = join(host, CW_DIR, folder)
     for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
       const m = e.isFile() ? BACKUP_FILE.exec(e.name) : null
       const now = m ? await fileNow(join(dir, e.name)) : null

@@ -10,7 +10,7 @@ import { stat } from 'original-fs/promises'
 import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
 import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { callsMade } from '../shared/activity'
-import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
+import { DEFAULT_API_PORT, CW_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
@@ -214,9 +214,9 @@ export async function startHookServer(): Promise<string> {
       // agent-protocol: the hook server answers a CLI hook, not an agent
       return send(res, 401, { error: 'unauthorized' })
     }
-    // Tests lose every hook while the file HIVE_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Hive can't
+    // Tests lose every hook while the file CW_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Hive can't
     // stop at its end, Copilot), answered as if Hive had taken them; unpackaged builds only.
-    const drop = !app.isPackaged ? process.env.HIVE_TEST_DROP_HOOKS : undefined
+    const drop = !app.isPackaged ? process.env.CW_TEST_DROP_HOOKS : undefined
     if (drop && existsSync(drop)) {
       await readBody(req).catch(() => '')
       return send(res, 200, {})
@@ -379,9 +379,9 @@ export async function regenerateToken(): Promise<string> {
   return apiToken
 }
 
-/** HIVE_API_PORT overrides the setting; development builds default to the next port so they don't clash with the installed app. */
+/** CW_API_PORT overrides the setting; development builds default to the next port so they don't clash with the installed app. */
 function apiPort(): number {
-  const env = Number(process.env.HIVE_API_PORT)
+  const env = Number(process.env.CW_API_PORT)
   if (env > 0) return env
   const port = config.settings.agentApi.port
   return !app.isPackaged && port === DEFAULT_API_PORT ? port + 1 : port
@@ -4026,7 +4026,7 @@ async function progressCallerIn(workspacePath: string): Promise<ProgressCaller> 
     return { source: 'agent', workspacePath, projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, provider: def ? agentProvider(def, config.settings) : null }
   }
   if (assistantCaller()) {
-    const live = sessions.liveFor(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID)
+    const live = sessions.liveFor(join(workspacePath, CW_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID)
     // agent-protocol: the Assistant's name
     return { source: 'assistant', workspacePath, agentName: `Combwork ${ASSISTANT_NAME}`, provider: live?.provider ?? null }
   }
@@ -4422,7 +4422,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   })
   const apiDir = apiWs?.path ? apiWs.hiveDir : null
   if (apiDir) await apiChainReady(apiDir)
-  return callerStore.run(caller, () => inApiWorkspace(apiDir, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, HIVE_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url))))
+  return callerStore.run(caller, () => inApiWorkspace(apiDir, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, CW_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url))))
 }
 
 async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
@@ -4518,7 +4518,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
  * (or Assistant's) own session. Its route and how it went, never its body or the reply: the query's names only.
  */
 function captureApiCall(req: IncomingMessage, res: ServerResponse, url: URL, m: ApiRequest, who: Caller | null, ms: number): void {
-  const own = who?.kind === 'agent' ? sessionSourceId(who.projectPath, who.agentId) : who?.kind === 'assistant' ? sessionSourceId(join(who.workspace, HIVE_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID) : null
+  const own = who?.kind === 'agent' ? sessionSourceId(who.projectPath, who.agentId) : who?.kind === 'assistant' ? sessionSourceId(join(who.workspace, CW_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID) : null
   devConsole.capture([m.ws && hiveSourceId(m.ws), own], () => {
     const name = `${req.method ?? ''} ${m.route}`
     const outcome = outcomeOf(res, m)

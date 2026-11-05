@@ -283,12 +283,12 @@ describe("the upgrade's adoption (#1218)", () => {
   })
 })
 
-// A copy of the live board (HIVE_STORE_ROUNDTRIP_DB, never the file in place): every card handled, none moved, once.
-describe.runIf(!!process.env.HIVE_STORE_ROUNDTRIP_DB && existsSync(process.env.HIVE_STORE_ROUNDTRIP_DB))('on a copy of a live board (#1218)', () => {
+// A copy of the live board (CW_STORE_ROUNDTRIP_DB, never the file in place): every card handled, none moved, once.
+describe.runIf(!!process.env.CW_STORE_ROUNDTRIP_DB && existsSync(process.env.CW_STORE_ROUNDTRIP_DB))('on a copy of a live board (#1218)', () => {
   it('handles every card once and moves none', async () => {
     const ws = join(base, 'live')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
-    copyFileSync(process.env.HIVE_STORE_ROUNDTRIP_DB!, join(ws, '.combwork', 'combwork.db'))
+    copyFileSync(process.env.CW_STORE_ROUNDTRIP_DB!, join(ws, '.combwork', 'combwork.db'))
     const w = await open(ws)
     if (store.upgradeWaiting(ws)) await inWorkspace(w, () => store.upgradeBoard(w))
     const before = store.adoptionCards(w)

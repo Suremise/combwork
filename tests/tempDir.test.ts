@@ -38,7 +38,7 @@ const ALLOWED: Record<string, string[]> = {
   // and the temp folder's variables a child gets from the run (the run's own folder, HI-2102).
   'e2e/runContext.cjs': ['const LOCAL = process.env.LOCALAPPDATA || os.tmpdir()', "'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'OS',"],
   'e2e/build.mjs': ["import { tmpdir } from 'os'", "export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'build-locks')"],
-  'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.HIVE_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')"],
+  'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')"],
   // npm run e2e -- --clear-dir: a folder the user names may be in the temp folder (one nothing here made).
   // The focused tests' picker's check (HI-1367) reads a binding naming the temp folder as not the repository's.
   'focusedPick.test.ts': ['if (bound.has(name) || !exprs.every((e) => !/tempDir|tmpdir|mkdtemp/.test(e) && names(e))) continue'],
@@ -170,14 +170,14 @@ describe('git as on the runner (tests/noGlobalGit.ts)', () => {
 
 describe("the run's own temp folder goes when the run ends (#995)", () => {
   const as = (folder: string, owner: string, fn: () => void): void => {
-    const was = { dir: process.env.HIVE_TEST_RUN_TMP, owner: process.env.HIVE_TEST_RUN_TMP_OWNER }
-    process.env.HIVE_TEST_RUN_TMP = folder
-    process.env.HIVE_TEST_RUN_TMP_OWNER = owner
+    const was = { dir: process.env.CW_TEST_RUN_TMP, owner: process.env.CW_TEST_RUN_TMP_OWNER }
+    process.env.CW_TEST_RUN_TMP = folder
+    process.env.CW_TEST_RUN_TMP_OWNER = owner
     try {
       fn()
     } finally {
-      process.env.HIVE_TEST_RUN_TMP = was.dir
-      process.env.HIVE_TEST_RUN_TMP_OWNER = was.owner
+      process.env.CW_TEST_RUN_TMP = was.dir
+      process.env.CW_TEST_RUN_TMP_OWNER = was.owner
     }
   }
 
@@ -195,7 +195,7 @@ describe("the run's own temp folder goes when the run ends (#995)", () => {
 
   it("is left alone by a run started inside it (another process), and nothing but a run's folder is ever removed", () => {
     // This worker is one: the run's folder is its parent's.
-    expect(process.env.HIVE_TEST_RUN_TMP_OWNER).not.toBe(String(process.pid))
+    expect(process.env.CW_TEST_RUN_TMP_OWNER).not.toBe(String(process.pid))
     expect(endRunTemp()).toBeUndefined()
     expect(existsSync(tempRoot())).toBe(true)
     const notARun = dir('hive-not-a-run-')

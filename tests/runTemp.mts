@@ -34,11 +34,11 @@ export type Protects = (path: string) => string | null | undefined
  * process that made it removes it (endRunTemp).
  */
 export function startRunTemp(protects?: Protects): string {
-  if (!process.env.HIVE_TEST_RUN_TMP) {
+  if (!process.env.CW_TEST_RUN_TMP) {
     mkdirSync(tempArea, { recursive: true })
     if (protects) pruneRunTemps(protects)
-    process.env.HIVE_TEST_RUN_TMP = realpathSync.native(mkdtempSync(join(tempArea, `run-${process.pid}-`)))
-    process.env.HIVE_TEST_RUN_TMP_OWNER = String(process.pid)
+    process.env.CW_TEST_RUN_TMP = realpathSync.native(mkdtempSync(join(tempArea, `run-${process.pid}-`)))
+    process.env.CW_TEST_RUN_TMP_OWNER = String(process.pid)
   }
   const dir = tempRoot()
   process.env.TEMP = process.env.TMP = process.env.TMPDIR = dir
@@ -86,8 +86,8 @@ export function pruneRunTemps(protects: Protects, { now = Date.now(), area = tem
 
 /** Removes this run's folder, if this process made it (tests/tempRun.ts, as the run ends). Replies with why it couldn't. */
 export function endRunTemp(): string | undefined {
-  const dir = process.env.HIVE_TEST_RUN_TMP
-  if (!dir || process.env.HIVE_TEST_RUN_TMP_OWNER !== String(process.pid)) return undefined
+  const dir = process.env.CW_TEST_RUN_TMP
+  if (!dir || process.env.CW_TEST_RUN_TMP_OWNER !== String(process.pid)) return undefined
   // Only ever a run's folder, directly in the test area.
   if (!basename(dir).startsWith('run-') || dirname(dir).toLowerCase() !== realpathSync.native(tempArea).toLowerCase()) return `not a run's folder: ${dir}`
   try {
@@ -101,7 +101,7 @@ export function endRunTemp(): string | undefined {
 /** The tests' temp folder by its real, long path, made if it isn't there: the run's own, or hive-test\tmp outside a run. */
 export function tempRoot(): string {
   if (root) return root
-  const dir = process.env.HIVE_TEST_RUN_TMP || tempArea
+  const dir = process.env.CW_TEST_RUN_TMP || tempArea
   mkdirSync(dir, { recursive: true })
   return (root = realpathSync.native(dir))
 }

@@ -1,7 +1,7 @@
 // #1103, the case seen on Darren's PC in the 0.9.2 release: Claude Code installed by its native installer in
 // ~\.local\bin, a folder on no PATH (Combwork's, the registry's). Provider Setup found it where it installs it, but a shell Combwork
 // started couldn't run `claude`. Once Combwork's refresh finds it, its folder is on the PATH of what Combwork starts (its child
-// environment), so a shell finds the same CLI by name; Combwork's own PATH, which it finds the CLIs on, is unchanged. The registry is a stand-in (HIVE_TEST_REGISTRY_PATH: none), the
+// environment), so a shell finds the same CLI by name; Combwork's own PATH, which it finds the CLIs on, is unchanged. The registry is a stand-in (CW_TEST_REGISTRY_PATH: none), the
 // home a temp folder, and the CLI's answers stubbed: nothing of the machine's own is read or changed.
 import { spawnSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
@@ -22,7 +22,7 @@ vi.mock('../src/main/providers/common', async (actual) => ({
   run: async (file: string, args: string[]) => (file === exe && args[0] === '--version' ? { stdout: '2.1.303 (Claude Code)', stderr: '', code: 0 } : file === exe ? { stdout: '{"loggedIn":false}', stderr: '', code: 0 } : { stdout: '', stderr: '', code: 1 })
 }))
 
-const saved = { PATH: process.env.PATH, Path: process.env.Path, HIVE_TEST_REGISTRY_PATH: process.env.HIVE_TEST_REGISTRY_PATH }
+const saved = { PATH: process.env.PATH, Path: process.env.Path, CW_TEST_REGISTRY_PATH: process.env.CW_TEST_REGISTRY_PATH }
 afterAll(() => {
   for (const [k, v] of Object.entries(saved)) {
     if (v === undefined) delete process.env[k]
@@ -36,7 +36,7 @@ describe("a standalone CLI found off PATH, on Combwork's PATH for what it starts
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     const system32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
     process.env[key] = system32
-    process.env.HIVE_TEST_REGISTRY_PATH = ''
+    process.env.CW_TEST_REGISTRY_PATH = ''
     const { childEnv } = await import('../src/main/ptyHost')
     const whereClaude = () => spawnSync(join(system32, 'where.exe'), ['claude'], { env: childEnv(), encoding: 'utf8', windowsHide: true })
     expect(whereClaude().status).not.toBe(0)

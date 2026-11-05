@@ -318,18 +318,18 @@ describe('antivirus scripts (#316)', () => {
 })
 
 describe('antivirus status cache (#322)', () => {
-  // On a fixture only (HIVE_TEST_ANTIVIRUS): every probe is logged, so a request that probes again shows the status wasn't kept.
+  // On a fixture only (CW_TEST_ANTIVIRUS): every probe is logged, so a request that probes again shows the status wasn't kept.
   const base = tempDir('hive-av-cache-')
   const fixture = join(base, 'fixture.json')
   const callLog = join(base, 'calls.log')
-  const env = { fixture: process.env.HIVE_TEST_ANTIVIRUS, log: process.env.HIVE_TEST_ANTIVIRUS_LOG }
+  const env = { fixture: process.env.CW_TEST_ANTIVIRUS, log: process.env.CW_TEST_ANTIVIRUS_LOG }
   beforeAll(() => {
     writeFileSync(fixture, JSON.stringify({ probe: probe() }))
-    process.env.HIVE_TEST_ANTIVIRUS = fixture
-    process.env.HIVE_TEST_ANTIVIRUS_LOG = callLog
+    process.env.CW_TEST_ANTIVIRUS = fixture
+    process.env.CW_TEST_ANTIVIRUS_LOG = callLog
   })
   afterAll(() => {
-    for (const [k, v] of [['HIVE_TEST_ANTIVIRUS', env.fixture], ['HIVE_TEST_ANTIVIRUS_LOG', env.log]] as const) {
+    for (const [k, v] of [['CW_TEST_ANTIVIRUS', env.fixture], ['CW_TEST_ANTIVIRUS_LOG', env.log]] as const) {
       if (v === undefined) delete process.env[k]
       else process.env[k] = v
     }

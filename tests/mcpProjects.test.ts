@@ -15,9 +15,9 @@ import { tempDir } from './tempDir'
 const base = tempDir('hive-mcp-projects-')
 const profile = join(base, 'profile')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
-process.env.HIVE_USER_DATA = profile
+process.env.CW_USER_DATA = profile
 // A test copy on its CLI test home: its agents start with no connection (the seam, HI-1755).
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 // Never the user's own CLI homes: the Codex and Copilot adapters read their config for a project's own servers.
 process.env.CODEX_HOME = join(base, 'codex-home')
 process.env.COPILOT_HOME = join(base, 'copilot-home')
@@ -93,7 +93,7 @@ describe('moving settings from before #1093', () => {
 
 describe('MCP servers per project (HI-2059)', () => {
   const trashDir = join(base, 'trash')
-  const was = process.env.HIVE_TEST_TRASH_DIR
+  const was = process.env.CW_TEST_TRASH_DIR
   const godot = { description: 'Godot', command: 'node', args: ['godot.js'] }
   // Each case's own workspace, as 0.9.0 left it: github on for all projects and turned off in apiary; notes deployed
   // and turned on in apiary only; docs deployed and off. Opening it moves it to #1093's model, then to added servers.
@@ -138,11 +138,11 @@ describe('MCP servers per project (HI-2059)', () => {
   }
 
   beforeAll(() => {
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
   })
   afterAll(() => {
-    if (was === undefined) delete process.env.HIVE_TEST_TRASH_DIR
-    else process.env.HIVE_TEST_TRASH_DIR = was
+    if (was === undefined) delete process.env.CW_TEST_TRASH_DIR
+    else process.env.CW_TEST_TRASH_DIR = was
   })
   beforeEach(() => {
     wsPath = tempDir('hive-mcp-projects-ws-')

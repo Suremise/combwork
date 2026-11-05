@@ -36,7 +36,7 @@ const threadLines = (report) => {
   lib.gitProject(alpha)
   const first = lib.git(alpha, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()
   lib.git(alpha, ['branch', 'other'])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.PACKAGED_EXE, args: [], cwd: lib.ROOT, env })
   // Closed whatever fails from here on, not only when every step does.
   try {

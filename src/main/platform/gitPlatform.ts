@@ -21,7 +21,7 @@ import { observer, type Disposable, type ObserveEvent } from './observe'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { samePath } from '../../shared/movePaths'
 import { isUnknown, unknown, type Containment, type Maybe, type Unknown } from './types'
-import { HIVE_DIR } from '../../shared/defaults'
+import { CW_DIR } from '../../shared/defaults'
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
 function statLine(p: string): string {
@@ -129,7 +129,7 @@ export class GitPlatform implements PlatformAdapter {
       const base = await G.lineHead(this.project, target)
       if (isUnknown(base)) return base
       if (!base) return unknown(UNREADABLE.head, { where: target })
-      return { folder: join(this.wf.cfg.slots ?? join(this.project, HIVE_DIR, 'slots'), card.key), line: lineName(this.wf.cfg.projectKey, card), base, target }
+      return { folder: join(this.wf.cfg.slots ?? join(this.project, CW_DIR, 'slots'), card.key), line: lineName(this.wf.cfg.projectKey, card), base, target }
     }
     const line = await G.branch(this.project)
     const base = await G.head(this.project)

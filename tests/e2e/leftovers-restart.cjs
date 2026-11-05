@@ -47,7 +47,7 @@ const readKept = () => (fs.existsSync(kept) ? JSON.parse(fs.readFileSync(kept, '
 
   let app = null
   try {
-    const first = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47870) } })
+    const first = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47870) } })
     app = first.app
     const { page, inv } = first
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -98,7 +98,7 @@ const readKept = () => (fs.existsSync(kept) ? JSON.parse(fs.readFileSync(kept, '
     k.launches[0].processes.push({ pid: stranger.pid, name: 'node.exe', label: 'node old-server.js', created: '116444736000000000' })
     fs.writeFileSync(kept, JSON.stringify(k, null, 2))
 
-    const second = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47870) } })
+    const second = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47870) } })
     app = second.app
     second.page.on('pageerror', (e) => check('no page errors (after the restart)', false, e.message))
     await lib.openWorkspace(second.inv, second.page, ws)

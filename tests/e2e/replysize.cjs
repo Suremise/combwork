@@ -1,4 +1,4 @@
-// Combwork's tool replies stay lean: every hive MCP tool (through out/main/hive-mcp.js, as an agent and as the
+// Combwork's tool replies stay lean: every Combwork MCP tool (through out/main/cw-mcp.js, as an agent and as the
 // Assistant) and the Agent API routes behind them, against a busy workspace (four projects, ~75 cards with long
 // descriptions and comments, handovers, notes, running agents). Checks what the replies say and that each stays
 // within its size; prints every reply's size in characters and writes the sizes and texts to replysize.json and
@@ -47,7 +47,7 @@ const prose = (seed, n) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, allowSessionInput: true, devConsole: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -114,11 +114,11 @@ const prose = (seed, n) => {
    */
   const coderOwnToken = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.token && l.env.CW_AGENT === coder.name && l.cwd.toLowerCase() === alpha.toLowerCase())?.token
   /**
-   * One hive tool call through hive-mcp.js: the text the agent gets (role 'assistant+settings': with Change settings on;
+   * One Combwork tool call through cw-mcp.js: the text the agent gets (role 'assistant+settings': with Change settings on;
    * 'own': with the coder's own token, as the agent calls it, where the caller matters: its own lane starts nobody, HI-1933).
    */
   const tool = (name, args, role = 'agent') => {
-    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: '1', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' } : role === 'own' ? { CW_API_TOKEN_FILE: lib.tokenFile(coderOwnToken()), CW_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
+    const extra = { CW_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : role === 'own' ? { CW_API_TOKEN_FILE: lib.tokenFile(coderOwnToken()), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, ...extra }),
@@ -129,7 +129,7 @@ const prose = (seed, n) => {
   }
   /** The tools a role is offered, as the CLI lists them ('assistant+settings': with Change settings on, every one of its own). */
   const toolList = (role = 'agent') => {
-    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
+    const extra = { CW_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, ...extra }),
@@ -197,7 +197,7 @@ const prose = (seed, n) => {
   const keyOf = new Map((await inv('tasks:list')).map((c) => [c.number, c.key || `#${c.number}`]))
   const K = (n) => keyOf.get(n) ?? `#${n}`
 
-  console.log('\n--- hive tools (as an agent)')
+  console.log('\n--- Combwork tools (as an agent)')
   const projects = measure('cw_list_projects', tool('cw_list_projects', {}), 1000)
   check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, builder\] idle; Tester \[claude-code, builder\] stopped$/m.test(projects), projects)
   // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
@@ -481,7 +481,7 @@ const prose = (seed, n) => {
   measure("cw_console (Combwork's events, as the Assistant)", tool('cw_console', { source: 'hive' }, 'assistant'), 300)
   await inv('console:subscribe', [])
 
-  console.log('\n--- hive tools (as the Assistant)')
+  console.log('\n--- Combwork tools (as the Assistant)')
   measure('cw_list_providers', tool('cw_list_providers', {}, 'assistant'))
   // Combwork's settings (#186): a listing (all, narrowed, a project's), one in full, and a change with Change settings on.
   // A line a setting (about 85 characters with its title): 6,200 since #418 added Tell the Assistant when I reply to an agent;
@@ -732,7 +732,7 @@ const prose = (seed, n) => {
   const coderToken = launch?.token
   check("metrics: the agent's own token is known", !!coderToken)
   const asCoder = (method, request) =>
-    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(coderToken), CW_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
+    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(coderToken), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
   const unicode = (await api('POST', '/v1/tasks', { title: 'Ünïcödé 日本語 🐝 "quoted" \\ back', project: 'alpha', description: 'Ελληνικά — ✓ — \n new line' })).body.number
   const expected = {}
   for (const [name, args] of [['cw_list_tasks', {}], ['cw_list_tasks', { details: true }], ['cw_read_task', { number: unicode }], ['cw_read_task', { number: 999999 }]]) {
@@ -756,7 +756,7 @@ const prose = (seed, n) => {
   const cats = (alphaPart?.catalog ?? []).filter((c) => c.role === 'agent')
   const cat = cats.reduce((a, c) => Object.fromEntries(Object.keys(a).map((k) => [k, a[k] + c[k]])), { starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 })
   // Once a start: the coder's, and the agent a card was started on, whose fake reads its inbox when its task's doorbell
-  // rings (#650: through the hive server, which it starts for that call, with a tool list of its own). The catalog sums
+  // rings (#650: through the Combwork MCP server, which it starts for that call, with a tool list of its own). The catalog sums
   // them: the coder's list as it got it, and the other's.
   const listBytes = Buffer.byteLength(JSON.stringify(list), 'utf8')
   const listChars = JSON.stringify(list).length
@@ -767,7 +767,7 @@ const prose = (seed, n) => {
   const listDescriptions = list.reduce((n, t) => n + inJson(t.description ?? ''), 0)
   const listParams = list.reduce((n, t) => n + paramsOf(t.inputSchema), 0)
   check("metrics: the tool list's descriptions and parameters' descriptions, a part of its characters", cat.partStarts === 2 && cat.partToolsChars === cat.toolsChars && cat.descriptionChars >= listDescriptions && cat.descriptionChars < listDescriptions * 3 && cat.paramChars >= listParams && cat.paramChars < listParams * 3 && cat.descriptionChars + cat.paramChars < cat.toolsChars, JSON.stringify({ cat, listDescriptions, listParams }))
-  check("metrics: each tool list on the side of the launch whose hive server sent it", cats.length > 0 && cats.every((c) => ['builder', 'reviewer', 'either', 'none'].includes(c.workflow)), JSON.stringify(cats.map((c) => [c.workflow, c.starts])))
+  check("metrics: each tool list on the side of the launch whose Combwork MCP server sent it", cats.length > 0 && cats.every((c) => ['builder', 'reviewer', 'either', 'none'].includes(c.workflow)), JSON.stringify(cats.map((c) => [c.workflow, c.starts])))
   check("metrics: the Assistant's tool calls are the workspace's own, with detail mode counted", (report.workspace?.mcp ?? []).some((sr) => sr.role === 'assistant' && sr.tool === 'cw_agent_activity' && sr.mode === 'detail'), JSON.stringify(report.workspace?.mcp?.slice(0, 3)))
   const routes = [...Object.values(report.projects), report.workspace].flatMap((pt) => pt.api.map((sr) => sr.route))
   check('metrics: API routes are templates, never paths asked for', routes.includes('/v1/tasks/:n') && !routes.some((r) => /\/\d/.test(r)), routes.join(' '))
@@ -808,7 +808,7 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
 
   // --- cw_inbox's three forms (#1531), by each caller: the Assistant (its tool), a script with an agent's own token
   // (the API), the agent (its tool), and the workspace's token, which has no inbox. After the metrics' checks: the
-  // agent's fake reads the message on its doorbell, starting a hive server the catalog would count.
+  // agent's fake reads the message on its doorbell, starting a Combwork MCP server the catalog would count.
   check("inbox: the Assistant's ack with read: the ack line, then the read", measure('cw_inbox (ack, read)', tool('cw_inbox', { ack: ['m99'], read: true }, 'assistant'), 200) === 'Nothing acked. Not in your inbox: m99.\nNothing new.', texts['cw_inbox (ack, read)'])
   // A delivery the token's own agent has received (alpha's latest launch: the agent a card was started on, its task):
   // read with its token, it is that agent's to ack, whoever it is.

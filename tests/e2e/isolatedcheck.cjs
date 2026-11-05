@@ -1,4 +1,4 @@
-// Isolated checks (#1435, SPEC §16.13): `hive-progress --check <name> --isolated` runs the project's check in a check copy
+// Isolated checks (#1435, SPEC §16.13): `cw-progress --check <name> --isolated` runs the project's check in a check copy
 // of its own at the card's revision. Two fake Claude Code builders share the project folder (Where cards are built: the
 // project folder), each on a card; the check is a script the test steers:
 // - in the shared folder, another agent's edit while the check runs makes it uncounted; the same check with --isolated,
@@ -8,7 +8,7 @@
 //   failures (HI-1831);
 // - an isolated check that started a detached process of its own is stopped from the Progress panel: its whole tree ends
 //   (the check and what it left), and the copy is used by the next run.
-// And HR1's round 1: the first copy's setup held past hive-progress's 5 s request limit (it waits, then runs); the
+// And HR1's round 1: the first copy's setup held past cw-progress's 5 s request limit (it waits, then runs); the
 // launcher route takes only the lease's own agent's own process, once; another project's copy folder gives an agent
 // nothing of its lease. Screenshots of the panel with the isolated run and its details, light and dark. Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -95,7 +95,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' }) })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }) })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -171,7 +171,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
 
     // --- In the shared folder: another agent's edit during the check makes it uncounted.
     steer('wait')
-    const shared = shell(b1.id, `hive-progress --check quick --card "${keyA}"`)
+    const shared = shell(b1.id, `cw-progress --check quick --card "${keyA}"`)
     check('the shared-folder check starts in the project folder', !!(await until(() => starts().length === 1, HUNG_MS)) && starts()[0].cwd.toLowerCase() === alpha.toLowerCase(), JSON.stringify(starts()))
     // Edited and undone while it runs (#1654): the folder is clean at its end, so it is the change itself that counts
     // against it (an edit left in place would make it dirty at the end, which its finish now reads before this goes on).
@@ -183,21 +183,21 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     const sharedId = (await runs()).find((r) => r.check === 'quick' && r.card === a && !r.copy)?.id
     const sharedCheck = await until(() => quick(a, sharedId), HUNG_MS)
     check("…but doesn't count: files changed in the folder while it ran", sharedCheck?.counted === false && sharedCheck.whyNot === 'changed', JSON.stringify(sharedCheck))
-    // #1654: hive-progress says so as it ends, naming what changed and the remedy, its exit code the command's.
+    // #1654: cw-progress says so as it ends, naming what changed and the remedy, its exit code the command's.
     const said = 'cw-progress: not counted as check quick: files changed in the folder while it ran (a.ts'
-    check('…and hive-progress says why, with what to do', sharedRun.stderr.includes(said) && sharedRun.stderr.includes('or with --isolated'), sharedRun.stderr)
+    check('…and cw-progress says why, with what to do', sharedRun.stderr.includes(said) && sharedRun.stderr.includes('or with --isolated'), sharedRun.stderr)
 
     // --- The same check, isolated: in copies/copy-1 at the card's revision; the same edit doesn't touch it. The first copy's
-    // setup is held past hive-progress's 5 s request limit (HR1's round 1): it waits, then runs.
+    // setup is held past cw-progress's 5 s request limit (HR1's round 1): it waits, then runs.
     await inv('project:updateConfig', alpha, { copies: { size: 1 }, slots: { setup: `node "${setupScript}"` } })
     steer('wait')
-    const iso = shell(b1.id, `hive-progress --check quick --isolated --card "${keyA}"`)
+    const iso = shell(b1.id, `cw-progress --check quick --isolated --card "${keyA}"`)
     const copies = () => inv('copies:list', alpha)
     check("copy-1 is being set up", !!(await until(async () => (await copies()).some((c) => c.name === 'copy-1' && c.state === 'creating'), HUNG_MS)), JSON.stringify(await copies()))
     // Held for longer than one request may take (5 s): the point is the time, so this waits for it (bounded).
     const heldFrom = Date.now()
     await until(() => Date.now() - heldFrom > 7000, HUNG_MS)
-    check('…past the request limit, nothing has run and hive-progress still waits', starts().length === 1 && !shells().some((x) => x.cmd.includes('--isolated')))
+    check('…past the request limit, nothing has run and cw-progress still waits', starts().length === 1 && !shells().some((x) => x.cmd.includes('--isolated')))
     fs.writeFileSync(setupGo, 'go')
     check('the isolated check starts in copies\\copy-1', !!(await until(() => starts().length === 2, HUNG_MS)) && /[\\/]copies[\\/]copy-1$/i.test(starts()[1].cwd), JSON.stringify(starts()[1]))
     check('…at the card\'s revision', gitIn(starts()[1].cwd, 'rev-parse', 'HEAD') === revision)
@@ -252,7 +252,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     check('C1 starts its card in beta', sc.status === 200, JSON.stringify(sc.body))
     await inv('project:updateConfig', beta, { copies: { size: 1 } })
     steer('wait')
-    const betaRun = shell(c1.id, `hive-progress --check quick --isolated --card "${keyC}"`, beta)
+    const betaRun = shell(c1.id, `cw-progress --check quick --isolated --card "${keyC}"`, beta)
     const betaCopy = await until(() => starts().find((x) => /beta[\\/]copies[\\/]copy-1$/i.test(x.cwd))?.cwd, HUNG_MS)
     check("C1's check holds beta's copy-1", !!betaCopy, JSON.stringify(starts()))
     const peek = await call(t1, '/v1/progress/resolve', { folder: betaCopy })
@@ -264,13 +264,13 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
 
     // --- The one copy leased: B2's isolated check waits for it, then runs there.
     steer('wait')
-    const holding = shell(b1.id, `hive-progress --check quick --isolated --card "${keyA}"`)
+    const holding = shell(b1.id, `cw-progress --check quick --isolated --card "${keyA}"`)
     check('B1 holds copy-1', !!(await until(() => starts().length === 4, HUNG_MS)))
     // B2's check refused a copy (it says so), not just its turn begun: B1 freeing it before B2 first asks would leave
     // B2 nothing to wait for (HI-1816).
     const b2Stderr = shellStderrFile(claudeHome, (await live(b2.id))?.agentName)
     fs.writeFileSync(b2Stderr, '')
-    const waiting = shell(b2.id, `hive-progress --check quick --isolated --card "${keyB}"`)
+    const waiting = shell(b2.id, `cw-progress --check quick --isolated --card "${keyB}"`)
     check('…B2\'s check waits: nothing of it runs while copy-1 is out', !!(await until(() => fs.existsSync(b2Stderr) && /waiting for a check copy/.test(fs.readFileSync(b2Stderr, 'utf8')), HUNG_MS)) && starts().length === 4, fs.existsSync(b2Stderr) ? fs.readFileSync(b2Stderr, 'utf8') : 'no stderr file')
     fs.writeFileSync(go, 'go')
     const held = await holding
@@ -312,7 +312,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
 
     // --- Stopped from the panel: the check and the process it started end, and the copy is used again.
     steer('spawn')
-    const stopped = shell(b1.id, `hive-progress --check quick --isolated --card "${keyA}"`)
+    const stopped = shell(b1.id, `cw-progress --check quick --isolated --card "${keyA}"`)
     const s5 = await until(() => starts()[5], HUNG_MS)
     check('a check that starts a detached process of its own runs in copy-1', !!s5 && !!s5.kid && /copy-1$/i.test(s5.cwd) && alive(s5.pid) && alive(s5.kid), JSON.stringify(s5))
     const stopId = await until(async () => (await runs()).find((r) => r.copy === 'copy-1' && r.state === 'running' && r.card === a)?.id, HUNG_MS)
@@ -324,7 +324,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     check('…its run ends stopped, not failed', stoppedRun?.code !== 0 && !!(await until(async () => (await runs()).find((r) => r.id === stopId)?.state === 'stopped', HUNG_MS)), JSON.stringify({ stoppedRun, state: (await runs()).find((r) => r.id === stopId)?.state }))
     check('…and copy-1 is free again', !!(await until(async () => (await copies()).every((c) => c.state === 'free'), HUNG_MS)), JSON.stringify(await copies()))
     steer('pass')
-    const next = await shell(b2.id, `hive-progress --check quick --isolated --card "${keyB}"`)
+    const next = await shell(b2.id, `cw-progress --check quick --isolated --card "${keyB}"`)
     check('the next isolated check runs in copy-1', next?.code === 0 && /copy-1$/i.test(starts()[6]?.cwd ?? ''), JSON.stringify({ next, s: starts()[6] }))
     await panel.screenshot({ path: path.join(shots, 'isolatedcheck-2-stopped.png') })
   } catch (e) {

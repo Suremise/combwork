@@ -192,7 +192,7 @@ export const AREAS = [
   { paths: ['src/main/bundled.ts', 'src/main/bundledHistory.json', 'src/main/skills.ts', 'src/main/revisions.ts', 'src/renderer/src/components/Skills.tsx', 'src/shared/skillDescriptions.ts', 'src/shared/skillLinks.ts'], suites: ['skills', 'skillaudience', 'skilldelivery'] },
   { paths: ['src/main/guidance.ts', 'src/shared/hiveGuidance.ts', 'src/shared/toolReplies.ts', 'src/shared/hiveToolLoad.ts', 'src/main/mcp/'], suites: ['skilldelivery', 'replysize', 'mcp', 'bridgereport', 'cardloop', 'slotguidance'] },
   // Agent text (HI-2065): the module every agent message is said through, and its extracted catalogue and schema; the
-  // canary runs through the built hive-mcp.js in agentguidance.
+  // canary runs through the built cw-mcp.js in agentguidance.
   { paths: ['src/shared/agentText/', 'agent-text/catalogue/', 'agent-text/schema/', 'src/main/apiText.ts', 'src/main/sessionText.ts'], suites: ['agentguidance', 'replysize', 'mcp', 'skilldelivery', 'bridgereport'] },
   // HI-2245: a builder's card watch and cw_lane next saying its card in Review has unsubmitted commits.
   { paths: ['src/main/unsubmitted.ts', 'src/shared/unsubmitted.ts'], suites: ['replysize', 'cardloop'] },
@@ -568,7 +568,7 @@ export const AREAS = [
   // session's chain is pinned from them at its launch (HI-2443).
   { paths: ['resources/dialects/'], suites: ['skills', 'openspeed', 'dialectlaunch', 'dialectsview'] },
   // The dialects service wired into sessions and the Agent API (HI-2443): chains pinned at launch, the Dialect setting,
-  // the launch record, CW_DIALECT_FILE for hive-mcp.js and hive-progress, the API chain.
+  // the launch record, CW_DIALECT_FILE for cw-mcp.js and cw-progress, the API chain.
   { paths: ['src/main/dialects/', 'tests/e2e/dialectlaunch.cjs'], suites: ['dialectlaunch', 'agentguidance', 'dialectsview'] },
   // The Dialects view (HI-2444): its list, a file's texts and layers, Save's checks, the JSON tab, the file actions,
   // Agent Settings' Dialect.
@@ -702,7 +702,7 @@ export function changedFiles(base = 'main', cwd = process.cwd()) {
 // --- The focused-test picker (HI-1367): which unit tests and e2e suites a change needs.
 //
 // Combwork's merge queue calls the project's `focused.pick` command in a clean checkout of the revision, with the base
-// commit in HIVE_FOCUSED_BASE and the changed paths on stdin, and reads one JSON line per test (or {"every":true}).
+// commit in CW_FOCUSED_BASE and the changed paths on stdin, and reads one JSON line per test (or {"every":true}).
 // The unit tests come from three places: a changed test file itself; Vitest's import graph (`vitest list --changed`,
 // which the CLI runs, so a change to code a test imports selects it); and UNIT_SCANS, for the tests that read the
 // repository by `git ls-files`, folder scans or file reads rather than imports, which the import graph can't see.
@@ -720,7 +720,7 @@ export const UNIT_SCANS = [
   // the suites' own sources are read for their rules (headers, waits, ports, CLI steps); the seams src reads.
   { test: 'tests/e2esuites.test.ts', adds: true },
   { test: 'tests/e2esuites.test.ts', paths: ['tests/e2e/'] },
-  { test: 'tests/e2esuites.test.ts', paths: ['src/'], lines: ['HIVE_TEST_'] },
+  { test: 'tests/e2esuites.test.ts', paths: ['src/'], lines: ['CW_TEST_'] },
   // No suite or scenario loads a unit test's helper (tests/*.ts).
   { test: 'tests/e2esuites.test.ts', paths: ['tests/scenarios/'], lines: ['require\\(', '\\bimport\\b', '\\bfrom\\s+[\'"`]'] },
   // Every source file: no control character (#1040), no mixed line endings (#149).
@@ -733,7 +733,7 @@ export const UNIT_SCANS = [
   // Tests name the temp folder only through tests/tempDir.ts (#448).
   { test: 'tests/tempDir.test.ts', paths: ['tests/'], lines: ['\\btmpdir\\b', '\\benv\\s*(\\.\\s*|\\[\\s*[\'"`])(temp|tmp)\\b'] },
   // Every e2e suite and scenario starts Combwork with a test profile, quiet.
-  { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'HIVE_USER_DATA', 'HIVE_TEST_QUIET'] },
+  { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'CW_USER_DATA', 'CW_TEST_QUIET'] },
   // The tools-connected log line (HI-2584): sessions.ts writes it, and suites read it only through lib.hiveToolsConnected.
   { test: 'tests/toolsConnectedLine.test.ts', paths: ['src/main/sessions.ts', 'tests/e2e/', 'tests/scenarios/', 'scripts/'], lines: ['tools connected'] },
   // Every caller of copilotTestEnv gives it `above` (#1308).
@@ -930,8 +930,8 @@ const git = (cwd, args) => execFileSync('git', ['-c', 'core.quotepath=false', ..
 /** The CLI: gathers pickTests' inputs in the checkout (cwd) and prints its lines. Diagnostics go to stderr. */
 async function pickCli() {
   const cwd = process.cwd()
-  const base = process.env.HIVE_FOCUSED_BASE
-  if (!base) throw new Error('HIVE_FOCUSED_BASE (the base commit) is not set')
+  const base = process.env.CW_FOCUSED_BASE
+  if (!base) throw new Error('CW_FOCUSED_BASE (the base commit) is not set')
   git(cwd, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`])
   const paths = [...new Set(readFileSync(0, 'utf8').split(/\r?\n/).map((l) => slashes(l.trim())).filter(Boolean))]
   if (!paths.length) return

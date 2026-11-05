@@ -25,14 +25,14 @@ const pwsh = (command: string): string => spawnSync(ps, ['-NoProfile', '-NonInte
 const UNINSTALL = `
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process')
 const args = process.argv.slice(2)
-fs.writeFileSync(path.join(process.env.HIVE_TEST_UNINSTALL_SEEN, 'args.json'), JSON.stringify(args))
+fs.writeFileSync(path.join(process.env.CW_TEST_UNINSTALL_SEEN, 'args.json'), JSON.stringify(args))
 // NSIS takes everything after _?= as the folder (unquoted, spaces and all): the arguments after it, joined again.
 const at = args.findIndex((a) => a.startsWith('_?='))
 const dir = at < 0 ? '' : args.slice(at).join(' ').slice(3)
 const mode = fs.readFileSync(path.join(dir, 'mode.txt'), 'utf8').trim()
 if (mode === 'fail') process.exit(2)
 fs.rmSync(path.join(dir, 'Hive.exe'), { force: true })
-if (mode !== 'leave-entry') execFileSync('reg', ['delete', process.env.HIVE_TEST_UNINSTALL_KEY, '/f'], { stdio: 'ignore' })
+if (mode !== 'leave-entry') execFileSync('reg', ['delete', process.env.CW_TEST_UNINSTALL_KEY, '/f'], { stdio: 'ignore' })
 process.exit(0)
 `
 
@@ -76,7 +76,7 @@ function upgrade(f: Fixture, extra: string[] = []): { code: number | null; out: 
   const r = spawnSync(
     ps,
     ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', SCRIPT, '-InstallDir', f.install, '-InstallKey', `${f.key}\\install`, '-UninstallKey', `${f.key}\\uninstall`, '-RunKey', `${f.key}\\run`, '-AppData', f.appData, '-LocalAppData', f.local, '-WorkDir', f.work, '-SkipAsk', '-RunningWaitMs', '1500', '-UninstallMs', '30000', ...extra],
-    { env: { ...psEnv, HIVE_TEST_UNINSTALL_SEEN: f.seen, HIVE_TEST_UNINSTALL_KEY: `${f.key}\\uninstall`.replace('HKCU:', 'HKCU') }, windowsHide: true, timeout: HUNG_MS, encoding: 'utf8' }
+    { env: { ...psEnv, CW_TEST_UNINSTALL_SEEN: f.seen, CW_TEST_UNINSTALL_KEY: `${f.key}\\uninstall`.replace('HKCU:', 'HKCU') }, windowsHide: true, timeout: HUNG_MS, encoding: 'utf8' }
   )
   return { code: r.status, out: r.stdout }
 }

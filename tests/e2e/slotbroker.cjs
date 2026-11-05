@@ -1,9 +1,9 @@
 // Windows Sandbox's broker and a connection switch's held slot (HI-2304, SPEC §16.10.3): MB1 switched connection, its
 // run left Windows Sandbox's WindowsSandboxServer.exe running, Combwork held the slot for it, and MB1 never resumed.
 // B1 starts a real card in slot-a on the fake Claude Code, keeping its active lease across the restarts. A test copy takes
-// the processes whose ids are in the file HIVE_TEST_SYSTEM_BROKER as the Sandbox's broker (no test can put one in
+// the processes whose ids are in the file CW_TEST_SYSTEM_BROKER as the Sandbox's broker (no test can put one in
 // WindowsApps; their paths are still asked of the helper by id and start time), and the names in the file
-// HIVE_TEST_SYSTEM_BROKER_ACTIVE as running on the machine.
+// CW_TEST_SYSTEM_BROKER_ACTIVE as running on the machine.
 // 1. B1 leaves the fake broker running (fake-claude's "hidden-linger") while a "Sandbox" runs, and its connection is
 //    switched at its safe point: it exits, slot-a stays held (the broker counts while a Sandbox runs), and the switch's
 //    resume waits, saying so in a notice once, starting nothing meanwhile.
@@ -109,7 +109,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
   let h = null
   const kept = []
   const start = async () => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_SYSTEM_BROKER: brokers, HIVE_TEST_SYSTEM_BROKER_ACTIVE: active }, viewport: { width: 1400, height: 950 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_SYSTEM_BROKER: brokers, CW_TEST_SYSTEM_BROKER_ACTIVE: active }, viewport: { width: 1400, height: 950 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)

@@ -1,5 +1,5 @@
 // Honest run states in the Progress panel (#549), on a fake Claude Code agent (fake-claude/) whose "shell:" step runs
-// hive-progress as an agent's shell does (Combwork's shims: Electron as Node): a run waiting for a test slot shows what it
+// cw-progress as an agent's shell does (Combwork's shims: Electron as Node): a run waiting for a test slot shows what it
 // waits for and how long it has waited, never a time left, with a still, hatched bar, and goes on with its steps when the
 // wait ends; a run past its estimate says "finishing", never "0 s left"; a command interrupted by Ctrl+C (its exit code,
 // a shell's 130) shows as stopped, not failed; a wrapper killed with its command (an agent stopping a preview server) shows as ended
@@ -39,7 +39,7 @@ const until = (fn, ms = 30000) => lib.until(fn, ms, 150)
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...cenv, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...cenv, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -92,7 +92,7 @@ const until = (fn, ms = 30000) => lib.until(fn, ms, 150)
   const rowOf = (id) => panel.locator(`.progress-run[data-run="${id}"]`)
   const textOf = async (id) => ((await rowOf(id).textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ')
 
-  // --- Waiting for a test slot (the wrapper's row, as a test runner under hive-progress reports a wait): what it waits
+  // --- Waiting for a test slot (the wrapper's row, as a test runner under cw-progress reports a wait): what it waits
   // for and how long, no time left, a hatched still bar; when the wait ends it goes on with its steps. The command waits
   // for the test's files, never for a time.
   const release = path.join(ctl, 'release')
@@ -101,18 +101,18 @@ const until = (fn, ms = 30000) => lib.until(fn, ms, 150)
   fs.writeFileSync(
     js,
     `const fs = require('fs')
-console.log('##hive-progress wait=waiting for a test slot: e2e: 137 suites in hb4')
+console.log('##cw-progress wait=waiting for a test slot: e2e: 137 suites in hb4')
 const t = setInterval(() => {
   if (!fs.existsSync(${JSON.stringify(release)})) return
   clearInterval(t)
-  console.log('##hive-progress wait=')
-  console.log('##hive-progress step=1 total=2 name=first suite')
+  console.log('##cw-progress wait=')
+  console.log('##cw-progress step=1 total=2 name=first suite')
   const u = setInterval(() => fs.existsSync(${JSON.stringify(end)}) && process.exit(0), 100)
 }, 100)
 `
   )
   let known = (await runs()).map((r) => r.id)
-  const queued = await startShell(builder.id, `hive-progress --title "Affected e2e" -- node "${js}"`)
+  const queued = await startShell(builder.id, `cw-progress --title "Affected e2e" -- node "${js}"`)
   const q = await newRun(known, (r) => r.title === 'Affected e2e')
   check('a waiting run is reported waiting, with no estimate', !!q && q.waiting === 'waiting for a test slot: e2e: 137 suites in hb4' && q.estimateMs === null && q.state === 'running', JSON.stringify(q))
   check('its row says what it waits for and how long, never a time left', !!(await until(async () => /waiting for a test slot: e2e: 137 suites in hb4/.test(await textOf(q?.id)) && /waiting \d+ s/.test(await textOf(q?.id)), 10000)) && !/left/.test(await textOf(q?.id)), await textOf(q?.id))
@@ -143,17 +143,17 @@ const t = setInterval(() => {
   // STATUS_CONTROL_C_EXIT (the unit tests cover it), the .cmd shim's cmd asks "Terminate batch job (Y/N)?" and waits for
   // an answer this shell never gives, as cmd does for any batch file.
   known = (await runs()).map((r) => r.id)
-  const ctrlcShell = await startShell(builder.id, `hive-progress --title "Interrupted build" -- node -e "process.exit(130)"`)
+  const ctrlcShell = await startShell(builder.id, `cw-progress --title "Interrupted build" -- node -e "process.exit(130)"`)
   const stopped = await until(async () => (await runs()).find((r) => !known.includes(r.id) && r.title === 'Interrupted build' && r.finishedAt !== null), 30000)
   check('a command ended by Ctrl+C shows as stopped, not failed', stopped?.state === 'stopped' && stopped.stopReason === 'interrupted', JSON.stringify(stopped))
   check('…its row says Stopped, with no warning or error mark', !!(await until(async () => /Stopped after/.test(await textOf(stopped?.id)), 5000)) && (await rowOf(stopped?.id).locator('.progress-fail, .progress-stale').count()) === 0, await textOf(stopped?.id))
   const ctrlc = await ctrlcShell()
   check('…its exit code passed through', ctrlc?.code === 130, JSON.stringify(ctrlc ?? null))
 
-  // --- A wrapper killed with its command (an agent stopping a preview server it ran through hive-progress): once its
+  // --- A wrapper killed with its command (an agent stopping a preview server it ran through cw-progress): once its
   // process is gone, the run has ended without a report, never "stopped reporting".
   known = (await runs()).map((r) => r.id)
-  const server = await startShell(builder.id, `hive-progress --title "Preview server" -- node -e "setInterval(() => {}, 1000)"`)
+  const server = await startShell(builder.id, `cw-progress --title "Preview server" -- node -e "setInterval(() => {}, 1000)"`)
   const srv = await newRun(known, (r) => r.title === 'Preview server')
   check('the server run reports its process', !!srv && Number.isInteger(srv.pid) && srv.pid > 0, JSON.stringify(srv))
   // Its identity while it is known to be the server (it runs until ended), for ending it as that process (#603).

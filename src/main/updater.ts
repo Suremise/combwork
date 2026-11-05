@@ -24,9 +24,9 @@ const CHECK_INTERVAL = 6 * 60 * 60 * 1000
 
 /**
  * The resources folder whose build identity and app are read (#1647): this build's own, or in an unpackaged test build
- * with a test feed the one HIVE_TEST_RESOURCES names (a stand-in installed copy).
+ * with a test feed the one CW_TEST_RESOURCES names (a stand-in installed copy).
  */
-const resourcesDir = (): string => (!app.isPackaged && process.env.HIVE_UPDATE_FEED && process.env.HIVE_TEST_RESOURCES ? process.env.HIVE_TEST_RESOURCES : process.resourcesPath)
+const resourcesDir = (): string => (!app.isPackaged && process.env.CW_UPDATE_FEED && process.env.CW_TEST_RESOURCES ? process.env.CW_TEST_RESOURCES : process.resourcesPath)
 /** What this build is (#1647): a local build is never replaced by a release of its own version. */
 let running: BuildIdentity = { version: app.getVersion(), commit: null, local: false }
 const localOf = (b: BuildIdentity): UpdateState['local'] => (b.local ? { commit: b.commit } : undefined)
@@ -60,17 +60,17 @@ export function updateState(): UpdateState {
 /**
  * Updates come from GitHub Releases (electron-updater reads latest.yml there and checks the
  * installer's SHA-512). Development builds never update, except in tests, which point
- * HIVE_UPDATE_FEED at a local server.
+ * CW_UPDATE_FEED at a local server.
  */
-const testFeed = (): string | undefined => (app.isPackaged ? undefined : process.env.HIVE_UPDATE_FEED)
-/** The test download cache's folder in %LOCALAPPDATA%: hive-test-updater, or the one HIVE_UPDATE_CACHE names (an e2e lane's). */
+const testFeed = (): string | undefined => (app.isPackaged ? undefined : process.env.CW_UPDATE_FEED)
+/** The test download cache's folder in %LOCALAPPDATA%: hive-test-updater, or the one CW_UPDATE_CACHE names (an e2e lane's). */
 const testCache = (): string => {
-  const name = process.env.HIVE_UPDATE_CACHE ?? ''
+  const name = process.env.CW_UPDATE_CACHE ?? ''
   return /^hive-test-updater-[\w-]+$/.test(name) ? name : 'hive-test-updater'
 }
 
 /**
- * A packaged Hive a test started (HIVE_TEST_QUIET=1, testQuiet: the packaged suites, the Sandbox checks) never checks
+ * A packaged Hive a test started (CW_TEST_QUIET=1, testQuiet: the packaged suites, the Sandbox checks) never checks
  * GitHub for updates (#1332): each check fetches the release's latest.yml, which counts as a download there. The
  * installed app is never started with it.
  */
@@ -321,13 +321,13 @@ export function initUpdater(opts: { restart: () => void }): void {
   })
 
   const reason = enabledReason()
-  if (packagedTestCopy()) log.info('A test copy (HIVE_TEST_QUIET=1): no update checks, automatic or manual')
+  if (packagedTestCopy()) log.info('A test copy (CW_TEST_QUIET=1): no update checks, automatic or manual')
   if (reason) set({ status: 'disabled', error: reason }, true)
   else if (config.settings.updates.checkAutomatically) {
     firstCheck = setTimeout(() => {
       firstCheck = null
       autoCheck()
-    }, Number(process.env.HIVE_UPDATE_DELAY) || FIRST_CHECK_DELAY)
+    }, Number(process.env.CW_UPDATE_DELAY) || FIRST_CHECK_DELAY)
   }
 
   noticeUpdated()

@@ -27,7 +27,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -209,7 +209,7 @@ const check = (name, ok, extra = '') => {
   // fitting their place. The texts are read from the locales, so a changed translation needs no change here.
   for (const lang of ['de', 'pl']) {
     const T = (area, id, values = {}) => Object.entries(values).reduce((t, [k, v]) => t.replace(`{${k}}`, v), JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', lang, `${area}.json`), 'utf8'))[id])
-    const appL = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off', HIVE_LANG: lang }) })
+    const appL = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off', CW_LANG: lang }) })
     try {
       const page = await appL.firstWindow()
       await lib.fitWindow(appL, page, { width: 1400, height: 900 })

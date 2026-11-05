@@ -908,12 +908,12 @@ describe("the repository's AGENTS.md", () => {
     expect(text).toMatch(/is the `verify-combwork-ui` skill/)
     expect(text).toMatch(/use the `investigate-flake` skill/)
     // Moved there (#1532): AGENTS.md no longer carries them.
-    for (const moved of [/EventID=5007/, /HIVE_TEST_SLOW_IPC/, /HIVE_UPDATE_FEED/, /make it cheaper unasked/]) expect(text).not.toMatch(moved)
+    for (const moved of [/EventID=5007/, /CW_TEST_SLOW_IPC/, /CW_UPDATE_FEED/, /make it cheaper unasked/]) expect(text).not.toMatch(moved)
     const skill = (name: string): string => readFileSync(join(ROOT, '.claude/skills', name, 'SKILL.md'), 'utf8')
     expect(skill('investigate-flake')).toMatch(/EventID=5007/)
     expect(skill('investigate-flake')).toMatch(/make it cheaper unasked/)
-    expect(skill('verify-combwork-ui')).toMatch(/HIVE_TEST_SLOW_IPC/)
-    expect(skill('verify-combwork-ui')).toMatch(/HIVE_UPDATE_FEED/)
+    expect(skill('verify-combwork-ui')).toMatch(/CW_TEST_SLOW_IPC/)
+    expect(skill('verify-combwork-ui')).toMatch(/CW_UPDATE_FEED/)
   })
 })
 
