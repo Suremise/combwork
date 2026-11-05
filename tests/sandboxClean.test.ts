@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url)
 // What the scan writes and the report reads is plain JSON.
 // oxlint-disable-next-line typescript/no-explicit-any
 type Json = Record<string, any>
-const { CATEGORIES, hiveHits, tally, scanText, scanTree, regEntries, newRegistryHits, cleanChecks } = require('./sandbox/clean.cjs')
+const { CATEGORIES, oldNameHits, tally, scanText, scanTree, regEntries, newRegistryHits, cleanChecks } = require('./sandbox/clean.cjs')
 const { evaluate, markdown, verdict, REQUIRED } = require('./sandbox/report.cjs')
 
 const write = (file: string, data: string | Buffer): void => {
@@ -24,14 +24,14 @@ const places = (t: Json, category: string): string[] => t.places[category].hits.
 
 test('a hit: "hive" in any case, alone or joined (as HG1\'s sweep read it); not inside an ordinary word', () => {
   const hits = ['Hive', 'HIVE', 'hive_test', 'cw-hive-mcp', '.hive/', "Hive's", 'hiveGuidance', 'getHive()', 'CW_HIVE_X', 'Hive Desktop', 'hive.db', 'x/hive', '2hive', 'hives']
-  for (const h of hits) assert.strictEqual(hiveHits(h).length, 1, h)
+  for (const h of hits) assert.strictEqual(oldNameHits(h).length, 1, h)
   const not = ['archive', 'Archive', 'ARCHIVE', 'archived', 'chives', 'beehive', 'Combwork', 'hiv e', '']
-  for (const n of not) assert.deepStrictEqual(hiveHits(n), [], n)
+  for (const n of not) assert.deepStrictEqual(oldNameHits(n), [], n)
   // Each hit carries its line, shortened around it, and several on a line are each counted.
-  const [a, b] = hiveHits('first line\nthe Hive app, archive, hive.log\nlast')
+  const [a, b] = oldNameHits('first line\nthe Hive app, archive, hive.log\nlast')
   assert.strictEqual(a.text, 'the Hive app, archive, hive.log')
   assert.strictEqual(b.match, 'hive')
-  assert.strictEqual(hiveHits(`${'x'.repeat(200)} hive ${'y'.repeat(200)}`)[0].text.length, 80 + 4 + 80 + 2)
+  assert.strictEqual(oldNameHits(`${'x'.repeat(200)} hive ${'y'.repeat(200)}`)[0].text.length, 80 + 4 + 80 + 2)
 })
 
 test('a folder: names and text files searched, logs apart, a profile\'s binaries read, the install folder\'s left unread, app.asar counted apart', () => {
@@ -104,7 +104,7 @@ test('a folder or file that can\'t be read is counted against its place, with wh
   const scan = { places: t.places, asar: [{ place: 'app.asar', count: 0 }], skipped: t.skipped }
   for (const c of CATEGORIES) if (!scan.places[c.id].scanned) scanText(t, c.id, `${c.id} place`, 'Combwork')
   const failed = collect(scan).filter((c) => !c.ok)
-  assert.deepStrictEqual(failed.map((c) => c.id), ['9.no-hive-workspace', '9.no-hive-logs'])
+  assert.deepStrictEqual(failed.map((c) => c.id), ['9.no-old-name-workspace', '9.no-old-name-logs'])
   assert.match(failed[0].detail, /^2 not read: /)
   assert.match(failed[0].detail, /locked \(EPERM: operation not permitted, scandir /)
   assert.match(failed[0].detail, /busy\.json \(EPERM: operation not permitted, open /)
@@ -177,7 +177,7 @@ const collect = (scan: Json): Json[] => {
 
 test("the check: passes on a scan with no hits, app.asar's hits counted but not failed", () => {
   const checks = collect(cleanScan())
-  assert.deepStrictEqual(checks.map((c) => c.id), [...CATEGORIES.map((c: Json) => `9.no-hive-${c.id}`), '9.asar-counted'])
+  assert.deepStrictEqual(checks.map((c) => c.id), [...CATEGORIES.map((c: Json) => `9.no-old-name-${c.id}`), '9.asar-counted'])
   assert.ok(checks.every((c) => c.ok), JSON.stringify(checks.filter((c) => !c.ok)))
   assert.strictEqual(checks.at(-1)?.name, "app.asar's own hits counted, not failed: 41")
 })
@@ -190,8 +190,8 @@ test('the check: a hit fails its place with the place and text; a place not sear
   scan.asar = []
   const failed = collect(scan).filter((c) => !c.ok)
   assert.deepStrictEqual(failed.map((c) => [c.id, c.detail]), [
-    ['9.no-hive-env', '1 hit: env HIVE_API_URL: HIVE_API_URL=http://127.0.0.1:47821'],
-    ['9.no-hive-export', 'not searched: no exported board (the driver named none)'],
+    ['9.no-old-name-env', '1 hit: env HIVE_API_URL: HIVE_API_URL=http://127.0.0.1:47821'],
+    ['9.no-old-name-export', 'not searched: no exported board (the driver named none)'],
     ['9.asar-counted', 'no app.asar in the install folder']
   ])
 })
@@ -210,9 +210,9 @@ test('the report: scenario 9 passes with no hits and notes app.asar\'s count; a 
   assert.strictEqual(verdict(ok), `PASSED: all ${ok.checks.length} checks`)
   assert.ok(ok.checks.length >= 1 + 12 + CATEGORIES.length + 1)
   const md = markdown(ok)
-  assert.match(md, /## 9\. A clean install used as a new user would, then searched: no "hive" anywhere \(HI-2592\)/)
-  assert.match(md, /- \*\*app\.asar\*\* holds 41 "hive" hit\(s\) \(C:\\Programs\\Combwork\\resources\\app\.asar: 41\): counted, not failed\./)
-  assert.doesNotMatch(md, /Where "hive" was found/)
+  assert.match(md, /## 9\. A clean install used as a new user would, then searched: no trace of the old name anywhere \(HI-2592\)/)
+  assert.match(md, /- \*\*app\.asar\*\* holds 41 hit\(s\) of the old name \(C:\\Programs\\Combwork\\resources\\app\.asar: 41\): counted, not failed\./)
+  assert.doesNotMatch(md, /Where the old name was found/)
 
   const scan = cleanScan()
   const t = { places: scan.places, asar: [], skipped: [] }
@@ -222,7 +222,7 @@ test('the report: scenario 9 passes with no hits and notes app.asar\'s count; a 
   assert.strictEqual(bad.failed, 2)
   const md2 = markdown(bad)
   assert.match(md2, /\*\*FAILED: 2 of \d+ checks\*\*/)
-  assert.match(md2, /## 9\. Where "hive" was found/)
+  assert.match(md2, /## 9\. Where the old name was found/)
   assert.match(md2, /\| window: Settings: general \| Start Hive at login \|/)
   assert.match(md2, /\| C:\\Users\\u\\AppData\\Roaming\\Combwork\\hive\.log \| hive\.log \|/)
 })
@@ -256,7 +256,7 @@ test('what the clean step relies on is still there, and it hands the scan the fi
     assert.ok(drive.includes(`\`\${prefix}-${f}\``), `drive.cjs writes ${f}`)
     assert.ok(scan.includes(`out('${f}')`), `clean-scan.cjs reads ${f}`)
   }
-  // Logs are found inside the folders it searches (clean.cjs scanTree): none at all fails 9.no-hive-logs.
+  // Logs are found inside the folders it searches (clean.cjs scanTree): none at all fails 9.no-old-name-logs.
   for (const c of CATEGORIES.filter((x: Json) => x.id !== 'logs')) assert.ok(scan.includes(`'${c.id}'`), `clean-scan.cjs searches ${c.id}`)
 })
 

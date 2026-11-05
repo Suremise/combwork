@@ -16,7 +16,7 @@ export const COMMIT_BURST_WINDOW_MS = 250
  */
 export const COMMIT_BURST_LIMIT = 50
 /** The console line's start: `<marker> <n>`, n the largest burst so far. */
-export const COMMIT_BURST_MARKER = '[hive commit burst]' // i18n-ignore: a test copy's console marker, read by the e2e harness
+export const COMMIT_BURST_MARKER = '[combwork commit burst]' // i18n-ignore: a test copy's console marker, read by the e2e harness
 
 /**
  * Counts commits by their times (ms, rising): add(t) returns how many fell within `windowMs` up to t; max is the most
@@ -56,7 +56,7 @@ export function burstOf(text: string): number | null {
  * in a useEffect loops (#1366), however fast or slow, and what React counts toward its own limit. A window's ordinary
  * work, however busy, starts a new chain at each thing from outside.
  */
-export const COMMIT_CHAIN_MARKER = '[hive commit chain]' // i18n-ignore: a test copy's console marker, read by the e2e harness
+export const COMMIT_CHAIN_MARKER = '[combwork commit chain]' // i18n-ignore: a test copy's console marker, read by the e2e harness
 /** The DOM event the preload sends the page as each message or reply from main arrives (the page can't see IPC itself). */
 export const FROM_MAIN_EVENT = 'cw-commit-watch-from-main'
 

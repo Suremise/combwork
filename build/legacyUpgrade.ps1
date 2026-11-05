@@ -10,7 +10,8 @@
 #   3. Moves the profile folders, %APPDATA% and %LOCALAPPDATA% each on its own: Hive → Combwork by one rename, only when
 #      Hive is a folder and Combwork is confirmed absent. Before the local rename, the installer's record
 #      (profile-move.json, HI-2461's contract) is put inside Hive's folder, so it arrives with the folder or not at all.
-#      Nothing is ever deleted or copied; a rename that fails leaves both, and the app falls back to Hive's (HI-2461).
+#      Nothing is ever deleted or copied; a rename that fails leaves both, for the app's first start to move once or to
+#      refuse to start (HI-2594: it never runs on Hive's folders).
 #
 # Exit codes, for the installer: 0 done (each folder moved or left, as its line says); 5 an app still runs, or whether it
 # does couldn't be told: nothing changed; 6 Hive Desktop couldn't be removed: the profile folders untouched (its line
@@ -134,7 +135,7 @@ try {
 }
 if ($uninstall -and -not $old) { $old = Split-Path -Parent (ExeOf $uninstall) }
 $oldExe = if ($old) { Join-Path $old $OldExeName } else { $null }
-Say $(if ($old) { "hive desktop: installed in $old" } else { 'hive desktop: not installed' })
+Say $(if ($old) { "previous installation: Hive Desktop in $old" } else { 'previous installation: none' })
 
 $newExe = Join-Path $InstallDir $ExeName
 if (-not $SkipAsk) {

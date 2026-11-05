@@ -15,7 +15,7 @@ const log = createLogger('journal')
 // The windows showing a workspace's journal browser (#1033) follow its changes: its Assistant home is `<workspace>/.combwork/assistant`.
 onJournalChange((home) => emit({ type: 'journal-changed', workspacePath: join(home, '..', '..') }))
 // agent-protocol: who a journal entry or delivery is from: Combwork's own name (HI-2463)
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const
 
 /**
  * The journal as a workspace has it (#1031): its settings (workspace.json `journal`, Settings → Assistant → Journal),
@@ -85,7 +85,7 @@ async function tellAssistant(ws: WorkspaceService, body: string): Promise<void> 
   if (!existsSync(join(home, CW_DIR, 'project.json'))) return
   // Loaded when used: sessions.ts reads the settings here, and deliveries.ts needs sessions loaded first.
   const { createDelivery } = await import('./deliveries')
-  await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body }).catch((e) => log.warn('telling the Assistant its journal settings changed', e))
+  await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: COMBWORK, body }).catch((e) => log.warn('telling the Assistant its journal settings changed', e))
 }
 
 /** What the Assistant is asked to suggest, once, when it writes a handover with its journal off (#1032). */

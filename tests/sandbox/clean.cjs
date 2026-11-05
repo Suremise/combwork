@@ -15,7 +15,7 @@
 const fs = require('fs')
 const path = require('path')
 
-/** Each place searched: its id (the report's check is 9.no-hive-<id>) and what it is, for the report. */
+/** Each place searched: its id (the report's check is 9.no-old-name-<id>) and what it is, for the report. */
 const CATEGORIES = [
   { id: 'install', title: 'the install folder (names, text files and the exes\' version info; app.asar counted apart)' },
   { id: 'roaming', title: '%APPDATA%\\Combwork (names and files)' },
@@ -35,7 +35,7 @@ const KEEP = 200
 const CHUNK = 8 * 1024 * 1024
 
 /** The hits in a text: [{ at, match, text }], text the hit's line (shortened around it). */
-function hiveHits(text) {
+function oldNameHits(text) {
   const s = String(text ?? '')
   const out = []
   const re = /hive/gi
@@ -70,7 +70,7 @@ function textOf(buf) {
 
 /** A binary's hits: its bytes read as Latin-1 (UTF-8 strings) and as UTF-16. */
 function binaryHits(buf) {
-  return [...hiveHits(buf.toString('latin1')), ...hiveHits(buf.toString('utf16le'))]
+  return [...oldNameHits(buf.toString('latin1')), ...oldNameHits(buf.toString('utf16le'))]
 }
 
 /**
@@ -100,7 +100,7 @@ function record(t, category, place, hits) {
 
 /** Searches a text for one place (a variable, a page, a registry dump). */
 function scanText(t, category, place, text) {
-  record(t, category, place, hiveHits(text))
+  record(t, category, place, oldNameHits(text))
 }
 
 const isLog = (p) => /\.log(\.\d+)?$/i.test(p) || /(^|[\\/])logs?[\\/]/i.test(p)
@@ -115,7 +115,7 @@ const isLog = (p) => /\.log(\.\d+)?$/i.test(p) || /(^|[\\/])logs?[\\/]/i.test(p)
 function scanTree(t, category, root, { binary = 'skip', skip = () => false } = {}) {
   let n = 0
   if (!fs.existsSync(root)) return n
-  record(t, category, root, hiveHits(path.basename(root)))
+  record(t, category, root, oldNameHits(path.basename(root)))
   const walk = (dir) => {
     let entries
     try {
@@ -128,7 +128,7 @@ function scanTree(t, category, root, { binary = 'skip', skip = () => false } = {
       const full = path.join(dir, e.name)
       const rel = path.relative(root, full)
       n++
-      record(t, isLog(rel) && e.isFile() ? 'logs' : category, full, hiveHits(e.name))
+      record(t, isLog(rel) && e.isFile() ? 'logs' : category, full, oldNameHits(e.name))
       if (e.isSymbolicLink()) continue
       if (e.isDirectory()) {
         walk(full)
@@ -168,13 +168,13 @@ function fileHits(file, binary) {
     fs.readSync(fd, head, 0, head.length, 0)
     const asText = textOf(head)
     if (asText === null && binary !== 'scan') return null
-    const hits = asText === null ? binaryHits(head) : hiveHits(asText)
+    const hits = asText === null ? binaryHits(head) : oldNameHits(asText)
     // The rest, in parts overlapping by 8 bytes (an even count, for UTF-16), so a "hive" across a boundary is found, at
     // worst twice.
     for (let at = head.length - 8; head.length === CHUNK && at + 8 < size; at += CHUNK - 8) {
       const part = Buffer.alloc(Math.min(CHUNK, size - at))
       fs.readSync(fd, part, 0, part.length, at)
-      hits.push(...(asText === null ? binaryHits(part) : hiveHits(part.toString(head[0] === 0xff && head[1] === 0xfe ? 'utf16le' : 'utf8'))))
+      hits.push(...(asText === null ? binaryHits(part) : oldNameHits(part.toString(head[0] === 0xff && head[1] === 0xfe ? 'utf16le' : 'utf8'))))
     }
     return hits
   } finally {
@@ -184,7 +184,7 @@ function fileHits(file, binary) {
 
 /**
  * `reg query <root> /f hive /s` output as entries: a key ("HKEY_CURRENT_USER\\…") and each value under it ("<key>\\<name>
- * = <data>"). reg's /f matches inside words too (archive), so hiveHits decides.
+ * = <data>"). reg's /f matches inside words too (archive), so oldNameHits decides.
  */
 function regEntries(text) {
   const out = []
@@ -204,7 +204,7 @@ function regEntries(text) {
 /** The registry entries naming "hive" that weren't there before the install: what the app (or its installer) wrote. */
 function newRegistryHits(before, after) {
   const was = new Set(regEntries(before))
-  return regEntries(after).filter((e) => !was.has(e) && hiveHits(e).length)
+  return regEntries(after).filter((e) => !was.has(e) && oldNameHits(e).length)
 }
 
 /**
@@ -216,10 +216,10 @@ function newRegistryHits(before, after) {
 function cleanChecks(scan, add) {
   for (const c of CATEGORIES) {
     const p = scan?.places?.[c.id]
-    const id = `9.no-hive-${c.id}`
+    const id = `9.no-old-name-${c.id}`
     // Something to search must have been there: a place missing (p.why) fails, so a gap is never a pass.
     if (!p || !p.scanned || p.why) {
-      add(id, `No "hive" in ${c.title}`, false, `not searched: ${p?.why || 'nothing was there'}`)
+      add(id, `No trace of the old name in ${c.title}`, false, `not searched: ${p?.why || 'nothing was there'}`)
       continue
     }
     const shown = p.hits.slice(0, 15).map((h) => `${h.place}: ${h.text}`).join('; ')
@@ -227,7 +227,7 @@ function cleanChecks(scan, add) {
     // Unread there: the count is the place's own; what is listed, the scan's record of them (kept up to its limit).
     const notRead = [].concat(scan?.skipped || []).filter((s) => s.category === c.id)
     const unreadText = p.unread ? `${p.unread} not read: ${notRead.slice(0, 10).map((s) => `${s.place} (${s.why})`).join('; ')}${p.unread > 10 ? '; …' : ''}` : ''
-    add(id, `No "hive" in ${c.title} (${p.scanned} searched)`, p.count === 0 && !p.unread, [hits, unreadText].filter(Boolean).join('; '))
+    add(id, `No trace of the old name in ${c.title} (${p.scanned} searched)`, p.count === 0 && !p.unread, [hits, unreadText].filter(Boolean).join('; '))
   }
   const asar = [].concat(scan?.asar || [])
   const total = asar.reduce((s, a) => s + (a.count || 0), 0)
@@ -257,4 +257,4 @@ function hitsMarkdown(scan) {
   return lines
 }
 
-module.exports = { CATEGORIES, KEEP, hiveHits, textOf, tally, record, scanText, scanTree, isLog, regEntries, newRegistryHits, cleanChecks, hitsMarkdown }
+module.exports = { CATEGORIES, KEEP, oldNameHits, textOf, tally, record, scanText, scanTree, isLog, regEntries, newRegistryHits, cleanChecks, hitsMarkdown }

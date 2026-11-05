@@ -1,7 +1,8 @@
 import { app } from 'electron'
-import { existsSync, mkdirSync, renameSync } from 'original-fs'
+import { mkdirSync, renameSync } from 'original-fs'
 import { basename, join } from 'path'
 import { isMainThread, Worker } from 'worker_threads'
+import { present } from './fsPresence'
 import { maskKeys } from './keyMatcher'
 import { appendLog, BUSY, LOG_STATE_SLOTS, STOP, WRITTEN, type LogBatch } from './logWriter'
 import { noteStep, stallClock } from './stallWork'
@@ -27,12 +28,15 @@ function file(name: string): string {
     const dir = logsDir()
     mkdirSync(dir, { recursive: true })
     // Before the first line (HI-2587): the old log's files take the new name, once (moveOldLogs).
+    let left: string[] = []
     if (!logsMoved) {
       logsMoved = true
-      moveOldLogs(dir)
+      left = moveOldLogs(dir)
     }
     f = join(dir, name)
     logFiles.set(name, f)
+    // Said once the log has its file (HI-2612): after the line being written, never inside its write.
+    if (left.length) queueMicrotask(() => write('warn', 'logger', `The log's old files were left under their old names for the next start: ${left.join('; ')}`)) // i18n-ignore: a line in the app's own log, which stays English
   }
   return f
 }
@@ -40,17 +44,21 @@ function file(name: string): string {
 /**
  * The log's files from before 1.1 renamed (HI-2587, the names upgrade, nameUpgrade.ts): `hive.log` → `combwork.log` and
  * `hive.1.log` → `combwork.1.log`, each only while its new name isn't there. One that can't be renamed (held by another
- * program), or whose new name is there already, stays where it is, never read: Help → Open Logs Folder shows it, and the
- * next start tries again while the new name is free. Never throws: a log mustn't.
+ * program), whose new name is there already, or either of which can't be looked at (access denied: never taken for
+ * absent, HI-2612, so a current log is never renamed over), stays where it is, never read: Help → Open Logs Folder shows
+ * it, and the next start tries again. Never throws (a log mustn't): what it left for a reason other than a taken name,
+ * each with its error's code, for the log's first lines.
  */
-export function moveOldLogs(dir: string): void {
+export function moveOldLogs(dir: string): string[] {
+  const left: string[] = []
   for (const [from, to] of [['hive.log', LOG_FILE], ['hive.1.log', LOG_FILE.replace(/\.log$/, '.1.log')]]) {
     try {
-      if (existsSync(join(dir, from)) && !existsSync(join(dir, to))) renameSync(join(dir, from), join(dir, to))
-    } catch {
-      // Left as it is: said nowhere, as nothing is logged yet.
+      if (present(join(dir, from)) && !present(join(dir, to))) renameSync(join(dir, from), join(dir, to))
+    } catch (e) {
+      left.push(`${from} (${(e as NodeJS.ErrnoException | null)?.code ?? 'error'})`)
     }
   }
+  return left
 }
 
 /** A log write this slow, made here, is noted as a step (HI-1692), so a stall it caused names it. */

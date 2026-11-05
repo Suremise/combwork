@@ -19,6 +19,8 @@ import { NEW_ID, OLD_ID, upgradedAdvancedIds, upgradedOptions, upgradedRunName }
  * - **The progress command's old names** (HI-2594): 1.0 and the RCs put `hive-progress` and `hive-progress.cmd` beside
  *   `cw-progress` in the profile's bin folder. They are removed before the shims are written (index.ts), so no session
  *   finds the old command.
+ * - **The window's storage** (HI-2610): the Activity tabs' kept views, by the renderer as each window starts
+ *   (activityView.ts upgradeActivityViews).
  */
 
 /**
@@ -30,9 +32,15 @@ export const oldProfileFolder = (packaged: boolean): string => (packaged ? 'Hive
 /** The progress command's shims under their names before 1.1, in the profile's bin folder. */
 export const OLD_SHIMS: readonly string[] = ['hive-progress', 'hive-progress.cmd']
 
-/** Removes the old shims from `binDir` (none there: nothing to do). Never throws: one left is never run by Combwork. */
-export async function removeOldShims(binDir: string): Promise<void> {
-  for (const name of OLD_SHIMS) await rm(join(binDir, name), { force: true }).catch(() => undefined)
+/**
+ * Removes the old shims from `binDir` (none there: nothing to do). Never throws (one left is never run by Combwork): the
+ * ones it couldn't remove (access denied, held), each with its error's code, for the start to log (HI-2612); it runs at
+ * every start, so the next one tries again.
+ */
+export async function removeOldShims(binDir: string): Promise<string[]> {
+  const left: string[] = []
+  for (const name of OLD_SHIMS) await rm(join(binDir, name), { force: true }).catch((e) => void left.push(`${name} (${(e as NodeJS.ErrnoException | null)?.code ?? 'error'})`))
+  return left
 }
 
 /** A run marker's data with its old key renamed; null when it has nothing old. */

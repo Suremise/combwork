@@ -709,8 +709,8 @@ _electron.launch = async (...args) => {
 // reaches React's nested-update limit. The burst is recorded only: input makes bursts as large as a loop's (HI-1864).
 // The chain fails the suite at the limit (HI-1865: a full run's normal suites stayed at 8 or under), unless the suite
 // accepts its chain (acceptCommitChain: commitburst's deliberate loop).
-const COMMIT_BURST_MARKER = '[hive commit burst]'
-const COMMIT_CHAIN_MARKER = '[hive commit chain]'
+const COMMIT_BURST_MARKER = '[combwork commit burst]'
+const COMMIT_CHAIN_MARKER = '[combwork commit chain]'
 const COMMIT_BURST_LIMIT = 50
 /**
  * A suite's record of its windows' bursts: each window's own largest, from its console lines and read once from the page

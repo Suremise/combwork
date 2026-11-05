@@ -239,13 +239,13 @@ export function runMatches(r: ProgressRun, f: RunsFilter, words: (r: ProgressRun
 
 /**
  * The Runs tab's Agent filter's value for a run's agent: its agent, or for Combwork's own runs who in Combwork ran it (#1356: the
- * filter has "Hive (merge queue)"; #1446: "Hive (slot slot-b)", one each; HI-1710: a copy's, its lease's agent, else "Hive (review copies)"); null for the
+ * filter has "Combwork (merge queue)"; #1446: "Combwork (slot slot-b)", one each; HI-1710: a copy's, its lease's agent, else "Combwork (review copies)"); null for the
  * Assistant and scripts, which the filter doesn't offer.
  */
-export const CW_RUNS = ':hive'
-/** The Agent filter's value for a slot's warming runs, "Hive (slot <name>)" (#1446). */
+export const CW_RUNS = ':combwork'
+/** The Agent filter's value for a slot's warming runs, "Combwork (slot <name>)" (#1446). */
 export const slotRunsKey = (slot: string): string => `${CW_RUNS}:slot:${slot.toLowerCase()}`
-/** The Agent filter's value for review and check copies' setup runs no lease credits to an agent, "Hive (review copies)" (HI-1710). */
+/** The Agent filter's value for review and check copies' setup runs no lease credits to an agent, "Combwork (review copies)" (HI-1710). */
 export const copiesRunsKey = `${CW_RUNS}:copies`
 export const runAgentKey = (r: Pick<ProgressRun, 'agentId' | 'source' | 'defaultName' | 'slot' | 'copy'>): string | null =>
   r.agentId ?? (r.source !== 'combwork' ? null : r.defaultName === 'slot' && r.slot ? slotRunsKey(r.slot) : r.defaultName === 'copy' ? copiesRunsKey : CW_RUNS)

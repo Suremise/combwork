@@ -30,7 +30,7 @@ const log = createLogger('answerRelay')
 const SOURCE = 'answer-relay'
 const ASSISTANT = 'assistant'
 /** Combwork's own deliveries come from it. */
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /** The Assistant's line for an answer (relayLine), said in its dialect (agent-facing). */
 const T = {
@@ -103,7 +103,7 @@ export async function relayAnswer(ws: WorkspaceService, a: AnswerToRelay): Promi
   try {
     if (!assistantCanAct(ws)) return await untold(ws, a.card, a.project, a.askerName, a.need)
     const meta = { card: a.card, project: a.project, askerName: a.askerName, ...(a.need ? { need: a.need } : {}) }
-    await createDelivery(ws.assistantHome, { agentId: ASSISTANT, kind: 'control', from: HIVE, card: a.card, body: inDialectOf({ projectPath: ws.assistantHome, agentId: ASSISTANT }, () => relayLine(a)), source: SOURCE, ref: `#${a.card}/${a.request}`, meta })
+    await createDelivery(ws.assistantHome, { agentId: ASSISTANT, kind: 'control', from: COMBWORK, card: a.card, body: inDialectOf({ projectPath: ws.assistantHome, agentId: ASSISTANT }, () => relayLine(a)), source: SOURCE, ref: `#${a.card}/${a.request}`, meta })
     await offerNow(ws.assistantHome, ASSISTANT)
   } catch (e) {
     log.warn(`giving the Assistant the user's answer on #${a.card}`, e)

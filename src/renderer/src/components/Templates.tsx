@@ -737,7 +737,7 @@ function useAllTemplates() {
 }
 
 const ALL = 'all'
-const HIVE = 'combwork'
+const COMBWORK_GROUP = 'combwork'
 const WORKSPACE = 'workspace'
 
 /** The Templates view's sidebar: every template, grouped by where it is kept, with a filter (All, Workspace, a project). */
@@ -746,15 +746,15 @@ export function TemplatesPanel() {
   const selected = useStore((s) => s.selectedTemplate)
   const filter = useStore((s) => s.templateFilter)
   const projects = useStore((s) => s.workspace?.projects) ?? []
-  const shownFilter = filter === ALL || filter === HIVE || filter === WORKSPACE || projects.some((p) => p.path === filter) ? filter : ALL
+  const shownFilter = filter === ALL || filter === COMBWORK_GROUP || filter === WORKSPACE || projects.some((p) => p.path === filter) ? filter : ALL
   const all = data ?? []
   const groups: { key: string; title: string; items: TemplateEntry[] }[] = [
-    { key: HIVE, title: tr(M.combwork), items: all.filter((t) => t.scope === 'combwork') },
+    { key: COMBWORK_GROUP, title: tr(M.combwork), items: all.filter((t) => t.scope === 'combwork') },
     { key: WORKSPACE, title: tr(M.workspace), items: all.filter((t) => t.scope === 'workspace') },
     ...projects.map((p) => ({ key: p.path, title: p.name, items: all.filter((t) => t.scope === 'project' && sameProject(t.project, p.path)) }))
-  ].filter((g) => (shownFilter === ALL ? g.key === HIVE || g.key === WORKSPACE || g.items.length > 0 : g.key === shownFilter))
+  ].filter((g) => (shownFilter === ALL ? g.key === COMBWORK_GROUP || g.key === WORKSPACE || g.items.length > 0 : g.key === shownFilter))
   const doImport = (): void =>
-    void importTemplate(shownFilter !== ALL && shownFilter !== HIVE && shownFilter !== WORKSPACE ? shownFilter : '').then((t) => t && set({ selectedTemplate: templateKey(t), templateFilter: ALL }))
+    void importTemplate(shownFilter !== ALL && shownFilter !== COMBWORK_GROUP && shownFilter !== WORKSPACE ? shownFilter : '').then((t) => t && set({ selectedTemplate: templateKey(t), templateFilter: ALL }))
   return (
     <>
       <div className="pane-header">
@@ -768,7 +768,7 @@ export function TemplatesPanel() {
         <div style={{ padding: '0 8px 6px 12px' }}>
           <select className="select" style={{ width: '100%' }} aria-label={tr(M.showOf)} value={shownFilter} onChange={(e) => set({ templateFilter: e.target.value })}>
             <option value={ALL}>{tr(M.allTemplates)}</option>
-            <option value={HIVE}>{tr(M.combwork)}</option>
+            <option value={COMBWORK_GROUP}>{tr(M.combwork)}</option>
             <option value={WORKSPACE}>{tr(M.workspace)}</option>
             {projects.map((p) => (
               <option key={p.path} value={p.path}>
@@ -789,11 +789,11 @@ export function TemplatesPanel() {
         )}
         {data &&
           groups.map((g) => (
-            <div key={g.key} className="template-group" data-group={g.key === HIVE || g.key === WORKSPACE ? g.key : 'project'}>
+            <div key={g.key} className="template-group" data-group={g.key === COMBWORK_GROUP || g.key === WORKSPACE ? g.key : 'project'}>
               <div className="skill-group">
                 {g.title} <span className="count">{g.items.length}</span>
               </div>
-              {g.items.length === 0 && <div className="pane-empty">{tr(g.key === HIVE ? M.noneCombwork : g.key === WORKSPACE ? M.noWorkspaceTemplates : M.noneOfItsOwn)}</div>}
+              {g.items.length === 0 && <div className="pane-empty">{tr(g.key === COMBWORK_GROUP ? M.noneCombwork : g.key === WORKSPACE ? M.noWorkspaceTemplates : M.noneOfItsOwn)}</div>}
               {g.items.map((t) => (
                 <TemplateRow key={templateKey(t)} t={t} selected={selected === templateKey(t)} onSelect={() => set({ selectedTemplate: templateKey(t) })} />
               ))}

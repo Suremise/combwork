@@ -47,7 +47,7 @@ const log = createLogger('loopWakes')
 
 /** Combwork's own deliveries come from it. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const
 /** The user's answer comes from them, as a decision does (decisionWakes.ts). */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const USER = { kind: 'user', name: 'the user' } as const
@@ -239,7 +239,7 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
     // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events), each its own (a
     // later handoff of the card, or another answer, doesn't replace it); the rest, Combwork's card events, the latest per card.
     const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`
-    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
+    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : COMBWORK, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
     await offerNow(projectPath, to.id)
   }, scopeOfHost(projectPath)))
 }

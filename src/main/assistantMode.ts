@@ -34,7 +34,7 @@ const switches = new Map<string, number>()
 const revision = (key: string): number => switches.get(key) ?? 0
 
 /** Combwork's own deliveries come from it. */
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /**
  * The mode notices' part in their deliveries (#649): offered only while no newer switch has begun since it was made (one
@@ -112,7 +112,7 @@ async function tell(w: { home: string; runId: string; text: string; mode: string
   const key = w.home.toLowerCase()
   // Stopped or restarted since (the launch it has, or will have, is in the mode already), or a newer switch began.
   if (sessions.liveFor(w.home, AGENT)?.runId !== w.runId || w.rev !== revision(key)) return false
-  await createDelivery(w.home, { agentId: AGENT, kind: 'control', from: HIVE, body: w.text, source: 'mode', ref: 'mode', replace: true, forRun: w.runId, meta: { rev: w.rev, modeId: w.modeId, mode: w.mode } })
+  await createDelivery(w.home, { agentId: AGENT, kind: 'control', from: COMBWORK, body: w.text, source: 'mode', ref: 'mode', replace: true, forRun: w.runId, meta: { rev: w.rev, modeId: w.modeId, mode: w.mode } })
   const typed = await offerNow(w.home, AGENT)
   if (!typed) log.info('The Assistant will be told its mode when it is free')
   return typed

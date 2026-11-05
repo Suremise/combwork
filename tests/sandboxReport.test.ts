@@ -33,7 +33,7 @@ const hiveState = (): Json => state({ uninstallEntries: [{ displayName: 'Hive De
 /** A finished driver record with all its required checks passing. */
 const driverOk = (kind: string, key: string): Json => {
   const req = REQUIRED[kind].drivers[key]
-  return { completed: true, checks: req.ids.map((id: string) => ({ id, scenario: Number(id.split('.')[0]), name: `check ${id}`, ok: true })), facts: { version: '0.6.0', exe: 'Combwork.exe', gitMissing: true, hive: ['workspace.json'], views: {} } }
+  return { completed: true, checks: req.ids.map((id: string) => ({ id, scenario: Number(id.split('.')[0]), name: `check ${id}`, ok: true })), facts: { version: '0.6.0', exe: 'Combwork.exe', gitMissing: true, workspaceTree: ['workspace.json'], views: {} } }
 }
 const allShots = [...REQUIRED.fresh.shots, ...REQUIRED.upgrade.shots]
 const meta = (over: Json = {}): Json => ({ app: APP, installer: 'Combwork-Setup-0.6.0.exe', installerVersion: '0.6.0', previousVersion: '0.5.1', ran: ['fresh', 'upgrade'], date: 'd', hostBuild: '10.0.26200', minutes: '3.0', shots: allShots, steps: [{ scenario: 1, what: '1. install', ok: true }], ...over })

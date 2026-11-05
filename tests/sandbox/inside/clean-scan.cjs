@@ -29,7 +29,7 @@ const run = (file, args) => {
 }
 const ps = (cmd) => run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd])
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) } catch { return null } }
-const hkcuHive = () => run('reg.exe', ['query', 'HKCU', '/f', 'hive', '/s'])
+const hkcuOldName = () => run('reg.exe', ['query', 'HKCU', '/f', 'hive', '/s'])
 
 function scan() {
   const t = tally()
@@ -80,7 +80,7 @@ function scan() {
   if (before === null) why.registry = 'no record of HKCU before the install (baseline)'
   else {
     // Each new entry named by its key (a value's "<key>\<name> = <data>").
-    const added = newRegistryHits(before, hkcuHive())
+    const added = newRegistryHits(before, hkcuOldName())
     for (const e of added) scanText(t, 'registry', e.split(' = ')[0], e)
     if (!added.length) scanText(t, 'registry', 'HKCU, what was added since the install', '')
   }
@@ -109,7 +109,7 @@ function scan() {
 }
 
 if (mode === 'baseline') {
-  fs.writeFileSync(out('reg-before.txt'), hkcuHive())
+  fs.writeFileSync(out('reg-before.txt'), hkcuOldName())
   console.log(`kept ${out('reg-before.txt')}`)
 } else if (mode === 'scan') {
   scan()
