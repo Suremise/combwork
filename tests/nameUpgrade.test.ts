@@ -247,7 +247,7 @@ describe('the names upgrade at the open', () => {
       return lstat(p)
     }
     try {
-      await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the workspace's \.gitignore, README and MCP definitions/)
+      await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the workspace's settings, templates, \.gitignore, README and MCP definitions/)
     } finally {
       stubTestHooks.stat = undefined
     }
