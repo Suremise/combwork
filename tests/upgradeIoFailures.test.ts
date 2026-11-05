@@ -15,21 +15,21 @@ vi.mock('../src/main/events', async (orig) => ({ ...(await orig<object>()), toas
 
 /** Paths whose calls fail, each with its error's code, as access denied, another program holding it or a bad disk would. */
 const { held, sync, async_ } = vi.hoisted(() => {
-  const held = new Map<string, string>()
-  const failing = (p: unknown): string | undefined => held.get(String(p).toLowerCase())
+  const paths = new Map<string, string>()
+  const failing = (p: unknown): string | undefined => paths.get(String(p).toLowerCase())
   const failure = (p: unknown, code: string): Error => Object.assign(new Error(`${code}: refused, '${String(p)}' (test)`), { code })
-  const sync = <F extends (...a: any[]) => any>(real: F): F =>
+  const syncCall = <F extends (...a: any[]) => any>(real: F): F =>
     ((p: unknown, ...rest: unknown[]) => {
       const code = failing(p)
       if (code) throw failure(p, code)
       return real(p, ...rest)
     }) as F
-  const async_ = <F extends (...a: any[]) => Promise<any>>(real: F): F =>
+  const asyncCall = <F extends (...a: any[]) => Promise<any>>(real: F): F =>
     ((p: unknown, ...rest: unknown[]) => {
       const code = failing(p)
       return code ? Promise.reject(failure(p, code)) : real(p, ...rest)
     }) as F
-  return { held, sync, async_ }
+  return { held: paths, sync: syncCall, async_: asyncCall }
 })
 
 vi.mock('original-fs', async (orig) => {
