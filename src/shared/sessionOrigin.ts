@@ -5,7 +5,7 @@ import type { SessionListItem } from './types'
 
 /**
  * Where a session ran and whose it was, for the Sessions tab: "Coder · Project folder", "Reviewer · Worktree ·
- * hive/reviewer". From what the session recorded (its agent's id and name, its folder and branch), never from which
+ * cw/reviewer". From what the session recorded (its agent's id and name, its folder and branch), never from which
  * agent has that name or folder now: an agent added later with the same name or worktree isn't the one that ran it.
  * Which agent resumes it now is separate (resumeTarget).
  */

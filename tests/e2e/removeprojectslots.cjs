@@ -31,7 +31,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
   fs.mkdirSync(shots, { recursive: true })
   lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
-  lib.git(beta, ['worktree', 'add', '-q', '-b', 'hive/hr1', path.join(trees, 'hr1'), 'main'])
+  lib.git(beta, ['worktree', 'add', '-q', '-b', 'cw/hr1', path.join(trees, 'hr1'), 'main'])
   fs.mkdirSync(path.join(beta, '.combwork'), { recursive: true })
   fs.writeFileSync(
     path.join(beta, '.combwork', 'project.json'),
@@ -41,7 +41,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
       agents: [
         { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder' },
         { id: 'b2', name: 'B2', provider: 'claude-code', workflowRole: 'builder' },
-        { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: path.join(trees, 'hr1'), branch: 'hive/hr1', base: 'main' } }
+        { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: path.join(trees, 'hr1'), branch: 'cw/hr1', base: 'main' } }
       ]
     }, null, 2)
   )

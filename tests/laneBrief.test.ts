@@ -12,7 +12,7 @@ const input = (over: Partial<LaneBriefInput> = {}): LaneBriefInput => ({
     { key: 'AL-1', title: 'Lane data' },
     { key: 'AL-2', title: 'Lane hover' }
   ],
-  builder: { name: 'B1', folder: 'D:\\ws.worktrees\\alpha\\b1', branch: 'hive/b1' },
+  builder: { name: 'B1', folder: 'D:\\ws.worktrees\\alpha\\b1', branch: 'cw/b1' },
   reviewer: { name: 'R1' },
   options: { review: 'agent', preChecks: ['typecheck', 'lint'], finish: 'agentMerges', okBefore: { mode: 'labels', labels: ['ui'] }, target: 'main' },
   rounds: 10,
@@ -41,7 +41,7 @@ describe("a lane's brief (#1280)", () => {
     const b = laneBrief(input(), 'builder')
     expect(b).toContain('use the card-loop skill as the builder, with R1 as the reviewer; rounds: 10.')
     expect(b).toContain('1. AL-1 Lane data\n2. AL-2 Lane hover')
-    expect(b).toContain('B1 works in D:\\ws.worktrees\\alpha\\b1 (branch hive/b1); work goes to main.')
+    expect(b).toContain('B1 works in D:\\ws.worktrees\\alpha\\b1 (branch cw/b1); work goes to main.')
     expect(b).toContain('- A reviewer agent reviews each card before it is merged.')
     expect(b).toContain('- Checks that pass before review: typecheck and lint. Run each as `cw-progress --check <name> --card "<key>"` before submitting.')
     expect(b).toContain('- The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.')

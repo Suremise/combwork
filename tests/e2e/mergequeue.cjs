@@ -59,8 +59,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check("…a merge commit with Combwork's trailers, its revision the builder's", message.includes(`Combwork-Card: ${(await h.card(one.n)).key}`) && message.includes(`Combwork-Revision: ${one.revision}`), message)
     check('…main untouched (the project folder\'s branch)', lib.git(fx.alpha, ['rev-parse', 'main']).trim() !== q.head(fx))
     const key1 = (await h.card(one.n)).key
-    const refs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/']).split(/\r?\n/).filter(Boolean)
-    check("…its test merge's ref dropped once it had its outcome; its submission still pinned", !refs().some((r) => r === `refs/hive/queue/${key1}`) && refs().some((r) => r.startsWith(`refs/hive/cards/${key1.toLowerCase()}/`)), JSON.stringify(refs()))
+    const refs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/']).split(/\r?\n/).filter(Boolean)
+    check("…its test merge's ref dropped once it had its outcome; its submission still pinned", !refs().some((r) => r === `refs/cw/queue/${key1}`) && refs().some((r) => r.startsWith(`refs/cw/cards/${key1.toLowerCase()}/`)), JSON.stringify(refs()))
     // Archived: its pin goes at the queue's next run (the next card's).
     await h.inv('tasks:archive', one.n, true)
 
@@ -98,9 +98,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await h.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await h.page.keyboard.press('Escape')
     // The run prunes once its queue is drained, after the outcome above is recorded.
-    const pinGone = await until(() => !refs().some((r) => r.startsWith(`refs/hive/cards/${key1.toLowerCase()}/`)), HUNG_MS)
+    const pinGone = await until(() => !refs().some((r) => r.startsWith(`refs/cw/cards/${key1.toLowerCase()}/`)), HUNG_MS)
     const key2 = (await h.card(two.n)).key.toLowerCase()
-    check("…the archived card's pin removed at the queue's next run; the next card's kept", !!pinGone && refs().some((r) => r.startsWith(`refs/hive/cards/${key2}/`)), JSON.stringify(refs()))
+    check("…the archived card's pin removed at the queue's next run; the next card's kept", !!pinGone && refs().some((r) => r.startsWith(`refs/cw/cards/${key2}/`)), JSON.stringify(refs()))
 
     // --- A red check: back with its log.
     q.steer(fx, 'fail', 'three is broken')
@@ -194,14 +194,14 @@ ${JSON.stringify(await h.kinds(five.n))}`)
     }
     if (crashed) {
       const afterCrash = q.head(fx)
-      const queueRefs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/queue/']).split(/\r?\n/).filter(Boolean)
+      const queueRefs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/queue/']).split(/\r?\n/).filter(Boolean)
       const refsAtCrash = queueRefs()
       try {
         h = await q.startHive(fx, { port: PORT, keepOptions: true })
         const restartedDone = await until(async () => (await h.card(crashed.n))?.column === 'done', HUNG_MS)
         const integ = (await h.facts(crashed.n)).filter((f) => f.kind === 'Integrated')
         check('…restarted: Done, Integrated (observed) once, its result the target as the crash left it', !!restartedDone && integ.length === 1 && integ[0].data.result === afterCrash && q.head(fx) === afterCrash, JSON.stringify(integ))
-        const crashedRef = `refs/hive/queue/${(await h.card(crashed.n)).key}`
+        const crashedRef = `refs/cw/queue/${(await h.card(crashed.n)).key}`
         check("…its test merge's ref, there at the crash, dropped by the recovery", refsAtCrash.includes(crashedRef) && !!(await until(() => !queueRefs().includes(crashedRef), HUNG_MS)), JSON.stringify({ refsAtCrash, now: queueRefs() }))
       } catch (e) {
         check('no exception after the restart', false, e.stack)

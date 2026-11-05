@@ -75,11 +75,11 @@ describe("G6's Rebase and fast-forward (#1184)", () => {
     linear(e, before)
     expect(landed(e, before).map((c) => sh(e.project, 'log', '-1', '--format=%s', c.commit))).toEqual(['AM-1: one', 'AM-1: two'])
     expect(sh(e.project, 'rev-parse', 'main')).toBe((o as { result: string }).result)
-    expect(tree(e, 'main')).toBe(tree(e, `refs/hive/queue/${card.key.toLowerCase()}`))
+    expect(tree(e, 'main')).toBe(tree(e, `refs/cw/queue/${card.key.toLowerCase()}`))
     expect(integrated(e, card.id)).toMatchObject({ method: 'fastForward', by: 'hive', result: sh(e.project, 'rev-parse', 'main') })
     expect(e.wf.state(card).stage).toBe('done')
     // The reviewed revision stays pinned.
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/1`)).toBe(e.wf.state(card).latest!.revision)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(e.wf.state(card).latest!.revision)
   })
 
   it('a linear card already on top of the target: its reviewed commits land as they are, no rewrite', async () => {

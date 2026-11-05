@@ -46,7 +46,7 @@ describe("the harness's repository template (HI-2025)", () => {
     sh(a, 'add', 'README.md')
     commit(a, { 'src/new.txt': 'new\n' }, 'a commit in A')
     sh(a, 'branch', 'side')
-    sh(a, 'update-ref', 'refs/hive/marker', 'HEAD')
+    sh(a, 'update-ref', 'refs/cw/marker', 'HEAD')
     writeFileSync(join(a, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n')
     writeFileSync(join(a, 'src', 'a.txt'), 'edited, uncommitted\n')
     expect(sh(a, 'rev-parse', 'HEAD')).not.toBe(head)

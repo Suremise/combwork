@@ -11,7 +11,7 @@ const ctx: RedactContext = {
     { name: 'acme', as: '<workspace>' },
     { name: 'billing', as: '<project>' },
     { name: 'Two', as: '<agent>' },
-    { name: 'hive/two', as: '<branch>' }
+    { name: 'cw/two', as: '<branch>' }
   ]
 }
 
@@ -23,7 +23,7 @@ describe('diagnostics redaction', () => {
   })
 
   it('names of workspaces, projects, agents and branches, as words only', () => {
-    expect(redact('[sessions] billing#Two started on hive/two', ctx)).toBe('[sessions] <project>#<agent> started on <branch>')
+    expect(redact('[sessions] billing#Two started on cw/two', ctx)).toBe('[sessions] <project>#<agent> started on <branch>')
     expect(redact('two-factor between billings', ctx)).toBe('two-factor between billings')
   })
 

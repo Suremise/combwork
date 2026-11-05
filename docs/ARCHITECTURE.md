@@ -582,7 +582,7 @@ ruleset. Pieces are looked up by id: an unknown id refuses to compile, and a rul
 **Merge queue.** One runner per project and target (`queueRunner.ts`, above), taking `repoLock` for the advance. Entries come from `IntegrationRequested` facts (each
 with an entry id; cancelled, failed and integrated entries are skipped); the order is rebuilt from facts at start,
 after reconciling any entry with `IntegrationStarted` and no outcome. The test merge happens in the queue's own
-worktree on `refs/hive/queue/<entry>`; merge checks are progress runs attributed to Combwork; the target advances by
+worktree on `refs/cw/queue/<entry>`; merge checks are progress runs attributed to Combwork; the target advances by
 compare-and-swap (`update-ref` with the expected old value), and when the target is checked out in a folder, by the
 **journaled** read-tree/update-ref protocol of SPEC §16.9.2 inside the folder fence: conditions checked before the
 folder is touched (branch, ref, nothing staged, no unstaged changes in the merged files), each phase written to the
@@ -590,7 +590,7 @@ folder is touched (branch, ref, nothing staged, no unstaged changes in the merge
 the queue (never `merge --ff-only`, which has no expected value). The repository lock (`repoLock.ts`: `hive-merge.lock` in the common git
 dir, #1347) is held only for the
 advance, never across the test merge (hooks, signing) or the merge checks, and never while an entry is paused. Every
-submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is archived; strict updates live only on
+submitted revision is pinned by `refs/cw/cards/<key>/<n>` until its card is archived; strict updates live only on
 the queue's ref. **Push after merging (G18, #1179):** `owePush` writes store meta `queue.pushOwed:<target>` in the
 same transaction as Combwork's `Integrated` (the advance's and recovery's), when `wf.cfg.options()` has `pushTarget` then
 (G18 is in no ruleset: `ruleOptions` drops it); `settlePush` runs first in every `runOnce` and after each merge, inside

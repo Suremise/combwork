@@ -737,7 +737,7 @@
   },
   "workspace.move.branchesBanner": {
     "defaultMessage": "{count, plural, one {An agent's branch is still named after an old folder; Repair renames it.} other {# agents' branches are still named after an old folder; Repair renames them.}}",
-    "description": "The banner when agents' git branches are named after where the workspace or project was (hive/<workspace>/<project>/<agent>)."
+    "description": "The banner when agents' git branches are named after where the workspace or project was (cw/<workspace>/<project>/<agent>)."
   },
   "workspace.move.cancel": {
     "defaultMessage": "Cancel",

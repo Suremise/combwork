@@ -8,7 +8,7 @@ import { agentCard, branchCards } from '../../src/shared/branchCards'
 
 let seq = 0
 const fact = <K extends FactKind>(kind: K, data: FactData[K], actor: Actor = 'hive', source: Fact['source'] = 'recorded'): Fact => ({ seq: ++seq, card: 7, kind, at: `2026-10-20T10:00:${String(seq).padStart(2, '0')}.000Z`, actor, source, data })
-const start = (over: Partial<StartedData> = {}): FactData['Started'] => ({ folder: 'project', line: 'hive/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code', ...over })
+const start = (over: Partial<StartedData> = {}): FactData['Started'] => ({ folder: 'project', line: 'cw/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code', ...over })
 const submit = (revision: string, round: number, over: Partial<SubmittedData> = {}): FactData['Submitted'] => ({ revision, base: 'base0000aaaa', head: revision, key: `key-${revision}`, files: [{ path: 'a.ts', status: 'M' }], round, generation: 0, sameRevision: false, summary: 'Did it', ...over })
 const verdict = (submission: number, revision: string, pass: boolean, round: number, generation = 0): FactData['Verdict'] => ({ reviewer: 'R1', submission, revision, pass, round, generation, comment: 'c1' })
 const check = (revision: string, result: FactData['CheckRan']['result'], counted = true, name = 'unit'): FactData['CheckRan'] => ({ name, command: 'npm test', revision, tested: revision, result, run: `run-${seq + 1}`, durationMs: 1200, by: 'B1', counted, ...(counted ? {} : { whyNot: 'dirty' as const }) })
@@ -32,15 +32,15 @@ function reviewed(): { facts: Fact[]; s1: number; s2: number } {
 describe("a card's work view (#1223)", () => {
   it('its line renamed (#1305: Repair renaming a branch named after an old place): the view follows it; only that line is renamed', () => {
     seq = 0
-    const facts: Fact[] = [fact('Started', start({ folder: 'D:/ws.worktrees/a/b1', line: 'hive/Scratch/a/b1' }), 'agent:B1'), fact('Moved', moved('todo', 'active'))]
-    facts.push(fact('LineRenamed', { from: 'hive/Scratch/a/b1', to: 'hive/Tools/a/b1', why: 'repair' }))
-    expect(workView(card, facts).line).toBe('hive/Tools/a/b1')
+    const facts: Fact[] = [fact('Started', start({ folder: 'D:/ws.worktrees/a/b1', line: 'cw/Scratch/a/b1' }), 'agent:B1'), fact('Moved', moved('todo', 'active'))]
+    facts.push(fact('LineRenamed', { from: 'cw/Scratch/a/b1', to: 'cw/Tools/a/b1', why: 'repair' }))
+    expect(workView(card, facts).line).toBe('cw/Tools/a/b1')
     // Written again (a Repair finishing a rename cut short), or for another line: nothing changes.
-    facts.push(fact('LineRenamed', { from: 'hive/Scratch/a/b1', to: 'hive/Elsewhere/a/b1', why: 'repair' }), fact('LineRenamed', { from: 'hive/other', to: 'hive/x', why: 'repair' }))
-    expect(workView(card, facts).line).toBe('hive/Tools/a/b1')
+    facts.push(fact('LineRenamed', { from: 'cw/Scratch/a/b1', to: 'cw/Elsewhere/a/b1', why: 'repair' }), fact('LineRenamed', { from: 'cw/other', to: 'cw/x', why: 'repair' }))
+    expect(workView(card, facts).line).toBe('cw/Tools/a/b1')
     // A new cycle starts from its own Started's line.
-    facts.push(fact('Started', start({ line: 'hive/Tools/a/b1-2' }), 'agent:B1'))
-    expect(workView(card, facts).line).toBe('hive/Tools/a/b1-2')
+    facts.push(fact('Started', start({ line: 'cw/Tools/a/b1-2' }), 'agent:B1'))
+    expect(workView(card, facts).line).toBe('cw/Tools/a/b1-2')
   })
 
   it('a card with no facts (before 1.0): its stage and nothing invented', () => {
@@ -75,7 +75,7 @@ describe("a card's work view (#1223)", () => {
   it('the line, base, folder and target of its start; each revision with its round, files, time and builder', () => {
     const { facts, s1, s2 } = reviewed()
     const v = workView(card, facts)
-    expect(v).toMatchObject({ folder: 'project', line: 'hive/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', kind: 'code', adopted: false, rounds: 1 })
+    expect(v).toMatchObject({ folder: 'project', line: 'cw/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', kind: 'code', adopted: false, rounds: 1 })
     expect(v.revisions.map((r) => [r.submission, r.revision, r.round, r.files.length, r.by])).toEqual([
       [s1, 'rev1111aaaa', 1, 1, 'B1'],
       [s2, 'rev2222bbbb', 2, 2, 'B1']
@@ -141,7 +141,7 @@ describe("a card's work view (#1223)", () => {
 
   it('a revision rewritten after the pass (another change): stale until the builder submits again', () => {
     const { facts } = reviewed()
-    const stale = [...facts, fact('HeadMoved', { line: 'hive/b1', from: 'rev2222bbbb', to: 'rev3333cccc' }, 'outside', 'observed'), fact('Stale', { approved: 'rev2222bbbb', current: 'rev3333cccc', why: 'change' })]
+    const stale = [...facts, fact('HeadMoved', { line: 'cw/b1', from: 'rev2222bbbb', to: 'rev3333cccc' }, 'outside', 'observed'), fact('Stale', { approved: 'rev2222bbbb', current: 'rev3333cccc', why: 'change' })]
     const v = workView(card, stale)
     expect(v.marks.stale).toEqual({ approved: 'rev2222bbbb', current: 'rev3333cccc', why: 'change' })
     expect(v.head).toBe('rev3333cccc')
@@ -219,8 +219,8 @@ describe("a card's work view (#1223)", () => {
 
   it("a new cycle starts the card's work again: the earlier revisions and verdicts are history, its rounds kept", () => {
     const { facts } = reviewed()
-    const v = workView({ ...card, stage: 'active' }, [...facts, fact('Moved', moved('review', 'todo')), fact('Started', start({ line: 'hive/b2', builder: 'B2' }), 'agent:B2')])
-    expect(v).toMatchObject({ line: 'hive/b2', builder: 'B2', revisions: [], verdicts: [], checks: [], rounds: 1 })
+    const v = workView({ ...card, stage: 'active' }, [...facts, fact('Moved', moved('review', 'todo')), fact('Started', start({ line: 'cw/b2', builder: 'B2' }), 'agent:B2')])
+    expect(v).toMatchObject({ line: 'cw/b2', builder: 'B2', revisions: [], verdicts: [], checks: [], rounds: 1 })
   })
 
   it("its stage is the fold's: the last Moved, else the cached stage it starts from (HR5's round 1 finding 3)", () => {
@@ -262,7 +262,7 @@ describe("a card's branch and its revision under review on its badge (#1424)", (
   it('started: its line, nothing under review until it is submitted', () => {
     seq = 0
     const facts: Fact[] = [fact('Started', start(), 'agent:B1'), fact('Moved', moved('todo', 'active'))]
-    expect(workBadge(workView(card, facts))).toMatchObject({ line: 'hive/b1', underReview: null })
+    expect(workBadge(workView(card, facts))).toMatchObject({ line: 'cw/b1', underReview: null })
   })
 
   it('submitted and in Review: the revision under review; resubmitted: the latest; passed: none', () => {
@@ -270,7 +270,7 @@ describe("a card's branch and its revision under review on its badge (#1424)", (
     const facts: Fact[] = [fact('Started', start(), 'agent:B1'), fact('Moved', moved('todo', 'active'))]
     const s1 = facts.push(fact('Submitted', submit('rev1111aaaa', 1), 'agent:B1')) && seq
     facts.push(fact('Moved', moved('active', 'review')))
-    expect(workBadge(workView(card, facts))).toMatchObject({ line: 'hive/b1', underReview: 'rev1111aaaa' })
+    expect(workBadge(workView(card, facts))).toMatchObject({ line: 'cw/b1', underReview: 'rev1111aaaa' })
     // Failed and returned: back in Active, nothing under review.
     facts.push(fact('Verdict', verdict(s1, 'rev1111aaaa', false, 1), 'agent:R1'), fact('Moved', moved('review', 'active')))
     expect(workBadge(workView(card, facts)).underReview).toBeNull()
@@ -278,19 +278,19 @@ describe("a card's branch and its revision under review on its badge (#1424)", (
     facts.push(fact('Submitted', submit('rev2222bbbb', 2), 'agent:B1'), fact('Moved', moved('active', 'review')))
     expect(workBadge(workView(card, facts)).underReview).toBe('rev2222bbbb')
     facts.push(fact('Verdict', verdict(seq - 1, 'rev2222bbbb', true, 2), 'agent:R1'), fact('Moved', moved('review', 'approved')))
-    expect(workBadge(workView(card, facts))).toMatchObject({ line: 'hive/b1', underReview: null })
+    expect(workBadge(workView(card, facts))).toMatchObject({ line: 'cw/b1', underReview: null })
   })
 
   it("adopted at the upgrade in Review: its line and the revision it was adopted with", () => {
     seq = 0
-    const facts = [fact('Adopted', start({ adoptedFrom: 'review', line: 'hive/b2' }), 'hive', 'observed'), fact('Moved', { from: 'todo', to: 'review', cause: 'derived' }), fact('Submitted', submit('rev9999eeee', 1, { adopted: true }), 'hive', 'observed')]
-    expect(workBadge(workView(card, facts))).toMatchObject({ line: 'hive/b2', underReview: 'rev9999eeee' })
+    const facts = [fact('Adopted', start({ adoptedFrom: 'review', line: 'cw/b2' }), 'hive', 'observed'), fact('Moved', { from: 'todo', to: 'review', cause: 'derived' }), fact('Submitted', submit('rev9999eeee', 1, { adopted: true }), 'hive', 'observed')]
+    expect(workBadge(workView(card, facts))).toMatchObject({ line: 'cw/b2', underReview: 'rev9999eeee' })
   })
 
   it('a new cycle takes its own line; a no-code card has nothing under review', () => {
     seq = 0
-    const facts: Fact[] = [fact('Started', start(), 'agent:B1'), fact('Moved', moved('todo', 'active')), fact('Moved', moved('active', 'todo')), fact('Started', start({ line: 'hive/b3' }), 'agent:B3'), fact('Moved', moved('todo', 'active'))]
-    expect(workBadge(workView(card, facts)).line).toBe('hive/b3')
+    const facts: Fact[] = [fact('Started', start(), 'agent:B1'), fact('Moved', moved('todo', 'active')), fact('Moved', moved('active', 'todo')), fact('Started', start({ line: 'cw/b3' }), 'agent:B3'), fact('Moved', moved('todo', 'active'))]
+    expect(workBadge(workView(card, facts)).line).toBe('cw/b3')
     const noCode = [fact('Started', start({ cardKind: 'no-code', line: null }), 'agent:B1'), fact('Moved', moved('todo', 'active')), fact('Submitted', submit('rev', 1, { revision: null }), 'agent:B1'), fact('Moved', moved('active', 'review'))]
     expect(workBadge(workView({ ...card, kind: 'no-code' }, noCode))).toMatchObject({ line: null, underReview: null })
   })
@@ -302,19 +302,19 @@ describe("a branch's cards (#1424)", () => {
 
   it("a project's branches each with the cards of its line: the one in flight first, then the latest started", () => {
     const badges = new Map([
-      [1, b(1, { line: 'hive/b1', stage: 'done', merged: 'm1m1m1m1', startedAt: '2026-10-22T10:00:00.000Z' })],
-      [2, b(2, { line: 'hive/b1', stage: 'review', underReview: 'r2r2r2r2', startedAt: '2026-10-22T09:00:00.000Z' })],
-      [3, b(3, { line: 'hive/b1', stage: 'done', merged: null, startedAt: '2026-10-22T11:00:00.000Z' })],
+      [1, b(1, { line: 'cw/b1', stage: 'done', merged: 'm1m1m1m1', startedAt: '2026-10-22T10:00:00.000Z' })],
+      [2, b(2, { line: 'cw/b1', stage: 'review', underReview: 'r2r2r2r2', startedAt: '2026-10-22T09:00:00.000Z' })],
+      [3, b(3, { line: 'cw/b1', stage: 'done', merged: null, startedAt: '2026-10-22T11:00:00.000Z' })],
       [4, b(4, { line: null, stage: 'active', noCode: true, startedAt: '2026-10-22T12:00:00.000Z' })],
-      [5, b(5, { line: 'hive/b1', stage: 'active', startedAt: '2026-10-22T13:00:00.000Z' })]
+      [5, b(5, { line: 'cw/b1', stage: 'active', startedAt: '2026-10-22T13:00:00.000Z' })]
     ])
     const got = branchCards('alpha', tasks, badges)
-    expect([...got.keys()]).toEqual(['hive/b1'])
-    expect(got.get('hive/b1')!.map((c) => c.card)).toEqual([2, 3, 1])
-    expect(got.get('hive/b1')![0]).toMatchObject({ stage: 'review', underReview: 'r2r2r2r2', merged: null })
-    expect(got.get('hive/b1')![2]).toMatchObject({ stage: 'done', merged: 'm1m1m1m1' })
+    expect([...got.keys()]).toEqual(['cw/b1'])
+    expect(got.get('cw/b1')!.map((c) => c.card)).toEqual([2, 3, 1])
+    expect(got.get('cw/b1')![0]).toMatchObject({ stage: 'review', underReview: 'r2r2r2r2', merged: null })
+    expect(got.get('cw/b1')![2]).toMatchObject({ stage: 'done', merged: 'm1m1m1m1' })
     // Another project's card on a branch of the same name isn't this project's; a no-code card has no row.
-    expect(branchCards('beta', tasks, badges).get('hive/b1')!.map((c) => c.card)).toEqual([5])
+    expect(branchCards('beta', tasks, badges).get('cw/b1')!.map((c) => c.card)).toEqual([5])
     expect(branchCards('alpha', tasks, new Map([[4, badges.get(4)!]])).size).toBe(0)
   })
 
@@ -330,7 +330,7 @@ describe("a branch's cards (#1424)", () => {
       [2, workBadge(workView({ card: 2, stage: 'todo', preWorkflow: false }, two))]
     ])
     expect(badges.get(1)!.lastSeq).toBeGreaterThan(badges.get(2)!.lastSeq)
-    const rows = branchCards('alpha', tasks, badges).get('hive/b1')!
+    const rows = branchCards('alpha', tasks, badges).get('cw/b1')!
     expect(rows.map((c) => [c.card, c.merged])).toEqual([
       [2, 'merge2'],
       [1, 'merge1']

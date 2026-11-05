@@ -100,7 +100,7 @@ function briefs(): { name: string; text: string }[] {
       { key: 'AL-1', title: 'Lane data' },
       { key: 'AL-2', title: 'Lane hover' }
     ],
-    builder: { name: 'B1', folder: 'D:/hive/b1', branch: 'hive/b1' },
+    builder: { name: 'B1', folder: 'D:/hive/b1', branch: 'cw/b1' },
     reviewer: { name: 'R1' },
     options: { review: 'agent', preChecks: ['typecheck', 'lint'], finish: 'agentMerges', okBefore: { mode: 'labels', labels: ['ui', 'api'] }, target: 'main' },
     rounds: 10,
@@ -108,7 +108,7 @@ function briefs(): { name: string; text: string }[] {
     ...over
   })
   const out: { name: string; text: string }[] = []
-  const builders = [{ name: 'B1', folder: 'D:/hive/b1', branch: 'hive/b1' }, { name: 'B1', folder: 'D:/hive/b1', branch: null }, { name: 'B1', folder: null, branch: null }, { name: 'B1', folder: null, branch: null, slot: 'slot-b' }]
+  const builders = [{ name: 'B1', folder: 'D:/hive/b1', branch: 'cw/b1' }, { name: 'B1', folder: 'D:/hive/b1', branch: null }, { name: 'B1', folder: null, branch: null }, { name: 'B1', folder: null, branch: null, slot: 'slot-b' }]
   const reviewers: Partial<LaneBriefInput>[] = [{}, { reviewer: null }, { reviewer: null, pool: [] }, { reviewer: null, pool: ['R1', 'R2', 'R3'] }]
   for (const [i, builder] of builders.entries()) for (const [j, r] of reviewers.entries()) for (const role of ['builder', 'reviewer'] as const) out.push({ name: `brief ${i} ${j} ${role}`, text: laneBrief(input({ builder, ...r }), role) })
   out.push({ name: 'brief no target, no note', text: laneBrief(input({ options: { review: 'none', preChecks: [], finish: 'hiveMerges', okBefore: { mode: 'none' } } as never, note: '' }), 'builder') })

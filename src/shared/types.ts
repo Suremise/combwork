@@ -1668,7 +1668,7 @@ export interface ProjectConfig {
   setupPending?: string[]
   /**
    * Workspace parts other than the workspace's own that Hive has given this project's worktree branches
-   * (hive/<part>/<project>/<agent>, #703 round 3: when a branch from before was in the way of its own): with its own,
+   * (cw/<part>/<project>/<agent>, #703 round 3: when a branch from before was in the way of its own): with its own,
    * the only ones Hive takes for this project's. Added when Hive first makes a branch in one; never removed.
    */
   branchSpaces?: string[]
@@ -1967,7 +1967,7 @@ export interface AddAgentOptions {
   name?: string
   /** Absent: the project folder (#1442: the window sends none; #1451 refuses a worktree). */
   location?: 'project' | 'new-worktree' | 'existing-worktree'
-  /** new-worktree: branch to create (default hive/<workspace>/<project>/<name>, #703) and the branch to base it on (default the current one). */
+  /** new-worktree: branch to create (default cw/<workspace>/<project>/<name>, #703) and the branch to base it on (default the current one). */
   branch?: string
   base?: string
   /** existing-worktree: its folder. */
@@ -2712,7 +2712,7 @@ export interface MoveHostPlan {
 }
 
 /**
- * An agent's branch in Hive's form, hive/<workspace>/<project>/<agent>, whose workspace or project part is an old one
+ * An agent's branch in Combwork's form, cw/<workspace>/<project>/<agent>, whose workspace or project part is an old one
  * (#1305, Darren's decision on #1303: renamed, never offered): `to` is its name here. `remote`: the remote it tracks,
  * which keeps the old name (pushing under the new one is the user's step). `kept`: why it isn't renamed now
  * (`exists`: a branch of that name is already there). `pending`: a rename a Repair before began and couldn't finish

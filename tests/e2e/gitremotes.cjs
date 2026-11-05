@@ -133,7 +133,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       // --- Rows with a remote's actions (Track…, Stop tracking) beside a long branch tracking origin (HR5's HI-1897
       // round 1): every row's time and actions whole, inside its row and lined up, Switch where it can be clicked, at
       // this width and a narrow one.
-      const long = 'hive/HI/HI-9999-a-branch-name-long-enough-to-crowd-its-row-out-of-its-own-room'
+      const long = 'cw/HI/HI-9999-a-branch-name-long-enough-to-crowd-its-row-out-of-its-own-room'
       g(alpha, 'branch', long, 'main')
       g(alpha, 'branch', `--set-upstream-to=origin/main`, long)
       await page.locator('[data-action="reload-branches"]').click()

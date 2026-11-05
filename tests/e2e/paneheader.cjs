@@ -146,7 +146,7 @@ function commits(wt, n) {
     check(`${tag}hovered, the name's tooltip has its worktree, branch and base`, full(await tips()), JSON.stringify(await tips()))
     await away()
     await until(async () => (await tips()).length === 0, HUNG_MS)
-    check(`${tag}no worktree text in any header`, (await page.locator('.pane-header-bar').allInnerTexts()).every((t) => !t.includes('hive/')))
+    check(`${tag}no worktree text in any header`, (await page.locator('.pane-header-bar').allInnerTexts()).every((t) => !t.includes('cw/')))
   }
   await worktreeMark('')
 

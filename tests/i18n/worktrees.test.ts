@@ -135,11 +135,11 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
 describe('an unused worktree not reused: English for the Agent API, data for the window', () => {
   it("the Add Agent dialog's look says why in the window's language (1.0 adds no agent in one: #1451), and so does a removal", async () => {
     setLanguage('de', GERMAN)
-    const t = { path: join(treesRoot, 'b1'), branch: 'hive/b1' }
+    const t = { path: join(treesRoot, 'b1'), branch: 'cw/b1' }
     await wt.createWorktree(proj, t.path, t.branch, 'main')
     commit(t.path, 'ahead.txt')
-    const look = await run(() => agents.worktreeMatch(proj, 'hive/b1', 'main', 'B1'))
-    expect(look).toMatchObject({ branch: 'hive/b1', reusable: false, why: '1 Commit nicht in main gemergt' })
+    const look = await run(() => agents.worktreeMatch(proj, 'cw/b1', 'main', 'B1'))
+    expect(look).toMatchObject({ branch: 'cw/b1', reusable: false, why: '1 Commit nicht in main gemergt' })
 
     // Removing that worktree is the window's: why it is kept, in its language (unmerged commits, and a file now too).
     writeFileSync(join(t.path, 'dirty.txt'), 'x')
@@ -154,12 +154,12 @@ describe('an unused worktree not reused: English for the Agent API, data for the
     // made outside Combwork lost its folder: only that one is what git's prune would forget.
     const third = join(treesRoot, 'third')
     const ext = join(base, 'external-blocker')
-    await wt.createWorktree(proj, third, 'hive/third', 'main')
+    await wt.createWorktree(proj, third, 'cw/third', 'main')
     git(proj, 'worktree', 'add', '-q', '-b', 'ext', ext)
     const before = await run(() => w.projectConfig(proj))
     await run(() =>
       w.mutateProjectConfig(proj, (c) => ({
-        agents: [...(c.agents ?? []), { id: 'a2', name: 'Second', worktree: { path: join(treesRoot, 'second'), branch: 'hive/second', base: 'main' } }, { id: 'a3', name: 'Third', worktree: { path: third, branch: 'hive/third', base: 'main' } }]
+        agents: [...(c.agents ?? []), { id: 'a2', name: 'Second', worktree: { path: join(treesRoot, 'second'), branch: 'cw/second', base: 'main' } }, { id: 'a3', name: 'Third', worktree: { path: third, branch: 'cw/third', base: 'main' } }]
       }))
     )
     try {
@@ -172,7 +172,7 @@ describe('an unused worktree not reused: English for the Agent API, data for the
     } finally {
       await run(() => w.mutateProjectConfig(proj, () => ({ agents: before.agents })))
       git(proj, 'worktree', 'prune')
-      git(proj, 'branch', '-D', 'ext', 'hive/third')
+      git(proj, 'branch', '-D', 'ext', 'cw/third')
     }
   })
 

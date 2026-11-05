@@ -40,7 +40,7 @@ const aliases = join(base, 'aliases')
 const alias = (target: string, name: string): string => junction(target, join(aliases, name))
 let w: ReturnType<typeof createWorkspaceService>
 /** An agent with a worktree at `path`. */
-const agent = (id: string, path: string): AgentDef => ({ id, name: id.toUpperCase(), provider: 'claude-code', worktree: { path, branch: `hive/${id}`, base: 'main' } }) as AgentDef
+const agent = (id: string, path: string): AgentDef => ({ id, name: id.toUpperCase(), provider: 'claude-code', worktree: { path, branch: `cw/${id}`, base: 'main' } }) as AgentDef
 
 beforeAll(async () => {
   mkdirSync(proj, { recursive: true })
@@ -50,7 +50,7 @@ beforeAll(async () => {
   git(proj, 'add', '-A')
   git(proj, 'commit', '-qm', 'a')
   git(proj, 'worktree', 'add', '-q', '-b', 'other', other)
-  git(proj, 'worktree', 'add', '-q', '-b', 'hive/a', tree)
+  git(proj, 'worktree', 'add', '-q', '-b', 'cw/a', tree)
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -98,7 +98,7 @@ describe('places by real path (#455)', () => {
   it("Repair's Locate of an agent's own worktree by another name changes nothing; another worktree is located", async () => {
     try {
       // The project moved (its recorded folder is elsewhere), so Repair looks at its agents' worktrees.
-      await w.mutateProjectConfig(proj, () => ({ lastPath: join(base, 'elsewhere', 'proj'), agents: [{ id: 'l', name: 'L', provider: 'claude-code', worktree: { path: tree, branch: 'hive/a', base: 'main' } } as AgentDef] }))
+      await w.mutateProjectConfig(proj, () => ({ lastPath: join(base, 'elsewhere', 'proj'), agents: [{ id: 'l', name: 'L', provider: 'claude-code', worktree: { path: tree, branch: 'cw/a', base: 'main' } } as AgentDef] }))
       const worktrees = async (picked: string): Promise<unknown[]> => (await movePlan(w, { locate: { [`${proj}#l`]: picked } }))!.hosts.find((h) => samePlace(h.path, proj))!.worktrees
       expect(await worktrees(alias(tree, 'tree-locate'))).toEqual([])
       expect(await worktrees(other)).toEqual([expect.objectContaining({ agentId: 'l', how: 'located', to: other })])
@@ -176,7 +176,7 @@ describe('places by real path (#455)', () => {
     config.settings.providers['claude-code'].enabled = true
     try {
       const named = alias(tree, 'tree-resume')
-      await w.mutateProjectConfig(proj, () => ({ worktreeSetup: 'echo setup', agents: [{ id: 'r', name: 'R', provider: 'claude-code', needsSetup: true, worktree: { path: named, branch: 'hive/a', base: 'main' } } as AgentDef] }))
+      await w.mutateProjectConfig(proj, () => ({ worktreeSetup: 'echo setup', agents: [{ id: 'r', name: 'R', provider: 'claude-code', needsSetup: true, worktree: { path: named, branch: 'cw/a', base: 'main' } } as AgentDef] }))
       const id = '6f1d3b52-1c1e-4a39-9d5e-2f7a1b0c4d11'
       await w.upsertSession(proj, { id, agent: 'claude-code', agentId: 'r', name: 'Earlier', cwd: tree, createdAt: new Date().toISOString(), lastActiveAt: new Date().toISOString(), archived: false })
       // Stopped just before its terminal would start (the worktree's setup), past every check of the folder.

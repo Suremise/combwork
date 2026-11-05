@@ -204,7 +204,7 @@ export function batchAgentsData(p: ProjectInfo, tasks: readonly TaskCard[], kind
   })
   const worktree: AgentColumn = {
     label: msg({ id: 'panes.table.worktree', defaultMessage: 'Worktree', description: "An agents table's column heading (Start New All, Remove All…): the agent's worktree branch." }),
-    cell: msg({ id: 'panes.table.worktreePrefix', defaultMessage: 'worktree {value}', description: "The agent's worktree in a line of text (screen readers, a dialog's copy): {value} is its branch (\"hive/b1\"). Lower case." })
+    cell: msg({ id: 'panes.table.worktreePrefix', defaultMessage: 'worktree {value}', description: "The agent's worktree in a line of text (screen readers, a dialog's copy): {value} is its branch (\"cw/b1\"). Lower case." })
   }
   const happens: AgentColumn = { label: msg({ id: 'panes.table.happens', defaultMessage: 'What happens', description: "An agents table's column heading (Start New All, Remove All…): what the action does to each agent." }) }
   return { columns: [STATE_COLUMN, CARD_COLUMN, ...(trees ? [worktree] : []), happens], rows }

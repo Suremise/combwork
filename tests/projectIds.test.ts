@@ -765,7 +765,7 @@ describe('merge holds Combwork closed under are told in their project now (#508 
     const { hashText } = await import('../src/main/fsutil')
     return join(base, 'profile', 'merge-slots', `${hashText(ws.toLowerCase())}.json`)
   }
-  const hold = (projectPath: string, extra: Record<string, unknown> = {}) => ({ projectPath, branch: 'hive/a1', agentId: 'a1', agentName: 'Builder', runId: 'old-run', cards: [1], since: 1, until: 2, ...extra })
+  const hold = (projectPath: string, extra: Record<string, unknown> = {}) => ({ projectPath, branch: 'cw/a1', agentId: 'a1', agentName: 'Builder', runId: 'old-run', cards: [1], since: 1, until: 2, ...extra })
   const writeHolds = async (ws: string, holds: object[]): Promise<string> => {
     const file = await holdsFile(ws)
     mkdirSync(join(base, 'profile', 'merge-slots'), { recursive: true })
@@ -834,7 +834,7 @@ describe('merge holds Combwork closed under are told in their project now (#508 
     await checkMoved(w)
     const id = (await w.projectIds()).byPath.get(alpha.toLowerCase())
     await disposeWorkspaceService(w)
-    const file = await writeHolds(from, [hold(alpha, { projectId: id }), hold(alpha, { runId: 'legacy-run', branch: 'hive/old' })])
+    const file = await writeHolds(from, [hold(alpha, { projectId: id }), hold(alpha, { runId: 'legacy-run', branch: 'cw/old' })])
     const before = readFileSync(file, 'utf8')
     const to = `${from}-moved`
     await moveFolder(from, to)

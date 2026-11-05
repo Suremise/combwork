@@ -62,9 +62,9 @@ let w: ReturnType<typeof createWorkspaceService>
 const run = <T,>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 let n = 0
 
-/** A new worktree hive/<name> in the workspace's worktree folder, off main. */
+/** A new worktree cw/<name> in the workspace's worktree folder, off main. */
 async function tree(name: string): Promise<{ path: string; branch: string }> {
-  const t = { path: join(root, name), branch: `hive/${name}` }
+  const t = { path: join(root, name), branch: `cw/${name}` }
   await createWorktree(proj, t.path, t.branch, 'main')
   return t
 }
@@ -519,9 +519,9 @@ describe('Remove anyway', () => {
     commit(t.path, 'w.txt')
     const p = await preview(t.path)
     expect(p.branch).toBe(t.branch)
-    git(t.path, 'checkout', '-q', '-b', `hive/different${n}`)
+    git(t.path, 'checkout', '-q', '-b', `cw/different${n}`)
     expect(await anyway(t.path, p.token)).toMatchObject({ deleted: false, reason: expect.stringMatching(/its branch/) })
-    expect(branches()).toEqual(expect.arrayContaining([t.branch, `hive/different${n}`]))
+    expect(branches()).toEqual(expect.arrayContaining([t.branch, `cw/different${n}`]))
     expect(existsSync(t.path)).toBe(true)
   })
 
@@ -606,7 +606,7 @@ describe('in the Changes tab (#400)', () => {
     // machine (the 8.3 temp folder only where the volume makes short names, #448). Git lists it by its real name.
     mkdirSync(root, { recursive: true })
     const via = junction(root, join(base, `via-root${++n}`))
-    const t = { path: join(via, `changes${n}`), branch: `hive/changes${n}` }
+    const t = { path: join(via, `changes${n}`), branch: `cw/changes${n}` }
     await createWorktree(proj, t.path, t.branch, 'main')
     commit(t.path, 'c.txt')
     const outside = join(base, 'elsewhere')
@@ -724,10 +724,10 @@ describe('without git (#346)', () => {
 })
 
 describe('what the window says', () => {
-  const wt = (check: UnusedWorktree['check'], extra: Partial<UnusedWorktree> = {}): UnusedWorktree => ({ path: 'C:\\w\\x', branch: 'hive/x', check, ...extra })
+  const wt = (check: UnusedWorktree['check'], extra: Partial<UnusedWorktree> = {}): UnusedWorktree => ({ path: 'C:\\w\\x', branch: 'cw/x', check, ...extra })
   it("the Overview's line counts them and the merged ones (#400)", () => {
-    const merged = { path: 'C:\\t\\a', branch: 'hive/a', check: { removable: true, into: 'main' } } as UnusedWorktree
-    const work = { path: 'C:\\t\\b', branch: 'hive/b', check: { removable: false, into: 'main', ahead: 1, dirty: 0 } } as UnusedWorktree
+    const merged = { path: 'C:\\t\\a', branch: 'cw/a', check: { removable: true, into: 'main' } } as UnusedWorktree
+    const work = { path: 'C:\\t\\b', branch: 'cw/b', check: { removable: false, into: 'main', ahead: 1, dirty: 0 } } as UnusedWorktree
     expect(unusedSummary([])).toBeNull()
     expect(unusedSummary([merged, work])).toBe('2 unused worktrees (1 merged)')
     expect(unusedSummary([merged])).toBe('1 unused worktree (1 merged)')
@@ -738,7 +738,7 @@ describe('what the window says', () => {
     expect(unusedWorkNotice([wt({ removable: false, into: 'main', ahead: 2, dirty: 0 }), wt({ removable: false, into: 'main', ahead: 0, dirty: 3 })])).toBe("2 unused worktrees have work that isn't on main")
   })
   it('nothing to remove anyway when git could not count it', () => {
-    expect(lostByRemoving(wt({ removable: false, into: 'main', reason: "git couldn't check hive/x" }))).toBeNull()
-    expect(unusedState(wt({ removable: false, into: 'main', reason: "git couldn't check hive/x" }))).toBe("git couldn't check hive/x")
+    expect(lostByRemoving(wt({ removable: false, into: 'main', reason: "git couldn't check cw/x" }))).toBeNull()
+    expect(unusedState(wt({ removable: false, into: 'main', reason: "git couldn't check cw/x" }))).toBe("git couldn't check cw/x")
   })
 })
