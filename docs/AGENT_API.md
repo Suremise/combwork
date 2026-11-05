@@ -403,7 +403,7 @@ The workspace's board: cards in six columns, `hold` (On Hold), `todo`, `doing`, 
 
 An agent runs as the user, so it could read the workspace token from disk: this keeps agents to their own project's work rather than containing a hostile one.
 
-`GET /v1/tasks[?project=web][&column=review][&archived=true][&q=words]` — the cards on the board in order (by column, then position), or the archived ones. `q` (from `api.version` 7, #1237) is the board's search: the cards whose title, description, project, agent's name or labels contain it (any case), or a card by its number (`%2312`) or key (`HI-12`, `HI-` for a project's); words of three characters or more go through the board's full-text index, so only the cards found are read. A card:
+`GET /v1/tasks[?project=web][&column=review][&archived=true][&q=words][&history=true]` — the cards on the board in order (by column, then position), or the archived ones. Each card comes without its history (from `api.version` 13, HI-2568), with `historyEntries` instead, the number of entries it has, as `GET /v1/tasks/{n}?history=false` gives one card, so the listing doesn't grow with every card's changes. `history=true` keeps every card's `history`, as in the card below; `GET /v1/tasks/{n}` gives one card's. `q` (from `api.version` 7, #1237) is the board's search: the cards whose title, description, project, agent's name or labels contain it (any case), or a card by its number (`%2312`) or key (`HI-12`, `HI-` for a project's); words of three characters or more go through the board's full-text index, so only the cards found are read. A card:
 
 ```json
 {

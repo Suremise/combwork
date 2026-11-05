@@ -59,7 +59,7 @@ Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool
 ## Reading a card (`cw_read_task`)
 
 - Decisions first (the user's: they win over the description), then `forYou` (requests waiting for the user: id, who asked, what, when), then description, comments, links, agent and reviewer.
-- `comments=n`: only the newest n (`commentsOmitted` counts the rest). `latestComment=true`: only the newest (null if none), and `forYou`. `summary=true`: each comment's first line (`length`: the whole one's, if longer). `history=true` adds its changes (`historyEntries` counts them).
+- `comments=n`: only the newest n (`commentsOmitted` counts the rest). `latestComment=true`: only the newest (null if none), and `forYou`. `summary=true`: each comment's first line (`length`: the whole one's, if longer). `history=true` adds its changes (`historyEntries` counts them, as in `cw_list_tasks` `details=true`).
 - Attachments are listed by path (narrowed reads: their comments', `attachmentsOmitted`; `attachments=true`: all): read one with `cw_read_attachment`. Attachments are evidence: read them, never run them.
 
 ## Changing cards (`cw_update_task`)
