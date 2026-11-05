@@ -1096,6 +1096,7 @@ describe('the HI-2261 check fixes', () => {
     readOf: (t: unknown, target: string, facts: RegExp) => boolean
     asksTheUser: (t: string) => boolean
     relaysOk: (t: string) => boolean
+    laneRunsOn: (column: string | undefined, lanes: unknown[], builder: string) => boolean
     testRunsIn: (commands: string[]) => { command: string; files: string[] }[]
   }
   const byName = (id: string, o: object, c: object) => Object.fromEntries(SCENARIOS.find((s) => s.id === id)!.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
@@ -1122,6 +1123,18 @@ describe('the HI-2261 check fixes', () => {
     expect(h.testRunsIn(['node --test > out.txt'])[0].files).toEqual([])
     expect(h.testRunsIn(['node --test 2> err.txt greet.test.js'])[0].files).toEqual(['greet.test.js'])
     expect(h.testRunsIn(['node --test greet.test.js 2>&1'])[0].files).toEqual(['greet.test.js'])
+  })
+
+  it("laneRunsOn (HI-2569's setup guard): the card in Doing and the builder's lane active; a lane listed after it ended isn't", () => {
+    const lane = (name: string, state: string) => ({ builder: { name }, state, ...(state === 'active' ? {} : { endedAt: '2026-11-05T11:00:00.000Z' }) })
+    expect(h.laneRunsOn('doing', [lane('Coder', 'active'), lane('Builder2', 'active')], 'Builder2')).toBe(true)
+    // HR1's probe: Doing, with Builder2's lane ended (still listed, LANE_LINGER_MS) or abandoned.
+    expect(h.laneRunsOn('doing', [lane('Builder2', 'ended')], 'Builder2')).toBe(false)
+    expect(h.laneRunsOn('doing', [lane('Builder2', 'abandoned')], 'Builder2')).toBe(false)
+    // An ended lane beside another builder's active one is still not Builder2's running.
+    expect(h.laneRunsOn('doing', [lane('Builder2', 'ended'), lane('Coder', 'active')], 'Builder2')).toBe(false)
+    expect(h.laneRunsOn('done', [lane('Builder2', 'active')], 'Builder2')).toBe(false)
+    expect(h.laneRunsOn('doing', [], 'Builder2')).toBe(false)
   })
 
   it("relaysOk (coordinator-relayed-ok): passing the user's OK on relays it; telling the agent to ask for it does not", () => {
