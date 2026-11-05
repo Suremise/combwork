@@ -761,7 +761,7 @@ describe("a begun deletion settled by the project's pass, whatever the switches 
   it('found whatever the card has done since (started again), and never settled twice', async () => {
     const { e, n, line, head, ws } = await cutShort('Started again')
     // A later cycle of the card: the begun deletion isn't in its current cycle any more, and is still found.
-    await e.wf.write(e.store.card(n), null, 'hive', (w) => void w.fact('Started', { folder: 'project', line: 'main', base: head, target: 'main', builder: 'B1', cardKind: 'code' }))
+    await e.wf.write(e.store.card(n), null, 'combwork', (w) => void w.fact('Started', { folder: 'project', line: 'main', base: head, target: 'main', builder: 'B1', cardKind: 'code' }))
     expect(cycleIn(e.store.facts(n))).toBeNull()
     await settleSlotCards(ws, e.project)
     expect(sh(e.project, 'rev-parse', line)).toBe(head)
@@ -790,7 +790,7 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     const slot = join(tempDir('slot-'), 'slot-a')
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const cycle = cycleIn(e.store.facts(card.id))!
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, slot, cycle, ws }
@@ -924,7 +924,7 @@ describe("a Start's prompt goes to the slot's placement only while one is due (H
     const card = e.wf.createCard({ title: 'Back for more' })
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: join(tempDir('slot-'), 'slot-a'), lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, cycle: cycleIn(e.store.facts(card.id))!, ws }
   }
@@ -940,7 +940,7 @@ describe("a Start's prompt goes to the slot's placement only while one is due (H
     await place(ws, e.project, e.wf, n, cycle, lease)
     expect(await placementDue(ws, e.project, n)).toBeNull()
     const card = e.store.card(n)
-    await e.wf.write(card, null, 'hive', (w) => void w.move('review', 'intent'))
+    await e.wf.write(card, null, 'combwork', (w) => void w.move('review', 'intent'))
     // A Start names its agent (taskStart's move gives it): never a move into Active for nobody (HI-2062).
     moved(await e.wf.move(n, 'active', 'assistant', { builder: 'B1' }))
     expect(e.wf.state(e.store.card(n)).stage).toBe('active')
@@ -995,7 +995,7 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     state.slot = slot
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
   }
@@ -1294,7 +1294,7 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
       moved(await e.wf.putBack(key, B1, { why: 'again' }))
       e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: state.slot, lease: 'l-2', fresh: true })
       moved(await e.wf.start(key, B1))
-      await e.wf.write(e.store.card(n)!, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-2', line: 'cw/AM/x', revision: 'r' }))
+      await e.wf.write(e.store.card(n)!, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-2', line: 'cw/AM/x', revision: 'r' }))
       const again = cycleIn(e.store.facts(n))!
       const lease2 = { ...(lease as object), id: 'l-2' } as never
       // One failure on the new cycle is its first, not the old one's third: no cutoff, no notice.
@@ -1316,7 +1316,7 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
     state.slot = slot
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     lane.text = brief
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }

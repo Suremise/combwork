@@ -281,7 +281,7 @@
   },
   "inbox.renamedNote": {
     "text": "(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__{server}__, and hive-progress is cw-progress.)",
-    "note": "HI-2463: after a line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename, or a lane's brief written that way). Its words are kept as written (they may be a person's or an agent's): this says how the old names map. server: Combwork's MCP server's name."
+    "note": "HI-2463, HI-2598: added once, by the names upgrade, after a stored line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename). Its words are kept as written (they may be a person's or an agent's): this says how the old names map. server: Combwork's MCP server's name."
   },
   "inbox.round.noCard": {
     "text": "There is no card {card}.",

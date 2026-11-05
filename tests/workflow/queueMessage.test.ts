@@ -19,8 +19,8 @@ const card = { key: 'RE-229', title: 'CI: drop the nightly scheduled run' }
 
 describe("the merge's commit message (G19)", () => {
   it("Combwork's: the card's key and title, then its trailers", () => {
-    expect(mergeMessage('hive', { card, revision: 'abc', reviewers: 'a-1', messages: [] })).toBe('RE-229: CI: drop the nightly scheduled run\n\nCombwork-Card: RE-229\nCombwork-Revision: abc\nCombwork-Reviewed-By: a-1')
-    expect(mergeMessage('hive', { card, revision: 'abc', updated: 'def', messages: [] })).toBe('RE-229: CI: drop the nightly scheduled run\n\nCombwork-Card: RE-229\nCombwork-Revision: abc\nCombwork-Updated: def')
+    expect(mergeMessage('combwork', { card, revision: 'abc', reviewers: 'a-1', messages: [] })).toBe('RE-229: CI: drop the nightly scheduled run\n\nCombwork-Card: RE-229\nCombwork-Revision: abc\nCombwork-Reviewed-By: a-1')
+    expect(mergeMessage('combwork', { card, revision: 'abc', updated: 'def', messages: [] })).toBe('RE-229: CI: drop the nightly scheduled run\n\nCombwork-Card: RE-229\nCombwork-Revision: abc\nCombwork-Updated: def')
   })
 
   it("the branch's own: one commit's message as it is, with no key and no trailer", () => {
@@ -42,7 +42,7 @@ describe("the merge's commit message (G19)", () => {
     // Historical data on purpose: the trailer Hive wrote before 1.1.
     expect(branchMessage(['Fix it\n\nHive-Card: RE-229\nHive-Revision: abc\nCo-Authored-By: Someone <x@y>'], card.title)).toBe('Fix it\n\nCo-Authored-By: Someone <x@y>')
     expect(mergeMessage('branch', { card, revision: 'abc', messages: ['Fix it\n\nHive-Card: RE-229'] })).toBe('Fix it')
-    const made = [mergeMessage('hive', { card, revision: 'abc', updated: 'def', reviewers: 'a-1', messages: [] }), updateMessage('hive', 'main', 'RE-229', 'abc')]
+    const made = [mergeMessage('combwork', { card, revision: 'abc', updated: 'def', reviewers: 'a-1', messages: [] }), updateMessage('combwork', 'main', 'RE-229', 'abc')]
     for (const m of made) {
       expect(m).toMatch(/^Combwork-Card: RE-229$/m)
       expect(m).not.toMatch(/^Hive-/m)
@@ -51,7 +51,7 @@ describe("the merge's commit message (G19)", () => {
 
   it("strict's update of the work: git's plain message for the branch's own, Combwork's names the card", () => {
     expect(updateMessage('branch', 'main', 'RE-229', 'abc')).toBe("Merge branch 'main'")
-    expect(updateMessage('hive', 'main', 'RE-229', 'abc')).toBe('Merge main into RE-229\n\nCombwork-Card: RE-229\nCombwork-Revision: abc')
+    expect(updateMessage('combwork', 'main', 'RE-229', 'abc')).toBe('Merge main into RE-229\n\nCombwork-Card: RE-229\nCombwork-Revision: abc')
   })
 
   it("isn't a rule, is the branch's own in every preset (HI-1997), and shows only when Combwork merges with a merge commit or squash", () => {
@@ -129,14 +129,14 @@ describe('the merge queue writes the message the project chose (G19)', () => {
   })
 
   it("Combwork's, chosen: the card's key and title with its trailers, as before", async () => {
-    const e = merging({ style: 'squash', commitMessage: 'hive' })
+    const e = merging({ style: 'squash', commitMessage: 'combwork' })
     const c = await approved(e, 'Keyed', [['Its own message', 'k.txt']])
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
     expect(body(e)).toMatch(new RegExp(`^${c.key}: Keyed\\n\\nCombwork-Card: ${c.key}\\nCombwork-Revision: `))
   })
 
   it('read as the options are when the queue merges: changed after the card was approved, it applies', async () => {
-    const e = merging({ style: 'squash', commitMessage: 'hive' })
+    const e = merging({ style: 'squash', commitMessage: 'combwork' })
     await approved(e, 'Late change', [['Its message', 'l.txt']])
     e.options.commitMessage = 'branch'
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])

@@ -7,7 +7,7 @@ import { checksOn, currentRevision, workBadge, workView, type WorkBadge } from '
 import { agentCard, branchCards } from '../../src/shared/branchCards'
 
 let seq = 0
-const fact = <K extends FactKind>(kind: K, data: FactData[K], actor: Actor = 'hive', source: Fact['source'] = 'recorded'): Fact => ({ seq: ++seq, card: 7, kind, at: `2026-10-20T10:00:${String(seq).padStart(2, '0')}.000Z`, actor, source, data })
+const fact = <K extends FactKind>(kind: K, data: FactData[K], actor: Actor = 'combwork', source: Fact['source'] = 'recorded'): Fact => ({ seq: ++seq, card: 7, kind, at: `2026-10-20T10:00:${String(seq).padStart(2, '0')}.000Z`, actor, source, data })
 const start = (over: Partial<StartedData> = {}): FactData['Started'] => ({ folder: 'project', line: 'cw/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code', ...over })
 const submit = (revision: string, round: number, over: Partial<SubmittedData> = {}): FactData['Submitted'] => ({ revision, base: 'base0000aaaa', head: revision, key: `key-${revision}`, files: [{ path: 'a.ts', status: 'M' }], round, generation: 0, sameRevision: false, summary: 'Did it', ...over })
 const verdict = (submission: number, revision: string, pass: boolean, round: number, generation = 0): FactData['Verdict'] => ({ reviewer: 'R1', submission, revision, pass, round, generation, comment: 'c1' })
@@ -167,8 +167,8 @@ describe("a card's work view (#1223)", () => {
     const { facts } = reviewed()
     const queued = [...facts, fact('Moved', moved('review', 'approved')), fact('IntegrationRequested', { entry: 'e1', revision: 'rev2222bbbb', key: null, target: 'main', style: 'merge' }), fact('IntegrationStarted', { entry: 'e1', expected: 'main0000', result: 'merge5555' })]
     expect(workView(card, queued).queue).toEqual({ entry: 'e1', revision: 'rev2222bbbb', target: 'main', state: 'started' })
-    const v = workView({ ...card, stage: 'done' }, [...queued, fact('Integrated', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', result: 'merge5555', method: 'merge', by: 'hive' })])
-    expect(v.integration).toEqual({ revision: 'rev2222bbbb', target: 'main', result: 'merge5555', method: 'merge', by: 'hive', mergeCommit: 'merge5555', at: expect.any(String) })
+    const v = workView({ ...card, stage: 'done' }, [...queued, fact('Integrated', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', result: 'merge5555', method: 'merge', by: 'combwork' })])
+    expect(v.integration).toEqual({ revision: 'rev2222bbbb', target: 'main', result: 'merge5555', method: 'merge', by: 'combwork', mergeCommit: 'merge5555', at: expect.any(String) })
     expect(v.queue!.state).toBe('integrated')
     const failed = workView(card, [...queued, fact('IntegrationFailed', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', reason: 'conflict', transient: false, files: ['tasks.ts', 'b.ts'], log: 'CONFLICT (content): Merge conflict in tasks.ts' })])
     // #1357: a return's details for the Work section: the files, the output, whether temporary, when.
@@ -201,7 +201,7 @@ describe("a card's work view (#1223)", () => {
     const part = workView(card, [...facts, fact('MergedInPart', { revision: 'rev1111aaaa', target: 'main' }, 'outside', 'observed')])
     expect(part.marks.mergedInPart).toEqual({ revision: 'rev1111aaaa', target: 'main' })
     expect(workBadge(part).mergedInPart).toBe(true)
-    const done = [...facts, fact('Integrated', { revision: 'rev2222bbbb', target: 'main', result: 'm7777', method: 'merge', by: 'hive' })]
+    const done = [...facts, fact('Integrated', { revision: 'rev2222bbbb', target: 'main', result: 'm7777', method: 'merge', by: 'combwork' })]
     const left = workView({ ...card, stage: 'done' }, [...done, fact('LeftTarget', { revision: 'rev2222bbbb', target: 'main' }, 'outside', 'observed')])
     expect(workBadge(left)).toMatchObject({ leftTarget: true })
     // Integrated again: the mark goes.
@@ -210,7 +210,7 @@ describe("a card's work view (#1223)", () => {
 
   it('an adopted card: the column it was in, its adopted submission', () => {
     seq = 0
-    const facts = [fact('Adopted', start({ adoptedFrom: 'review' }), 'hive', 'observed'), fact('Moved', { from: 'todo', to: 'review', cause: 'derived' }), fact('Submitted', submit('rev9999eeee', 1, { adopted: true }), 'hive', 'observed')]
+    const facts = [fact('Adopted', start({ adoptedFrom: 'review' }), 'combwork', 'observed'), fact('Moved', { from: 'todo', to: 'review', cause: 'derived' }), fact('Submitted', submit('rev9999eeee', 1, { adopted: true }), 'combwork', 'observed')]
     const v = workView(card, facts)
     expect(v).toMatchObject({ adopted: true, adoptedFrom: 'review', preWorkflow: false })
     expect(v.revisions).toMatchObject([{ revision: 'rev9999eeee', adopted: true, by: null }])
@@ -283,7 +283,7 @@ describe("a card's branch and its revision under review on its badge (#1424)", (
 
   it("adopted at the upgrade in Review: its line and the revision it was adopted with", () => {
     seq = 0
-    const facts = [fact('Adopted', start({ adoptedFrom: 'review', line: 'cw/b2' }), 'hive', 'observed'), fact('Moved', { from: 'todo', to: 'review', cause: 'derived' }), fact('Submitted', submit('rev9999eeee', 1, { adopted: true }), 'hive', 'observed')]
+    const facts = [fact('Adopted', start({ adoptedFrom: 'review', line: 'cw/b2' }), 'combwork', 'observed'), fact('Moved', { from: 'todo', to: 'review', cause: 'derived' }), fact('Submitted', submit('rev9999eeee', 1, { adopted: true }), 'combwork', 'observed')]
     expect(workBadge(workView(card, facts))).toMatchObject({ line: 'cw/b2', underReview: 'rev9999eeee' })
   })
 
@@ -321,10 +321,10 @@ describe("a branch's cards (#1424)", () => {
   it("a later fact on an older card (a refused start) doesn't put it first (HR4's round 1): the cycles' starts decide", () => {
     // Card 1 started at :01 and merged; card 2 started at :20 and merged; then a start of card 1 refused at :40.
     const at = (s: number): string => `2026-10-22T10:00:${String(s).padStart(2, '0')}.000Z`
-    const f = (c: number, n: number, s: number, kind: Fact['kind'], data: unknown): Fact => ({ seq: n, card: c, kind, at: at(s), actor: 'hive', source: 'recorded', data }) as Fact
-    const one = [f(1, 1, 1, 'Started', start()), f(1, 2, 2, 'Moved', moved('todo', 'active')), f(1, 3, 3, 'Integrated', { entry: 'e1', revision: 'rev1', target: 'main', result: 'merge1', method: 'merge', by: 'hive' }), f(1, 4, 4, 'Moved', moved('approved', 'done'))]
+    const f = (c: number, n: number, s: number, kind: Fact['kind'], data: unknown): Fact => ({ seq: n, card: c, kind, at: at(s), actor: 'combwork', source: 'recorded', data }) as Fact
+    const one = [f(1, 1, 1, 'Started', start()), f(1, 2, 2, 'Moved', moved('todo', 'active')), f(1, 3, 3, 'Integrated', { entry: 'e1', revision: 'rev1', target: 'main', result: 'merge1', method: 'merge', by: 'combwork' }), f(1, 4, 4, 'Moved', moved('approved', 'done'))]
     const later = [...one, f(1, 5, 40, 'Refused', { move: 'start', rule: 'lane.oneAtATime', message: 'm', next: 'n', values: {} })]
-    const two = [f(2, 1, 20, 'Started', start()), f(2, 2, 21, 'Moved', moved('todo', 'active')), f(2, 3, 22, 'Integrated', { entry: 'e2', revision: 'rev2', target: 'main', result: 'merge2', method: 'merge', by: 'hive' }), f(2, 4, 23, 'Moved', moved('approved', 'done'))]
+    const two = [f(2, 1, 20, 'Started', start()), f(2, 2, 21, 'Moved', moved('todo', 'active')), f(2, 3, 22, 'Integrated', { entry: 'e2', revision: 'rev2', target: 'main', result: 'merge2', method: 'merge', by: 'combwork' }), f(2, 4, 23, 'Moved', moved('approved', 'done'))]
     const badges = new Map([
       [1, workBadge(workView({ card: 1, stage: 'todo', preWorkflow: false }, later))],
       [2, workBadge(workView({ card: 2, stage: 'todo', preWorkflow: false }, two))]

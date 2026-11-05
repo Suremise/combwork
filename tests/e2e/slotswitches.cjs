@@ -68,7 +68,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms) => lib.until(fn, ms, 250)
     // Pair with Combwork merges into integration (checked out nowhere), cards in slots, G15 off.
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, slotsUpToDate: false } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, slotsUpToDate: false } })
     check('G15 (Slots are brought up to date before each card) is off', (await inv('workflow:form', alpha))?.options?.slotsUpToDate === false, JSON.stringify((await inv('workflow:form', alpha))?.options))
     await inv('advanced:set', 'cw.slots.deleteMergedLines', false)
     await inv('advanced:set', 'cw.slots.renameAdopted', false)

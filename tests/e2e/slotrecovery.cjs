@@ -94,7 +94,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
   try {
     await start('afterAction')
     await lib.fitWindow(h.app, h.page, { width: 1400, height: 850 })
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     const add = (name, workflowRole) => lib.addAgent(inv, alpha, { name, workflowRole })
     const [b1, b2, b3, b4, r1] = [await add('B1', 'builder'), await add('B2', 'builder'), await add('B3', 'builder'), await add('B4', 'builder'), await add('R1', 'reviewer')]
     const create = async (title) => (await inv('tasks:create', { title, project: 'alpha' })).number

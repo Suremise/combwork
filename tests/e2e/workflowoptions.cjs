@@ -256,7 +256,7 @@ async function theForm(page, app, inv) {
     await themes('contradiction', row('finish'))
     await row('folder').locator('select').selectOption('project')
     check('resolved: the reasons go, Save is on', !!(await lib.until(async () => (await reasons('finish')).length === 0 && (await reasons('folder')).length === 0 && (await save.isEnabled()), HUNG_MS)))
-    await row('finish').locator('select').selectOption('hiveMerges')
+    await row('finish').locator('select').selectOption('combworkMerges')
     check('Combwork merges in the project folder: under both rows', !!(await lib.until(() => both('mergeNeedsSlots', 'finish', 'folder'), HUNG_MS)) && (await save.isDisabled()))
     await discard()
     await row('reviewers').locator('select').selectOption('2')
@@ -322,7 +322,7 @@ async function theForm(page, app, inv) {
 
     // --- Pair (Combwork merges, #1355): Combwork merges, G9's checks suggested from the scripts with their commands, the install.
     await applyChoice('pair')
-    check('Pair: Combwork merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
+    check('Pair: Combwork merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'combworkMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
     check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
     check('…G8 shown in Merging while Combwork merges', (await inGroup('merging')).includes('strict'))
     // G18 (#1179): pushing the target after a merge, shown while Combwork merges, off in the preset; switched on and saved.
@@ -341,7 +341,7 @@ async function theForm(page, app, inv) {
     await themes('filelocks-slots', row('fileLocks'))
     await row('mergeInstall').locator('select').selectOption('always')
     await saveAll()
-    check('saved: Combwork merges, the merge checks, the install and the push after merging, in project.json', !!(await lib.until(async () => saved().finish === 'hiveMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always' && saved().pushTarget === true && saved().style === 'rebase', HUNG_MS)), JSON.stringify(saved()))
+    check('saved: Combwork merges, the merge checks, the install and the push after merging, in project.json', !!(await lib.until(async () => saved().finish === 'combworkMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always' && saved().pushTarget === true && saved().style === 'rebase', HUNG_MS)), JSON.stringify(saved()))
     for (let i = (await row('mergeChecks').locator('.workflow-check').count()) - 1; i >= 0; i--) await row('mergeChecks').locator('.workflow-check').nth(i).getByRole('button', { name: 'Remove' }).click()
     check('with no merge checks, the install row is not shown', !!(await lib.until(async () => (await row('mergeInstall').count()) === 0, HUNG_MS)))
     await discard()
@@ -473,7 +473,7 @@ async function theForm(page, app, inv) {
     check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
     await themes('none-loops', section.locator('.workflow-group[data-group="loops"]'))
     const noneBase = { hiveWorkflow: 1, platform: 'none', preset: null, options: {} }
-    const merging = await pasteIn({ ...noneBase, options: { finish: 'hiveMerges' } })
+    const merging = await pasteIn({ ...noneBase, options: { finish: 'combworkMerges' } })
     check('None: a merge pasted is refused, merging needs Git', !!(await lib.until(async () => (await merging.innerText()).includes('Merging needs Git'), HUNG_MS)), await merging.innerText())
     await merging.locator('textarea').fill(JSON.stringify({ ...noneBase, options: { folder: 'slots' } }))
     await merging.getByRole('button', { name: 'Try Again' }).click()

@@ -316,7 +316,7 @@ function helpers(h) {
       const f = await inv('workflow:form', alpha)
       return f?.preset === 'team' ? f.options : null
     }, HUNG_MS)
-    must('Team saved from the tab: Combwork merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
+    must('Team saved from the tab: Combwork merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'combworkMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${path.join(fx.tools, 'setup.js')}"` } })
 
     // --- Two lanes from the window at once, each lent a slot, its builder started there in a new conversation.
@@ -339,7 +339,7 @@ function helpers(h) {
       }, HUNG_MS)
       check(`${b.name} runs in ${s.name}`, !!there && there.slot === s.name, JSON.stringify(await x.live(alpha, b.id)))
     }
-    check("the slots' warming ran as Combwork's, for each slot", !!(await until(async () => ['slot-a', 'slot-b'].every((n) => lines(setupLog).includes(n)), HUNG_MS)) && (await x.runs()).some((r) => r.source === 'hive' && r.slot === 'slot-a'), JSON.stringify({ log: lines(setupLog), runs: (await x.runs()).filter((r) => r.slot).map((r) => [r.slot, r.source, r.defaultName]) }))
+    check("the slots' warming ran as Combwork's, for each slot", !!(await until(async () => ['slot-a', 'slot-b'].every((n) => lines(setupLog).includes(n)), HUNG_MS)) && (await x.runs()).some((r) => r.source === 'combwork' && r.slot === 'slot-a'), JSON.stringify({ log: lines(setupLog), runs: (await x.runs()).filter((r) => r.slot).map((r) => [r.slot, r.source, r.defaultName]) }))
 
     // Each card its own line from main's head.
     const startIn = async (b, n, slot) => {
@@ -551,7 +551,7 @@ const assignedOf = async (x, n) => (await x.facts(n)).filter((f) => f.kind === '
 async function pool(h) {
   const { inv } = h
   const x = helpers(h)
-  await inv('workflow:setOptions', beta, { preset: null, options: { review: 'agent', noSelfReview: true, reviewers: 2, finish: 'hiveMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity: fx.identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
+  await inv('workflow:setOptions', beta, { preset: null, options: { review: 'agent', noSelfReview: true, reviewers: 2, finish: 'combworkMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity: fx.identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
   const plan = await inv('templates:plan', beta, 'hive', 'team-6-pool.json')
   check('Team 6 + pool suggests the reviewer pool', plan.reviewerMode === 'pool', JSON.stringify(plan.reviewerMode))
   await inv('templates:load', beta, 'hive', 'team-6-pool.json', plan.remove.map((a) => a.id))

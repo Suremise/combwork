@@ -251,7 +251,7 @@ async function renameCardLines(ws: WorkspaceService, project: string, from: stri
   for (const card of wf.store.cards()) {
     if (!on(wf.state(card).started?.line)) continue
     // Checked again under the write's lock: a card another observer has already renamed gets no second fact.
-    await wf.write(card, null, 'hive', (w) => {
+    await wf.write(card, null, 'combwork', (w) => {
       if (on(w.state().started?.line)) w.fact('LineRenamed', { from, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
     })
   }

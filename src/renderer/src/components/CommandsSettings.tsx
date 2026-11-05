@@ -210,10 +210,10 @@ function CommandList({ list, values, onChange, run }: { list: CustomCommand[]; v
 /** A point's commands in order, picked from the lists it may use, with what can't run there said. */
 function PointPicker({ point, lists, values, update, onChange }: { point: CommandPoint; lists: { hive: CustomCommand[]; workspace?: CustomCommand[] }; values: CommandValues; update: boolean; onChange: (next: CommandPoint) => void }) {
   useLanguage()
-  const find = (r: CommandRef): CustomCommand | undefined => (r.scope === 'hive' ? lists.hive : (lists.workspace ?? [])).find((c) => c.id === r.id)
+  const find = (r: CommandRef): CustomCommand | undefined => (r.scope === 'combwork' ? lists.hive : (lists.workspace ?? [])).find((c) => c.id === r.id)
   const picked = (r: CommandRef): boolean => point.run.some((x) => x.scope === r.scope && x.id === r.id)
-  const choices: CommandRef[] = [...(lists.workspace ?? []).map((c) => ({ scope: 'workspace' as const, id: c.id })), ...lists.hive.map((c) => ({ scope: 'hive' as const, id: c.id }))].filter((r) => !picked(r))
-  const label = (r: CommandRef): string => `${find(r)?.name ?? tr(M.gone)}${r.scope === 'hive' && lists.workspace ? ` (${tr(M.hiveBadge)})` : ''}`
+  const choices: CommandRef[] = [...(lists.workspace ?? []).map((c) => ({ scope: 'workspace' as const, id: c.id })), ...lists.hive.map((c) => ({ scope: 'combwork' as const, id: c.id }))].filter((r) => !picked(r))
+  const label = (r: CommandRef): string => `${find(r)?.name ?? tr(M.gone)}${r.scope === 'combwork' && lists.workspace ? ` (${tr(M.hiveBadge)})` : ''}`
   return (
     <div className="close-command-settings">
       {!point.run.length && <div className="muted">{tr(M.pointEmpty)}</div>}
@@ -265,7 +265,7 @@ const runIt = (ref: CommandRef): void => void actions.attempt(tr(M.runFailed), (
 function useHive(): [CommandsHive, (change: (current: CommandsHive) => CommandsHive) => void] {
   const value = useStore((s) => s.settings?.commands ?? EMPTY_HIVE)
   // Every window gets settings-changed with what was saved.
-  return useScope('hive', value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setHive', next)))
+  return useScope('combwork', value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setHive', next)))
 }
 
 /** The workspace's commands, as saved (workspace.json), and its edit: saved to that workspace, whatever the window shows by then. */
@@ -284,7 +284,7 @@ export function HiveCommands() {
     <CommandList
       list={hive.list}
       values={values}
-      run={(id) => runIt({ scope: 'hive', id })}
+      run={(id) => runIt({ scope: 'combwork', id })}
       onChange={(list) => save((cur) => ({ list, onQuit: { ...cur.onQuit, run: cur.onQuit.run.filter((r) => list.some((c) => c.id === r.id)) } }))}
     />
   )
@@ -302,7 +302,7 @@ export function WorkspaceCommands() {
   const [ws, save] = useWorkspace()
   const values = useValues('manual')
   if (!path) return <div className="muted">{tr(M.noWorkspace)}</div>
-  const keep = (list: CustomCommand[]) => (p: CommandPoint): CommandPoint => ({ ...p, run: p.run.filter((r) => r.scope === 'hive' || list.some((c) => c.id === r.id)) })
+  const keep = (list: CustomCommand[]) => (p: CommandPoint): CommandPoint => ({ ...p, run: p.run.filter((r) => r.scope === 'combwork' || list.some((c) => c.id === r.id)) })
   return <CommandList list={ws.list} values={values} run={(id) => runIt({ scope: 'workspace', id })} onChange={(list) => save((cur) => ({ list, onOpen: keep(list)(cur.onOpen), onClose: keep(list)(cur.onClose) }))} />
 }
 

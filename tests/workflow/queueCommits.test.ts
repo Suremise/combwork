@@ -16,7 +16,7 @@ afterEach(() => {
   env = null
 })
 
-const team = (o: Partial<WorkflowOptions> = {}): Env => (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], commitMessage: 'hive', okBefore: { mode: 'never', labels: [] }, ...o }))
+const team = (o: Partial<WorkflowOptions> = {}): Env => (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], commitMessage: 'combwork', okBefore: { mode: 'never', labels: [] }, ...o }))
 
 /** A card approved and queued for main, checked out nowhere (the project folder detached). */
 async function queued(e: Env, title = 'Change') {

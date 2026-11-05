@@ -40,7 +40,7 @@ const closeList = (cmd) => ({ list: [{ id: 'c-00000001', name: 'Close', command:
 /** Combwork's commands with When Combwork quits running `cmd`. */
 /** Saves a workspace's close commands (`cmd`) to the workspace its window shows (commands:setWorkspace names it). */
 const saveClose = async (i, cmd) => i('commands:setWorkspace', (await i('workspace:get')).path, closeList(cmd))
-const quitList = (cmd) => ({ list: [{ id: 'c-0000000f', name: 'Quit', command: cmd }], onQuit: { run: [{ scope: 'hive', id: 'c-0000000f' }] } })
+const quitList = (cmd) => ({ list: [{ id: 'c-0000000f', name: 'Quit', command: cmd }], onQuit: { run: [{ scope: 'combwork', id: 'c-0000000f' }] } })
 /** A failed command's choice in the panel (HI-1954): Rerun, Skip it and continue, Stop here. */
 const choose = (page, name) => page.locator('.close-command .dialog-footer button', { hasText: name }).click()
 const panel = (page, state) => page.locator(`.overlay.close-command[data-state="${state}"]`)

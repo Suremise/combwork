@@ -346,7 +346,7 @@
   "board.forYou.approve": "批准",
   "board.forYou.asDecision": "记为决定",
   "board.forYou.asDecisionTip": "把你的回答记为卡片的一项决定（它的智能体从此必须遵守），并以此回答问题。",
-  "board.forYou.asked": "{who, select, hive {Combwork 提问} other {{who} 提问}} · {when}",
+  "board.forYou.asked": "{who, select, combwork {Combwork 提问} other {{who} 提问}} · {when}",
   "board.forYou.checklist": "需要测试：",
   "board.forYou.chip": "待你处理",
   "board.forYou.chipTip": "{n, plural, other {# 项待你处理：{requests}}}",

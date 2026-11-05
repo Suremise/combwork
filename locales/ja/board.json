@@ -346,7 +346,7 @@
   "board.forYou.approve": "承認",
   "board.forYou.asDecision": "決定事項として記録",
   "board.forYou.asDecisionTip": "回答をカードの決定事項の1つとして記録し（エージェントは今後これに従う必要があります）、それで質問に答えます。",
-  "board.forYou.asked": "{who, select, hive {Combworkからの依頼} other {{who}からの依頼}} · {when}",
+  "board.forYou.asked": "{who, select, combwork {Combworkからの依頼} other {{who}からの依頼}} · {when}",
   "board.forYou.checklist": "試すこと：",
   "board.forYou.chip": "要対応",
   "board.forYou.chipTip": "{n, plural, other {要対応#件：{requests}}}",

@@ -17,7 +17,7 @@ afterEach(() => {
 })
 
 const strict = (over: { style?: 'merge' | 'squash' } = {}): Env => {
-  env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], strict: true, commitMessage: 'hive', ...over })
+  env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], strict: true, commitMessage: 'combwork', ...over })
   // The target checked out nowhere: the plain compare-and-swap advance.
   sh(env.project, 'checkout', '-q', '--detach')
   return env

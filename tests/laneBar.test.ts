@@ -699,7 +699,7 @@ describe('refusals name the user as you in the window, as the user to agents (HI
     expect(r.change).toBe('These rules are set in Version Control, where the user can change them.')
     expect(refusal('loop.followUpChecked', { card: 'AL-1' }).next).toBe("Wait for the reviewer's ok or gaps; if none comes, ask the user.")
     expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'cw/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Combwork brings cw/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
-    expect(refusal('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
+    expect(refusal('merge.combworkMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
     expect(refusal('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }).next).toMatch(/^The project's Git repository is gone: ask the user to restore it/)
   })
 
@@ -710,7 +710,7 @@ describe('refusals name the user as you in the window, as the user to agents (HI
       expect(l.change).toBe('These rules are set in Version Control, where you can change them.')
     }
     expect(refusalLines('loop.followUpChecked', { card: 'AL-1' }, inCard).next).toBe("The agent waits for the reviewer's ok or gaps; if none comes, it asks you.")
-    expect(refusalLines('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'fix' }, inCard).next).toBe('It is in the merge queue for main, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.')
+    expect(refusalLines('merge.combworkMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'fix' }, inCard).next).toBe('It is in the merge queue for main, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.')
     expect(refusalLines('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }, inCard).next).toMatch(/^The project's Git repository is gone: restore it, or switch the project to None/)
   })
 

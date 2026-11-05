@@ -13,7 +13,7 @@ import { DEFAULT_PROJECT_CONFIG, DEFAULT_WORKSPACE_CONFIG, CW_DIR, mergeDefaults
 import { migrateWorkspacePreferences } from '../shared/workflow/preferences'
 import { settlePlacements } from '../shared/paneCells'
 import { assistantMcpAdded, MCP_ADDED_MODEL, mcpAdded, mcpNames, migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
-import { ASSISTANT_OTHER_MCP, advancedDef, checkAdvanced, migrateAdvancedIds } from '../shared/advanced'
+import { ASSISTANT_OTHER_MCP, advancedDef, checkAdvanced } from '../shared/advanced'
 import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { MIGRATED_CLOSE, migrateWorkspaceCommands } from '../shared/commands'
@@ -58,8 +58,6 @@ function loadedConfig(raw: unknown): WorkspaceConfig {
   const c = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(raw as Record<string, unknown>)))
   c.commands = migrateWorkspaceCommands(c, tr(MIGRATED_CLOSE))
   delete c.onClose
-  // The workspace's own advanced values under their cw.* ids (HI-2518), one way: the file changes when it is next saved.
-  if (c.advanced && typeof c.advanced === 'object' && !Array.isArray(c.advanced)) c.advanced = migrateAdvancedIds(c.advanced).record
   return c
 }
 

@@ -134,7 +134,7 @@ export function projectOwnPreferences(platform: PlatformId, cfg: Pick<ProjectCon
  * there as LEGACY_ADVANCED until main moves it) and a workspace's own (workspace.json's `advanced`). Each becomes its
  * level's Maximum agents, for None and Git.
  */
-export const AGENTS_PER_PROJECT = 'hive.agents.perProject'
+export const AGENTS_PER_PROJECT = 'cw.agents.perProject'
 
 /**
  * Workflow defaults (Hive's or a workspace's) with old values each platform's lacks: a value a level already sets wins.

@@ -1,7 +1,7 @@
 // Agents under Combwork merges (#1354, SPEC §16.9.3): a project set to "Combwork merges" into `integration` (queueFixture.cjs),
 // fake Claude Code agents acting by their own tokens, the Assistant off. A builder whose card is approved and queued
 // tries to merge it itself:
-// - cw_report_merge (report-merge) and cw_merge_slot (claim naming the card): both refused (409, merge.hiveMerges)
+// - cw_report_merge (report-merge) and cw_merge_slot (claim naming the card): both refused (409, merge.combworkMerges)
 //   with where it is in the merge queue and where the rule is set; the card untouched;
 // - its card read says who merges it and where it is;
 // then the queue returns it for a conflict, and its wake names the files and the next step; the builder merges the
@@ -49,16 +49,16 @@ async function call(h, who, method, url, body) {
     const before = q.head(fx)
 
     const report = await q.intent(h, card.builder, card.n, 'report-merge')
-    check('report merge: refused (409) by merge.hiveMerges', report.status === 409 && report.body?.rule === 'merge.hiveMerges', JSON.stringify(report))
+    check('report merge: refused (409) by merge.combworkMerges', report.status === 409 && report.body?.rule === 'merge.combworkMerges', JSON.stringify(report))
     check('…saying Combwork merges it, and where the rule is set', String(report.body?.message).startsWith(`Combwork merges ${key}`) && String(report.body?.change).includes('Who merges'), JSON.stringify(report.body))
     // The first card is the one testing now (its checks run in this Combwork's queue: the window's order, #1353): this one is next.
     check('…its next step: its place in the queue (next, behind the card being tested), and wait for Done or a return', String(report.body?.next) === 'It is in the merge queue for integration (position 1) and moves to Done once merged: wait for that, or for it to come back.', String(report.body?.next))
     const slot = await call(h, card.builder, 'POST', '/v1/projects/alpha/merge-slot/claim', { cards: [card.n], timeoutSeconds: 0 })
-    check('the merge slot claimed for it: refused the same way', slot.status === 409 && slot.body?.rule === 'merge.hiveMerges', JSON.stringify(slot))
+    check('the merge slot claimed for it: refused the same way', slot.status === 409 && slot.body?.rule === 'merge.combworkMerges', JSON.stringify(slot))
     const holders = await call(h, card.builder, 'GET', '/v1/projects/alpha/merge-slot?branch=integration')
     check('…the slot not taken', holders.status === 200 && !JSON.stringify(holders.body).includes(card.builder.name), JSON.stringify(holders.body))
     check('…the card untouched: not Done, the target unmoved', (await column(card.n)) !== 'done' && q.head(fx) === before)
-    check('…both refusals recorded on the card', (await h.facts(card.n)).filter((f) => f.kind === 'Refused' && f.data?.rule === 'merge.hiveMerges').length === 2, JSON.stringify(await h.kinds(card.n)))
+    check('…both refusals recorded on the card', (await h.facts(card.n)).filter((f) => f.kind === 'Refused' && f.data?.rule === 'merge.combworkMerges').length === 2, JSON.stringify(await h.kinds(card.n)))
     const read = await call(h, card.builder, 'GET', `/v1/tasks/${encodeURIComponent(key)}`)
     check("its card read says Combwork merges it and where it is", read.status === 200 && String(read.body?.merge).startsWith('Combwork merges this card (its rules)'), JSON.stringify(read.body?.merge))
 
@@ -106,7 +106,7 @@ async function call(h, who, method, url, body) {
     check('…reviewed and passed again', review.status === 200 && verdict.status === 200, JSON.stringify({ review, verdict }))
     check('…and the queue merges it: Done', !!(await until(async () => (await column(card.n)) === 'done', HUNG_MS)), JSON.stringify(await h.kinds(card.n)))
     const integ = (await h.facts(card.n)).filter((f) => f.kind === 'Integrated')
-    check('…Integrated by Combwork, the target at its result', integ.length === 1 && integ[0].data.by === 'hive' && integ[0].data.result === q.head(fx), JSON.stringify(integ))
+    check('…Integrated by Combwork, the target at its result', integ.length === 1 && integ[0].data.by === 'combwork' && integ[0].data.result === q.head(fx), JSON.stringify(integ))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

@@ -257,7 +257,7 @@ describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
     off(resolveOptions('git', { project: { identity: { name: 'A' } } as never }), /project options: identity/)
     off(resolveOptions('git', { project: { commands: { test: 1 } } as never }), /project options: commands/)
     // Every value each option takes passes.
-    expect(resolveOptions('git', { project: { review: 'agentThenYou', noSelfReview: true, reviewers: 2, sameness: 'exact', finish: 'hiveMerges', style: 'squash', folder: 'slots', okBefore: { mode: 'never', labels: ['ui'] }, identity: { name: 'A', email: 'a@example.com' } } }).invalid).toBeNull()
+    expect(resolveOptions('git', { project: { review: 'agentThenYou', noSelfReview: true, reviewers: 2, sameness: 'exact', finish: 'combworkMerges', style: 'squash', folder: 'slots', okBefore: { mode: 'never', labels: ['ui'] }, identity: { name: 'A', email: 'a@example.com' } } }).invalid).toBeNull()
   })
 
   it("the runtime works under the project's resolved options, read again at each call", async () => {

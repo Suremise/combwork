@@ -54,9 +54,9 @@ describe('the override switches', () => {
   it('are booleans, on by default (what Combwork does today), named <provider>.override.<what>, taken by sessions started afterwards', () => {
     const switches = ADVANCED_DEFS.filter((d) => d.override)
     expect(switches.map((d) => d.id).sort()).toEqual([
-      'claude-code.override.mcpIsolation', 'claude-code.override.preApproveHiveTools', 'claude-code.override.promptSnapshotOff', 'claude-code.override.statusLine',
-      'codex.override.mcpIsolation', 'codex.override.preApproveHiveTools', 'codex.override.terminalTitle',
-      'copilot.override.allMcpInstructions', 'copilot.override.mcpIsolation', 'copilot.override.noAutoUpdate', 'copilot.override.preApproveHiveTools', 'copilot.override.stripGitHubTokens'
+      'claude-code.override.mcpIsolation', 'claude-code.override.preApproveCombworkTools', 'claude-code.override.promptSnapshotOff', 'claude-code.override.statusLine',
+      'codex.override.mcpIsolation', 'codex.override.preApproveCombworkTools', 'codex.override.terminalTitle',
+      'copilot.override.allMcpInstructions', 'copilot.override.mcpIsolation', 'copilot.override.noAutoUpdate', 'copilot.override.preApproveCombworkTools', 'copilot.override.stripGitHubTokens'
     ])
     for (const d of switches) {
       expect(d, d.id).toMatchObject({ kind: 'boolean', default: true, applies: 'sessions' })
@@ -205,7 +205,7 @@ describe("Combwork's tools pre-approved (row 3)", () => {
   it('Claude Code: the Assistant’s trusted Combwork tools with the switch on, none with it off', async () => {
     const allowed = (): string[] => { const a = claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args; const i = a.indexOf('--allowedTools'); return i < 0 ? [] : a[i + 1].split(',') }
     expect(allowed()).toEqual(['mcp__combwork__cw_list_tasks', 'mcp__combwork__cw_read_task'])
-    await advanced.set(overrideId('claude-code', 'preApproveHiveTools'), false)
+    await advanced.set(overrideId('claude-code', 'preApproveCombworkTools'), false)
     expect(allowed()).toEqual([])
     // Combwork's tools are still there: only Claude Code's trust changed.
     expect(claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args).toContain('--mcp-config')
@@ -215,7 +215,7 @@ describe("Combwork's tools pre-approved (row 3)", () => {
     const allowTools = (ctx: LaunchContext): string[] => copilot.buildCommand('C:\\bin\\copilot.exe', ctx).args.filter((a) => a.startsWith('--allow-tool=combwork'))
     expect(allowTools(context())).toEqual(['--allow-tool=combwork'])
     expect(allowTools(assistant())).toEqual(['--allow-tool=combwork(cw_list_tasks)', '--allow-tool=combwork(cw_read_task)'])
-    await advanced.set(overrideId('copilot', 'preApproveHiveTools'), false)
+    await advanced.set(overrideId('copilot', 'preApproveCombworkTools'), false)
     expect(allowTools(context())).toEqual([])
     expect(allowTools(assistant())).toEqual([])
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', context()).args).toContain('--additional-mcp-config')
@@ -264,7 +264,7 @@ describe("Codex: Combwork's tools pre-approved (row 3, #1174) and its own MCP se
     const assistant = hiveTable(context({ trustedHiveTools: ['cw_list_tasks', 'cw_read_task'] }))!
     expect(assistant).not.toContain('default_tools_approval_mode')
     expect(assistant).toContain('tools={cw_list_tasks={approval_mode="approve"},cw_read_task={approval_mode="approve"}}')
-    await advanced.set(overrideId('codex', 'preApproveHiveTools'), false)
+    await advanced.set(overrideId('codex', 'preApproveCombworkTools'), false)
     for (const t of [hiveTable(context()), hiveTable(context({ trustedHiveTools: ['cw_list_tasks'] }))]) {
       expect(t).not.toContain('approval_mode')
       // Still Combwork's server, on.
@@ -347,7 +347,7 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
       expect(table({ ...where(place, native), trustedHiveTools: [] }), place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_write_shared_note: { approval_mode: 'auto' }, cw_list_tasks: { approval_mode: 'auto' } } })
     }
     // The switch off: nothing approved, for an agent either.
-    await advanced.set(overrideId('codex', 'preApproveHiveTools'), false)
+    await advanced.set(overrideId('codex', 'preApproveCombworkTools'), false)
     expect(table(where('home', native))).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_write_shared_note: { approval_mode: 'auto' }, cw_list_tasks: { approval_mode: 'auto' } } })
   })
 

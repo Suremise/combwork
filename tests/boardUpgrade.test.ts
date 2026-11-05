@@ -652,7 +652,7 @@ describe("what services read before the database was replaced is read again (#12
   function writtenBy09(ws: string, scope: string, id: string, next: number, body: string): void {
     const raw = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
     try {
-      const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Combwork' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
+      const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
       raw.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET doc = excluded.doc').run('deliveries', scope, id, 0, JSON.stringify(rec))
       raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run('deliveries', scope, 'next', String(next))
       raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO NOTHING').run('deliveries', scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: 1, file: null }))
@@ -675,7 +675,7 @@ describe("what services read before the database was replaced is read again (#12
       writtenBy09(ws, scope, 'm1', 2, 'Written by 0.9 while the upgrade waited')
       await inWorkspace(w, () => store.upgradeBoard(w))
       expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited'])
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'The first in 1.0' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Hive' }, body: 'The first in 1.0' }))
       expect(made.id).toBe('m2')
       const saved = await inWorkspace(w, () => delivery.savedForTests(host))
       expect(bodies(saved.deliveries)).toEqual(['m1 Written by 0.9 while the upgrade waited', 'm2 The first in 1.0'])
@@ -744,7 +744,7 @@ describe("what services read before the database was replaced is read again (#12
       const { scope } = await inWorkspace(w, () => w.sessionScope(host))
       writtenBy09(ws, scope, 'm1', 2, 'From 0.9')
       await inWorkspace(w, () => store.upgradeBoard(w))
-      await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'Only in 1.0' }))
+      await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Hive' }, body: 'Only in 1.0' }))
       expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 From 0.9', 'm2 Only in 1.0'])
       // Back to the 0.9 board: what it has, not the 1.0 board's cache.
       await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
@@ -752,7 +752,7 @@ describe("what services read before the database was replaced is read again (#12
       // 0.9 adds one, then it is upgraded again: that one is kept, and the next id follows it.
       writtenBy09(ws, scope, 'm2', 3, 'From 0.9 after the restore')
       await inWorkspace(w, () => store.upgradeBoard(w))
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'In 1.0 again' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Hive' }, body: 'In 1.0 again' }))
       expect(made.id).toBe('m3')
       expect(bodies((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries)).toEqual(['m1 From 0.9', 'm2 From 0.9 after the restore', 'm3 In 1.0 again'])
     } finally {
@@ -854,7 +854,7 @@ describe('a workspace closed right after its database was replaced stays closed 
     try {
       await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
       await inWorkspace(w, () => store.upgradeBoard(w))
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'After the upgrade' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Hive' }, body: 'After the upgrade' }))
       expect((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries.map((r) => r.id)).toEqual([made.id])
     } finally {
       await delivery.forgetDeliveriesForTests()

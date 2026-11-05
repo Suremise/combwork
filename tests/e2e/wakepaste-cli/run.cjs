@@ -51,7 +51,7 @@ module.exports = async function run(provider) {
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, '..', 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
-  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideHiveMcp: true }
+  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideCombworkMcp: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   // Codex: a wait to be drawn longer than any suspension here (Settings → Advanced, Codex → Typed line: wait to be drawn).
   if (provider === 'codex') fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'codex.prompt.drawnSeconds': 60 } }, null, 2))

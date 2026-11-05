@@ -132,12 +132,6 @@ export const LEGACY_TOOLS_SERVER = 'hive'
 /** Whether a name is one of the reserved server names (case-insensitive, as servers' names are compared). */
 export const isReservedServerName = (name: string): boolean => [TOOLS_SERVER, LEGACY_TOOLS_SERVER].includes(name.trim().toLowerCase())
 
-/**
- * A tool's current name for a name read back from stored data (HI-2463): metrics and ledgers written before the rename
- * recorded `hive_<tool>`. A read-time projection only: what is stored stays as it was written.
- */
-export const currentToolName = (name: string): string => (name.startsWith('hive_') && CW_TOOLS.includes(`cw_${name.slice(5)}`) ? `cw_${name.slice(5)}` : name)
-
 /** Every tool the combwork MCP server has (a test checks it against hive-mcp.ts): the only tool names metrics record. */
 export const CW_TOOLS: readonly string[] = [
   'cw_list_projects', 'cw_project_status', 'cw_session_usage', 'cw_list_shared_notes', 'cw_read_shared_note', 'cw_write_shared_note', 'cw_doc_outline', 'cw_read_section',

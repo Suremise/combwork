@@ -128,7 +128,7 @@
     "description": "Combwork's reply to a hook, in the Hooks dialog's Combwork's reply column. Allowed is only what Combwork answered, not any other hook's answer."
   },
   "hooks.source": {
-    "defaultMessage": "{source, select, hive {Combwork} managed {Managed settings} cli {Command line} project {Project} local {Project (local)} user {User} plugin {Plugin} other {Other}}",
+    "defaultMessage": "{source, select, combwork {Combwork} managed {Managed settings} cli {Command line} project {Project} local {Project (local)} user {User} plugin {Plugin} other {Other}}",
     "description": "Where a hook comes from, in the Hooks dialog's From column."
   },
   "hooks.stale": {

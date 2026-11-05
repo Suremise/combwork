@@ -31,7 +31,7 @@
   "hooks.receiver": "Combworkの{form}フック経由",
   "hooks.refresh": "再読み込み",
   "hooks.response": "{response, select, none {特になし} context {コンテキストを送信} allowed {許可} warned {警告付きで許可} asked {確認を依頼} blocked {ブロック} error {エラー} other {不明}}",
-  "hooks.source": "{source, select, hive {Combwork} managed {管理された設定} cli {コマンドライン} project {プロジェクト} local {プロジェクト（ローカル）} user {ユーザー} plugin {プラグイン} other {その他}}",
+  "hooks.source": "{source, select, combwork {Combwork} managed {管理された設定} cli {コマンドライン} project {プロジェクト} local {プロジェクト（ローカル）} user {ユーザー} plugin {プラグイン} other {その他}}",
   "hooks.stale": "読み込んだ後にエージェントが再起動しました。表示は以前のセッションのものです。",
   "hooks.status": "{status, select, passed {Combworkが渡したもの} trusted {信頼済み} untrusted {未信頼：実行されません} modified {信頼後に変更：実行されません} unverified {設定済み · 読み込みは未確認} disabled {オフ} notLoaded {未読み込み} unsupported {不明な形式} other {不明}}",
   "hooks.timeSpan": "{from}–{to}",

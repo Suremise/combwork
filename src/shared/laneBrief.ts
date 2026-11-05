@@ -78,7 +78,7 @@ export function laneRules(o: LaneBriefInput['options']): string[] {
   const out: string[] = []
   out.push(say({ none: B.reviewNone, agent: B.reviewAgent, agentThenYou: B.reviewAgentThenYou, you: B.reviewYou }[o.review]))
   if (o.preChecks.length) out.push(say(B.preChecks, { checks: agentList(o.preChecks) }))
-  out.push(say({ hiveMerges: B.finishHive, agentMerges: B.finishAgent, committed: B.finishCommitted, notChecked: B.finishNotChecked, accept: B.finishAccept }[o.finish]))
+  out.push(say({ combworkMerges: B.finishHive, agentMerges: B.finishAgent, committed: B.finishCommitted, notChecked: B.finishNotChecked, accept: B.finishAccept }[o.finish]))
   if (o.okBefore.mode === 'every') out.push(say(B.okEvery))
   if (o.okBefore.mode === 'labels' && o.okBefore.labels.length) out.push(say(B.okLabels, { labels: agentList(o.okBefore.labels) }))
   return out

@@ -173,7 +173,7 @@ async function start() {
   const next = storeMeta(place.ws, 'deliveries', 'next', place.scope)
   const at = new Date().toISOString()
   const eventId = `m${next}`
-  putStoreDoc(place.ws, 'deliveries', eventId, { id: eventId, seq: next, agentId: builder.id, agentName: 'Builder', conversation: sessionId, kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, card: 7, body: '[CW] #7 is back in Review, round 2.', state: 'offered', created: at, offered: at, offers: 1, offerRun: 'a-launch-that-ended', expires: new Date(Date.now() + 3600_000).toISOString() }, { scope: place.scope, meta: { next: next + 1 } })
+  putStoreDoc(place.ws, 'deliveries', eventId, { id: eventId, seq: next, agentId: builder.id, agentName: 'Builder', conversation: sessionId, kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, card: 7, body: '[CW] #7 is back in Review, round 2.', state: 'offered', created: at, offered: at, offers: 1, offerRun: 'a-launch-that-ended', expires: new Date(Date.now() + 3600_000).toISOString() }, { scope: place.scope, meta: { next: next + 1 } })
 
   ;({ app, page, inv, live } = await start())
   await page.getByText('alpha', { exact: true }).first().click()

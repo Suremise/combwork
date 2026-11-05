@@ -11,7 +11,7 @@ import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
 
 /** Who caused a fact. */
-export type Actor = 'user' | 'assistant' | 'hive' | 'outside' | `agent:${string}`
+export type Actor = 'user' | 'assistant' | 'combwork' | 'outside' | `agent:${string}`
 
 export const agentActor = (agent: string): Actor => `agent:${agent}`
 export const agentOf = (a: Actor): string | null => (a.startsWith('agent:') ? a.slice(6) : null)
@@ -330,7 +330,7 @@ export interface FactData {
    * counted run at the submitted revision (`run`), review evidence at that revision, never a run at the merged result.
    */
   FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string }
-  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'hive' | 'agent' | 'outside'; outsideRules?: string[] }
+  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
   /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */

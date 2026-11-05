@@ -118,7 +118,7 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
     expect(readFileSync(join(ws, '.combwork', 'backups', step.V09_TEMPLATES, 'workspace', 'pair.json'), 'utf8')).toBe(v1('Pair'))
     // 1.0 lists only its own: the 0.9 files aren't listed, loaded, added from or deleted.
     const listed = await inWorkspace(w, () => templates.listTemplates(join(ws, 'p')))
-    expect(listed.filter((t) => t.scope !== 'hive').map((t) => t.file).sort()).toEqual(['damaged.json', 'new.json'])
+    expect(listed.filter((t) => t.scope !== 'combwork').map((t) => t.file).sort()).toEqual(['damaged.json', 'new.json'])
     await expect(inWorkspace(w, () => templates.templatePlan(join(ws, 'p'), 'workspace', 'pair.json'))).rejects.toThrow(/no longer there/)
     await expect(inWorkspace(w, () => templates.addAgentFromTemplate(join(ws, 'p'), 'project', 'mine.json', 0))).rejects.toThrow(/no longer there/)
     await expect(inWorkspace(w, () => templates.deleteTemplate({ scope: 'workspace', file: 'team.json' }))).rejects.toThrow(/no longer there/)

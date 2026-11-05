@@ -58,7 +58,7 @@ export interface QueueRuns {
  * it from the Agent API's public form (#620).
  */
 export function progressRuns(store: ProgressStore, on: () => boolean, workspacePath: string, projectPath: string, warn: (e: unknown) => void = () => undefined): QueueRuns {
-  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'hive', workspacePath, projectPath, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
+  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'combwork', workspacePath, projectPath, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
   return {
     start: (r) => {
       if (!on()) return null

@@ -63,7 +63,7 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 let n = 0
 
 /** "Combwork merges" into main, a reviewer agent, one merge check. */
-const CW_MERGES = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', mergeChecks: ['quick'], commands: { quick: 'quick' } } as const
+const CW_MERGES = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', mergeChecks: ['quick'], commands: { quick: 'quick' } } as const
 
 async function workspace(at?: string): Promise<{ w: WS; repo: string; wt: string; ws: string }> {
   const ws = at ?? join(base, `ws-${++n}`)
@@ -297,18 +297,18 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
     const { setWorkflowOptions } = await import('../src/main/workflow/optionsForm')
     // Nothing queued: the Agent API lists no queue; the window's listing has main, Combwork merging into it.
     expect(await inWorkspace(w, () => queueViews(w, repo))).toEqual([])
-    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: true, inFlight: [], queued: [] }])
+    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', combworkMerges: true, inFlight: [], queued: [] }])
     const card = await approved(w, wt)
-    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: true, inFlight: [card], queued: [{ card }] }])
+    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', combworkMerges: true, inFlight: [card], queued: [{ card }] }])
     // The next cards go to the agent: the queue isn't the current options' any more, but its card is still in flight under them.
     host.changed.length = 0
     await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...CW_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
     // The windows are told (which queues show follows the options), whoever saved them.
     expect(host.changed).toEqual(['main'])
-    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: false, inFlight: [card], queued: [{ card }] }])
+    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', combworkMerges: false, inFlight: [card], queued: [{ card }] }])
     // Merged: Done, nothing in flight; the merge stays in its outcomes.
     expect(await drain(w, repo, true)).toMatchObject([{ outcome: 'integrated' }])
-    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: false, inFlight: [], queued: [], recent: [{ card, outcome: 'merged' }] }])
+    expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', combworkMerges: false, inFlight: [], queued: [], recent: [{ card, outcome: 'merged' }] }])
   })
 
   it('a return is marked seen once, for every reader; an entry that was not returned there is ignored; the Agent API never says it', async () => {
@@ -358,8 +358,8 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
     const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Other ${entry}`, project: 'p' }, user)).number)
     await wf.locked(() =>
       wf.store.tx((tx) => {
-        tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `${entry}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
-        tx.append(other, { kind: 'IntegrationFailed', actor: 'hive', source: 'recorded', data: { entry: `${entry}/e1`, revision: 'f'.repeat(40), target: 'main', reason: 'checks', transient: false, log: `red ${entry}` } })
+        tx.append(other, { kind: 'IntegrationRequested', actor: 'combwork', source: 'recorded', data: { entry: `${entry}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
+        tx.append(other, { kind: 'IntegrationFailed', actor: 'combwork', source: 'recorded', data: { entry: `${entry}/e1`, revision: 'f'.repeat(40), target: 'main', reason: 'checks', transient: false, log: `red ${entry}` } })
       })
     )
     return other
@@ -376,8 +376,8 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
       const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Cancelled ${i}`, project: 'p' }, user)).number)
       await wf.locked(() =>
         wf.store.tx((tx) => {
-          tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `c${i}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
-          tx.append(other, { kind: 'IntegrationCancelled', actor: 'hive', source: 'recorded', data: { entry: `c${i}/e1`, reason: 'removed' } })
+          tx.append(other, { kind: 'IntegrationRequested', actor: 'combwork', source: 'recorded', data: { entry: `c${i}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
+          tx.append(other, { kind: 'IntegrationCancelled', actor: 'combwork', source: 'recorded', data: { entry: `c${i}/e1`, reason: 'removed' } })
         })
       )
     }
@@ -511,8 +511,8 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
     await inWorkspace(w, () => pauseQueue(w, repo, 'main', 'user'))
     await wf.locked(() =>
       wf.store.tx((tx) => {
-        for (let i = 20; i < 70; i++) tx.append(others[i], { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e2`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge', requeue: 'retry' } })
-        tx.append(others[69], { kind: 'IntegrationStarted', actor: 'hive', source: 'recorded', data: { entry: 'o69/e2', expected: 'e'.repeat(40), result: 'd'.repeat(40) } })
+        for (let i = 20; i < 70; i++) tx.append(others[i], { kind: 'IntegrationRequested', actor: 'combwork', source: 'recorded', data: { entry: `o${i}/e2`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge', requeue: 'retry' } })
+        tx.append(others[69], { kind: 'IntegrationStarted', actor: 'combwork', source: 'recorded', data: { entry: 'o69/e2', expected: 'e'.repeat(40), result: 'd'.repeat(40) } })
       })
     )
     let v = await view()

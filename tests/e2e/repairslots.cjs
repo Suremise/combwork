@@ -120,7 +120,7 @@ const isIn = (dir, rev, ref) => {
     // --- Before the move: the slots, a lane on slot-a, B1's conversation in hb1.
     await start(wsOf(before))
     const alpha = path.join(wsOf(before), 'alpha')
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     const c1 = (await inv('tasks:create', { title: 'Moved along', project: 'alpha' })).number
     const key = (await card(c1)).key
     const hb1 = await until(async () => (await inv('slots:list', alpha)).find((s) => s.name === 'hb1' && s.lease?.kind === 'carried'), HUNG_MS)

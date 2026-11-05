@@ -30,7 +30,7 @@ const log = createLogger('answerRelay')
 const SOURCE = 'answer-relay'
 const ASSISTANT = 'assistant'
 /** Hive's own deliveries come from it. */
-const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /** The Assistant's line for an answer (relayLine), said in its dialect (agent-facing). */
 const T = {

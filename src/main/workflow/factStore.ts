@@ -445,7 +445,7 @@ export class FactStore {
     return this.conn.write((db) => {
       const n = takeNumberIn(db)
       const at = this.now().toISOString()
-      const doc = { number: n, title: c.title, description: '', project: this.scope.project, agent: null, column: STAGE_CATEGORY[stage], order: n, labels: c.labels, blocked: null, blockedBy: c.blockedBy, links: [], comments: [], history: [], archived: false, createdAt: at, createdBy: 'Hive', updatedAt: at }
+      const doc = { number: n, title: c.title, description: '', project: this.scope.project, agent: null, column: STAGE_CATEGORY[stage], order: n, labels: c.labels, blocked: null, blockedBy: c.blockedBy, links: [], comments: [], history: [], archived: false, createdAt: at, createdBy: 'Combwork', updatedAt: at }
       writeCardRows(db, decomposeCard(n, doc))
       db.prepare('UPDATE cards SET stage = ?, kind = ?, pre_workflow = ? WHERE number = ?').run(stage, c.kind, c.preWorkflow ? 1 : 0, n)
       setColumns(db, n, c)
@@ -614,7 +614,7 @@ export class FactStore {
       if (!had) {
         const ord = (db.prepare('SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM lanes').get() as { n: number }).n
         db.prepare(
-          "INSERT INTO lanes (id, ord, project, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES (?, ?, ?, 'hive', 'Hive', ?, ?, ?, ?, 'active', 'Hive', ?, ?)"
+          "INSERT INTO lanes (id, ord, project, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES (?, ?, ?, 'combwork', 'Combwork', ?, ?, ?, ?, 'active', 'Combwork', ?, ?)"
         ).run(id, ord, this.scope.project, reviewer ?? null, reviewer ?? null, rounds, LOOP_WAIT_HOURS * 60, at, at)
       } else if (reviewer) db.prepare('UPDATE lanes SET reviewer_id = ?, reviewer_name = ?, updated_at = ? WHERE id = ?').run(reviewer, reviewer, at, id)
       writeLane(db, newLane(id, cards, ruleset), at)

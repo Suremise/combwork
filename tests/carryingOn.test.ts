@@ -49,7 +49,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     }
   })
   deliveries.setReadsInboxForTests(() => true)
-  const hive = { kind: 'hive' as const, name: 'Combwork' }
+  const hive = { kind: 'combwork' as const, name: 'Combwork' }
   /** What b1 has unread (queued, offered or uncertain: not received, not ended). */
   const unread = async (): Promise<string[]> => (await deliveries.deliveriesOf(alpha, 'b1')).filter((r) => ['queued', 'offered', 'uncertain'].includes(r.state)).map((r) => r.id)
   const setSwitches = async (on: Record<InboxSwitch, boolean>): Promise<void> => {

@@ -101,7 +101,7 @@
   "content.templates.overMax": "Ma {count, number} agentów, a przepływ pracy tego projektu pozwala na {max, plural, one {# agenta} few {# agentów} many {# agentów} other {# agenta}}: najpierw zwiększ Maksymalną liczbę agentów w Kontrola wersji → Przepływ pracy albo wczytaj go z jego przepływem pracy. Nic nie zmieniono.",
   "content.templates.restoring": "Cofanie przywraca agentów tego projektu do stanu sprzed wczytania szablonu",
   "content.templates.running": "Agent {agent} działa lub się uruchamia: najpierw go zatrzymaj.",
-  "content.templates.scope": "Nieznany zakres „{scope}”: hive, workspace lub project.",
+  "content.templates.scope": "Nieznany zakres „{scope}”: combwork, workspace lub project.",
   "content.templates.started": "W międzyczasie uruchomił się agent: nic nie zmieniono. Najpierw go zatrzymaj.",
   "content.templates.taken": "{names}: {count, plural, one {agent o tej nazwie już istnieje} few {agenci o tych nazwach już istnieją} many {agenci o tych nazwach już istnieją} other {agenci o tych nazwach już istnieją}} w projektach {projects}. Nazwy agentów są unikalne w obszarze roboczym, więc {count, plural, one {zmień ją} few {zmień je} many {zmień je} other {zmień je}}.",
   "content.templates.takenNothing": "{names}: {count, plural, one {agent o tej nazwie już istnieje} few {agenci o tych nazwach już istnieją} many {agenci o tych nazwach już istnieją} other {agenci o tych nazwach już istnieją}} w projektach {projects}. Nazwy agentów są unikalne w obszarze roboczym, więc {count, plural, one {zmień ją} few {zmień je} many {zmień je} other {zmień je}}. Nic nie zmieniono.",

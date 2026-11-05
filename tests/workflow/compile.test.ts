@@ -33,7 +33,7 @@ describe('compilation', () => {
     expect(holds(allOff('none'))).toBe(false)
     expect(holds(preset('git', 'solo'))).toBe(false)
     expect(holds({ ...off, finish: 'committed' })).toBe(false)
-    expect(holds({ ...off, finish: 'hiveMerges', folder: 'slots' })).toBe(true)
+    expect(holds({ ...off, finish: 'combworkMerges', folder: 'slots' })).toBe(true)
     expect(holds({ ...off, finish: 'agentMerges', folder: 'slots' })).toBe(true)
     expect(holds(preset('git', 'pair'))).toBe(true)
     expect(holds(preset('none', 'team'))).toBe(true)

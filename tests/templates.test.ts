@@ -259,7 +259,7 @@ describe('the template format', () => {
     }
 
     // Their names as the window shows them, in its language; any other template's as saved.
-    expect(templateTitle({ scope: 'hive', file: 'team-3x3.json', name: 'whatever main said' })).toBe('Team 3×3')
+    expect(templateTitle({ scope: 'combwork', file: 'team-3x3.json', name: 'whatever main said' })).toBe('Team 3×3')
     expect(templateTitle({ scope: 'workspace', file: 'team-3x3.json', name: 'Mine' })).toBe('Mine')
   })
 
@@ -377,7 +377,7 @@ describe('saving and loading templates', () => {
     templates.testHooks.staged = undefined
   })
   /** The templates kept in the workspace and its projects (Combwork's own left out). */
-  const userTemplates = <T extends { scope: string }>(list: T[]): T[] => list.filter((t) => t.scope !== 'hive')
+  const userTemplates = <T extends { scope: string }>(list: T[]): T[] => list.filter((t) => t.scope !== 'combwork')
 
   it('saves in either scope; a name in both is listed twice, and saving over a name asks first', async () => {
     const saved = await run(() => templates.saveTemplate(alpha, 'workspace', 'Pair'))
@@ -385,7 +385,7 @@ describe('saving and loading templates', () => {
     await run(() => templates.saveTemplate(alpha, 'project', 'pair'))
     const listed = await run(() => templates.listTemplates(alpha))
     // Combwork's own first (#1436), in their order; then the workspace's and the project's.
-    expect(listed.map((t) => `${t.scope}:${t.file}`).slice(0, 6)).toEqual(CW_TEMPLATES.map((h) => `hive:${h.file}`))
+    expect(listed.map((t) => `${t.scope}:${t.file}`).slice(0, 6)).toEqual(CW_TEMPLATES.map((h) => `combwork:${h.file}`))
     expect(userTemplates(listed).map((t) => `${t.scope}:${t.name}`)).toEqual(['workspace:Pair', 'project:pair'])
     // The project's are its own: beta sees only the workspace's.
     expect(userTemplates(await run(() => templates.listTemplates(beta))).map((t) => t.name)).toEqual(['Pair'])
@@ -637,7 +637,7 @@ describe('saving and loading templates', () => {
     expect(ws.length).toBeGreaterThan(0)
     expect(ws.every((t) => t.project === undefined)).toBe(true)
     // Combwork's own first (#1436), then the workspace's, then each project's.
-    expect(all.slice(0, CW_TEMPLATES.length).map((t) => [t.scope, t.file, t.project])).toEqual(CW_TEMPLATES.map((h) => ['hive', h.file, undefined]))
+    expect(all.slice(0, CW_TEMPLATES.length).map((t) => [t.scope, t.file, t.project])).toEqual(CW_TEMPLATES.map((h) => ['combwork', h.file, undefined]))
     expect(all.findIndex((t) => t.scope === 'workspace')).toBe(CW_TEMPLATES.length)
     expect(all.findIndex((t) => t.scope === 'project')).toBe(CW_TEMPLATES.length + ws.length)
     expect(all.filter((t) => t.scope === 'project').map((t) => [t.project, t.file])).toEqual([[alpha, 'pair.json'], [alpha, 'trees.json']])
@@ -675,13 +675,13 @@ describe('saving and loading templates', () => {
   })
 
   it("Combwork's own are read-only (#1436): loaded, duplicated and exported, never saved over, renamed, edited, imported into or deleted", async () => {
-    const pair = { scope: 'hive' as const, file: 'pair.json' }
+    const pair = { scope: 'combwork' as const, file: 'pair.json' }
     const refused = /Combwork's own templates can't be changed: duplicate one/
     await expect(run(() => templates.renameTemplate(pair, 'Mine'))).rejects.toThrow(refused)
     await expect(run(() => templates.deleteTemplate(pair))).rejects.toThrow(refused)
     await expect(run(() => templates.updateTemplate(pair, { name: 'Mine', layout: 'auto', agents: [{ name: 'A', role: 'builder', provider: 'claude-code' }] }, null))).rejects.toThrow(refused)
-    await expect(run(() => templates.saveTemplate(alpha, 'hive' as never, 'Mine'))).rejects.toThrow(refused)
-    await expect(run(() => templates.duplicateTemplate({ scope: 'workspace', file: 'pair.json' }, { scope: 'hive' }))).rejects.toThrow(refused)
+    await expect(run(() => templates.saveTemplate(alpha, 'combwork' as never, 'Mine'))).rejects.toThrow(refused)
+    await expect(run(() => templates.duplicateTemplate({ scope: 'workspace', file: 'pair.json' }, { scope: 'combwork' }))).rejects.toThrow(refused)
     // A copy to change: its agents, pairs and suggestion, with when it was made.
     const copy = await run(() => templates.duplicateTemplate(pair, { scope: 'project', project: beta }))
     expect([copy.scope, copy.name, copy.agents.map((a) => [a.name, a.role, a.provider]), copy.pairs, copy.suggestedPreset, !!copy.savedAt]).toEqual(['project', 'Pair', [['{key}-B{n}', 'builder', 'claude-code'], ['{key}-R{n}', 'reviewer', 'codex']], [{ builder: '{key}-B1', reviewer: '{key}-R1' }], 'pair', true])
@@ -693,7 +693,7 @@ describe('saving and loading templates', () => {
   })
 
   it("an edit drops only the pairs it breaks (HR3's round 1, 4): a copy of Team 3×3 with one builder made a reviewer keeps the other two pairs", async () => {
-    const team = await run(() => templates.duplicateTemplate({ scope: 'hive', file: 'team-3x3.json' }, { scope: 'workspace' }))
+    const team = await run(() => templates.duplicateTemplate({ scope: 'combwork', file: 'team-3x3.json' }, { scope: 'workspace' }))
     expect(team.pairs).toHaveLength(3)
     const ref = { scope: 'workspace' as const, file: team.file }
     // The first builder made a reviewer (its pattern, so its number, unchanged): its pair goes, the other two stay.
@@ -798,25 +798,25 @@ describe('saving and loading templates', () => {
   gitIt("Combwork's Team 3×3 (#1436): six agents named from the project's key, paired both ways, in a grid, none in a worktree; each role on the first connection of the CLI it suggests, else the first usable (HI-2109)", async () => {
     const ids = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     // Names made from the key that can't be read (beta has none yet): refused, never a guessed key (#1440).
-    await expect(run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).rejects.toThrow(/couldn't read beta's key/)
-    await expect(run(() => templates.addAgentFromTemplate(beta, 'hive', 'team-3x3.json', 0))).rejects.toThrow(/couldn't read beta's key/)
+    await expect(run(() => templates.templatePlan(beta, 'combwork', 'team-3x3.json'))).rejects.toThrow(/couldn't read beta's key/)
+    await expect(run(() => templates.addAgentFromTemplate(beta, 'combwork', 'team-3x3.json', 0))).rejects.toThrow(/couldn't read beta's key/)
     await expect(run(() => templates.saveTemplate(beta, 'workspace', 'Unkeyed', false, true))).rejects.toThrow(/couldn't read beta's key/)
     expect(cfgOf(beta).agents.map((a: StoredAgent) => a.id)).toEqual(ids)
     // Listed for beta (HI-1948: the window's menu names them so), its names keep {key} while main has no key for it.
-    const listedNames = async () => (await run(() => templates.listTemplates(beta))).find((t) => t.scope === 'hive' && t.file === 'team-3x3.json')?.agentNames
+    const listedNames = async () => (await run(() => templates.listTemplates(beta))).find((t) => t.scope === 'combwork' && t.file === 'team-3x3.json')?.agentNames
     expect(await listedNames()).toEqual(['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `{key}-${n}`))
     const { keyProjects, projectKeyOf } = await import('../src/main/projectKeys')
     await run(() => keyProjects(w))
     const key = (await run(() => projectKeyOf(w, beta)))!
     expect(key).toMatch(/^[A-Z]{2,4}$/)
-    const plan = await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))
+    const plan = await run(() => templates.templatePlan(beta, 'combwork', 'team-3x3.json'))
     const want = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `${key}-${n}`)
     // Once it has one, every agent's name as its plan makes them, by place; the template's own patterns kept as they are.
     expect(await listedNames()).toEqual(plan.templateNames)
     expect((await run(() => templates.listTemplates(beta))).find((t) => t.file === 'team-3x3.json')?.agents.map((a) => a.name)).toEqual(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}'])
     expect([plan.name, plan.blocked, plan.create.map((a) => a.name), plan.templateNames, plan.layout, plan.suggestedPreset, plan.options.map((o) => o.id)]).toEqual(['Team 3×3', [], want, want, 'grid6', 'team', ['c-cc', 'c-cc-high', 'c-cx']])
     expect(plan.pairs).toEqual([{ builder: 0, reviewer: 3 }, { builder: 1, reviewer: 4 }, { builder: 2, reviewer: 5 }])
-    await run(() => templates.loadTemplate(beta, 'hive', 'team-3x3.json', ids))
+    await run(() => templates.loadTemplate(beta, 'combwork', 'team-3x3.json', ids))
     const made = cfgOf(beta)
     expect(await layoutOf(beta)).toBe('grid6')
     expect(made.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.provider, a.connection, a.pairedWith, a.worktree])).toEqual([
@@ -829,15 +829,15 @@ describe('saving and loading templates', () => {
     ])
     // The project's options started from Team: no suggestion to switch (#1436). Its key's want, chosen again: the same.
     await w.mutateProjectConfig(beta, () => ({ workflow: { platform: 'git', preset: 'team', options: {} } }) as never)
-    expect((await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).suggestedPreset).toBeNull()
+    expect((await run(() => templates.templatePlan(beta, 'combwork', 'team-3x3.json'))).suggestedPreset).toBeNull()
     // Codex not installed (HI-2109): its connections aren't offered; the reviewer suggesting it gets the first usable one,
     // Combwork's own templates and the user's alike (a suggestion, never a refusal).
     const info = providerService.info
     providerService.info = ((id: string) => ({ provider: id, found: id !== 'codex' })) as never
     try {
-      const noCodex = await run(() => templates.templatePlan(beta, 'hive', 'pair.json'))
+      const noCodex = await run(() => templates.templatePlan(beta, 'combwork', 'pair.json'))
       expect([noCodex.blocked, noCodex.create.map((a) => a.provider), noCodex.options.map((o) => o.id)]).toEqual([[], ['claude-code', 'codex'], ['c-cc', 'c-cc-high']])
-      const mine = await run(() => templates.duplicateTemplate({ scope: 'hive', file: 'pair.json' }, { scope: 'workspace' }))
+      const mine = await run(() => templates.duplicateTemplate({ scope: 'combwork', file: 'pair.json' }, { scope: 'workspace' }))
       expect((await run(() => templates.templatePlan(beta, 'workspace', mine.file))).blocked).toEqual([])
       await run(() => templates.deleteTemplate({ scope: 'workspace', file: mine.file }))
     } finally {
@@ -1113,7 +1113,7 @@ describe("a template's workflow (HI-1910)", () => {
     // Its agents' names are made from the project's key.
     const { keyProjects } = await import('../src/main/projectKeys')
     await run(() => keyProjects(w))
-    const wf = (await run(() => templates.templatePlan(gitB, 'hive', 'team-6-pool.json'))).workflow!
+    const wf = (await run(() => templates.templatePlan(gitB, 'combwork', 'team-6-pool.json'))).workflow!
     expect(wf.section).toMatchObject({ preset: 'team', options: { reviewerMode: 'pool', review: 'agent' } })
     expect(wf.overlay!.options.target).toBe('main')
   })

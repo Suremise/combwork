@@ -531,13 +531,13 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
       case 'finish':
         // Hive merges since P5's queue (#1355).
-        return select('finish', [['hiveMerges', tr(V.finish.hiveMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
+        return select('finish', [['combworkMerges', tr(V.finish.combworkMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
       case 'style':
         return select('style', [['merge', tr(V.style.merge)], ['squash', tr(V.style.squash)], ['rebase', tr(V.style.rebase)]])
       case 'commitMessage':
-        return select('commitMessage', [['hive', tr(V.commitMessage.hive)], ['branch', tr(V.commitMessage.branch)]])
+        return select('commitMessage', [['combwork', tr(V.commitMessage.combwork)], ['branch', tr(V.commitMessage.branch)]])
       case 'folder':
         return select('folder', [['slots', tr(V.folder.slots)], ['project', tr(V.folder.project)]])
       case 'reviewerMode':

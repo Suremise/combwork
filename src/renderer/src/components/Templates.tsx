@@ -327,7 +327,7 @@ export async function importTemplate(initial: string): Promise<TemplateEntry | n
 }
 
 function ScopeBadge({ t }: { t: TemplateEntry }) {
-  if (t.scope === 'hive') return <span className="badge accent">{tr(M.hive)}</span>
+  if (t.scope === 'combwork') return <span className="badge accent">{tr(M.hive)}</span>
   return t.scope === 'workspace' ? <span className="badge accent">{tr(M.workspace)}</span> : <span className="badge">{projectName(t.project)}</span>
 }
 
@@ -628,7 +628,7 @@ export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: Tem
   const otherPlace = t.scope === 'project' ? '' : (project?.path ?? selectedProject ?? projectsNow()[0]?.path ?? '')
   const unknown = unknownProviders(t.agents)
   // Hive's own (#1436): loaded, duplicated and exported, never changed where they are.
-  const readOnly = t.scope === 'hive'
+  const readOnly = t.scope === 'combwork'
   const description = templateDescription(t)
   // The editor has the template as it is kept (#1440: its patterns, never the names they make here).
   if (editing && !t.problem && !readOnly) return <TemplateEditor t={entry} project={project} onDone={() => setEditing(false)} />
@@ -737,7 +737,7 @@ function useAllTemplates() {
 }
 
 const ALL = 'all'
-const HIVE = 'hive'
+const HIVE = 'combwork'
 const WORKSPACE = 'workspace'
 
 /** The Templates view's sidebar: every template, grouped by where it is kept, with a filter (All, Workspace, a project). */
@@ -749,7 +749,7 @@ export function TemplatesPanel() {
   const shownFilter = filter === ALL || filter === HIVE || filter === WORKSPACE || projects.some((p) => p.path === filter) ? filter : ALL
   const all = data ?? []
   const groups: { key: string; title: string; items: TemplateEntry[] }[] = [
-    { key: HIVE, title: tr(M.hive), items: all.filter((t) => t.scope === 'hive') },
+    { key: HIVE, title: tr(M.hive), items: all.filter((t) => t.scope === 'combwork') },
     { key: WORKSPACE, title: tr(M.workspace), items: all.filter((t) => t.scope === 'workspace') },
     ...projects.map((p) => ({ key: p.path, title: p.name, items: all.filter((t) => t.scope === 'project' && sameProject(t.project, p.path)) }))
   ].filter((g) => (shownFilter === ALL ? g.key === HIVE || g.key === WORKSPACE || g.items.length > 0 : g.key === shownFilter))
@@ -844,7 +844,7 @@ export function ProjectTemplatesTab({ project }: { project: ProjectInfo }) {
   const list = loaded.data
   const mine = (list ?? []).filter((t) => t.scope === 'project')
   const shared = (list ?? []).filter((t) => t.scope === 'workspace')
-  const hive = (list ?? []).filter((t) => t.scope === 'hive')
+  const hive = (list ?? []).filter((t) => t.scope === 'combwork')
   const current = selected ? list?.find((t) => templateKey(t) === selected) : undefined
   const row = (t: TemplateEntry) => <TemplateRow key={templateKey(t)} t={t} showScope selected={selected === templateKey(t)} onSelect={() => setSelected(templateKey(t))} />
   // The list beside the template, or above it when the tab is narrow (#890; app.css `.templates-split`, as Changes').

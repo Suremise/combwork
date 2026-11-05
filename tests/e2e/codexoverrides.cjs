@@ -120,7 +120,7 @@ function codexCommandLine(runId) {
     const r1 = await startReady('right-click')
     if (r1) {
       check('Codex tracks the mouse (any motion)', !!(await lib.until(async () => (await mouse()) === 'any', HUNG_MS, 100)), await mouse())
-      check("right-click is Combwork's by default", (await rightClickGoesTo()) === 'hive', await rightClickGoesTo())
+      check("right-click is Combwork's by default", (await rightClickGoesTo()) === 'combwork', await rightClickGoesTo())
       // Text to select: typed into Codex's input, never sent.
       await inv('pty:write', key, TEXT)
       const at = await lib.until(async () => {
@@ -206,7 +206,7 @@ function codexCommandLine(runId) {
 
       // Off again: Combwork's again, at once.
       await inv('advanced:set', RIGHT_ID, false)
-      check("off again: right-click is Combwork's at once", !!(await lib.until(async () => (await rightClickGoesTo()) === 'hive', HUNG_MS, 100)), await rightClickGoesTo())
+      check("off again: right-click is Combwork's at once", !!(await lib.until(async () => (await rightClickGoesTo()) === 'combwork', HUNG_MS, 100)), await rightClickGoesTo())
       await setClip('BACKAGAIN')
       const r4 = await reads()
       await rightClick()
@@ -309,7 +309,7 @@ function codexCommandLine(runId) {
       const cGoesTo = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-right-click'), ckey)
       const cmouse = () => page.evaluate((k) => window.__hiveTerminalState(k)?.mouse, ckey)
       check('Claude Code tracks no mouse', (await cmouse()) === 'none', await cmouse())
-      check("right-click is Combwork's by default", (await cGoesTo()) === 'hive', await cGoesTo())
+      check("right-click is Combwork's by default", (await cGoesTo()) === 'combwork', await cGoesTo())
       const pt = await lib.until(() => page.evaluate(([k, t]) => window.__hiveTerminalTextAt(k, t), [ckey, '? for shortcuts']), HUNG_MS, 200)
       check('its prompt is on screen', !!pt)
       const cRightClick = () => page.mouse.click(pt.x, pt.y, { button: 'right' })
@@ -336,7 +336,7 @@ function codexCommandLine(runId) {
           await chold(false)
         }
         await inv('advanced:set', CLAUDE_RIGHT_ID, false)
-        check("off again: Claude Code's right-click is Combwork's at once", !!(await lib.until(async () => (await cGoesTo()) === 'hive', HUNG_MS, 100)), await cGoesTo())
+        check("off again: Claude Code's right-click is Combwork's at once", !!(await lib.until(async () => (await cGoesTo()) === 'combwork', HUNG_MS, 100)), await cGoesTo())
       } else check('the pane holds its mouse reports back (a test build)', false)
       await setClip('')
     }

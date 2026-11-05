@@ -333,7 +333,7 @@ export function buildActivityView(input: ActivityInput, agentId: string, opts: {
     const live = a.live
     if (!live) return base
     // Its session the list doesn't have yet (just started; the list is read again later): drawn from its live state.
-    const s = listed.get(live.sessionId) ?? ({ id: live.sessionId, agentId: a.id, agentName: a.name, name: live.sessionName ?? a.name, source: 'hive', lastActivity: live.startedAt ?? new Date(input.at).toISOString(), hasTranscript: true, hasBackup: false, title: null, usage: null, recache: null } as SessionListItem)
+    const s = listed.get(live.sessionId) ?? ({ id: live.sessionId, agentId: a.id, agentName: a.name, name: live.sessionName ?? a.name, source: 'combwork', lastActivity: live.startedAt ?? new Date(input.at).toISOString(), hasTranscript: true, hasBackup: false, title: null, usage: null, recache: null } as SessionListItem)
     const turns = input.turns.get(s.id)
     const last = turns?.turns.at(-1) ?? null
     const tasks = input.now.tasks.filter((x) => x.sessionId === s.id)

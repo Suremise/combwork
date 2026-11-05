@@ -31,7 +31,7 @@
   "hooks.receiver": "through Combwork's {form} hook",
   "hooks.refresh": "Refresh",
   "hooks.response": "{response, select, none {Nothing to say} context {Sent context} allowed {Allowed} warned {Allowed, with a warning} asked {Asked you} blocked {Blocked} error {Error} other {Unknown}}",
-  "hooks.source": "{source, select, hive {Combwork} managed {Managed settings} cli {Command line} project {Project} local {Project (local)} user {User} plugin {Plugin} other {Other}}",
+  "hooks.source": "{source, select, combwork {Combwork} managed {Managed settings} cli {Command line} project {Project} local {Project (local)} user {User} plugin {Plugin} other {Other}}",
   "hooks.stale": "The agent has restarted since this was read: it shows its earlier session.",
   "hooks.status": "{status, select, passed {Passed by Combwork} trusted {Trusted} untrusted {Not trusted: won't run} modified {Changed since trusted: won't run} unverified {Configured · loading unverified} disabled {Turned off} notLoaded {Not loaded} unsupported {Unknown form} other {Unknown}}",
   "hooks.timeSpan": "{from}–{to}",

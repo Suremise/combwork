@@ -142,7 +142,7 @@ describe("a card's folder moved with its worktree (#1343)", () => {
     // The observer reads the builder's old record and no move pending; before it writes, Repair moves the card.
     e.wf.cfg.agentFolder = async () => ({ path: folder, base: null })
     e.wf.cfg.movePending = async () => {
-      await other.write(other.store.card(card.id), null, 'hive', (w) => w.fact('FolderMoved', { from: folder, to, why: 'repair' }))
+      await other.write(other.store.card(card.id), null, 'combwork', (w) => w.fact('FolderMoved', { from: folder, to, why: 'repair' }))
       return false
     }
     await reconcile(e.wf, card)
@@ -212,7 +212,7 @@ describe("a card's folder moved with its worktree (#1343)", () => {
     const e = (env = setup(opts))
     const { card, folder } = await started(e)
     const to = join(e.home, 'moved-b1')
-    const write = (from: string, dest: string) => e.wf.write(e.store.card(card.id), null, 'hive', (w) => w.fact('FolderMoved', { from, to: dest, why: 'repair' }))
+    const write = (from: string, dest: string) => e.wf.write(e.store.card(card.id), null, 'combwork', (w) => w.fact('FolderMoved', { from, to: dest, why: 'repair' }))
     await write(join(e.home, 'elsewhere'), join(e.home, 'nowhere'))
     expect(e.wf.state(card).started!.folder).toBe(folder)
     // Named by another spelling of the same folder (case, a trailing separator): still the card's.

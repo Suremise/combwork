@@ -2731,10 +2731,6 @@
     "text": "{id} is a project's setting: say which project.",
     "note": "A project's setting read or changed without naming the project. {id} is the setting's id."
   },
-  "settings.agent.tool.renamed": {
-    "text": "{id} was renamed: use {now}.",
-    "note": "A setting named by its id from before HI-2518 (an advanced setting's hive.* id, now cw.*). {id} is the id as given, {now} its id now."
-  },
   "settings.agent.tool.restart.assistant": {
     "text": "to the Assistant after it restarts",
     "note": "When a change applies: to the Assistant once it restarts (#676)."

@@ -4,7 +4,7 @@ import { call } from '../api'
 import { saveAllDrafts, unsavedFiles } from './FileView'
 
 /** The parts of the window an ErrorBoundary names when it fails; without one it says "This view". */
-export type ErrorView = 'assistant' | 'progress' | 'tab' | 'devConsole' | 'hive'
+export type ErrorView = 'assistant' | 'progress' | 'tab' | 'devConsole' | 'combwork'
 
 interface Props {
   children: ReactNode

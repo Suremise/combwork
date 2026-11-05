@@ -444,7 +444,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     source: o.source ?? 'agent',
     agentName: o.agentName ?? 'B1',
     ...(o.source === 'api' ? {} : { projectPath: alpha }),
-    ...(o.source === 'hive' ? { defaultName: 'mergeQueue' } : o.source === 'api' ? {} : { agentId: o.agentId ?? builder.id, provider: 'claude-code' }),
+    ...(o.source === 'combwork' ? { defaultName: 'mergeQueue' } : o.source === 'api' ? {} : { agentId: o.agentId ?? builder.id, provider: 'claude-code' }),
     ...(o.card ? { card: o.card, revision: o.revision ?? REV } : {}),
     ...(o.check ? { check: o.check } : {}),
     ...(o.copy ? { copy: o.copy } : {})
@@ -452,7 +452,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
   const R1 = { agentName: 'R1', agentId: reviewer.id }
   const REV2 = '0123e4979f1c2b3a4d5e6f708192a3b4c5d6e7f8'
   // The merge queue's runs as queueChecks.ts names them, "<key> · <check> · <revision>", with no check name of their own.
-  const queued = (card, label, revision = REV) => ({ card: card.number, title: `${card.key} · ${label} · ${revision.slice(0, 7)}`, command: `npm run ${label}`, revision, source: 'hive', agentName: 'Combwork (merge queue)' })
+  const queued = (card, label, revision = REV) => ({ card: card.number, title: `${card.key} · ${label} · ${revision.slice(0, 7)}`, command: `npm run ${label}`, revision, source: 'combwork', agentName: 'Combwork (merge queue)' })
   const busy = [
     ran('b-unit', 1, 40, { card: b.number, title: 'unit', command: 'npm test' }),
     ran('b-review', 3, 20, { card: b.number, title: 'Review lint', command: 'npm run lint', copy: 'copy-7', ...R1 }),

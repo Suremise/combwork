@@ -19,7 +19,7 @@ export type ProgressCaller =
    * Hive's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them;
    * `installAsWritten`, an install run as written (no clean form of it).
    */
-  | { source: 'hive'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string; reviewer?: CopyHolder }
+  | { source: 'combwork'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string; reviewer?: CopyHolder }
 
 /** The agent whose lease held a review copy as Hive's run in it started (HI-1710): the run is credited to it. */
 export interface CopyHolder {
@@ -86,13 +86,10 @@ export interface ProgressDeps {
 
 const key = (p: string): string => p.toLowerCase()
 
-/** The stored name of Hive's own runs (#1349); the window shows it in its language (`defaultName`). */
+/** The stored name of Combwork's own runs (#1349); the window shows it in its language (`defaultName`). */
 // agent-protocol: a run's stored name, which the window words in its language
 export const CW_RUNS = 'Combwork (merge queue)' // i18n-ignore: a run's stored name, which agents read too
-/** Its name before HI-2463, which runs and facts stored then still hold: read as CW_RUNS. */
-// agent-protocol: a run's stored name from before HI-2463, read back
-export const LEGACY_HIVE_RUNS = 'Hive (merge queue)' // i18n-ignore: a run's stored name, as stored before HI-2463
-/** The stored name of a slot's warming runs (#1429), "Hive (slot slot-b)"; the window shows it in its language. */
+/** The stored name of a slot's warming runs (#1429), "Combwork (slot slot-b)"; the window shows it in its language. */
 // agent-protocol: a run's stored name, which the window words in its language
 export const slotRunsName = (slot: string): string => `Combwork (slot ${slot})` // i18n-ignore: a run's stored name, which agents read too
 /**
@@ -130,7 +127,7 @@ function text(v: unknown, name: string, max: number): string | undefined {
 }
 
 const KEPT_STATES = new Set<unknown>(['passed', 'failed', 'stale', 'stopped'])
-const SOURCES = new Set<unknown>(['agent', 'assistant', 'api', 'hive'])
+const SOURCES = new Set<unknown>(['agent', 'assistant', 'api', 'combwork'])
 
 /** A kept text field, cut to its limit, or null when it isn't text. */
 const keptText = (v: unknown, max: number): string | null => (typeof v === 'string' ? text(v, '', max) || null : null)
@@ -157,22 +154,22 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
     ids.add(id)
     const source = r.source as ProgressSource
     const named = keptText(r.agentName, MAX_TITLE)
-    const slot = source === 'hive' && typeof r.slot === 'string' && SLOT_NAME.test(r.slot) ? r.slot : null
+    const slot = source === 'combwork' && typeof r.slot === 'string' && SLOT_NAME.test(r.slot) ? r.slot : null
     const copy = typeof r.copy === 'string' && COPY_NAME.test(r.copy) ? r.copy : null
     // A copy's warming run credited to its lease's agent (HI-1710): kept with that agent's id and name.
-    const keptHolder = source === 'hive' && copy && !slot ? keptText(r.agentId, 200) : null
-    const holder = keptHolder && named && r.defaultName !== 'copy' && named !== COPIES_RUNS && !named.startsWith('Combwork (') && !named.startsWith('Hive (') ? { agentId: keptHolder, agentName: named } : null
+    const keptHolder = source === 'combwork' && copy && !slot ? keptText(r.agentId, 200) : null
+    const holder = keptHolder && named && r.defaultName !== 'copy' && named !== COPIES_RUNS && !named.startsWith('Combwork (') ? { agentId: keptHolder, agentName: named } : null
     out.push({
       id,
       workspacePath,
-      projectPath: source === 'agent' || source === 'hive' ? keptText(r.projectPath, 1000) : null,
+      projectPath: source === 'agent' || source === 'combwork' ? keptText(r.projectPath, 1000) : null,
       agentId: source === 'agent' ? keptText(r.agentId, 200) : (holder?.agentId ?? null),
-      agentName: source === 'hive' ? hiveName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
+      agentName: source === 'combwork' ? hiveName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
       // A script's name is always Hive's (scripts don't name themselves, start()), as is the merge queue's; an agent's
       // only when it has none, or when Hive's "Agent" was saved with its mark (a nameless run kept before: this file is
       // read again after a save).
-      ...(source === 'hive' ? hiveName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
-      provider: source !== 'hive' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
+      ...(source === 'combwork' ? hiveName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
+      provider: source !== 'combwork' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
       source,
       title,
       command: keptText(r.command, MAX_COMMAND),
@@ -197,12 +194,12 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       exitCode: keptNumber(r.exitCode),
       logPath: keptText(r.logPath, MAX_LOG_PATH),
       ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
-      ...(source === 'hive' && r.noInstall === true ? { noInstall: true as const } : {}),
-      ...(source === 'hive' && r.installAsWritten === true ? { installAsWritten: true as const } : {}),
+      ...(source === 'combwork' && r.noInstall === true ? { noInstall: true as const } : {}),
+      ...(source === 'combwork' && r.installAsWritten === true ? { installAsWritten: true as const } : {}),
       ...runFor(keptFor(r)),
-      ...(source !== 'hive' && copy ? { copy } : {}),
+      ...(source !== 'combwork' && copy ? { copy } : {}),
       ...keptCounts(r.counts),
-      ...(source === 'hive' ? keptTransient(r.transient) : {})
+      ...(source === 'combwork' ? keptTransient(r.transient) : {})
     })
   }
   return out
@@ -395,11 +392,11 @@ export class ProgressStore {
     const run: ProgressRun = {
       id: randomUUID(),
       workspacePath: caller.workspacePath,
-      projectPath: caller.source === 'agent' || caller.source === 'hive' ? caller.projectPath : null,
-      agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'hive' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
-      agentName: caller.source === 'api' ? 'Script' : caller.source === 'hive' ? hiveName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
-      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'hive' ? hiveName(caller.slot, caller.copy, caller.reviewer) : {}),
-      provider: caller.source === 'api' || caller.source === 'hive' ? null : caller.provider,
+      projectPath: caller.source === 'agent' || caller.source === 'combwork' ? caller.projectPath : null,
+      agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'combwork' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
+      agentName: caller.source === 'api' ? 'Script' : caller.source === 'combwork' ? hiveName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
+      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'combwork' ? hiveName(caller.slot, caller.copy, caller.reviewer) : {}),
+      provider: caller.source === 'api' || caller.source === 'combwork' ? null : caller.provider,
       source: caller.source as ProgressSource,
       title,
       command: command || null,
@@ -425,8 +422,8 @@ export class ProgressStore {
       exitCode: null,
       logPath: null,
       ...(body.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
-      ...(caller.source === 'hive' && caller.noInstall ? { noInstall: true as const } : {}),
-      ...(caller.source === 'hive' && caller.installAsWritten ? { installAsWritten: true as const } : {}),
+      ...(caller.source === 'combwork' && caller.noInstall ? { noInstall: true as const } : {}),
+      ...(caller.source === 'combwork' && caller.installAsWritten ? { installAsWritten: true as const } : {}),
       ...runFor(link)
     }
     this.runs.set(key(caller.workspacePath), [run, ...list])
@@ -501,7 +498,7 @@ export class ProgressStore {
     if (exitCode !== undefined) run.exitCode = exitCode
     if (logPath) run.logPath = logPath
     // Why Hive's own failed run counts as temporary (#1362): only Hive's runs say it.
-    if (caller.source === 'hive' && run.state === 'failed') Object.assign(run, keptTransient(body.transient))
+    if (caller.source === 'combwork' && run.state === 'failed') Object.assign(run, keptTransient(body.transient))
     if (run.state === 'passed' && run.total !== null) run.step = run.total
     if (run.state === 'failed') this.unseenFailure.add(key(run.workspacePath))
     this.ended(run.workspacePath)
@@ -557,7 +554,7 @@ export class ProgressStore {
         }
         if (r.state !== 'running') continue
         // Hive's own runs have no reporter to fall quiet: Hive ends each one itself (its time limit included).
-        if (r.source === 'hive') continue
+        if (r.source === 'combwork') continue
         const stopped = r.source !== 'api' && !this.deps.ownerRunning(r)
         if (stopped || isOverdue(r, now)) {
           r.state = 'stale'
@@ -643,8 +640,8 @@ export class ProgressStore {
    */
   private owns(caller: ProgressCaller, r: ProgressRun, forLimit = false): boolean {
     if (key(r.workspacePath) !== key(caller.workspacePath)) return false
-    if (caller.source === 'hive') return r.source === 'hive' && key(r.projectPath ?? '') === key(caller.projectPath)
-    if (r.source === 'hive') return false
+    if (caller.source === 'combwork') return r.source === 'combwork' && key(r.projectPath ?? '') === key(caller.projectPath)
+    if (r.source === 'combwork') return false
     if (caller.source === 'api') return forLimit ? r.source === 'api' : true
     if (caller.source === 'assistant') return r.source === 'assistant'
     return r.source === 'agent' && r.agentId === caller.agentId && key(r.projectPath ?? '') === key(caller.projectPath)

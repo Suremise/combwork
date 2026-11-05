@@ -393,7 +393,7 @@ function testHooks(projectPath: string, target: string): QueueHooks {
  */
 function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
   const locked = sessions.locksIn(folder)
-  const runs = ws.path ? progress.list(ws.path).filter((r) => r.source !== 'hive' && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet')) && !!r.folder && inFolder(r.folder, folder)) : []
+  const runs = ws.path ? progress.list(ws.path).filter((r) => r.source !== 'combwork' && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet')) && !!r.folder && inFolder(r.folder, folder)) : []
   const what = [...new Set([...locked, ...runs.map((r) => r.folder!)])]
   return what.length ? what : null
 }

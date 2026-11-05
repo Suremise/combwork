@@ -31,7 +31,7 @@ afterEach(() => {
 afterAll(() => j.closeAllJournals())
 
 const all: JournalSettings = { ...DEFAULT_JOURNAL, scope: ['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment'] }
-const write = (h: string, input: Partial<Parameters<typeof j.writeEntry>[2]> & { summary: string }, source: 'assistant' | 'hive' = 'assistant') => j.writeEntry(h, all, { kind: 'decision', ...input }, source)
+const write = (h: string, input: Partial<Parameters<typeof j.writeEntry>[2]> & { summary: string }, source: 'assistant' | 'combwork' = 'assistant') => j.writeEntry(h, all, { kind: 'decision', ...input }, source)
 /** Sets entries' times (a test stands in for days passing). */
 function at(h: string, times: Record<number, string>): void {
   j.closeJournal(h)
@@ -46,7 +46,7 @@ function seeded(): string {
   const h = home()
   const a = write(h, { summary: 'Orange theme chosen', project: 'alpha', links: [{ type: 'card', ref: '#12' }, { type: 'commit', ref: 'abc123' }] })
   const b = write(h, { kind: 'plan', summary: 'Plan the orange markers', project: 'beta' })
-  const c = write(h, { kind: 'event', summary: '#12 is Done', project: 'alpha', links: [{ type: 'card', ref: '12' }] }, 'hive')
+  const c = write(h, { kind: 'event', summary: '#12 is Done', project: 'alpha', links: [{ type: 'card', ref: '12' }] }, 'combwork')
   const d = write(h, { kind: 'insight', summary: 'Themes need contrast', detail: 'Orange text on white fails AA.' })
   const e = write(h, { kind: 'digest', summary: 'Week 42', digestOf: '2026-W42', importance: 2 })
   at(h, { [a]: '2026-10-14T10:00:00.000Z', [b]: '2026-10-15T10:00:00.000Z', [c]: '2026-10-16T09:00:00.000Z', [d]: '2026-10-16T12:00:00.000Z', [e]: '2026-10-13T08:00:00.000Z' })
@@ -61,7 +61,7 @@ describe('the timeline', () => {
     expect(p.total).toBe(5)
     expect(p.rows[3].links).toEqual([{ type: 'card', ref: '12' }, { type: 'commit', ref: 'abc123' }])
     expect(p.rows[4]).toMatchObject({ kind: 'digest', digestOf: '2026-W42', importance: 2, source: 'assistant' })
-    expect(p.rows[1].source).toBe('hive')
+    expect(p.rows[1].source).toBe('combwork')
   })
 
   it('comes in pages, the total all of them', () => {
@@ -100,7 +100,7 @@ describe('the filters', () => {
     expect(summaries(j.browseJournal(h, { kinds: ['digest'] }))).toEqual(['Week 42'])
     expect(summaries(j.browseJournal(h, { project: 'ALPHA' }))).toEqual(['#12 is Done', 'Orange theme chosen'])
     expect(summaries(j.browseJournal(h, { project: '' }))).toEqual(['Themes need contrast', 'Week 42'])
-    expect(summaries(j.browseJournal(h, { source: 'hive' }))).toEqual(['#12 is Done'])
+    expect(summaries(j.browseJournal(h, { source: 'combwork' }))).toEqual(['#12 is Done'])
     expect(summaries(j.browseJournal(h, { since: '2026-10-15T00:00:00.000Z', until: '2026-10-16T10:00:00.000Z' }))).toEqual(['#12 is Done', 'Plan the orange markers'])
     expect(summaries(j.browseJournal(h, { query: 'orange', project: 'alpha', source: 'assistant' }))).toEqual(['Orange theme chosen'])
     expect(() => j.browseJournal(h, { since: 'yesterday-ish' })).toThrow(/since must be a date/)
@@ -147,7 +147,7 @@ describe('Forget everything about X', () => {
 
   it('with filters only', () => {
     const h = seeded()
-    expect(j.forgetJournal(h, { source: 'hive' }, j.forgetPreview(h, { source: 'hive' }).token)).toEqual({ gone: 1 })
+    expect(j.forgetJournal(h, { source: 'combwork' }, j.forgetPreview(h, { source: 'combwork' }).token)).toEqual({ gone: 1 })
     expect(j.browseJournal(h, {}).total).toBe(4)
   })
 
@@ -178,7 +178,7 @@ describe('Forget everything about X', () => {
     expect(j.forgetJournal(h, q, seen.token)).toMatchObject({ changed: { count: 2 } })
     expect(j.browseJournal(h, {}).total).toBe(5)
     // A token from another search never deletes this one's.
-    expect(j.forgetJournal(h, q, j.forgetPreview(h, { source: 'hive' }).token)).toMatchObject({ changed: { count: 2 } })
+    expect(j.forgetJournal(h, q, j.forgetPreview(h, { source: 'combwork' }).token)).toMatchObject({ changed: { count: 2 } })
   })
 })
 

@@ -151,7 +151,7 @@ describe('the Progress panel tabs (#1309)', () => {
 
 describe('runs by card (HI-1701)', () => {
   const at = (min: number, over: Partial<ProgressRun> = {}): ProgressRun => run({ startedAt: NOW - min * 60_000, finishedAt: NOW - min * 60_000 + 1000, ...over })
-  const queue = (min: number, check: string, over: Partial<ProgressRun> = {}): ProgressRun => at(min, { source: 'hive', agentId: undefined, agentName: 'Combwork (merge queue)', defaultName: 'mergeQueue', check, title: check, command: `npm run ${check}`, ...over })
+  const queue = (min: number, check: string, over: Partial<ProgressRun> = {}): ProgressRun => at(min, { source: 'combwork', agentId: undefined, agentName: 'Combwork (merge queue)', defaultName: 'mergeQueue', check, title: check, command: `npm run ${check}`, ...over })
 
   it("groups a day's runs by card, the card with the newest run first and Other last, each card's runs newest first", () => {
     const a1 = at(50, { card: 1, title: 'unit' })
@@ -170,7 +170,7 @@ describe('runs by card (HI-1701)', () => {
     const tries = [at(60, { card: 3, state: 'failed' }), at(50, { card: 3, state: 'failed' }), at(40, { card: 3 })]
     const checks = [queue(20, 'lint', { card: 3 }), queue(19, 'typecheck', { card: 3, state: 'failed' }), queue(10, 'typecheck', { card: 3 })]
     // A slot's warming is Combwork's too, but not the queue's: it stays a run of its own.
-    const warm = at(15, { card: 3, source: 'hive', agentId: undefined, defaultName: 'slot', slot: 'slot-b', title: 'setup', command: 'npm ci' })
+    const warm = at(15, { card: 3, source: 'combwork', agentId: undefined, defaultName: 'slot', slot: 'slot-b', title: 'setup', command: 'npm ci' })
     const [c] = runsByCard(runDays([...tries, ...checks, warm], NOW)[0])
     expect(c.items.map((g) => [g.runs.length, !!g.queue])).toEqual([[3, true], [1, false], [3, false]])
     expect(c).toMatchObject({ runs: 7, failed: 3 })

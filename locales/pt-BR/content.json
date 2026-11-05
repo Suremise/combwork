@@ -101,7 +101,7 @@
   "content.templates.overMax": "Ele tem {count, number} agentes, e o fluxo de trabalho deste projeto permite {max, plural, one {# agente} other {# agentes}}: aumente primeiro o Máximo de agentes em Controle de versão → Fluxo de trabalho, ou carregue-o com o fluxo de trabalho dele. Nada foi alterado.",
   "content.templates.restoring": "Desfazer está devolvendo os agentes deste projeto a como estavam antes de um modelo ser carregado",
   "content.templates.running": "O agente {agent} está em execução ou iniciando: pare-o primeiro.",
-  "content.templates.scope": "Escopo desconhecido “{scope}”: hive, workspace ou project.",
+  "content.templates.scope": "Escopo desconhecido “{scope}”: combwork, workspace ou project.",
   "content.templates.started": "Um agente foi iniciado nesse meio-tempo: nada foi alterado. Pare-o primeiro.",
   "content.templates.taken": "{names} {count, plural, =0 {já são agentes} one {já é um agente} other {já são agentes}} em {projects}: os nomes de agentes são únicos no espaço de trabalho, então {count, plural, =0 {renomeie-os} one {renomeie-o} other {renomeie-os}}.",
   "content.templates.takenNothing": "{names} {count, plural, =0 {já são agentes} one {já é um agente} other {já são agentes}} em {projects}: os nomes de agentes são únicos no espaço de trabalho, então {count, plural, =0 {renomeie-os} one {renomeie-o} other {renomeie-os}}. Nada foi alterado.",

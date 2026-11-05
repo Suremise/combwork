@@ -129,7 +129,7 @@ async function seedBilling(ctx) {
   await inv('project:setActive', dir, true)
   await inv('workflow:setOptions', dir, {
     preset: null,
-    options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: ['quick'], mergeChecks: ['quick'], commands: { quick: `"${tool}"` }, identity: IDENTITY, okBefore: { mode: 'never', labels: [] } }
+    options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: ['quick'], mergeChecks: ['quick'], commands: { quick: `"${tool}"` }, identity: IDENTITY, okBefore: { mode: 'never', labels: [] } }
   })
   await inv('queue:pause', dir, 'integration')
   const fx = { name: 'i18nshots-billing', ws: ctx.workspace, claudeHome: ctx.claudeHome, alpha: dir, identity: IDENTITY }

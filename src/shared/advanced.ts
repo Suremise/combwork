@@ -286,19 +286,12 @@ export const LANES_UNWATCHED_NOTICE = 'cw.lanes.unwatchedNotice'
 export const ORPHAN_NOTICE = 'cw.processes.orphanNotice'
 
 /**
- * Settings Hive no longer has, dropped quietly from advanced.json as it is read (and so at its next write), never listed
- * as unknown: `hive.accounts.preview`, the Connections preview switch, gone since connections are on for everyone (S8,
- * HI-1774).
- */
-export const RETIRED_ADVANCED: ReadonlySet<string> = new Set(['hive.accounts.preview'])
-
-/**
- * Settings Hive no longer lists but keeps in advanced.json as they are, never listed as unknown, read once more where a
- * workspace still needs to move them to its own settings: `hive.assistant.otherMcpServers` (HI-1472, each workspace's
- * Assistant MCP choices); `hive.agents.perProject` (#562), Agents per project, Maximum agents in the workflow defaults
+ * Settings Combwork no longer lists but keeps in advanced.json as they are, never listed as unknown, read once more where a
+ * workspace still needs to move them to its own settings (their hive.* ids renamed by the names upgrade, HI-2598):
+ * `cw.assistant.otherMcpServers` (HI-1472, each workspace's Assistant MCP choices); `cw.agents.perProject` (#562), Agents per project, Maximum agents in the workflow defaults
  * since HI-2001 (main's migrateAgentsPerProject moves it, then drops it).
  */
-export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['hive.assistant.otherMcpServers', 'hive.agents.perProject'])
+export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['cw.assistant.otherMcpServers', 'cw.agents.perProject'])
 
 /** Whether sessions are started with TERM=xterm-256color and no WT_SESSION (HI-2004): read by main's ptyHost. */
 export const TERMINAL_TYPE = 'cw.sessions.terminalType'
@@ -353,7 +346,7 @@ export const RAW_CARD_START = 'cw.prompt.rawCardStart'
  * per server in each workspace: no longer listed, but kept in advanced.json (LEGACY_ADVANCED) so a workspace opened
  * later still moves an "on" to its own choices (workspace.ts's migrateAssistantMcp).
  */
-export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
+export const ASSISTANT_OTHER_MCP = 'cw.assistant.otherMcpServers'
 
 /** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
 export const CW_GUIDANCE = 'cw.guidance'
@@ -2876,7 +2869,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // Hive's tools pre-approved (#1281, #966 row 3): CLI trust only. What a session may do with them is the Agent API's and
   // Control's either way, and whether it has them at all is the workspace's MCP settings.
   {
-    id: overrideId('claude-code', 'preApproveHiveTools'),
+    id: overrideId('claude-code', 'preApproveCombworkTools'),
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.override.preApproveCombworkTools.title', defaultMessage: "Pre-approve the Assistant's Combwork tools", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
@@ -2943,7 +2936,7 @@ const SOURCES: readonly AdvancedSource[] = [
     ]
   },
   {
-    id: overrideId('codex', 'preApproveHiveTools'),
+    id: overrideId('codex', 'preApproveCombworkTools'),
     group: 'codex',
     title: msg({ id: 'settings.advanced.codex.override.preApproveCombworkTools.title', defaultMessage: "Pre-approve Combwork's tools", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
@@ -2973,7 +2966,7 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/mcp-list-codex-0.163.0-disabled.json`, version: '0.163.0', text: '"enabled": false', shows: "Codex listing a server of its own config turned off for one launch (-c mcp_servers.<name>.enabled=false)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
-    id: overrideId('copilot', 'preApproveHiveTools'),
+    id: overrideId('copilot', 'preApproveCombworkTools'),
     group: 'copilot',
     title: msg({ id: 'settings.advanced.copilot.override.preApproveCombworkTools.title', defaultMessage: "Pre-approve Combwork's tools", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
@@ -3086,31 +3079,6 @@ const SOURCES: readonly AdvancedSource[] = [
 export const ADVANCED_DEFS: readonly AdvancedDef[] = SOURCES.map((d) => ({ ...d, title: englishText(d.title), desc: englishText(d.desc), text: { title: d.title, desc: d.desc } }))
 
 const BY_ID = new Map(ADVANCED_DEFS.map((d) => [d.id, d]))
-
-/**
- * Combwork's own settings' ids before HI-2518 (`hive.<area>.<name>`), each with the `cw.` id it has now. Saved values move
- * to the new id as they are read (advanced.json, a workspace's own in workspace.json), one way: nothing is kept under
- * the old id, and an agent's call naming one is refused with the new id (the settings tools). LEGACY_ADVANCED and
- * RETIRED_ADVANCED keys keep their hive.* names: they are no settings now, only what older migrations read.
- */
-export const RENAMED_ADVANCED: ReadonlyMap<string, string> = new Map(ADVANCED_DEFS.filter((d) => d.group === 'cw').map((d) => [`hive.${d.id.slice('cw.'.length)}`, d.id]))
-
-/**
- * A record keyed by advanced ids with each hive.* id renamed to its cw.* one (HI-2518): `renamed` lists the old ids
- * moved or dropped. Where both are there, the cw.* one is kept (by presence: false, 0 and [] are values) and the old one
- * dropped. Other keys (unknown, LEGACY_ADVANCED) stay as they are, in their order. Pure.
- */
-export function migrateAdvancedIds<T>(record: Record<string, T>): { record: Record<string, T>; renamed: string[] } {
-  const renamed = Object.keys(record).filter((k) => RENAMED_ADVANCED.has(k))
-  if (!renamed.length) return { record, renamed }
-  const out: Record<string, T> = {}
-  for (const [k, v] of Object.entries(record)) {
-    const to = RENAMED_ADVANCED.get(k)
-    if (!to) out[k] = v
-    else if (!Object.hasOwn(record, to)) out[to] = v
-  }
-  return { record: out, renamed }
-}
 
 export function advancedDef(id: string): AdvancedDef | undefined {
   return BY_ID.get(id)
@@ -3395,7 +3363,7 @@ const FILE_PROBLEM = {
 const fileProblem = (t: Text): { error: string; errorText: Text } => ({ error: englishText(t), errorText: t })
 
 /** advanced.json read: its overrides and versions, or why it can't be used (then Hive keeps what it had). */
-export function parseAdvancedFile(text: string): { values: Record<string, unknown>; madeFor: Record<string, MadeFor>; unknown: string[]; renamed: string[] } | { error: string; errorText: Text } {
+export function parseAdvancedFile(text: string): { values: Record<string, unknown>; madeFor: Record<string, MadeFor>; unknown: string[] } | { error: string; errorText: Text } {
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -3406,13 +3374,11 @@ export function parseAdvancedFile(text: string): { values: Record<string, unknow
   if (typeof raw.format === 'number' && raw.format > ADVANCED_FORMAT) return fileProblem(withValues(FILE_PROBLEM.newer, { format: raw.format, supported: ADVANCED_FORMAT }))
   const given = raw.values === undefined ? {} : raw.values
   if (!isPlainObject(given)) return fileProblem(FILE_PROBLEM.notValues)
-  // A retired setting is dropped as read: neither listed as unknown nor kept at the next write. A hive.* id is read as its
-  // cw.* one (HI-2518), here, so that every reader, the early ones before the store loads too, sees the new ids.
-  const { record: values, renamed } = migrateAdvancedIds(Object.fromEntries(Object.entries(given).filter(([k]) => !RETIRED_ADVANCED.has(k))))
+  const values = { ...given }
   const madeFor: Record<string, MadeFor> = {}
   if (isPlainObject(raw.madeFor))
-    for (const [k, m] of Object.entries(migrateAdvancedIds(raw.madeFor).record)) if (isPlainObject(m) && k in values) madeFor[k] = { version: typeof m.version === 'string' ? m.version : null, value: m.value }
-  return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k) && !LEGACY_ADVANCED.has(k)), renamed }
+    for (const [k, m] of Object.entries(raw.madeFor)) if (isPlainObject(m) && k in values) madeFor[k] = { version: typeof m.version === 'string' ? m.version : null, value: m.value }
+  return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k) && !LEGACY_ADVANCED.has(k)) }
 }
 
 /** What a value takes, in words, as an agent reads it (the Assistant's tools; said in its chain, HI-2441). */

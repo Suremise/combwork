@@ -117,7 +117,7 @@ const check = (name, ok, extra = '') => {
       const o = await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => [e.value, e.textContent, e.parentElement.getAttribute('label')]))
       return o.some(([, t]) => t.startsWith('B1')) ? o : null
     }, HUNG_MS)
-    check('the picker lists Combwork, the Assistant and the project\'s agents', options?.some(([v, t, g]) => v.startsWith('hive:') && t.startsWith('Combwork') && g === 'Combwork') && options.some(([v, t, g]) => v.includes('#assistant') && t.startsWith('Assistant') && g === 'Combwork') && options.some(([, t, g]) => t.startsWith('B1') && g === 'alpha') && !options.some(([, t, g]) => /Hive/.test(`${t} ${g ?? ''}`)), JSON.stringify(options))
+    check('the picker lists Combwork, the Assistant and the project\'s agents', options?.some(([v, t, g]) => v.startsWith('combwork:') && t.startsWith('Combwork') && g === 'Combwork') && options.some(([v, t, g]) => v.includes('#assistant') && t.startsWith('Assistant') && g === 'Combwork') && options.some(([, t, g]) => t.startsWith('B1') && g === 'alpha') && !options.some(([, t, g]) => /Hive/.test(`${t} ${g ?? ''}`)), JSON.stringify(options))
     const b1Option = options.find(([, t]) => t.startsWith('B1'))[0]
     await dc.locator('.dc-source').selectOption(b1Option)
     await lib.until(async () => (await inv('console:sources')).find((s) => s.agentId === b1.id)?.capturing, HUNG_MS)
@@ -291,7 +291,7 @@ const check = (name, ok, extra = '') => {
     await dc.locator('.dc-record').click()
     await dc.locator('.dc-record-start').click()
     const switched = await lib.until(async () => (await recordingText()).trim().match(/^Recording \d+ events to (console-\S+\.jsonl)/)?.[1] ?? null, HUNG_MS)
-    const hiveOption = (await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).find((v) => v.startsWith('hive:'))
+    const hiveOption = (await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).find((v) => v.startsWith('combwork:'))
     await dc.locator('.dc-source').selectOption(hiveOption)
     // The file's end line is written before the window hears it ended: wait for both.
     const switchedEnd = await lib.until(async () => {
@@ -363,10 +363,10 @@ const check = (name, ok, extra = '') => {
         return null
       }, HUNG_MS)
     const dc2 = await consoleOn('consolewindow-ws2')
-    const hive2 = (await inv2('console:sources')).find((x) => x.kind === 'hive')
+    const hive2 = (await inv2('console:sources')).find((x) => x.kind === 'combwork')
     await lib.until(async () => (await dc2.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).includes(hive2.id), HUNG_MS)
     await dc2.locator('.dc-source').selectOption(hive2.id)
-    const hive2Live = async () => !!(await inv2('console:sources')).find((x) => x.kind === 'hive')?.capturing && (await dc2.locator('.dc-live').textContent()).includes('Live')
+    const hive2Live = async () => !!(await inv2('console:sources')).find((x) => x.kind === 'combwork')?.capturing && (await dc2.locator('.dc-live').textContent()).includes('Live')
     await lib.until(hive2Live, HUNG_MS)
     check("a second window's console watches its own workspace", await hive2Live())
 
@@ -385,9 +385,9 @@ const check = (name, ok, extra = '') => {
     const oldWatch = await dc3.evaluate((id) => window.combwork.invoke('console:subscribe', [id]), b1Option)
     const oldRead = await dc3.evaluate((id) => window.combwork.invoke('console:snapshot', id, 0), b1Option)
     check("…and can't watch or read the old workspace's sources", JSON.stringify(oldWatch) === '{}' && oldRead.length === 0, `${JSON.stringify(oldWatch)} ${oldRead.length}`)
-    const hive3 = ws3Sources.find((x) => x.kind === 'hive')
+    const hive3 = ws3Sources.find((x) => x.kind === 'combwork')
     await dc3.locator('.dc-source').selectOption(hive3.id)
-    await lib.until(async () => (await inv('console:sources')).find((x) => x.kind === 'hive')?.capturing, HUNG_MS)
+    await lib.until(async () => (await inv('console:sources')).find((x) => x.kind === 'combwork')?.capturing, HUNG_MS)
     await inv('workspace:close')
     await lib.until(() => !consoles().includes(dc3), HUNG_MS)
     check('closing the workspace closes its console', !consoles().includes(dc3))

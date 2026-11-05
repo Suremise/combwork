@@ -807,7 +807,7 @@ async function tellListChanged(ws: WorkspaceService, l: LaneRecord): Promise<voi
   const body = inDialectOf({ projectPath, agentId: l.builder.id }, () => withCardNames(ws, () => say(A.listChanged, { cards: l.cards.map(cardRef).join(', ') })))
   try {
     // agent-protocol: the sender's name, Combwork's own
-    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
+    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
     await offerNow(projectPath, l.builder.id)
   } catch (e) {
     log.warn(`telling lane ${l.id}'s builder its list changed`, e)
@@ -1003,7 +1003,7 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
     if (!Array.isArray(d) || d.length) throw new LaneError(409, say(A.uncommitted, { card: key, agent: builder.name }))
   }
   const { runIntent, CW_LANE_START } = await import('./tasks')
-  const { reply } = await runIntent(wf, flying.number, CW_LANE_START, (w) => w.putBack(`#${flying.number}`, 'hive', { why: inDefaultDialect(() => say(A.putBackWhy, { by: s.by })) }), undefined, s.commit)
+  const { reply } = await runIntent(wf, flying.number, CW_LANE_START, (w) => w.putBack(`#${flying.number}`, 'combwork', { why: inDefaultDialect(() => say(A.putBackWhy, { by: s.by })) }), undefined, s.commit)
   const r = reply as { ok?: boolean; refused?: boolean; message?: string }
   // agent-protocol: a refusal's message, said again in the reader's dialect by refusalBody
   if (r.refused) throw new LaneError(409, (r.refused && typeof (reply as Refusal).rule === 'string' && (reply as Refusal).values ? (refusalBody(reply as Refusal).message as string) : r.message) ?? say(A.notPutBack, { card: key }))
@@ -1019,7 +1019,7 @@ async function tellReordered(ws: WorkspaceService, l: LaneRecord, put: { putBack
   const body = inDialectOf({ projectPath, agentId: l.builder.id }, () => withCardNames(ws, () => say(A.reordered, { by, card: put.putBack, line: put.line ?? say(A.itsBranch), cards: l.cards.map(cardRef).join(', ') })))
   try {
     // agent-protocol: the sender's name, Combwork's own
-    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
+    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
     await offerNow(projectPath, l.builder.id)
   } catch (e) {
     log.warn(`telling lane ${l.id}'s builder of its reorder`, e)

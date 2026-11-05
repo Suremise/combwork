@@ -192,7 +192,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('…which shows only Combwork\'s runs', !!(await until(async () => (await panel.locator('.progress-tab-runs [data-run]').count()) >= 1 && (await panel.locator('.progress-tab-runs').innerText()).includes('Combwork (merge queue)') && !(await panel.locator('.progress-tab-runs').innerText()).includes('npm test\n'), HUNG_MS)))
     await panel.getByRole('button', { name: 'Clear' }).click()
     // A finished one (Zero's red check) has its log: Open log in its details.
-    const zeroRun = (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.card === zero.n && r.state === 'failed')
+    const zeroRun = (await inv('progress:snapshot')).runs.find((r) => r.source === 'combwork' && r.card === zero.n && r.state === 'failed')
     const zeroRunRow = panel.locator(`.progress-tab-runs [data-run="${zeroRun?.id}"]`)
     // Its card's runs and the queue's folded line opened (HI-1701: runs by card, the queue's checks in one line).
     await until(async () => {
@@ -213,7 +213,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // --- Old rules: the next cards go to the agent; the queue's card stays, controllable.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges', mergeChecks: [] }) })
     const after = await view()
-    check('the options say the agent merges now; the queue keeps its cards in flight', after?.hiveMerges === false && after.inFlight.includes(one.n) && after.queued.length === 2, JSON.stringify({ hiveMerges: after?.hiveMerges, inFlight: after?.inFlight }))
+    check('the options say the agent merges now; the queue keeps its cards in flight', after?.combworkMerges === false && after.inFlight.includes(one.n) && after.queued.length === 2, JSON.stringify({ combworkMerges: after?.combworkMerges, inFlight: after?.inFlight }))
     check("…its card stays", (await card.count()) === 1 && (await cardText()).includes(`${twoKey} and ${threeKey} waiting`), await cardText())
     // Remove from queue, asked first.
     await card.locator(`.progress-queue-list li[data-entry^="${threeKey}/"]`).getByRole('button', { name: `Remove ${threeKey} from the queue` }).click()

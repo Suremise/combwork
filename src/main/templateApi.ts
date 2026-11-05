@@ -30,7 +30,7 @@ const refused = (text: string, kind: 'invalid' | 'notFound' | 'conflict'): HiveE
 /** The template routes' agent text (dialects, HI-2447): refusals and what a load or Choose Connections couldn't do. */
 const T = {
   required: agentMsg({ id: 'template.find.required', text: 'template is required: its file or name, as list gives them', note: 'A template call named none.' }),
-  scope: agentMsg({ id: 'template.find.scope', text: 'scope is hive, workspace or project', note: "A template call's scope isn't one of the three. They are the argument's values." }),
+  scope: agentMsg({ id: 'template.find.scope', text: 'scope is combwork, workspace or project', note: "A template call's scope isn't one of the three. They are the argument's values." }),
   from: agentMsg({ id: 'template.find.from', text: 'from is a project name', note: "A template call's from isn't text." }),
   none: agentMsg({ id: 'template.find.none', text: 'No template "{template}"{scoped, select, yes { in the {scope} scope} other {}}{fromProject, select, yes { kept in {from}} other {}}: list gives them.', note: 'No template has that file or name, in the scope or project named, if any.' }),
   several: agentMsg({ id: 'template.find.several', text: 'Several templates are called "{template}": name one by scope and file ({choices}).', note: 'More than one template has that name: never one picked for the caller. {choices} lists each as "scope: file".' }),
@@ -97,7 +97,7 @@ export async function templateRows(projectPath: string): Promise<TemplateRow[]> 
 export async function findTemplate(projectPath: string, a: { template?: unknown; scope?: unknown; from?: unknown }): Promise<TemplateEntry> {
   const template = typeof a.template === 'string' ? a.template.trim() : ''
   if (!template) throw refused(say(T.required), 'invalid')
-  if (a.scope !== undefined && a.scope !== 'hive' && a.scope !== 'workspace' && a.scope !== 'project') throw refused(say(T.scope), 'invalid')
+  if (a.scope !== undefined && a.scope !== 'combwork' && a.scope !== 'workspace' && a.scope !== 'project') throw refused(say(T.scope), 'invalid')
   if (a.from !== undefined && typeof a.from !== 'string') throw refused(say(T.from), 'invalid')
   const from = typeof a.from === 'string' && a.from.trim() ? a.from.trim().toLowerCase() : null
   const all = from ? (await listAllTemplates()).filter((e) => e.scope === 'project' && !!e.project && basename(e.project).toLowerCase() === from) : await listTemplates(projectPath)

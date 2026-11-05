@@ -478,7 +478,7 @@ const prose = (seed, n) => {
       .on('error', reject)
   })
   check('sources come a page at a time, with the total', sourcePage.status === 200 && sourcePage.body.sources.length === 2 && sourcePage.body.total > 2 && sourcePage.body.offset === 0, sourcePage.text.slice(0, 300))
-  measure("cw_console (Combwork's events, as the Assistant)", tool('cw_console', { source: 'hive' }, 'assistant'), 300)
+  measure("cw_console (Combwork's events, as the Assistant)", tool('cw_console', { source: 'combwork' }, 'assistant'), 300)
   await inv('console:subscribe', [])
 
   console.log('\n--- Combwork tools (as the Assistant)')

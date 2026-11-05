@@ -488,7 +488,7 @@ function useConversationPicker() {
     const list = await actions.attempt(tr(M.listFailed), () => call('session:list', project.path))
     if (!list) return
     const open = project.agents[0]?.live?.sessionId
-    const all = list.filter((s) => s.source === 'hive' && !s.archived && !s.sub)
+    const all = list.filter((s) => s.source === 'combwork' && !s.archived && !s.sub)
     const items: MenuEntry[] = [{ header: true, label: tr(M.resumeOne) }]
     if (!all.length) items.push({ label: tr(M.noConversations), disabled: true })
     for (const s of all.slice(0, 12)) {

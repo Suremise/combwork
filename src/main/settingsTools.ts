@@ -2,7 +2,7 @@ import { basename } from 'path'
 import type { SettingsPatch } from '../shared/api'
 import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId, SlotDefaults } from '../shared/types'
 import { modelCaps } from '../shared/models'
-import { RENAMED_ADVANCED, advancedDef, advancedTakes } from '../shared/advanced'
+import { advancedDef, advancedTakes } from '../shared/advanced'
 import { agentMsg, say } from '../shared/agentText'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, agentSetting, checkSettingValue, effortTakes, settingDefault, settingEntry, settingHelps, settingKind, settingOptions, settingPatch, settingPath, settingReadOnly, settingValue, settingValueText, shownSettingPath, workflowTakes, PLATFORM_SETTING_KEY, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
@@ -37,7 +37,6 @@ import { advanced, updateSettingsChecked } from './advanced'
  * text is the catalog's (agentSetting, settingPath).
  */
 const T = {
-  renamed: agentMsg({ id: 'settings.agent.tool.renamed', text: '{id} was renamed: use {now}.', note: "A setting named by its id from before HI-2518 (an advanced setting's hive.* id, now cw.*). {id} is the id as given, {now} its id now." }),
   noSetting: agentMsg({ id: 'settings.agent.tool.noSetting', text: 'No setting "{id}": cw_list_settings lists them (query narrows it).', note: 'cw_read_setting or cw_update_setting naming no setting there is. {id} is the id as given.' }),
   projectSetting: agentMsg({ id: 'settings.agent.tool.projectSetting', text: "{id} is a project's setting: say which project.", note: "A project's setting read or changed without naming the project. {id} is the setting's id." }),
   usersToChange: agentMsg({ id: 'settings.agent.tool.usersToChange', text: "{path} is the user's to change.", note: "A sensitive setting with no reason recorded (#186). {path} is where the user changes it." }),
@@ -79,19 +78,11 @@ export class SettingRefused extends Error {
   }
 }
 
-/** An advanced setting's id from before HI-2518 (`advanced.hive.…`, `workspace.advanced.hive.…`) as it is named now, or null. */
-export function renamedSetting(id: string): string | null {
-  const m = /^((?:workspace\.)?advanced\.)(hive\..+)$/.exec(id)
-  const to = m ? RENAMED_ADVANCED.get(m[2]) : undefined
-  return m && to && settingEntry(`${m[1]}${to}`) ? `${m[1]}${to}` : null
-}
-
-/** The entry for an id, or 404 naming how to find one: an old hive.* id is refused with the one it has now (HI-2518). */
+/** The entry for an id, or 404 naming how to find one. */
 export function entryOf(id: string): SettingEntry {
   const e = settingEntry(id)
   if (!e || e.action) {
-    const now = renamedSetting(id)
-    throw new SettingRefused(404, now ? say(T.renamed, { id, now }) : say(T.noSetting, { id }))
+    throw new SettingRefused(404, say(T.noSetting, { id }))
   }
   return e
 }
@@ -145,7 +136,7 @@ function takesText(e: SettingEntry, project: ProjectConfig | null): string {
   }
 }
 
-const RESTART_TEXT = { sessions: T.restartSessions, assistant: T.restartAssistant, hive: T.restartHive } as const
+const RESTART_TEXT = { sessions: T.restartSessions, assistant: T.restartAssistant, combwork: T.restartHive } as const
 
 // A listing row's gist (#1312): its first sentence, cut at a word within 60 characters, so a query's rows stay lean.
 const firstSentence = (s: string): string => {

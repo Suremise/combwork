@@ -721,7 +721,7 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
   // merge queue and what to do next: #1354, up to NOTE_MAX): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
   const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' || kind === 'reply' ? REQUEST_MAX : kind === 'answer' ? ANSWER_MAX : NOTE_MAX
-  const whose = kind === 'request' ? 'reviewerAsks' : kind === 'reply' ? 'builderReplies' : kind === 'step' || kind === 'stepNotice' ? 'builder' : kind === 'stepAnswer' ? 'reviewer' : 'hive'
+  const whose = kind === 'request' ? 'reviewerAsks' : kind === 'reply' ? 'builderReplies' : kind === 'step' || kind === 'stepNotice' ? 'builder' : kind === 'stepAnswer' ? 'reviewer' : 'combwork'
   const tail = say(W.loopTail, { who })
   // HI-2087: Hive's note that the merge queue returned the card leads the line, as a watch's does: its column and the
   // review's pass first made HB2 take HI-2046 for merged.

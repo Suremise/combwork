@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
-import { upgradedRunMarker, upgradeRunMarkerFile } from '../src/main/nameUpgradeProfile'
+import { upgradedAdvanced, upgradedConfig, upgradedRunMarker, upgradedRuns, upgradeProfileFiles, upgradeRunMarkerFile } from '../src/main/nameUpgradeProfile'
 import { parseRunMarker } from '../src/shared/unexpectedClose'
 import { moveOldLogs } from '../src/main/logger'
 
@@ -56,6 +56,68 @@ describe("the log's files", () => {
     const fresh = join(base, `logs${++n}`)
     mkdirSync(fresh)
     moveOldLogs(fresh)
+    expect(readdirSync(fresh)).toEqual([])
+  })
+})
+
+// HI-2598 (design HI-2598/s9 §5): the profile's stored values. A 1.0 profile has every one old, an RC2 one some, a fresh one
+// none; each file is rewritten only while it has one, so a second start only reads.
+describe("the profile's stored values", () => {
+  const CONFIG_10 = {
+    version: 9,
+    settings: {
+      workflow: { git: { finish: 'hiveMerges', commitMessage: 'hive', review: 'agent' }, none: { maxAgents: 3 } },
+      commands: { list: [{ id: 'c1', name: 'Tidy', command: 'x' }], onQuit: { run: [{ scope: 'hive', id: 'c1' }] } },
+      agentApi: { enabled: true, provideHiveMcp: false }
+    }
+  }
+  const ADVANCED_10 = { format: 1, values: { 'hive.processes.orphanNotice': false, 'hive.accounts.preview': true, 'claude-code.override.preApproveHiveTools': false, 'hive.agents.perProject': 4, 'hive.assistant.otherMcpServers': true }, madeFor: { 'claude-code.override.preApproveHiveTools': { version: '2.1.0', value: false } } }
+  const RUNS_10 = { version: 1, runs: [{ id: 'r1', source: 'hive', agentName: 'Hive (merge queue)', title: 't' }, { id: 'r2', source: 'hive', agentName: 'Hive (slot slot-b)', title: 't' }, { id: 'r3', source: 'agent', agentName: 'HB2', title: 't' }] }
+
+  it('config.json: workflow defaults, When Combwork quits and the Agent API switch take the new values', () => {
+    const now = upgradedConfig(CONFIG_10) as typeof CONFIG_10 & { settings: { agentApi: Record<string, unknown> } }
+    expect(now.settings.workflow).toEqual({ git: { finish: 'combworkMerges', commitMessage: 'combwork', review: 'agent' }, none: { maxAgents: 3 } })
+    expect(now.settings.commands.onQuit.run).toEqual([{ scope: 'combwork', id: 'c1' }])
+    expect(now.settings.agentApi).toEqual({ enabled: true, provideCombworkMcp: false })
+    expect(upgradedConfig(now)).toBeNull()
+    // RC2: a new key already there wins, and the old is dropped.
+    expect((upgradedConfig({ settings: { agentApi: { provideHiveMcp: false, provideCombworkMcp: true } } }) as any).settings.agentApi).toEqual({ provideCombworkMcp: true })
+    expect(upgradedConfig({ settings: { workflow: { git: { finish: 'combworkMerges' } } } })).toBeNull()
+  })
+
+  it("advanced.json: hive.* and the CLIs' pre-approve ids renamed, the retired switch dropped, a new id kept over its old one", () => {
+    const now = upgradedAdvanced(ADVANCED_10) as { values: Record<string, unknown>; madeFor: Record<string, unknown> }
+    expect(now.values).toEqual({ 'cw.processes.orphanNotice': false, 'claude-code.override.preApproveCombworkTools': false, 'cw.agents.perProject': 4, 'cw.assistant.otherMcpServers': true })
+    expect(now.madeFor).toEqual({ 'claude-code.override.preApproveCombworkTools': { version: '2.1.0', value: false } })
+    expect(upgradedAdvanced(now)).toBeNull()
+    expect((upgradedAdvanced({ values: { 'hive.processes.orphanNotice': false, 'cw.processes.orphanNotice': true } }) as any).values).toEqual({ 'cw.processes.orphanNotice': true })
+  })
+
+  it("progress runs: Combwork's own take its source and names; an agent's stay", () => {
+    const now = upgradedRuns(RUNS_10) as typeof RUNS_10
+    expect(now.runs.map((r) => [r.source, r.agentName])).toEqual([['combwork', 'Combwork (merge queue)'], ['combwork', 'Combwork (slot slot-b)'], ['agent', 'HB2']])
+    expect(upgradedRuns(now)).toBeNull()
+  })
+
+  it('the files are rewritten once at start; a fresh profile and files not JSON are left as they are', () => {
+    const dir = join(base, `profile${++n}`)
+    mkdirSync(join(dir, 'progress-history'), { recursive: true })
+    writeFileSync(join(dir, 'config.json'), JSON.stringify(CONFIG_10))
+    writeFileSync(join(dir, 'advanced.json'), JSON.stringify(ADVANCED_10))
+    writeFileSync(join(dir, 'progress-history', 'abc.json'), JSON.stringify(RUNS_10))
+    writeFileSync(join(dir, 'progress-history', 'bad.json'), 'not json')
+    upgradeProfileFiles(dir)
+    expect(JSON.parse(readFileSync(join(dir, 'config.json'), 'utf8')).settings.agentApi.provideCombworkMcp).toBe(false)
+    expect(Object.keys(JSON.parse(readFileSync(join(dir, 'advanced.json'), 'utf8')).values)).not.toContain('hive.processes.orphanNotice')
+    expect(JSON.parse(readFileSync(join(dir, 'progress-history', 'abc.json'), 'utf8')).runs[0].source).toBe('combwork')
+    expect(readFileSync(join(dir, 'progress-history', 'bad.json'), 'utf8')).toBe('not json')
+    const texts = ['config.json', 'advanced.json', join('progress-history', 'abc.json')].map((f) => readFileSync(join(dir, f), 'utf8'))
+    upgradeProfileFiles(dir)
+    expect(['config.json', 'advanced.json', join('progress-history', 'abc.json')].map((f) => readFileSync(join(dir, f), 'utf8'))).toEqual(texts)
+    expect(readdirSync(dir).filter((f) => f.endsWith('.upgrading'))).toEqual([])
+    const fresh = join(base, `profile${++n}`)
+    mkdirSync(fresh)
+    upgradeProfileFiles(fresh)
     expect(readdirSync(fresh)).toEqual([])
   })
 })

@@ -33,7 +33,7 @@ export function nextStep(s: CardState, r: Ruleset): NextStep | null {
       if (s.stale) return { step: 'intents', intents: ['submit'] } // i18n-ignore: an intent's name, agent-facing
       if (asked) return { step: 'user' }
       if (r.options.finish === 'agentMerges' || r.options.finish === 'notChecked') return { step: 'merge' }
-      return r.options.finish === 'hiveMerges' ? { step: 'queue' } : { step: 'user' }
+      return r.options.finish === 'combworkMerges' ? { step: 'queue' } : { step: 'user' }
     case 'merging':
       return { step: 'queue' }
     case 'done':

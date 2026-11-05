@@ -13,7 +13,7 @@ import type { ProviderId } from './types'
 import { maskSecrets, maskText } from './redact'
 
 /** Who sends the events: one agent's session (the Assistant's too), or Hive itself in a workspace. */
-export type ConsoleSourceKind = 'session' | 'assistant' | 'hive'
+export type ConsoleSourceKind = 'session' | 'assistant' | 'combwork'
 
 /**
  * What an event is: a CLI's hook, status line, transcript records or terminal markers; a line Hive typed into it; its
@@ -115,11 +115,11 @@ export const RING_MAX_BYTES = 1024 * 1024
 export const EVENT_MAX_BYTES = 32 * 1024
 
 const sessionPrefix = 'session:'
-const hivePrefix = 'hive:'
+const hivePrefix = 'combwork:'
 export const sessionSourceId = (projectPath: string, agentId: string): string => `${sessionPrefix}${projectPath.toLowerCase()}#${agentId}`
 export const hiveSourceId = (workspacePath: string): string => `${hivePrefix}${workspacePath.toLowerCase()}`
-export function parseSourceId(id: string): { kind: 'session'; projectPath: string; agentId: string } | { kind: 'hive'; workspacePath: string } | null {
-  if (id.startsWith(hivePrefix) && id.length > hivePrefix.length) return { kind: 'hive', workspacePath: id.slice(hivePrefix.length) }
+export function parseSourceId(id: string): { kind: 'session'; projectPath: string; agentId: string } | { kind: 'combwork'; workspacePath: string } | null {
+  if (id.startsWith(hivePrefix) && id.length > hivePrefix.length) return { kind: 'combwork', workspacePath: id.slice(hivePrefix.length) }
   if (!id.startsWith(sessionPrefix)) return null
   const at = id.lastIndexOf('#')
   if (at <= sessionPrefix.length || at === id.length - 1) return null
@@ -141,7 +141,7 @@ export function mayRead(reader: ConsoleReader, source: string, workspaceOfProjec
   if (!s) return false
   if (reader.kind === 'all') return true
   if (reader.kind === 'agent') return s.kind === 'session' && samePath(s.projectPath, reader.projectPath) && s.agentId === reader.agentId
-  if (s.kind === 'hive') return samePath(s.workspacePath, reader.workspace)
+  if (s.kind === 'combwork') return samePath(s.workspacePath, reader.workspace)
   const ws = workspaceOfProject(s.projectPath)
   return !!ws && samePath(ws, reader.workspace)
 }

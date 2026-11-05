@@ -17,7 +17,7 @@ export const HOOK_SHORT_MAX = 300
  * Where a hook comes from: Hive's own (passed for this launch), the CLI's settings scopes (managed, the command line's,
  * the project's, its local file, the user's or a connection's home), or a plugin.
  */
-export type HookSource = 'hive' | 'managed' | 'cli' | 'project' | 'local' | 'user' | 'plugin' | 'other'
+export type HookSource = 'combwork' | 'managed' | 'cli' | 'project' | 'local' | 'user' | 'plugin' | 'other'
 
 /**
  * How sure Hive is of a hook: `passed`, Hive passed it for this launch; `trusted`, `untrusted`, `modified`, as the CLI

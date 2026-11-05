@@ -32,7 +32,7 @@ import { upgradeRunMarkerFile } from './nameUpgradeProfile'
  * agents resumed only if Settings → Sessions says so. Nothing is stopped unless the user says so.
  */
 const log = createLogger('lastRun')
-const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /** What the last run left, found at this start: null when it quit normally (or this is the first run). */
 export interface UnexpectedClose {

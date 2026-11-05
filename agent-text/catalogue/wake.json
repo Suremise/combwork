@@ -364,7 +364,7 @@
     "note": "A lane watch wake too long to tell in full: the agents waiting for the user, each \"name (project)\"."
   },
   "wake.lane.waitsForUser": {
-    "text": "{card} waits for the user{who, select, agent { ({by} asks)} hive { (Combwork asks)} other {}}",
+    "text": "{card} waits for the user{who, select, agent { ({by} asks)} combwork { (Combwork asks)} other {}}",
     "note": "A lane watch wake's event (HI-1991): a new request for the user on a lane's card (what it asks follows). card: \"HI-12\"; who: agent (by: the asking agent's name), hive (Combwork asked), or none (not known)."
   },
   "wake.limit.ask": {

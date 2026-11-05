@@ -101,7 +101,7 @@
   "content.templates.overMax": "Sie hat {count, number} Agenten, und der Workflow dieses Projekts erlaubt {max, plural, one {# Agenten} other {# Agenten}}: Erhöhe zuerst die Höchstzahl an Agenten unter Versionsverwaltung → Workflow, oder lade sie mit ihrem Workflow. Es wurde nichts geändert.",
   "content.templates.restoring": "Rückgängig stellt die Agenten dieses Projekts so wieder her, wie sie vor dem Laden einer Vorlage waren",
   "content.templates.running": "Agent {agent} läuft oder startet gerade: Zuerst stoppen.",
-  "content.templates.scope": "Unbekannter Bereich „{scope}“: hive, workspace oder project.",
+  "content.templates.scope": "Unbekannter Bereich „{scope}“: combwork, workspace oder project.",
   "content.templates.started": "Inzwischen wurde ein Agent gestartet: Es wurde nichts geändert. Zuerst stoppen.",
   "content.templates.taken": "{names} {count, plural, one {ist bereits ein Agent} other {sind bereits Agenten}} in {projects}: Agentennamen sind im ganzen Arbeitsbereich eindeutig, also benenne {count, plural, one {ihn} other {sie}} um.",
   "content.templates.takenNothing": "{names} {count, plural, one {ist bereits ein Agent} other {sind bereits Agenten}} in {projects}: Agentennamen sind im ganzen Arbeitsbereich eindeutig, also benenne {count, plural, one {ihn} other {sie}} um. Es wurde nichts geändert.",

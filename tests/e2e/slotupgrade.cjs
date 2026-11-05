@@ -143,7 +143,7 @@ const isIn = (dir, rev, ref) => {
   try {
     // --- 1. "0.9 day": the dev build with the slots' migration held off.
     await start({ CW_TEST_SLOT_MIGRATION: 'off' })
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     await inv('workflow:setOptions', solo, { preset: null, options: { review: 'none', finish: 'notChecked', folder: 'slots' } })
     const create = async (title, project) => (await inv('tasks:create', { title, project })).number
     const c1 = await create('Old one', 'alpha')

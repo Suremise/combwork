@@ -1229,7 +1229,7 @@ const SIGNED_IN_AGAIN = msg({ id: 'session.status.signedInAgain', defaultMessage
 /** What Resume (n) types into such an agent. */
 /** Hive's own deliveries come from it (#649). */
 // agent-protocol: the app's name, as a delivery's sender
-const CW_SENDER = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the sender's name in deliveries, which agents read
+const CW_SENDER = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the sender's name in deliveries, which agents read
 const CARRY_ON_PROMPT = SESSION.carryOn
 
 class SessionManager {
@@ -1593,7 +1593,7 @@ class SessionManager {
       const last = usage?.lastActivity ?? rec.lastActiveAt
       if (!live.has(rec.id) && (rec.archived || !(Date.parse(last) >= since))) continue
       const { keptUsage: _kept, ...fields } = rec
-      out.push({ ...fields, provider: recordProvider(rec), source: 'hive', title: usage?.title ?? null, lastActivity: last, hasTranscript: true, hasBackup: false, usage: null, recache: null })
+      out.push({ ...fields, provider: recordProvider(rec), source: 'combwork', title: usage?.title ?? null, lastActivity: last, hasTranscript: true, hasBackup: false, usage: null, recache: null })
     }
     return out
   }
@@ -6292,7 +6292,7 @@ class SessionManager {
     const l = this.findLaunch(runId, body.session_id)?.[1]
     if (!l?.hookHistory) return null
     const event = clip(typeof body.hook_event_name === 'string' ? body.hook_event_name : '?', HOOK_SHORT_MAX).text
-    const obs: HookObservation = { l, started: performance.now(), fired: { at: Date.now(), event, receiver: l.hooks?.receivers[event] ?? 'hive', response: 'none', ledger: 'none', ms: 0 } }
+    const obs: HookObservation = { l, started: performance.now(), fired: { at: Date.now(), event, receiver: l.hooks?.receivers[event] ?? 'combwork', response: 'none', ledger: 'none', ms: 0 } }
     this.hookObs.set(body, obs)
     return obs
   }
@@ -7663,7 +7663,7 @@ class SessionManager {
         ...(sub ? { sub } : {}),
         ...(fresh ? { fresh } : {}),
         provider,
-        source: 'hive',
+        source: 'combwork',
         title: usage?.title ?? null,
         lastActivity: usage?.lastActivity ?? rec.lastActiveAt,
         hasTranscript,
@@ -8303,7 +8303,7 @@ class SessionManager {
       items.push({
         id: rec.id,
         provider: recordProvider(rec),
-        source: 'hive',
+        source: 'combwork',
         agentId: rec.agentId,
         ...(agentName ? { agentName } : {}),
         cwd: rec.cwd,
@@ -8338,7 +8338,7 @@ class SessionManager {
     const item = (k: { id: string; provider: ProviderId; agentId?: string; agentName?: string; cwd?: string; name?: string; usage: SessionUsage }): SessionListItem => ({
       id: k.id,
       provider: k.provider,
-      source: 'hive' as const,
+      source: 'combwork' as const,
       agentId: k.agentId,
       ...(k.agentName ? { agentName: k.agentName } : {}),
       cwd: k.cwd,

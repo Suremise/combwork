@@ -896,7 +896,7 @@ export function queueFolderNeeded(wf: Workflow, target: string, busy?: () => boo
   for (const card of wf.store.cardsInFlight()) {
     const s = wf.state(card)
     if (s.entries.some((e) => e.target === target && (e.state === 'open' || e.state === 'started'))) return true
-    if (s.started && s.stage !== 'done' && s.stage !== 'todo' && s.started.target === target && wf.rulesetOf(card, s).options.finish === 'hiveMerges') return true
+    if (s.started && s.stage !== 'done' && s.stage !== 'todo' && s.started.target === target && wf.rulesetOf(card, s).options.finish === 'combworkMerges') return true
   }
   return false
 }

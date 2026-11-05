@@ -59,7 +59,7 @@ describe('the journal in a workspace', () => {
     await run(() => tasks.updateTask(c.number, { column: 'done' }, user))
     await finished(c.number)
   }
-  const facts = (): string[] => (existsSync(journal.journalFile(home())) ? journal.recall(home(), { limit: 50 }).filter((r) => r.source === 'hive').map((r) => r.summary) : [])
+  const facts = (): string[] => (existsSync(journal.journalFile(home())) ? journal.recall(home(), { limit: 50 }).filter((r) => r.source === 'combwork').map((r) => r.summary) : [])
   /** What the Assistant was told (its inbox's bodies). */
   const told = async (): Promise<string[]> => (await deliveries.deliveriesOf(home(), 'assistant')).map((d) => d.body)
 
@@ -100,7 +100,7 @@ describe('the journal in a workspace', () => {
     // Linked and marked: the merge is important and points at its commit and cards.
     const merged = journal.recall(home(), { link: { type: 'commit', ref: '45b5696b' } })
     expect(merged).toHaveLength(1)
-    expect(journal.readEntry(home(), merged[0].id)).toMatchObject({ kind: 'event', source: 'hive', project: 'alpha', importance: 2, tags: ['hive', 'lane'] })
+    expect(journal.readEntry(home(), merged[0].id)).toMatchObject({ kind: 'event', source: 'combwork', project: 'alpha', importance: 2, tags: ['combwork', 'lane'] })
     expect(journal.recall(home(), { link: { type: 'card', ref: String(c1.number) } })).toHaveLength(3)
   })
 

@@ -42,7 +42,7 @@ const IMPORTANCE = [
 
 const SOURCE: Record<JournalSource, ReturnType<typeof msg>> = {
   assistant: msg({ id: 'assistant.journal.source.assistant', defaultMessage: 'The Assistant', description: 'Who wrote a journal entry: the Combwork Assistant.' }),
-  hive: msg({ id: 'assistant.journal.source.cw', defaultMessage: 'Combwork', description: "Who wrote a journal entry: Combwork itself (its own facts: lanes, merges, unexpected closes). Combwork's name stays as it is." })
+  combwork: msg({ id: 'assistant.journal.source.cw', defaultMessage: 'Combwork', description: "Who wrote a journal entry: Combwork itself (its own facts: lanes, merges, unexpected closes). Combwork's name stays as it is." })
 }
 
 const M = {
@@ -341,7 +341,7 @@ export function JournalView({ digests }: { digests: boolean }) {
           <select className="select journal-source" aria-label={tr(M.sourceLabel)} value={filters.source} onChange={(e) => setFilters({ ...filters, source: e.target.value as Filters['source'] })}>
             <option value="">{tr(M.allSources)}</option>
             <option value="assistant">{tr(SOURCE.assistant)}</option>
-            <option value="hive">{tr(SOURCE.hive)}</option>
+            <option value="combwork">{tr(SOURCE.combwork)}</option>
           </select>
           <label className="journal-date">
             <span className="faint">{tr(M.from)}</span>

@@ -46,7 +46,7 @@ describe("the team pause's hold on deliveries (HI-2081)", async () => {
     }
   })
   deliveries.setSenderCheckForTests(() => null)
-  const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
+  const hive: DeliverySender = { kind: 'combwork', name: 'Combwork' }
   const wake = (o: Record<string, unknown> = {}) => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'card-event', from: hive, card: 7, body: 'is in Review', source: 'loop', ref: '#7', ...o })
   const states = async () => (await deliveries.deliveriesOf(alpha, 'b1')).map((r) => `${r.id} ${r.state}`)
   beforeEach(() => {

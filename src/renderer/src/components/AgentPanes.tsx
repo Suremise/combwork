@@ -141,7 +141,7 @@ function sessionPickerItems(project: ProjectInfo, a: AgentInfo, list: SessionLis
   const holders = new Map(project.agents.filter((x) => x.live).map((x) => [x.live!.sessionId, x]))
   const many = project.agents.length > 1
   // Conversations only: a sub-session (a Codex guardian review, say) is never resumed.
-  const all = list.filter((s) => s.source === 'hive' && !s.archived && !s.sub && sessionInAgentFolder(project.path, a, s))
+  const all = list.filter((s) => s.source === 'combwork' && !s.archived && !s.sub && sessionInAgentFolder(project.path, a, s))
   const items: MenuEntry[] = [
     {
       header: true,
@@ -728,7 +728,7 @@ function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): Menu
   const full = project.agents.length >= agentLimit(project)
   return all.length
     ? all.flatMap((t) => [
-        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Combwork} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Combwork: one of Combwork's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
+        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, combwork {Combwork} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Combwork: one of Combwork's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
         ...t.agents.map((a, i) => ({
           // Their names as this project's, as main made them with its key (HI-1948: Hive's own are patterns of it, HI-B1);
           // none from main, `{key}` stays.
@@ -745,11 +745,11 @@ function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): Menu
 /** + Add ▾ → Templates: Save Template…, then the templates to load, by scope (loading replaces the agents, after saying who goes and who comes). */
 function templateMenuItems(project: ProjectInfo, all: TemplateEntry[]): MenuEntry[] {
   const load: MenuEntry[] = all.length
-    ? (['hive', 'workspace', 'project'] satisfies TemplateScope[]).flatMap((scope) => {
+    ? (['combwork', 'workspace', 'project'] satisfies TemplateScope[]).flatMap((scope) => {
         const here = all.filter((t) => t.scope === scope)
         return here.length
           ? [
-              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, hive {Combwork's templates} workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above Combwork's own templates (#1436), those kept in the workspace, or in this project." }), { scope }) },
+              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, combwork {Combwork's templates} workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above Combwork's own templates (#1436), those kept in the workspace, or in this project." }), { scope }) },
               ...here.map((t) => ({ label: templateTitle(t), icon: 'library', detail: shownProblem(t) ?? tr(msg({ id: 'panes.template.detail', defaultMessage: '{n, plural, one {# agent} other {# agents}} · {layout}', description: "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")." }), { n: t.agents.length, layout: layoutName(t.layout) }), disabled: !!t.problem, onClick: () => void actions.loadTemplate(project.path, t) }))
             ]
           : []

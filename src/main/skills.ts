@@ -140,7 +140,7 @@ async function readSkill(dir: string, level: SkillInfo['level'], plugin?: string
   const s: SkillInfo = { name: fm.name || basename(dir), description: fm.description ?? '', level, path: dir, plugin }
   // A Hive skill whose header can't be read, or whose audience isn't one Hive knows, has no audience: nobody gets it,
   // and `problem` says why. Other skills only lend their name and description, so a broken header just leaves those out.
-  if (level === 'hive') {
+  if (level === 'combwork') {
     if (fm.problem) Object.assign(s, { problem: fm.problem }, fm.problemText ? { problemText: fm.problemText } : {})
     else s.audience = fm.audience ?? 'agents'
   }
@@ -266,7 +266,7 @@ export async function hiveSkills(withMissing = false, role?: 'agent' | 'assistan
   const bundled = new Set(await bundledIds('skills'))
   for (const e of entries) {
     if (!e.isDirectory() || e.name.startsWith('.')) continue
-    const s = await readSkill(join(workspace.skillsDir, e.name), 'hive')
+    const s = await readSkill(join(workspace.skillsDir, e.name), 'combwork')
     if (!s) continue
     // The folder name is the identity Hive uses for copies and invocation.
     s.name = e.name
@@ -277,7 +277,7 @@ export async function hiveSkills(withMissing = false, role?: 'agent' | 'assistan
     const have = new Set(out.map((s) => s.name.toLowerCase()))
     for (const name of bundled) {
       if (have.has(name.toLowerCase())) continue
-      const s = await readSkill(join(bundledSkillsDir(), name), 'hive')
+      const s = await readSkill(join(bundledSkillsDir(), name), 'combwork')
       if (s) out.push({ ...s, name, bundled: 'missing' })
     }
   }
@@ -380,7 +380,7 @@ function assertName(name: string): void {
 }
 
 function targetDir(target: SkillTarget): string {
-  if (target.kind === 'hive') return workspace.skillsDir
+  if (target.kind === 'combwork') return workspace.skillsDir
   return localDir(workspace.assertProject(target.projectPath), target.provider)
 }
 
@@ -413,14 +413,14 @@ async function writeSkill(name: string, files: Map<string, Uint8Array | string>,
     for (const c of claimed) await rm(c, { recursive: true, force: true }).catch(() => undefined)
     throw e
   }
-  const s = (await readSkill(dirs[0], targets[0].kind === 'hive' ? 'hive' : 'local'))!
+  const s = (await readSkill(dirs[0], targets[0].kind === 'combwork' ? 'combwork' : 'local'))!
   if (targets[0].kind === 'local') s.provider = targets[0].provider
   else s.name = name
   return s
 }
 
 /** A new skill with a starter SKILL.md, in the workspace or a project's local folders. */
-export async function createSkill(name: string, description: string, targets: SkillTarget[] = [{ kind: 'hive' }]): Promise<SkillInfo> {
+export async function createSkill(name: string, description: string, targets: SkillTarget[] = [{ kind: 'combwork' }]): Promise<SkillInfo> {
   const desc = yamlText(description || 'Describe when the agent should use this skill.') // i18n-ignore: SKILL.md's text, which agents read
   // i18n-ignore: a new SKILL.md's text, which agents read
   const text = `---\nname: ${name}\ndescription: ${desc}\n---\n\n# ${name}\n\nWrite the instructions the agent should follow when this skill applies.\n`
@@ -521,7 +521,7 @@ export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
   const dest = join(workspace.skillsDir, name)
   if (existsSync(dest)) await trash(dest)
   await restoreBundled('skills', name)
-  const s = (await readSkill(dest, 'hive'))!
+  const s = (await readSkill(dest, 'combwork'))!
   return { ...s, name, bundled: 'same' }
 }
 
@@ -533,7 +533,7 @@ export async function copySkillToWorkspace(skillPath: string): Promise<SkillInfo
   if (existsSync(dest)) throw hiveError(msg({ id: 'content.skill.copyExists', defaultMessage: 'The workspace already has a skill named "{name}"', description: 'An error copying a skill into the workspace: it has one called {name} already.' }), { name }, { kind: 'conflict' })
   if (!(await isFile(join(skillPath, 'SKILL.md')))) throw hiveError(msg({ id: 'content.skill.notSkill', defaultMessage: 'Not a skill folder (no SKILL.md)', description: 'An error copying a skill into the workspace: its folder has no SKILL.md (a file name: keep it).' }))
   await copyDir(skillPath, dest)
-  const s = (await readSkill(dest, 'hive'))!
+  const s = (await readSkill(dest, 'combwork'))!
   s.name = name
   return s
 }

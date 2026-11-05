@@ -441,22 +441,6 @@ describe('the saved file is untrusted', () => {
     await disposeWorkspaceService(w)
   })
 
-  it('a tool saved before HI-2463 (hive_<tool>) is read as cw_<tool>, merged with its new series and counted once', async () => {
-    const { w, path } = await open()
-    await w.close()
-    const series = (tool: string, count: number) => ({ tool, role: 'agent', mode: 'compact', outcome: 'ok', count, totalMs: count, maxMs: 1, histogram: [count, ...histogram.slice(1)], chars: 10 * count, bytes: 10 * count })
-    write(path, { version: 1, buckets: [{ start: hourOf(T0) - HOUR, span: 'hour', projects: { alpha: { mcp: { a: series('hive_list_tasks', 2), b: series('cw_list_tasks', 3), c: series('hive_inbox', 1) } } } }] })
-    await w.open(path)
-    const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - 2 * HOUR).toISOString() })
-    const mcp = r.projects.alpha.mcp.map((s) => ({ tool: s.tool, count: s.count, chars: s.chars })).sort((a, b) => a.tool.localeCompare(b.tool))
-    expect(mcp).toEqual([{ tool: 'cw_inbox', count: 1, chars: 10 }, { tool: 'cw_list_tasks', count: 5, chars: 50 }])
-    // Read again (a second load), still once: the projection reads what is stored, it never adds to it.
-    await w.close()
-    await w.open(path)
-    expect(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - 2 * HOUR).toISOString() }).projects.alpha.mcp.find((s) => s.tool === 'cw_list_tasks')!.count).toBe(5)
-    await disposeWorkspaceService(w)
-  })
-
   it("a launch saved before 0.9.3 counts its persona's size as its mode's (#1084)", async () => {
     const { w, path } = await open()
     await w.close()
@@ -1222,7 +1206,7 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
     for (const p of ['alpha', 'beta']) mkdirSync(join(path, p), { recursive: true })
     const at = new Date(T0 - HOUR).toISOString()
     const usage = (input: number, cost: number | null, context = 0) => ({ inputTokens: input, outputTokens: 1, cacheWriteTokens: 0, cacheReadTokens: 0, requests: 2, reasoningTokens: 0, contextTokens: context, contextWindow: context ? 200000 : null, compactions: [], cacheTtlSeconds: 300, firstActivity: at, lastActivity: at, userMessages: 1, lastPrompt: null, costUsd: cost, costEstimated: false })
-    const item = (id: string, u: (ReturnType<typeof usage> & { safeguards?: Record<string, number> }) | null, agentName?: string) => ({ id, provider: 'claude-code', source: 'hive', title: null, lastActivity: at, hasTranscript: true, hasBackup: false, usage: u, recache: null, ...(agentName ? { agentName } : {}) })
+    const item = (id: string, u: (ReturnType<typeof usage> & { safeguards?: Record<string, number> }) | null, agentName?: string) => ({ id, provider: 'claude-code', source: 'combwork', title: null, lastActivity: at, hasTranscript: true, hasBackup: false, usage: u, recache: null, ...(agentName ? { agentName } : {}) })
     const byPath: Record<string, unknown[]> = {
       [join(path, 'alpha').toLowerCase()]: [item('a1', { ...usage(100, 1, 5000), safeguards: { 'claude-opus-5-5': 2 } }, 'HB3'), item('a2', { ...usage(50, null, 15000), safeguards: { 'claude-opus-5-5': 1, 'claude-opus-4-8': 1 } }, 'HB3')],
       [join(path, 'beta').toLowerCase()]: [item('b1', null)],
@@ -1428,7 +1412,7 @@ describe('#116 round 2: observation boundaries, evicted history, unreadable sess
     const { w, path } = await open()
     for (const p of ['alpha', 'beta']) mkdirSync(join(path, p), { recursive: true })
     const when = new Date(T0 - HOUR).toISOString()
-    const item = (id: string) => ({ id, provider: 'claude-code', source: 'hive', title: null, lastActivity: when, hasTranscript: true, hasBackup: false, usage: null, recache: null })
+    const item = (id: string) => ({ id, provider: 'claude-code', source: 'combwork', title: null, lastActivity: when, hasTranscript: true, hasBackup: false, usage: null, recache: null })
     const broken = new Set<string>()
     const orig = { usageItems: sessions.usageItems }
     ;(sessions as unknown as { usageItems: (p: string) => Promise<unknown[]> }).usageItems = async (p) => {

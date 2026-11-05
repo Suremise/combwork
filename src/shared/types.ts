@@ -275,7 +275,7 @@ export interface AppSettings {
   agentApi: {
     enabled: boolean
     port: number
-    provideHiveMcp: boolean
+    provideCombworkMcp: boolean
     allowSessionInput: boolean
     /** Agents and the Hive Assistant may read the developer console through the hive tools (#636): their own sessions; the Assistant its workspace's. */
     devConsole: boolean
@@ -1005,7 +1005,7 @@ export interface CustomCommand {
 
 /** A command a point runs: Hive's or the workspace's, by id. */
 export interface CommandRef {
-  scope: 'hive' | 'workspace'
+  scope: 'combwork' | 'workspace'
   id: string
 }
 
@@ -1473,7 +1473,7 @@ export interface ProjectWorkflow {
   mergeAsk?: true
   /**
    * HI-1997: Git's commit message (G19) set to Hive's by a choice, not left by a preset: set by `writeWorkflow` when a
-   * write changes it to 'hive', kept while it stays so. The one-time switch to the branch's own keeps such a project's.
+   * write changes it to 'combwork', kept while it stays so. The one-time switch to the branch's own keeps such a project's.
    */
   commitMessageChosen?: true
 }
@@ -2119,7 +2119,7 @@ export interface MergeBranchList {
   checkedOut: string | null
 }
 
-export type UnusedWorktreeOrigin = { madeBy: 'hive'; agentName?: string } | { madeBy: 'other' }
+export type UnusedWorktreeOrigin = { madeBy: 'combwork'; agentName?: string } | { madeBy: 'other' }
 
 /** A project's unused worktrees, or why git couldn't list them. */
 export interface UnusedWorktrees {
@@ -2841,7 +2841,7 @@ export interface MoveReport {
   complete: boolean
 }
 
-export type SkillLevel = 'hive' | 'machine' | 'plugin' | 'local'
+export type SkillLevel = 'combwork' | 'machine' | 'plugin' | 'local'
 
 export interface SkillInfo {
   /** For machine (user), plugin and local skills: the provider that loads them. */
@@ -2877,7 +2877,7 @@ export interface SkillDeliveryChoice {
 }
 
 /** Where a new skill goes: the workspace's Hive skills, or a provider's local skills folder in a project. */
-export type SkillTarget = { kind: 'hive' } | { kind: 'local'; projectPath: string; provider: ProviderId }
+export type SkillTarget = { kind: 'combwork' } | { kind: 'local'; projectPath: string; provider: ProviderId }
 
 export interface McpServerDef {
   command?: string
@@ -3278,7 +3278,7 @@ export interface PurgeResult {
 export interface SessionListItem extends Partial<SessionRecord> {
   id: string
   provider: ProviderId
-  source: 'hive' | 'external'
+  source: 'combwork' | 'external'
   title: string | null
   lastActivity: string | null
   hasTranscript: boolean
@@ -4040,7 +4040,7 @@ export interface LaneStatus {
  * Who reported a progress run: a project agent (by its token), the Hive Assistant, a script with the workspace token, or
  * Hive itself (its merge queue's checks, #1349: no agent and no token reports them).
  */
-export type ProgressSource = 'agent' | 'assistant' | 'api' | 'hive'
+export type ProgressSource = 'agent' | 'assistant' | 'api' | 'combwork'
 
 /**
  * A merge slot (#350): one merge at a time into a project's branch. `holder` is who merges now (an agent, or the user's

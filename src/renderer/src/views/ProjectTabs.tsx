@@ -486,7 +486,7 @@ export function OverviewTab({ project }: { project: ProjectInfo }) {
   if (!items) return error ? <LoadFailed what={tr(M.sessionsTarget)} error={error} onRetry={reload} /> : <div className="empty-state"><Icon name="loading" spin />{tr(M.loading)}</div>
 
   const from = periodFrom(period, now)
-  const inPeriod = activeIn([...items.filter((i) => i.source === 'hive'), ...kept], from)
+  const inPeriod = activeIn([...items.filter((i) => i.source === 'combwork'), ...kept], from)
   const total = sumUsage(inPeriod, from)
   const running = project.agents.filter((a) => a.live && !a.live.settingUp)
   const used = new Set([...inPeriod.map((i) => i.provider), ...running.map((a) => a.live!.provider)])
@@ -752,7 +752,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
   const liveState = agent ? agent.live : project.live
   const current = useMemo(() => {
     if (liveState?.sessionId) return items.find((i) => i.id === liveState.sessionId) ?? null
-    const own = items.filter((i) => i.source === 'hive' && (!agent || sessionAgent(project, i) === agent.id))
+    const own = items.filter((i) => i.source === 'combwork' && (!agent || sessionAgent(project, i) === agent.id))
     return own.find((i) => !i.archived) ?? own[0] ?? null
   }, [items, liveState?.sessionId, agent, project])
   const u: SessionUsage | null = current?.usage ?? null
@@ -1463,8 +1463,8 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
   const setHiveOpen = (open: boolean): void => setFold({ hive: open })
   const all = skills ?? []
   // This project's agents get the Hive skills for them; those for the Assistant alone are left out, and counted.
-  const hive = all.filter((s) => s.level === 'hive' && s.audience !== 'assistant')
-  const assistantOnly = all.filter((s) => s.level === 'hive' && s.audience === 'assistant').length
+  const hive = all.filter((s) => s.level === 'combwork' && s.audience !== 'assistant')
+  const assistantOnly = all.filter((s) => s.level === 'combwork' && s.audience === 'assistant').length
   const current = selected ? all.find((s) => s.path === selected) : undefined
 
   const add = async (mode: 'new' | 'file', provider: ProviderId): Promise<void> => {
@@ -1502,7 +1502,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
           )}
           {skills && (
             <div className="skill-group skill-group-toggle" role="button" tabIndex={0} aria-expanded={hiveOpen} onClick={() => setHiveOpen(!hiveOpen)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setHiveOpen(!hiveOpen))}>
-              <Icon name={hiveOpen ? 'chevron-down' : 'chevron-right'} /> {tr(C.hiveGroup)} <span className="count">{hive.length}</span> <InfoTip text={SKILL_LEVEL_TIP.hive} />
+              <Icon name={hiveOpen ? 'chevron-down' : 'chevron-right'} /> {tr(C.hiveGroup)} <span className="count">{hive.length}</span> <InfoTip text={SKILL_LEVEL_TIP.combwork} />
             </div>
           )}
           {skills && hiveOpen && hive.length === 0 && <div className="pane-empty">{tr(C.noHiveSkills)}</div>}
@@ -1593,7 +1593,7 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
   const { load: loadScoped } = loaded
   const load = useCallback(() => loadScoped(wsPath, () => call('mcp:list')), [wsPath, loadScoped])
   useEffect(load, [load, version])
-  const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideHiveMcp && api?.running)
+  const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideCombworkMcp && api?.running)
   // Only the servers added here (HI-2059): a broken definition still named in its list stays, to be removed.
   const added = (servers ?? []).filter((m) => serverAddedIn({ ...m, def: m.def ?? {} }, project.path))
   // Which agents get a server, once any agent has a choice of its own (#537, Agent Settings → MCP servers).

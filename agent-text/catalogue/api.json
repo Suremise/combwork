@@ -533,10 +533,10 @@
     "text": "project is required with agent"
   },
   "api.console.saySource": {
-    "text": "Say which source: agent (and project), source=assistant or source=hive"
+    "text": "Say which source: agent (and project), source=assistant or source=combwork"
   },
   "api.console.sourceArg": {
-    "text": "source is hive or assistant; name an agent with agent (and project)"
+    "text": "source is combwork or assistant; name an agent with agent (and project)"
   },
   "api.console.unknownKinds": {
     "text": "Unknown event kinds: {kinds} (kinds are {known})"

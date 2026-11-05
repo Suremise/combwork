@@ -37,6 +37,6 @@ export const SHIPPED_SKILL_SOURCES: Record<string, string> = {
 
 /** A Hive skill's description as the window shows it: one Hive ships, translated while its copy still has Hive's words. */
 export const shippedSkillDescription = (s: { name: string; description: string; level: string; bundled?: string }): Msg | undefined => {
-  const shipped = s.level === 'hive' && s.bundled ? SHIPPED_SKILL_DESCRIPTIONS[s.name] : undefined
+  const shipped = s.level === 'combwork' && s.bundled ? SHIPPED_SKILL_DESCRIPTIONS[s.name] : undefined
   return shipped && (SHIPPED_SKILL_SOURCES[s.name] ?? shipped.defaultMessage) === s.description ? shipped : undefined
 }

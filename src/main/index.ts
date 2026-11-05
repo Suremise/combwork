@@ -38,6 +38,7 @@ import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
 import { MARKED_LOG } from '../shared/redact'
 import { APP_NAME, DEV_APP_NAME, appName, legacyProfileFolder, profileFolder } from '../shared/appName'
 import { chooseProfile, choiceLine, setProfileChoices } from './profileFolders'
+import { upgradeProfileFiles } from './nameUpgradeProfile'
 import { syncLoginItemAtStart } from './loginItem'
 import { startProfileNotices } from './profileNotices'
 import { PROVIDERS, dangerModes, labelList, projectProviderConfig, providerSettings } from '../shared/providers'
@@ -162,6 +163,8 @@ if (process.env.CW_USER_DATA && !app.isPackaged && process.env.CW_TEST_PROFILE_C
   chooseProfiles(join(base, 'appdata'), join(base, 'localappdata'), false)
 } else if (process.env.CW_USER_DATA) app.setPath('userData', process.env.CW_USER_DATA)
 else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local'), app.isPackaged)
+// The names upgrade's stored values in the profile (HI-2598), before any of its files is read.
+upgradeProfileFiles(app.getPath('userData'))
 // Key masking as the profile's files say, before the first line is logged (HI-1855): strict only where a key may be.
 startCoverageEarly()
 // Every way out from here on is logged (#985).
@@ -1071,7 +1074,7 @@ app.whenReady().then(async () => {
       }
     }
     const url = assistantApiUrl()
-    if (!s.enabled || !s.provideHiveMcp || !url) return null
+    if (!s.enabled || !s.provideCombworkMcp || !url) return null
     return {
       command: process.execPath,
       args: [hiveMcpScript()],

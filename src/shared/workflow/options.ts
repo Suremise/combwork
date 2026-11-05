@@ -16,13 +16,13 @@ import type { ReviewerMode } from './roles'
 /** G1 / N1: who checks the work before it's done. */
 export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
 /** G5: who finishes a code card. None's only way is acceptance. */
-export type Finisher = 'hiveMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept'
+export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept'
 /** G11: where cards are built. None always works in the project folder (OP-16). */
 export type FolderMode = 'slots' | 'project'
 /** G9's install: from scratch when the manifests changed (the default, and always so), or before every merge. */
 export type MergeInstall = 'onManifestChange' | 'always'
 /** G19: the message of Hive's merge commit: Hive's (`KEY: title` and trailers) or the branch's own. */
-export type CommitMessage = 'hive' | 'branch'
+export type CommitMessage = 'combwork' | 'branch'
 /** G10: your OK before merging. */
 export interface OkBefore {
   mode: 'never' | 'labels' | 'every'
@@ -283,7 +283,7 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
     review: 'agent',
     noSelfReview: true,
     preChecks: checks.quick,
-    finish: 'hiveMerges',
+    finish: 'combworkMerges',
     style: 'merge',
     target: checks.target || 'main',
     mergeChecks: checks.quick,
@@ -312,7 +312,7 @@ export const CONTRADICTIONS = {
   mergeNeedsSlots: msg({ id: 'workflow.contradiction.mergeNeedsSlots', defaultMessage: 'When Combwork or the agent merges, each card needs its own folder.', description: 'Why workflow options cannot be saved: a merging option was chosen while everyone works in the project folder.' }),
   committedNeedsFolder: msg({ id: 'workflow.contradiction.committedNeedsFolder', defaultMessage: '“Committed is done” needs everyone in the project folder.', description: 'Why workflow options cannot be saved: “Committed is done” was chosen while each card has its own folder.' }),
   okWithReview: msg({ id: 'workflow.contradiction.okWithReview', defaultMessage: 'Your OK before merging is already part of review by you.', description: "Why workflow options cannot be saved: the user's OK before merging was set while the user already reviews." }),
-  hiveMergesNeedsGit: msg({ id: 'workflow.contradiction.combworkMergesNeedsGit', defaultMessage: 'Merging needs Git: without version control, work is accepted where it is.', description: 'Why workflow options cannot be saved: a merge option was set for a project with no version control.' }),
+  combworkMergesNeedsGit: msg({ id: 'workflow.contradiction.combworkMergesNeedsGit', defaultMessage: 'Merging needs Git: without version control, work is accepted where it is.', description: 'Why workflow options cannot be saved: a merge option was set for a project with no version control.' }),
   quorumNeedsAgent: msg({ id: 'workflow.contradiction.quorumNeedsAgent', defaultMessage: 'Two reviewers per card need review by reviewer agents.', description: 'Why workflow options cannot be saved: two reviewers per card were set without reviewer agents.' }),
   upToDateNeedsSlots: msg({ id: 'workflow.contradiction.upToDateNeedsSlots', defaultMessage: 'Slots are brought up to date only when each card has its own folder.', description: 'Why workflow options cannot be saved: “Slots are brought up to date before each card” (G15) was set while everyone works in the project folder (glossary 2.5: slot).' }),
   poolNeedsAgent: msg({ id: 'workflow.contradiction.poolNeedsAgent', defaultMessage: 'A shared pool of reviewers needs review by reviewer agents.', description: 'Why workflow options cannot be saved: “Reviewers” was set to a shared pool (reviewer agents lanes share) without review by reviewer agents.' }),
@@ -353,7 +353,7 @@ export const CONTRADICTION_ROWS: Record<Contradiction, OptionKey[]> = {
   mergeNeedsSlots: ['finish', 'folder'],
   committedNeedsFolder: ['finish', 'folder'],
   okWithReview: ['okBefore', 'review'],
-  hiveMergesNeedsGit: ['finish'],
+  combworkMergesNeedsGit: ['finish'],
   quorumNeedsAgent: ['reviewers', 'review'],
   poolNeedsAgent: ['reviewerMode', 'review'],
   upToDateNeedsSlots: ['slotsUpToDate', 'folder'],
@@ -385,19 +385,19 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   if (o.reviewers === 2 && !reviewerAgent(o.review)) out.push('quorumNeedsAgent')
   if (reviewerModeOf(o) === 'pool' && !reviewerAgent(o.review)) out.push('poolNeedsAgent')
   if (o.platform === 'none') {
-    if (o.finish !== 'accept') out.push('hiveMergesNeedsGit')
+    if (o.finish !== 'accept') out.push('combworkMergesNeedsGit')
     if (o.folder !== 'project') out.push('noneHasNoSlots')
   } else {
-    if (o.finish === 'accept') out.push('hiveMergesNeedsGit')
-    if ((o.finish === 'hiveMerges' || o.finish === 'agentMerges') && o.folder !== 'slots') out.push('mergeNeedsSlots')
+    if (o.finish === 'accept') out.push('combworkMergesNeedsGit')
+    if ((o.finish === 'combworkMerges' || o.finish === 'agentMerges') && o.folder !== 'slots') out.push('mergeNeedsSlots')
     if (o.finish === 'committed' && o.folder !== 'project') out.push('committedNeedsFolder')
     // G15 depends on G11 alone (#1445): only a slot is brought up to date.
     if (o.slotsUpToDate && o.folder !== 'slots') out.push('upToDateNeedsSlots')
     // G20 (HI-1367): its runner is needed; its picker isn't (without one, every card names its own tests).
-    if (o.focusedTests && o.finish === 'hiveMerges' && !o.commands[FOCUSED_RUN]?.trim()) out.push('focusedNeedsRunner')
+    if (o.focusedTests && o.finish === 'combworkMerges' && !o.commands[FOCUSED_RUN]?.trim()) out.push('focusedNeedsRunner')
   }
   if (o.okBefore.mode !== 'never' && reviewByYou(o.review)) out.push('okWithReview')
-  if (where.subfolder && o.platform === 'git' && (o.finish === 'hiveMerges' || o.finish === 'agentMerges') && !o.targetOwn) out.push('subfolderTarget')
+  if (where.subfolder && o.platform === 'git' && (o.finish === 'combworkMerges' || o.finish === 'agentMerges') && !o.targetOwn) out.push('subfolderTarget')
   return out
 }
 
@@ -426,13 +426,13 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   noSelfReview: bool,
   preChecks: strings,
   sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
-  finish: oneOf<Finisher>(['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
+  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
   style: oneOf<WorkflowOptions['style']>(['merge', 'squash', 'rebase']),
   target: (v) => typeof v === 'string',
   targetOwn: (v) => v === true,
   strict: bool,
   pushTarget: bool,
-  commitMessage: oneOf<CommitMessage>(['hive', 'branch']),
+  commitMessage: oneOf<CommitMessage>(['combwork', 'branch']),
   mergeChecks: strings,
   mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),
   focusedTests: bool,
@@ -541,15 +541,15 @@ export function previewRows(options: WorkflowOptions, effective: WorkflowOptions
  * with everyone in the project folder (the only place a commit can take in another agent's files).
  */
 export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
-  if (key === 'mergeChecks' || key === 'focusedTests') return o.finish === 'hiveMerges'
+  if (key === 'mergeChecks' || key === 'focusedTests') return o.finish === 'combworkMerges'
   // The install comes before G9's checks and G20's run alike (HI-1367): focused tests alone install too.
-  if (key === 'mergeInstall') return o.finish === 'hiveMerges' && (o.mergeChecks.length > 0 || o.focusedTests)
+  if (key === 'mergeInstall') return o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)
   // G8 strict (#1352): the merge queue brings work up to date, so only when Hive merges.
-  if (key === 'strict') return o.finish === 'hiveMerges'
+  if (key === 'strict') return o.finish === 'combworkMerges'
   // G18 (#1179): only the merge queue pushes.
-  if (key === 'pushTarget') return o.finish === 'hiveMerges'
+  if (key === 'pushTarget') return o.finish === 'combworkMerges'
   // G19 (HI-1697): only the merge queue makes a merge's commit, and Rebase makes none (the branch's commits land).
-  if (key === 'commitMessage') return o.finish === 'hiveMerges' && o.style !== 'rebase'
+  if (key === 'commitMessage') return o.finish === 'combworkMerges' && o.style !== 'rebase'
   if (key === 'sharedFolderWarning') return o.folder === 'project'
   // G15 depends on G11 alone: only with each card in a slot. G17 whenever a reviewer agent reviews, whatever G11 is
   // (with everyone in the project folder the pool's reviewers read in review copies, #1439).

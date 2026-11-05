@@ -1,12 +1,12 @@
 // G19's default switched to the branch's own message (HI-1997, Darren's decisions of 29 Oct): every preset and All off now
 // merge with the branch's own commit messages, not Hive's (the card's key and trailers), since card titles name people
 // and details a public history shouldn't keep. Until then the presets filled Hive's into every level they were chosen at,
-// so a stored 'hive' can't tell a choice from a fill. A one-time step switches the fills:
-// - a project's own Git options (in force, or kept for another platform, #1419) drop a stored 'hive', and so inherit the
+// so a stored 'combwork' can't tell a choice from a fill. A one-time step switches the fills:
+// - a project's own Git options (in force, or kept for another platform, #1419) drop a stored 'combwork', and so inherit the
 //   new default, unless something proves the user chose it: its `commitMessageChosen` mark (projectWorkflow.ts, set by a
 //   write that changes it to Hive's), or its merge-choice record (HI-1697) saying Hive's. Darren's decision (09:31): an
-//   ambiguous saved 'hive' is the old default, and switches;
-// - the workspace's and Hive's own Git defaults drop a stored 'hive' likewise (nothing records a choice there);
+//   ambiguous saved 'combwork' is the old default, and switches;
+// - the workspace's and Hive's own Git defaults drop a stored 'combwork' likewise (nothing records a choice there);
 // - a stored 'branch' is never touched.
 //
 // Once, durably, like the G15 step (slotsUpToDateStep.ts): each project settled under its lock with its `stepsDone`
@@ -32,7 +32,7 @@ export const COMMIT_MESSAGE_STEP = 'workflow.commitMessageDefault'
 
 /** Git options without a stored Hive's commit message; null when they have none. */
 function withoutHive(options: Partial<WorkflowOptions> | undefined): Partial<WorkflowOptions> | null {
-  if (!options || options.commitMessage !== 'hive') return null
+  if (!options || options.commitMessage !== 'combwork') return null
   const { commitMessage: _hive, ...rest } = options
   return rest
 }
@@ -57,10 +57,10 @@ export function settledCommitMessage(wf: ProjectWorkflow | null | undefined, cho
  */
 export function keptAnswered(wf: ProjectWorkflow | null | undefined): ProjectWorkflow | null {
   if (!wf) return null
-  if (wf.platform === 'git') return wf.options?.commitMessage === undefined ? writeWorkflow(wf, { platform: 'git', preset: wf.preset, options: { ...wf.options, commitMessage: 'hive' } }) : null
+  if (wf.platform === 'git') return wf.options?.commitMessage === undefined ? writeWorkflow(wf, { platform: 'git', preset: wf.preset, options: { ...wf.options, commitMessage: 'combwork' } }) : null
   const git = wf.kept?.git
   if (!git || git.options?.commitMessage !== undefined) return null
-  return { ...wf, commitMessageChosen: true, kept: { ...wf.kept, git: { ...git, options: { ...git.options, commitMessage: 'hive' } } } }
+  return { ...wf, commitMessageChosen: true, kept: { ...wf.kept, git: { ...git, options: { ...git.options, commitMessage: 'combwork' } } } }
 }
 
 /** Workflow defaults (Hive's or a workspace's) without a stored Hive's commit message for Git; null when they have none. */
@@ -82,7 +82,7 @@ export async function settleGlobalCommitMessage(): Promise<void> {
     c.settings.stepsDone = [...(c.settings.stepsDone ?? []), COMMIT_MESSAGE_STEP]
   })
   if (!(await config.saveNow())) {
-    // Not recorded on disk: the next start runs it again (dropping a 'hive' again is the same change).
+    // Not recorded on disk: the next start runs it again (dropping a 'combwork' again is the same change).
     return log.warn("Combwork's workflow defaults couldn't be saved with the branch's own commit messages: tried again at the next start")
   }
   if (next) log.info("Combwork's workflow defaults now merge with the branch's own commit messages (HI-1997)")
@@ -106,7 +106,7 @@ export async function settleCommitMessageDefault(ws: WorkspaceService, hooks: St
       await hooks.beforeProject?.(folder)
       if (!alive()) return changed
       // The board's record of the user's answer (HI-1697): Hive's chosen there is kept.
-      const answered = mergeChoiceOf(ws, basename(folder))?.commitMessage === 'hive'
+      const answered = mergeChoiceOf(ws, basename(folder))?.commitMessage === 'combwork'
       let did = false
       await ws.mutateProjectConfig(folder, (c) => {
         if (boardValue(ws, COMMIT_MESSAGE_STEP) !== null || c.stepsDone?.includes(COMMIT_MESSAGE_STEP)) return {}

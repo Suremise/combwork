@@ -797,7 +797,7 @@ let senderRefusal = (from: DeliverySender): string | null => {
  * Whether an agent can read its inbox (#650): the Assistant always (its own tools); a project agent through its hive
  * tools, which it has only while the Agent API and the built-in hive server are on.
  */
-let readsInbox = (_host: string, agentId: string): boolean => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideHiveMcp)
+let readsInbox = (_host: string, agentId: string): boolean => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideCombworkMcp)
 export const agentReadsInbox = (host: string, agentId: string): boolean => readsInbox(host, agentId)
 
 /**
@@ -835,7 +835,7 @@ const noInbox = (name: string): string => say(T.noInbox, { name })
 export class NoInbox extends Error {}
 /** For tests: whether agents can read their inbox (null: as the settings say). */
 export const setReadsInboxForTests = (fn: ((host: string, agentId: string) => boolean) | null): void => {
-  readsInbox = fn ?? ((_host, agentId) => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideHiveMcp))
+  readsInbox = fn ?? ((_host, agentId) => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideCombworkMcp))
 }
 /** For tests: how a sender's permission is worked out. */
 export const setSenderCheckForTests = (fn: (from: DeliverySender) => string | null): void => {
@@ -2062,7 +2062,7 @@ export async function carryConversation(host: string, agentId: string, from: str
 
 /** Who tells a fresh conversation what its earlier one received and didn't ack: Combwork itself. */
 // agent-protocol: the product's name, as a delivery's sender
-const CARRIED_SENDER = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const CARRIED_SENDER = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 // The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts' deliveries, read from the
 // file before, go from memory (a save begun from them is refused by their generation). The next use of a host (an agent's

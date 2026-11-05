@@ -610,7 +610,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // it gets none. Not where the user's own arguments choose, nor with the switch off (#1167).
     const refresh = appended || ctx.promptAddedBefore === true
     if (refresh && ctx.resume && launchOverrides(ctx.overrides, CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
-    if (ctx.trustedHiveTools?.length && ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveHiveTools')) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__${TOOLS_SERVER}__${t}`).join(','))
+    if (ctx.trustedHiveTools?.length && ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveCombworkTools')) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__${TOOLS_SERVER}__${t}`).join(','))
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
     if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)
     if (ctx.effort) args.push('--effort', ctx.effort)
@@ -665,7 +665,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     this.hooksByRun.delete(ctx.runId)
     const secrets = [ctx.hookAuthFile, ctx.env.CW_HOOK_TOKEN ?? '']
     const off = this.hooksOffIn(ctx)
-    const hive = rowsOfHooksTable(passed, { source: 'hive', status: off ? 'disabled' : 'passed', ...(off ? { why: off } : {}), observed: true }, secrets)
+    const hive = rowsOfHooksTable(passed, { source: 'combwork', status: off ? 'disabled' : 'passed', ...(off ? { why: off } : {}), observed: true }, secrets)
     const read = (): ReturnType<typeof settingsScopes> => settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
     // What of a scope decides its hooks: their table and the switches that turn them off.
     const print = (json: unknown): string => {

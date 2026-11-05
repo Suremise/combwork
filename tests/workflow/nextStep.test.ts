@@ -22,7 +22,7 @@ interface Cell {
 const cells: Cell[] = []
 for (const platform of ['git', 'none'] as const)
   for (const review of ['none', 'agent', 'agentThenYou', 'you'] as ReviewBy[])
-    for (const finish of (platform === 'git' ? ['hiveMerges', 'agentMerges', 'committed', 'notChecked'] : ['accept']) as Finisher[])
+    for (const finish of (platform === 'git' ? ['combworkMerges', 'agentMerges', 'committed', 'notChecked'] : ['accept']) as Finisher[])
       for (const kind of ['code', 'no-code'] as const)
         for (const ok of ['never', 'every'] as const) cells.push({ platform, review, finish, folder: platform === 'git' && finish !== 'committed' ? 'slots' : 'project', kind, ok })
 

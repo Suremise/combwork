@@ -135,7 +135,7 @@ const assistantOnly = bundledForAssistant.length + 1
   check('project tab: the default and both are', has('plain') && has('both-ways') && has('work-on-card'))
   const note = await page.locator('.assistant-only-note').innerText().catch(() => '')
   check('project tab: says how many are left out, and why', note.startsWith(`${assistantOnly} Combwork skills are for the Assistant only`) && /don't get them/.test(note), note)
-  const agentsGet = (await inv('skills:list', proj)).filter((s) => s.level === 'hive' && s.audience !== 'assistant').length
+  const agentsGet = (await inv('skills:list', proj)).filter((s) => s.level === 'combwork' && s.audience !== 'assistant').length
   check('project tab: its Combwork rows are what project agents are given', tabRows.filter((t) => !/Local|User|Plugin/.test(t)).length >= agentsGet)
 
   // Copy to workspace: says who gets it now, from its own metadata. The provider's local skills start folded (#118).

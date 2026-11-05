@@ -365,7 +365,7 @@ describe("the canary dialect over the inbox's, lane, agent and usage watches' an
   const PROTOCOL = ['[CW]', 'New in your inbox:', 'User']
   const VALUES = ['HB1', 'HB2', 'alpha', 'Ship it', 'Yes', 'hello', 'Anthropic', 'greet', 'l-1', '1.0.0', '1.0.1', 'UTC', 'nope', 'x']
   const ms = Array.from({ length: 30 }, (_, i) => `m${i + 1}`)
-  const record = (n: number, over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: `m${n}`, seq: n, agentId: 'a1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, card: 7, body: 'hello', state: 'offered', created: '2026-11-03T10:00:00.000Z', expires: '2026-11-04T10:00:00.000Z', ...over })
+  const record = (n: number, over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: `m${n}`, seq: n, agentId: 'a1', conversation: null, kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, card: 7, body: 'hello', state: 'offered', created: '2026-11-03T10:00:00.000Z', expires: '2026-11-04T10:00:00.000Z', ...over })
   const agent = { projectPath: 'C:/ws/alpha', agentId: 'b1', name: 'HB1', project: 'alpha' }
 
   function texts(): { name: string; text: string; values?: string[] }[] {

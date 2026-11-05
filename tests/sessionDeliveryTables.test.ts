@@ -149,7 +149,7 @@ describe('records through their rows (storeCodec.ts)', () => {
       expect(Object.getPrototypeOf(back)).toBe(Object.prototype)
     }
     // A delivery whose body has a lone surrogate: deliveries.ts reads it, so it keeps its row.
-    const lone = { id: 'm9', seq: 9, agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Combwork' }, body: 'half \ud83d of an emoji', state: 'queued', created: at, expires: at }
+    const lone = { id: 'm9', seq: 9, agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'half \ud83d of an emoji', state: 'queued', created: at, expires: at }
     expect(readDelivery(json(lone))).not.toBeNull()
     expect(deliveryFromRow(deliveryToRow('p1', lone)!)).toEqual(lone)
     const prot = own(fullDelivery('m8', 8), '__proto__', 1)

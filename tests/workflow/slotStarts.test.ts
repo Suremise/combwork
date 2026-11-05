@@ -214,7 +214,7 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     expect(lineFacts(e, card.id)).toEqual([])
     // Its preparation makes the line and records it (slotCards.ts's prepare).
     sh(e.project, 'branch', line, s.started!.base!)
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: s.started!.base! }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: s.started!.base! }))
     expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
     await reconcile(e.wf, card)
     expect(lineFacts(e, card.id)).toEqual([])
@@ -231,7 +231,7 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     const card = e.wf.createCard({ title: 'Started again' })
     moved(await e.wf.start(card.key, B1))
     const line = e.wf.state(card).started!.line!
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: 'r' }))
     expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
     // Put back, then started again in another slot's lease: the earlier preparation was for the earlier cycle.
     moved(await e.wf.move(card.key, 'todo', 'user'))
@@ -250,7 +250,7 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     moved(await e.wf.start(card.key, B1))
     const s = e.wf.state(card)
     const line = s.started!.line!
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease, line, revision: s.started!.base! }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease, line, revision: s.started!.base! }))
     // Prepared, then deleted outside Combwork before this observer reads it.
     sh(e.project, 'branch', line, s.started!.base!)
     sh(e.project, 'branch', '-D', line)

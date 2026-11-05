@@ -99,7 +99,7 @@ const check = (name, ok, extra = '') => {
     check('the turn finishes', !!(await lib.until(async () => (await status()) === 'finished', 60000, 200)), await status())
     // Combwork leaves Copilot its own mouse handling (no --no-mouse, #737): it tracks any motion.
     check('Copilot tracks the mouse', !!(await lib.until(async () => (await mouse()) === 'any', HUNG_MS, 100)), await mouse())
-    check("right-click is Combwork's", (await rightClickGoesTo()) === 'hive', await rightClickGoesTo())
+    check("right-click is Combwork's", (await rightClickGoesTo()) === 'combwork', await rightClickGoesTo())
 
     // Where the text is: the middle of its first character, and a character's width from two words' positions.
     const at = await lib.until(async () => {

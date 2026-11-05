@@ -34,7 +34,7 @@ const switches = new Map<string, number>()
 const revision = (key: string): number => switches.get(key) ?? 0
 
 /** Hive's own deliveries come from it. */
-const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /**
  * The mode notices' part in their deliveries (#649): offered only while no newer switch has begun since it was made (one

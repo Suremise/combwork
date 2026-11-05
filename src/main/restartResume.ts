@@ -35,7 +35,7 @@ import { dataFolder } from './hiveFolder'
  * the one owner of these resumes (lastRun.ts leaves it the agents it lists).
  */
 const log = createLogger('restart')
-const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 const RECORD_FILE = 'restart.json'
 
 const T = {

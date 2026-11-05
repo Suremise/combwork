@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, migrateAdvancedIds, parseAdvancedFile, RENAMED_ADVANCED, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
+import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, parseAdvancedFile, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
 import { CLAUDE_FOOTER_MODES } from '../src/shared/claude'
 import { COPILOT_FOOTER_MODES } from '../src/shared/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
@@ -196,7 +196,7 @@ describe('advanced.json', () => {
     const text = advancedFileText({ 'cw.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'I trust' }, { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } })
     expect(JSON.parse(text)).toEqual({ format: 1, values: { 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } })
     expect(Object.keys(JSON.parse(text).values)).toEqual(['claude-code.trust.prompt', 'cw.mcp.replySeconds'])
-    expect(parseAdvancedFile(text)).toEqual({ values: { 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } }, unknown: [], renamed: [] })
+    expect(parseAdvancedFile(text)).toEqual({ values: { 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } }, unknown: [] })
     expect(parseAdvancedFile('{ "values": ')).toMatchObject({ error: expect.stringContaining("isn't valid JSON") })
     expect(parseAdvancedFile('[]')).toMatchObject({ error: expect.stringContaining('object') })
     expect(parseAdvancedFile('{"format":2,"values":{}}')).toMatchObject({ error: expect.stringContaining('newer Combwork') })
@@ -206,56 +206,12 @@ describe('advanced.json', () => {
     expect(parseAdvancedFile('{"values":{},"madeFor":{"claude-code.trust.prompt":{"version":"1","value":"x"}}}')).toMatchObject({ madeFor: {} })
   })
 
-  it("reads Combwork's own settings' hive.* ids as their cw.* ones, one way, the cw.* one winning by presence (HI-2518)", () => {
-    // Every setting of Combwork's own has a cw.* id, in group cw; no setting has a hive.* id now.
+  it("Combwork's own settings have cw.* ids; an old hive.* id is no setting now, listed as unknown (HI-2518, HI-2598)", () => {
     expect(ADVANCED_DEFS.filter((d) => d.id.startsWith('hive.'))).toEqual([])
     for (const d of ADVANCED_DEFS) expect(d.id.startsWith(`${d.group}.`), d.id).toBe(true)
-    expect(RENAMED_ADVANCED.size).toBe(ADVANCED_DEFS.filter((d) => d.group === 'cw').length)
-    expect(RENAMED_ADVANCED.get('hive.cards.attachmentFolders')).toBe('cw.cards.attachmentFolders')
-    expect(RENAMED_ADVANCED.get('hive.outage.checkUrl.codex')).toBe('cw.outage.checkUrl.codex')
-    // Old migrations' and retired keys keep their names: they are no settings now.
-    for (const k of ['hive.assistant.otherMcpServers', 'hive.agents.perProject', 'hive.accounts.preview']) expect(RENAMED_ADVANCED.has(k), k).toBe(false)
-    expect(migrateAdvancedIds({ 'hive.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'x', 'hive.agents.perProject': 3, 'hive.nope': 1 })).toEqual({ record: { 'cw.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'x', 'hive.agents.perProject': 3, 'hive.nope': 1 }, renamed: ['hive.mcp.replySeconds'] })
-    // Both there: the new one is kept, false, 0 and [] too, and the old one dropped.
-    expect(migrateAdvancedIds({ 'hive.restart.resumeAfterUpdate': true, 'cw.restart.resumeAfterUpdate': false }).record).toEqual({ 'cw.restart.resumeAfterUpdate': false })
-    expect(migrateAdvancedIds({ 'cw.progress.lanesShown': 0, 'hive.progress.lanesShown': 6 }).record).toEqual({ 'cw.progress.lanesShown': 0 })
-    expect(migrateAdvancedIds({ 'hive.cards.attachmentFolders': ['C:\\x'], 'cw.cards.attachmentFolders': [] }).record).toEqual({ 'cw.cards.attachmentFolders': [] })
-    const same = { 'cw.mcp.replySeconds': 1 }
-    expect(migrateAdvancedIds(same)).toEqual({ record: same, renamed: [] })
-    // advanced.json as read: values and the version records, the old ids gone; unknown keys listed as before.
-    const read = parseAdvancedFile(JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'hive.nope': 1, 'cw.progress.lanesShown': 0, 'hive.progress.lanesShown': 6 }, madeFor: { 'hive.mcp.replySeconds': { version: '1', value: 600 } } }))
-    expect(read).toEqual({ values: { 'cw.mcp.replySeconds': 600, 'hive.nope': 1, 'cw.progress.lanesShown': 0 }, madeFor: { 'cw.mcp.replySeconds': { version: '1', value: 600 } }, unknown: ['hive.nope'], renamed: ['hive.mcp.replySeconds', 'hive.progress.lanesShown'] })
-  })
-
-  it('the store writes an old file back under the new ids, in its queued write, and never over a file it could not read (HI-2518)', async () => {
-    const dir = tempDir('hive-advanced-renamed-')
-    const file = join(dir, 'advanced.json')
-    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'I trust' }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } }))
-    const s = new AdvancedStore()
-    try {
-      s.load(dir)
-      expect(s.number('cw.mcp.replySeconds')).toBe(600)
-      await vi.waitFor(() => expect(JSON.parse(readFileSync(file, 'utf8')).values).toEqual({ 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }), { timeout: 10_000 })
-      expect(JSON.parse(readFileSync(file, 'utf8')).madeFor).toEqual({ 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } })
-      // A hand edit with an old id later is read the new way too, and written back.
-      writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 900 } }))
-      await s.reload()
-      expect(s.number('cw.mcp.replySeconds')).toBe(900)
-      await vi.waitFor(() => expect(JSON.parse(readFileSync(file, 'utf8')).values).toEqual({ 'cw.mcp.replySeconds': 900 }), { timeout: 10_000 })
-    } finally {
-      s.stop()
-    }
-    const broken = tempDir('hive-advanced-renamed-')
-    const text = '{"values":{"hive.mcp.replySeconds":600}'
-    writeFileSync(join(broken, 'advanced.json'), text)
-    const b = new AdvancedStore()
-    try {
-      b.load(broken)
-      expect(b.state(null).fileError).toBeTruthy()
-      expect(readFileSync(join(broken, 'advanced.json'), 'utf8')).toBe(text)
-    } finally {
-      b.stop()
-    }
+    // The names upgrade renames them in the profile before advanced.json is read (storedNames.test.ts): nothing reads one after.
+    const read = parseAdvancedFile(JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'cw.progress.lanesShown': 0 } }))
+    expect(read).toEqual({ values: { 'hive.mcp.replySeconds': 600, 'cw.progress.lanesShown': 0 }, madeFor: {}, unknown: ['hive.mcp.replySeconds'] })
   })
 })
 
@@ -287,17 +243,6 @@ describe('the advanced store', () => {
     await s.set('cw.mcp.replySeconds', 300)
     await s.set('claude-code.trust.prompt', null)
     expect(read(file)).toEqual({ format: 1, values: {}, madeFor: {} })
-  })
-
-  it('a retired setting (the Connections preview, HI-1774) is dropped as read, never unknown, and gone at the next write; a real unknown one stays', async () => {
-    const { s, dir, file } = store()
-    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.accounts.preview': true, 'hive.nope': 1, 'cw.mcp.replySeconds': 400 }, madeFor: { 'hive.accounts.preview': { version: null, value: true } } }))
-    expect(parseAdvancedFile(readFileSync(file, 'utf8'))).toEqual({ values: { 'hive.nope': 1, 'cw.mcp.replySeconds': 400 }, madeFor: {}, unknown: ['hive.nope'], renamed: [] })
-    s.load(dir)
-    expect(s.state(null).unknown).toEqual(['hive.nope'])
-    await s.set('cw.mcp.replySeconds', 600)
-    expect(read(file)).toEqual({ format: 1, values: { 'hive.nope': 1, 'cw.mcp.replySeconds': 600 }, madeFor: {} })
-    await expect(s.set('hive.accounts.preview', true)).rejects.toThrow('No advanced setting')
   })
 
   it('reads a file edited by hand: a changed CLI-facing value is made for the CLI installed now; an invalid one falls back', async () => {

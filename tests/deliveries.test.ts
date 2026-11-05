@@ -57,7 +57,7 @@ describe('delivery records (#647)', () => {
   })
 
   it("HI-2087: a card's events with the merge queue's return among them lead with the return and its reason", () => {
-    const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
+    const hive: DeliverySender = { kind: 'combwork', name: 'Combwork' }
     const back = '[CW] HI-46 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (cw_submit).'
     // Its lines as their makers mark them: the queue's return (a loop wake's note, or a watch's line leading with it),
     // a watch's line telling only a comment, and anything else unmarked.
@@ -78,7 +78,7 @@ describe('delivery records (#647)', () => {
   })
 
   it("coalesces a card's events into one item, where its first one was; a message stays its own", () => {
-    const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
+    const hive: DeliverySender = { kind: 'combwork', name: 'Combwork' }
     const items = inboxItems([
       rec({ id: 'm1', seq: 1, kind: 'card-event', from: hive, card: 607, body: 'is in Review' }),
       rec({ id: 'm2', seq: 2 }),
@@ -112,38 +112,6 @@ describe('delivery records (#647)', () => {
   // HR1's round 1 on HI-2463: Combwork's text quotes people and agents (a relayed answer between <<< >>>, a card's latest
   // comment, a lane's brief): never rewritten. Only a leading "[Hive] " becomes "[CW] ", and one naming an old tool or
   // command gets a note on how the names map.
-  it("hands out Combwork's own text word for word: an old prefix made current, a note where it names old names outside its quotes", async () => {
-    const { relayLine } = await import('../src/main/answerRelay')
-    const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
-    const NOTE = '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__combwork__, and hive-progress is cw-progress.)'
-    const old = '[Hive] HI-46 came back from the merge queue: commit and submit again (hive_submit), then wait (mcp__hive__hive_wait_for_tasks); hive-progress shows it.'
-    // The relay's real line (answerRelay.relayLine): the question, the reply and the decision quoted whole.
-    const relay = relayLine({ card: 9, key: 'HI-9', project: 'alpha', asker: 'b1', askerName: 'B1', request: 'r1', question: 'Rename hive_inbox in the example?', outcome: 'answered', reply: 'Keep hive-progress and hive_inbox unchanged in the archived example.', decision: 'Archived examples keep hive_inbox.', need: null })
-    const brief = "Your lane's brief (lane L, from the Assistant):\nRun hive-progress for the suites, as before."
-    const quoted = 'Use hive_submit as [Hive] said; hive-progress too.'
-    const items = inboxItems([
-      rec({ id: 'm1', seq: 1, from: hive, body: old }),
-      rec({ id: 'm2', seq: 2, from: hive, kind: 'control', body: relay }),
-      rec({ id: 'm3', seq: 3, from: hive, body: brief }),
-      rec({ id: 'm4', seq: 4, body: quoted }),
-      rec({ id: 'm5', seq: 5, from: { kind: 'user', name: 'Darren' }, kind: 'answer', body: quoted }),
-      rec({ id: 'm6', seq: 6, kind: 'card-event', from: hive, card: 46, body: '[Hive] HI-46 is in Doing; latest comment by B1: "use hive_submit"' }),
-      rec({ id: 'm7', seq: 7, from: hive, body: 'Unknown hive_not_a_tool stays.' })
-    ])
-    expect(items.map((i) => i.text)).toEqual([
-      `[CW] ${old.slice(7)} ${NOTE}`,
-      relay,
-      `${brief} ${NOTE}`,
-      quoted,
-      quoted,
-      '[CW] HI-46 is in Doing; latest comment by B1: "use hive_submit"',
-      'Unknown hive_not_a_tool stays.'
-    ])
-    // The quoted words reach the agent exactly as the user wrote them.
-    expect(items[1].text).toContain('<<<Keep hive-progress and hive_inbox unchanged in the archived example.>>>')
-    expect(items[1].text).toContain('<<<Archived examples keep hive_inbox.>>>')
-  })
-
   it('lists again what an earlier conversation received and never acked, once carried to a fresh one (HI-2463)', () => {
     const carried = rec({ id: 'm3', seq: 3, state: 'received', received: at, carriedFrom: 'old-conversation' })
     const items = inboxItems([rec({ id: 'm1', seq: 1 }), carried, rec({ id: 'm2', seq: 2, state: 'received', received: at })])
@@ -198,7 +166,7 @@ describe('the delivery service (#647)', async () => {
   deliveries.setSenderCheckForTests((from) => (from.kind !== 'assistant' ? null : !now.control ? 'the user turned Settings → Assistant → Control down' : from.launch !== now.launch ? "the Assistant's session that left it ended" : null))
   const ws = join(base, 'ws')
   const asst = (launch = 'a1'): DeliverySender => ({ kind: 'assistant', name: 'the Assistant', workspace: ws, launch })
-  const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
+  const hive: DeliverySender = { kind: 'combwork', name: 'Combwork' }
   const make = (o: Partial<Parameters<typeof deliveries.createDelivery>[1]> = {}) => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', conversation: 's1', kind: 'rebrief', from: asst(), body: 'Rebase first.', ...o })
   const states = async (agentId = 'b1') => (await deliveries.deliveriesOf(alpha, agentId)).map((r) => `${r.id} ${r.state}${r.detail ? `: ${r.detail}` : ''}`)
   /** What is saved of alpha's deliveries (#1018: in the workspace's database). */

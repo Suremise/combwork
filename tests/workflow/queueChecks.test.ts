@@ -307,13 +307,13 @@ describe('the mergeInstall option', () => {
 })
 
 describe("Combwork's runs in the Progress panel", () => {
-  const caller = { source: 'hive' as const, workspacePath: 'C:\\ws', projectPath: 'C:\\ws\\app' }
+  const caller = { source: 'combwork' as const, workspacePath: 'C:\\ws', projectPath: 'C:\\ws\\app' }
   const store = () => new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
 
   it('are "Combwork (merge queue)" in the project, no agent; only Combwork changes them; they never go stale; kept as they were', () => {
     const p = store()
     const r = p.start({ ...caller, noInstall: true }, { title: 'AM-1 · check · a3f2c1d', command: 'npm test' }, { card: 1, revision: 'a'.repeat(40), testedCheckout: 'a'.repeat(40) })
-    expect(r).toMatchObject({ source: 'hive', agentName: CW_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, agentId: null, provider: null, noInstall: true, card: 1 })
+    expect(r).toMatchObject({ source: 'combwork', agentName: CW_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, agentId: null, provider: null, noInstall: true, card: 1 })
     // A script (the workspace's token) can't end it, and neither can another project's queue.
     expect(() => p.finish({ source: 'api', workspacePath: caller.workspacePath }, r.id, { ok: true })).toThrow('Unknown progress run')
     expect(() => p.finish({ ...caller, projectPath: 'C:\\ws\\other' }, r.id, { ok: true })).toThrow('Unknown progress run')
@@ -323,7 +323,7 @@ describe("Combwork's runs in the Progress panel", () => {
     p.finish(caller, r.id, { ok: false, exitCode: 1, logPath: 'C:\\logs\\x.log' })
     p.noteCheck(caller.workspacePath, r.id, { name: 'check', counted: false, whyNot: 'changed' })
     const [kept] = keptRuns(JSON.parse(JSON.stringify({ runs: p.list(caller.workspacePath) })), caller.workspacePath)
-    expect(kept).toMatchObject({ source: 'hive', agentName: CW_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, noInstall: true, logPath: 'C:\\logs\\x.log', counts: { name: 'check', counted: false, whyNot: 'changed' } })
+    expect(kept).toMatchObject({ source: 'combwork', agentName: CW_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, noInstall: true, logPath: 'C:\\logs\\x.log', counts: { name: 'check', counted: false, whyNot: 'changed' } })
   })
 })
 
@@ -337,10 +337,10 @@ describe("the runner's own runs, outside the queue", () => {
     const r = queueChecks({ env: base, runs: progressRuns(store, () => true, ws, project), logDir: tempDir('qc-logs-'), timeoutMs: () => 60_000, setupCommand: () => 'echo fake-token-review-1349' })
     expect(await r.install(tempDir('qc-folder-'), true, ctx)).toMatchObject({ ok: true })
     const [run] = store.list(ws)
-    expect(run).toMatchObject({ source: 'hive', titleFromCommand: true, installAsWritten: true, state: 'passed' })
+    expect(run).toMatchObject({ source: 'combwork', titleFromCommand: true, installAsWritten: true, state: 'passed' })
     expect(run.title).toContain('fake-token-review-1349')
     const pub = publicRun(run)
-    expect(pub).toMatchObject({ titleFromCommand: true, source: 'hive' })
+    expect(pub).toMatchObject({ titleFromCommand: true, source: 'combwork' })
     expect(JSON.stringify(pub)).not.toContain('fake-token')
     // A check's title is its name, which the project gave it: kept.
     await r.runCheck('lint', 'echo ok', tempDir('qc-folder-'), ctx)

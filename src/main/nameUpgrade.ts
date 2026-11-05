@@ -9,6 +9,7 @@ import { HiveError, errorText, hiveError } from './hiveError'
 import { createLogger } from './logger'
 import { upgradeWorkspaceFiles } from './nameUpgradeFiles'
 import { upgradeProject } from './nameUpgradeProjects'
+import { upgradeProjectValues, upgradeWorkspaceValues } from './nameUpgradeValues'
 
 /**
  * The one-way names upgrade (HI-2587, its design HI-2587/s15 with s20, s23 and s26): what 1.0 and the 1.1 release
@@ -32,7 +33,8 @@ const log = createLogger('nameUpgrade')
 
 /** Written once every step has worked for the workspace: the names upgrade's version. */
 export const NAMES_DONE_FILE = 'combwork-names.json'
-const NAMES_VERSION = 1
+// 3: HI-2598's stored values (2: HI-2594). A workspace or project recorded at an older version runs every step again.
+export const NAMES_VERSION = 3
 
 export type WorkspaceStep = 'board' | 'files' | 'projects'
 
@@ -40,8 +42,8 @@ const M = {
   failed: msg({ id: 'service.nameUpgrade.failed', defaultMessage: "Combwork couldn't finish renaming {what} from Hive's names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.", description: "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names Hive stored (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence." }),
   what: {
     board: msg({ id: 'main.nameUpgrade.what.board', defaultMessage: "the board's file", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, hive.db to combwork.db." }),
-    files: msg({ id: 'main.nameUpgrade.what.files', defaultMessage: "the workspace's .gitignore, README and MCP definitions", description: 'What the names upgrade was renaming when it failed (service.nameUpgrade.failed): files in the workspace\'s .combwork folder. Keep .gitignore, README and MCP as they are.' }),
-    projects: msg({ id: 'main.nameUpgrade.what.projects', defaultMessage: "the projects' skill copies, git exclude lines and refs", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…)." })
+    files: msg({ id: 'main.nameUpgrade.what.files', defaultMessage: "the workspace's settings, templates, .gitignore, README and MCP definitions", description: 'What the names upgrade was renaming when it failed (service.nameUpgrade.failed): files in the workspace\'s .combwork folder (its workspace.json settings and its templates, HI-2598). Keep .gitignore, README and MCP as they are.' }),
+    projects: msg({ id: 'main.nameUpgrade.what.projects', defaultMessage: "the projects' settings, templates, skill copies, git exclude lines and refs", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): values in the projects' project.json settings and templates (HI-2598), markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…)." })
   } satisfies Record<WorkspaceStep, Msg<string>>
 }
 
@@ -95,12 +97,18 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
     const only = o.only
     return step('projects', o.stop, async () => {
       await upgradeProject(only, [])
-      await record(only)
+      if (await upgradeProjectValues(only)) await record(only)
     })
   }
   if (!existsSync(dir)) return
   await step('board', o.stop, () => moveBoardFile(dir, o.checkpoint))
-  await step('files', o.stop, async () => upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README))
+  // A file that couldn't be read now (another program holds it) is converted at the next open: no record till then.
+  let settled = true
+  await step('files', o.stop, async () => {
+    await upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README)
+    // workspace.json's and the templates' stored values (HI-2598, nameUpgradeValues.ts), before its load reads them.
+    if (!(await upgradeWorkspaceValues(ws))) settled = false
+  })
   await step('projects', o.stop, async () => {
     // Each project, then each folder its agents worked in that the board's records name (slots, worktrees, copies: the
     // same repository's exclude file, already done, and their own skill copies).
@@ -108,12 +116,14 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
     for (const p of o.projects) {
       o.stop()
       await upgradeProject(p, [])
-      await record(p)
+      if (await upgradeProjectValues(p)) await record(p)
+      else settled = false
     }
     o.stop()
     await upgradeProject(null, copyFolders)
   })
   o.stop()
+  if (!settled) return log.info('The names upgrade left a file it could not read for the next open')
   await record(ws)
   log.info(`The names upgrade is done for this workspace (${NAMES_DONE_FILE})`)
 }

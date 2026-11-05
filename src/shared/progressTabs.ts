@@ -106,7 +106,7 @@ export function runGroupLabel(g: RunGroup, name: string | null, tr: Tr, title: s
 }
 
 /** A run of Hive's merge queue (a merge check or install on a card's merged result), not a slot's or a copy's setup. */
-const isQueueRun = (r: ProgressRun): boolean => r.source === 'hive' && runAgentKey(r) === CW_RUNS
+const isQueueRun = (r: ProgressRun): boolean => r.source === 'combwork' && runAgentKey(r) === CW_RUNS
 
 /**
  * A card's runs on a day (HI-1701): its runs and their retries folded as before, the merge queue's checks folded into
@@ -248,7 +248,7 @@ export const slotRunsKey = (slot: string): string => `${CW_RUNS}:slot:${slot.toL
 /** The Agent filter's value for review and check copies' setup runs no lease credits to an agent, "Hive (review copies)" (HI-1710). */
 export const copiesRunsKey = `${CW_RUNS}:copies`
 export const runAgentKey = (r: Pick<ProgressRun, 'agentId' | 'source' | 'defaultName' | 'slot' | 'copy'>): string | null =>
-  r.agentId ?? (r.source !== 'hive' ? null : r.defaultName === 'slot' && r.slot ? slotRunsKey(r.slot) : r.defaultName === 'copy' ? copiesRunsKey : CW_RUNS)
+  r.agentId ?? (r.source !== 'combwork' ? null : r.defaultName === 'slot' && r.slot ? slotRunsKey(r.slot) : r.defaultName === 'copy' ? copiesRunsKey : CW_RUNS)
 
 /**
  * The tabs' badges (#1309): merges waiting (agents waiting for a merge slot, and cards queued in the merge queues shown,

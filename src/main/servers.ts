@@ -207,7 +207,7 @@ export async function startHookServer(): Promise<string> {
     if (!hookTokenMatches(run, req.headers.authorization)) {
       // The developer console (#636): a hook refused (an ended launch's, or a wrong token), in every workspace watched.
       // agent-protocol: the developer console's record of a refused hook (a log line)
-      devConsole.capture(devConsole.capturedLike('hive:'), () => ({ kind: 'hook-server', name: 'refused', raw: { statusline: query.has('statusline'), run: !!run }, made: { status: 401 }, summary: `hook refused (${run ? "not this launch's token, or it has ended" : 'no launch named'})` }))
+      devConsole.capture(devConsole.capturedLike('combwork:'), () => ({ kind: 'hook-server', name: 'refused', raw: { statusline: query.has('statusline'), run: !!run }, made: { status: 401 }, summary: `hook refused (${run ? "not this launch's token, or it has ended" : 'no launch named'})` }))
       // In the log too, once a run (#711): a hook the CLI sent but Hive refused leaves a trace on Hive's side.
       const note = refusedHookNote(run)
       if (note) log.info(note)
@@ -892,7 +892,7 @@ route('POST', '/v1/projects/:name/stop', async ({ params, query, body }) => {
 route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
   const p = projectByName(params[0])
   const agent = query.get('agent')
-  const id = query.get('sessionId') ?? sessions.liveFor(p, agent ? await agentParam(p, agent) : undefined)?.sessionId ??(await sessions.list(p)).find((s) => s.source === 'hive')?.id
+  const id = query.get('sessionId') ?? sessions.liveFor(p, agent ? await agentParam(p, agent) : undefined)?.sessionId ??(await sessions.list(p)).find((s) => s.source === 'combwork')?.id
   if (!id) throw new HttpError(404, say(API.agent.noSessions))
   const usage = await sessions.usage(p, id)
   // Where it ran (#1434): its folder, and the slot that is, if any.
@@ -1944,7 +1944,7 @@ async function slotAgent(p: string): Promise<SlotAgent> {
 
 /**
  * A claim naming cards Hive merges (each card's own rules, #1354): refused before the slot is touched, as the card's
- * report merge would be (`merge.hiveMerges`, recorded as Refused, saying where it is in the merge queue). A claim naming
+ * report merge would be (`merge.combworkMerges`, recorded as Refused, saying where it is in the merge queue). A claim naming
  * no card, or cards the agent merges, is unchanged: the slot stays for agents' merges and the user's own.
  */
 async function refuseHiveMerges(projectPath: string, cards: number[]): Promise<void> {
@@ -2291,7 +2291,7 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
 }
 
 /** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
-const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, pauses: _pauses, ...v }: QueueView): QueuePublic => ({
+const publicQueue = ({ projectPath: _p, paused, combworkMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, pauses: _pauses, ...v }: QueueView): QueuePublic => ({
   ...v,
   paused: paused ? (({ stuck, message: _m, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
   recent: v.recent.map(({ log: output, seen: _s, revision: _rev, tookMs: _took, push: _push, logPath: _lp, ...r }) => (output ? { ...r, hasLog: true as const } : r))
@@ -3852,7 +3852,7 @@ route('GET', '/v1/skills', async ({ query }) => {
     // A project's own skills are its agents' business (like its sessions).
     ownProjectOnly(p, [API.own.listingSkills])
     // What the project's agents are given: not the Hive skills for the Assistant alone (as its Skills tab).
-    return (await inWorkspace(workspaceOf(p), () => listSkills(p))).filter((s) => !(s.level === 'hive' && s.audience === 'assistant')).map(skillRow)
+    return (await inWorkspace(workspaceOf(p), () => listSkills(p))).filter((s) => !(s.level === 'combwork' && s.audience === 'assistant')).map(skillRow)
   }
   return (await inWorkspace(requireWorkspace(), () => listSkills())).map(skillRow)
 })
@@ -4090,7 +4090,7 @@ async function consoleSource(query: URLSearchParams): Promise<string> {
   const me = agentCaller()
   let id: string
   try {
-    if (which === 'hive') id = hiveSourceId(requireWorkspace().path!)
+    if (which === 'combwork') id = hiveSourceId(requireWorkspace().path!)
     else if (which === 'assistant') id = sessionSourceId(requireWorkspace().assistantHome, ASSISTANT_AGENT_ID)
     else if (which) throw new HttpError(400, say(API.console.sourceArg))
     else if (!project && !agent) {
@@ -4112,12 +4112,12 @@ async function consoleSource(query: URLSearchParams): Promise<string> {
 
 /** A source as a reply names it (bounded names; whether an open console is capturing it, and how many events it holds). */
 function consoleRow(s: ConsoleSource | undefined, id: string) {
-  const kind = s?.kind ?? (id.startsWith('hive:') ? 'hive' : 'session')
+  const kind = s?.kind ?? (id.startsWith('combwork:') ? 'combwork' : 'session')
   // `select` names it exactly as a read takes it (the agent's id and its project's own name), apart from the display
   // label, which is cut and masked: following a listing always reads the source it lists.
-  const select = kind === 'hive' ? { source: 'hive' } : kind === 'assistant' ? { source: 'assistant' } : s?.agentId && s.project ? { agent: s.agentId, project: s.project } : undefined
+  const select = kind === 'combwork' ? { source: 'combwork' } : kind === 'assistant' ? { source: 'assistant' } : s?.agentId && s.project ? { agent: s.agentId, project: s.project } : undefined
   // agent-protocol: the app's name, as a source's label
-  return { label: hiveName(s?.label ?? (kind === 'hive' ? 'Combwork' : say(API.console.anAgent)), 80), kind, ...(select ? { select } : {}), ...(s?.provider ? { provider: s.provider } : {}), capturing: devConsole.capturing(id), events: devConsole.count(id) }
+  return { label: hiveName(s?.label ?? (kind === 'combwork' ? 'Combwork' : say(API.console.anAgent)), 80), kind, ...(select ? { select } : {}), ...(s?.provider ? { provider: s.provider } : {}), capturing: devConsole.capturing(id), events: devConsole.count(id) }
 }
 
 const consoleRowOf = (e: ConsoleEvent) => ({ seq: e.seq, at: e.at, kind: e.kind, name: e.name, summary: e.summary, ...(e.truncated ? { truncated: true } : {}) })

@@ -27,7 +27,7 @@ const M = {
 
 /** An entry's one line as the window shows it: a build of Hive's in the user's language, any other as written. */
 export function journalSummary(e: { source: JournalSource; summary: string }): string {
-  const b = e.source === 'hive' ? parseBuildSummary(e.summary) : null
+  const b = e.source === 'combwork' ? parseBuildSummary(e.summary) : null
   if (!b) return e.summary
   const values = { version: b.version, kind: tr(KIND[b.kind]), commit: b.commit }
   if (b.by === 'release') return b.branch ? tr(M.uploaded, { ...values, branch: b.branch }) : tr(M.uploadedDetached, values)
@@ -36,7 +36,7 @@ export function journalSummary(e: { source: JournalSource; summary: string }): s
 
 /** A build's detail as lines in the user's language, or null for another entry's (shown as written, in Markdown). */
 export function journalBuildDetail(e: { source: JournalSource; summary: string; detail: string | null }): string[] | null {
-  if (e.source !== 'hive' || !e.detail || !parseBuildSummary(e.summary)) return null
+  if (e.source !== 'combwork' || !e.detail || !parseBuildSummary(e.summary)) return null
   const d = parseBuildDetail(e.detail)
   if (!d) return null
   return [tr(M.installer, { path: d.installer }), tr(M.builtAt, { when: formatDateTime(d.builtAt) }), ...(d.uploaded ? [tr(M.uploadedNote)] : [])]

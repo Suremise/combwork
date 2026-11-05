@@ -15,7 +15,7 @@ function session(days: Record<string, number>, provider: 'claude-code' | 'codex'
   return {
     id: `s-${Math.random()}`,
     provider,
-    source: 'hive',
+    source: 'combwork',
     title: null,
     lastActivity: `${last}T12:00:00.000Z`,
     hasTranscript: true,

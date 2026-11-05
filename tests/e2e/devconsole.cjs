@@ -65,7 +65,7 @@ const check = (name, ok, extra = '') => {
       return list.some((s) => s.agentId === b1.id) && list.some((s) => s.agentId === b2.id) ? list : null
     }, HUNG_MS)
     const b1Source = sources?.find((s) => s.agentId === b1.id)
-    check("the window lists the workspace's agents, its Assistant and Combwork as sources", !!b1Source && sources.some((s) => s.kind === 'assistant') && sources.some((s) => s.kind === 'hive'), JSON.stringify(sources))
+    check("the window lists the workspace's agents, its Assistant and Combwork as sources", !!b1Source && sources.some((s) => s.kind === 'assistant') && sources.some((s) => s.kind === 'combwork'), JSON.stringify(sources))
     check('…none of them captured while nobody watches', sources?.every((s) => !s.capturing && s.events === 0), JSON.stringify(sources))
 
     // --- Every listed source reads back with exactly the arguments the listing gives (long and alike names too).
@@ -133,7 +133,7 @@ const check = (name, ok, extra = '') => {
     check('…and one in full on request, still redacted', full.status === 200 && full.body.events[0]?.raw?.prompt?.startsWith('<text:') && !JSON.stringify(full.body).includes(PRIVATE), JSON.stringify(full.body).slice(0, 300))
     for (const [what, q] of [
       ['another agent of its project', `agent=B2`],
-      ["Combwork's own events", 'source=hive'],
+      ["Combwork's own events", 'source=combwork'],
       ["the Assistant's", 'source=assistant'],
       ['an agent that does not exist', 'agent=Nobody']
     ]) {
@@ -144,12 +144,12 @@ const check = (name, ok, extra = '') => {
     check('…and lists only its own session', listed.status === 200 && listed.body.total === 1 && listed.body.sources[0].select?.agent === b1.id && listed.body.sources[0].label === 'alpha · B1' && listed.body.sources[0].capturing === true, JSON.stringify(listed.body))
 
     // --- Combwork's own events, once the window watches them too: B1's API call shows there and in B1's session.
-    const notYet = await api('GET', '/v1/console/events?source=hive')
+    const notYet = await api('GET', '/v1/console/events?source=combwork')
     check("Combwork's events aren't captured until the window watches them", notYet.status === 200 && notYet.body.source.capturing === false, JSON.stringify(notYet.body))
-    await inv('console:subscribe', [b1Source.id, sources.find((s) => s.kind === 'hive').id])
+    await inv('console:subscribe', [b1Source.id, sources.find((s) => s.kind === 'combwork').id])
     await api('GET', '/v1/status', b1Token)
     const hiveEvents = await lib.until(async () => {
-      const r = await api('GET', '/v1/console/events?source=hive')
+      const r = await api('GET', '/v1/console/events?source=combwork')
       return r.body?.events?.find((e) => e.kind === 'api' && e.name === 'GET /v1/status') ? r.body : null
     }, HUNG_MS)
     check("an agent's API call is in Combwork's events, who made it and how it went", /by agent .* → 200 ok/.test(hiveEvents?.events.find((e) => e.name === 'GET /v1/status')?.summary ?? ''), JSON.stringify(hiveEvents))

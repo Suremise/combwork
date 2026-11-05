@@ -101,7 +101,7 @@
   "content.templates.overMax": "エージェントが{count, number}個ありますが、このプロジェクトのワークフローで使えるのは{max, plural, other {#個}}までです。先に「バージョン管理」→「ワークフロー」で最大エージェント数を上げるか、ワークフローごと読み込んでください。何も変更していません。",
   "content.templates.restoring": "元に戻す操作で、このプロジェクトのエージェントをテンプレート読み込み前の状態に戻しています",
   "content.templates.running": "{agent}が実行中か起動中です。先に停止してください。",
-  "content.templates.scope": "不明なスコープ「{scope}」：hive、workspace、projectのいずれかです。",
+  "content.templates.scope": "不明なスコープ「{scope}」：combwork、workspace、projectのいずれかです。",
   "content.templates.started": "読み込み中にエージェントが起動したため、何も変更していません。先に停止してください。",
   "content.templates.taken": "{names}は{projects}で{count, plural, other {既にエージェント名として使われています}}。エージェント名はワークスペース全体で重複できないため、{count, plural, other {名前を変更してください}}。",
   "content.templates.takenNothing": "{names}は{projects}で{count, plural, other {既にエージェント名として使われています}}。エージェント名はワークスペース全体で重複できないため、{count, plural, other {名前を変更してください}}。何も変更していません。",

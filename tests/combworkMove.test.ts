@@ -25,6 +25,7 @@ vi.mock('../src/main/events', async (orig) => ({
 const base = tempDir('combworkmove-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { MOVED_FILE, MOVE_LOCK_FILE, MARK_FILE, finishMove, moveFolders, moveTestHooks, movedFolders, movedPath } = await import('../src/main/combworkMove')
+const { NAMES_VERSION } = await import('../src/main/nameUpgrade')
 const { dataFolder } = await import('../src/main/hiveFolder')
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
@@ -111,7 +112,7 @@ describe('nothing to move', () => {
     json(join(done, '.combwork', 'workspace.json'), {})
     json(join(done, 'alpha', '.combwork', 'project.json'), {})
     // Its names upgraded too (HI-2587): nothing left of Hive's.
-    json(join(done, '.combwork', 'combwork-names.json'), { version: 1 })
+    json(join(done, '.combwork', 'combwork-names.json'), { version: NAMES_VERSION })
     expect(await moveFolders(done)).toEqual({ late: false, moved: 0 })
     expect(existsSync(join(done, MOVE_LOCK_FILE))).toBe(false)
   })

@@ -7,7 +7,7 @@ const id = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(
 const item = (n: number, more: Partial<SessionListItem> = {}): SessionListItem => ({
   id: id(n),
   provider: 'claude-code',
-  source: 'hive',
+  source: 'combwork',
   title: null,
   name: `S${n}`,
   lastActivity: `2026-10-0${Math.min(9, n)}T10:00:00.000Z`,

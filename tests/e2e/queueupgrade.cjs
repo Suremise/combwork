@@ -165,7 +165,7 @@ const log = () => {
     const integrated = (await h.facts(one.n)).find((f) => f.kind === 'Integrated')
     const msgOf = (ref = 'integration') => lib.git(fx.alpha, ['log', '-1', '--format=%B', ref]).trim()
     const parents = (ref = 'integration') => lib.git(fx.alpha, ['log', '-1', '--format=%P', ref]).trim().split(' ').length
-    check("…Integrated by Combwork, the target at its result, one squashed commit with the branch's own message: no key, no trailer", integrated?.data?.by === 'hive' && integrated.data.result === q.head(fx) && parents() === 1 && msgOf() === 'After the upgrade', `${JSON.stringify(integrated)} / ${msgOf()}`)
+    check("…Integrated by Combwork, the target at its result, one squashed commit with the branch's own message: no key, no trailer", integrated?.data?.by === 'combwork' && integrated.data.result === q.head(fx) && parents() === 1 && msgOf() === 'After the upgrade', `${JSON.stringify(integrated)} / ${msgOf()}`)
     // The board records the choice first; project.json follows it (the upgrade's mark stays: the record answers it).
     const recorded = () => {
       const row = rows("SELECT value FROM board_meta WHERE key = 'workflow:alpha:mergeChoice'")[0]
@@ -210,7 +210,7 @@ const log = () => {
     /** What the choice must leave alone: the project's other options, as queueOptions set them. */
     const unrelated = () => {
       const o = projectJson().workflow?.options ?? {}
-      return o.finish === 'hiveMerges' && o.target === 'integration' && JSON.stringify(o.mergeChecks) === '["quick"]' && o.identity?.email === fx.identity.email
+      return o.finish === 'combworkMerges' && o.target === 'integration' && JSON.stringify(o.mergeChecks) === '["quick"]' && o.identity?.email === fx.identity.email
     }
 
     // The other way to answer (decision 3, HR5's round 1): a save in Version Control → Workflow, Squash with the branch's
@@ -271,7 +271,7 @@ const log = () => {
     await h.page.keyboard.press('Escape')
 
     // Combwork's message again (the other option), still squashing: the next card lands as "KEY: title" with its trailers.
-    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { style: 'squash', commitMessage: 'hive' }) })
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { style: 'squash', commitMessage: 'combwork' }) })
     q.steer(fx, 'pass')
     const two = await q.approveBy(fx, h, builder, reviewer, 'With the key', { 'two.txt': 'two\n' })
     check('a card with the choice made is approved', Object.values(two.steps).every((s) => s.status === 200), JSON.stringify(two.steps))

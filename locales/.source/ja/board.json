@@ -346,7 +346,7 @@
   "board.forYou.approve": "Approve",
   "board.forYou.asDecision": "Record as Decision",
   "board.forYou.asDecisionTip": "Records your answer as one of the card's decisions, which its agents must follow from now on, and answers the question with it.",
-  "board.forYou.asked": "{who, select, hive {Combwork asks} other {{who} asks}} · {when}",
+  "board.forYou.asked": "{who, select, combwork {Combwork asks} other {{who} asks}} · {when}",
   "board.forYou.checklist": "To try:",
   "board.forYou.chip": "For you",
   "board.forYou.chipTip": "{n, plural, one {Waits for you: {requests}} other {# requests wait for you: {requests}}}",

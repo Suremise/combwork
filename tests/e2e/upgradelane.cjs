@@ -178,7 +178,7 @@ function driver(app, page) {
     const merged = (n) => `cw cw_report_merge ${JSON.stringify({ card: cards.find((c) => c.number === n)?.key })}`
     script('Builder', [`${merged(n1)} then ${work(n2)} then boardmove ${n2} review then boardcomment ${n2}`, `${merged(n2)} then boardmove ${n3} doing then ${work(n3)} then boardmove ${n3} review then boardcomment ${n3}`, 'work 1'])
     const sessions = await dev.inv('session:list', alpha)
-    const sessionOf = (id) => sessions.find((x) => x.agentId === id && x.source === 'hive')?.id
+    const sessionOf = (id) => sessions.find((x) => x.agentId === id && x.source === 'combwork')?.id
     check("the 0.9 sessions are there, one per agent", !!sessionOf(builder.id) && !!sessionOf(reviewer.id), JSON.stringify(sessions.map((x) => [x.agentId, x.id])))
     check('both agents start again from their 0.9 sessions', !!(await dev.start(reviewer.id, sessionOf(reviewer.id))) && !!(await dev.start(builder.id, sessionOf(builder.id))))
     // Launched before the names agents see changed, a 0.9 conversation starts fresh, its work carried (HI-2463).

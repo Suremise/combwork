@@ -787,9 +787,9 @@ export function TerminalView({
     <div
       className={cx('terminal-host', !visible && 'hidden', dimmed && 'dimmed')}
       data-pty={ptyKey}
-      data-right-click={rightClickToCli ? 'cli' : 'hive'}
-      data-ctrl-cv={ctrlCVToCli ? 'cli' : 'hive'}
-      data-all-keys={allKeysToCli ? 'cli' : 'hive'}
+      data-right-click={rightClickToCli ? 'cli' : 'combwork'}
+      data-ctrl-cv={ctrlCVToCli ? 'cli' : 'combwork'}
+      data-all-keys={allKeysToCli ? 'cli' : 'combwork'}
       style={{ ['--terminal-bg' as string]: terminalTheme().background, ...style }}
       ref={host}
     >
