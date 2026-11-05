@@ -40,7 +40,6 @@ export const ACTIVITY_KINDS = [
   'activate-project',
   'deactivate-project',
   'setting',
-  'revert-setting',
   'undo'
 ] as const
 
