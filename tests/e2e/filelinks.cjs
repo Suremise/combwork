@@ -109,7 +109,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   // Its tooltip is a message, in the window's language as it shows (HI-2346): a language changed meanwhile, as main
   // sends it, applies to the same terminal's next hover; then back to English.
   const lang = (await inv('app:info')).language
-  const speak = (code, messages) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: { ...lang, code, locale: code, messages } })
+  const speak = (code, messages) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: { ...lang, code, locale: code, messages } })
   await speak('de', { 'files.links.title': 'In Dateien öffnen · Strg+Klick' })
   await page.mouse.move(nope.x + 4, nope.y)
   await until(async () => (await linkTitle()) === 0, HUNG_MS)

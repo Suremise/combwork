@@ -121,7 +121,7 @@ const PSEUDO = 'en-XA'
 
 /** Tells the window its language changed, as Settings → General → Language does (the language-changed event). */
 const sendLanguage = (ctx, language) =>
-  ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'language-changed', language: l }), language)
+  ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language: l }), language)
 
 /**
  * The notices closed. Putting .git back (closeInit) raises "Version control changed in alpha" at the window's bottom

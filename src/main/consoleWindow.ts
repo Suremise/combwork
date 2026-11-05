@@ -158,5 +158,5 @@ export function closeConsoleWindows(): void {
 
 /** Sends an event to every console window (the settings, for its theme; the console's options). */
 export function sendToConsoles(event: CombworkEvent): void {
-  for (const w of consoles.values()) if (!w.isDestroyed()) w.webContents.send('hive:event', event)
+  for (const w of consoles.values()) if (!w.isDestroyed()) w.webContents.send('cw:event', event)
 }

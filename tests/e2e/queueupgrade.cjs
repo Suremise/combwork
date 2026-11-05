@@ -261,7 +261,7 @@ const log = () => {
     const answer = (await h.facts(five.n)).find((x) => x.kind === 'Approval' && x.data?.request === five.request)
     check("…the answer, in German, as Version Control → Workflow names the options (HI-1733)", answer?.data?.note === german, JSON.stringify(answer?.data))
     // The board by its command, as the menu runs it (its button's name is German now).
-    if (!(await h.page.locator('.board').isVisible())) await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: 'view.board', args: [] })
+    if (!(await h.page.locator('.board').isVisible())) await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: 'view.board', args: [] })
     await until(async () => (await h.page.locator(`.task-card[data-task="${five.n}"]`).count()) === 1, HUNG_MS)
     await q.openByTitle(h.page, five.n)
     const comment = h.page.locator('.task-comment', { hasText: de['workflow.value.style.squash'] }).last()

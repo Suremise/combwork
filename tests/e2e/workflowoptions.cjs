@@ -146,7 +146,7 @@ async function theForm(page, app, inv) {
       globalThis.__presetsCalls = 0
       handlers.set('workflow:presetsNotice', (...x) => (globalThis.__presetsCalls++, h(...x)))
     })
-    const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
+    const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
     const running = page.locator('.project-row', { hasText: 'web' }).locator('.agent-count')
     for (const s of ['ready', 'working', 'waiting', 'working']) for (const a of ['b1', 'r1']) await status(a, s)
     // Main knows nothing of these made-up runs, so a workspace refresh meanwhile (a project.json write's) drops them: they
@@ -500,7 +500,7 @@ async function theForm(page, app, inv) {
     check('N6: dependencies done switched on None’s form alone, saved', n6.ok, n6.said)
     // notes as it was (Solo, nothing of its own), which the late reads below start from; the form reads it again.
     await inv('workflow:setOptions', notes, { preset: 'solo', options: {} })
-    await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: notes })
+    await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: notes })
     check('notes back to Solo, the form with it', !!(await lib.until(async () => projectJson(notes).workflow?.preset === 'solo' && (await row('review').locator('select').inputValue()) === 'none' && (await row('excluded').locator('input').inputValue()) === 'node_modules, .venv', HUNG_MS)), JSON.stringify(projectJson(notes).workflow))
 
     // --- Reads answering late (HR5's round 1): a reload never replaces an edit made while it waited, an older read never
@@ -530,7 +530,7 @@ async function theForm(page, app, inv) {
         s.held = s.held.filter((y) => y.p !== x)
       }, p)
     const heldFor = (p) => app.evaluate((_, x) => globalThis.__wf.held.filter((y) => y.p === x).length, p)
-    const changedElsewhere = (p) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: p })
+    const changedElsewhere = (p) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: p })
     // After a release, a read of the window's own answered after it: the held answer has been taken (or dropped) by then.
     const fence = (p) => inv('workflow:form', p)
     // An edit made while a reload waits stays.
@@ -594,7 +594,7 @@ async function theForm(page, app, inv) {
     const speak = async (code) => {
       const dir = path.join(lib.ROOT, 'locales', code)
       messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
     }
     /**
      * The save's dialog opened in the window's language (#1489): its title, message, what changes (Merge style, its

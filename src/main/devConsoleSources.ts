@@ -22,8 +22,8 @@ export function consoleSources(ws: WorkspaceService): ConsoleSource[] {
   }
   const rows = info.projects.flatMap((p) => p.agents.map((a) => row(p, a, 'session')))
   if (info.assistant) rows.push(...info.assistant.agents.map((a) => row(info.assistant!, a, 'assistant')))
-  const hive = combworkSourceId(wsPath)
-  rows.push({ id: hive, kind: 'combwork', label: APP_NAME, workspacePath: wsPath, capturing: devConsole.capturing(hive), events: devConsole.count(hive) }) // the app's name (HI-2511), as the source of its own events
+  const combwork = combworkSourceId(wsPath)
+  rows.push({ id: combwork, kind: 'combwork', label: APP_NAME, workspacePath: wsPath, capturing: devConsole.capturing(combwork), events: devConsole.count(combwork) }) // the app's name (HI-2511), as the source of its own events
   return rows
 }
 

@@ -131,14 +131,14 @@ export interface CombworkHookNeeds {
  * the highest file that sets one, and without it blocks Hive's hooks (`allowedHttpHookUrls`) or sends them without
  * the token (`httpHookAllowedEnvVars`); checked with 2.1.292. Managed settings, above this file, still apply.
  */
-export function mergeLaunchSettings(hive: { hooks: Record<string, unknown[]>; statusLine: unknown }, user: Record<string, unknown> | null, needs: CombworkHookNeeds): Record<string, unknown> {
-  if (!user) return { ...hive }
+export function mergeLaunchSettings(combwork: { hooks: Record<string, unknown[]>; statusLine: unknown }, user: Record<string, unknown> | null, needs: CombworkHookNeeds): Record<string, unknown> {
+  if (!user) return { ...combwork }
   const theirs = user.hooks && typeof user.hooks === 'object' && !Array.isArray(user.hooks) ? (user.hooks as Record<string, unknown>) : {}
-  const hooks: Record<string, unknown[]> = { ...hive.hooks }
+  const hooks: Record<string, unknown[]> = { ...combwork.hooks }
   for (const [ev, groups] of Object.entries(theirs)) {
     if (Array.isArray(groups)) hooks[ev] = [...(hooks[ev] ?? []), ...groups]
   }
-  const out: Record<string, unknown> = { ...user, hooks, statusLine: hive.statusLine }
+  const out: Record<string, unknown> = { ...user, hooks, statusLine: combwork.statusLine }
   const allowing = (key: (typeof HOOK_ALLOWLISTS)[number], entry: string): void => {
     const list = user[key]
     if (Array.isArray(list) && !list.includes(entry)) out[key] = [...list, entry]

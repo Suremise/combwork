@@ -1457,13 +1457,13 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
   // Hive skills (the workspace's, the same in every project) start open at the top; the provider's skills folded under
   // the dropdown. Opening or folding either is remembered for the project (Darren, 5 Oct).
   const fold = useStore((s) => s.skillsFold[key])
-  const combworkOpen = fold?.hive ?? true
+  const combworkOpen = fold?.combwork ?? true
   const providerOpen = fold?.provider ?? false
-  const setFold = (patch: { hive?: boolean; provider?: boolean }): void => rememberProjectPref('skillsFold', key, { hive: combworkOpen, provider: providerOpen, ...patch })
-  const setCombworkOpen = (open: boolean): void => setFold({ hive: open })
+  const setFold = (patch: { combwork?: boolean; provider?: boolean }): void => rememberProjectPref('skillsFold', key, { combwork: combworkOpen, provider: providerOpen, ...patch })
+  const setCombworkOpen = (open: boolean): void => setFold({ combwork: open })
   const all = skills ?? []
   // This project's agents get the Hive skills for them; those for the Assistant alone are left out, and counted.
-  const hive = all.filter((s) => s.level === 'combwork' && s.audience !== 'assistant')
+  const combwork = all.filter((s) => s.level === 'combwork' && s.audience !== 'assistant')
   const assistantOnly = all.filter((s) => s.level === 'combwork' && s.audience === 'assistant').length
   const current = selected ? all.find((s) => s.path === selected) : undefined
 
@@ -1502,19 +1502,19 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
           )}
           {skills && (
             <div className="skill-group skill-group-toggle" role="button" tabIndex={0} aria-expanded={combworkOpen} onClick={() => setCombworkOpen(!combworkOpen)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setCombworkOpen(!combworkOpen))}>
-              <Icon name={combworkOpen ? 'chevron-down' : 'chevron-right'} /> {tr(C.combworkGroup)} <span className="count">{hive.length}</span> <InfoTip text={SKILL_LEVEL_TIP.combwork} />
+              <Icon name={combworkOpen ? 'chevron-down' : 'chevron-right'} /> {tr(C.combworkGroup)} <span className="count">{combwork.length}</span> <InfoTip text={SKILL_LEVEL_TIP.combwork} />
             </div>
           )}
-          {skills && combworkOpen && hive.length === 0 && <div className="pane-empty">{tr(C.noCombworkSkills)}</div>}
+          {skills && combworkOpen && combwork.length === 0 && <div className="pane-empty">{tr(C.noCombworkSkills)}</div>}
           {combworkOpen &&
-            hive.map((sk) =>
+            combwork.map((sk) =>
               row(
                 sk,
                 <IconButton icon="go-to-file" title={tr(C.editInWorkspace)} onClick={() => editInWorkspace(sk)} />,
                 !sk.problem && sk.bundled !== 'missing' ? <DeliveredSwitch skill={sk} projectPath={project.path} /> : undefined
               )
             )}
-          {skills && combworkOpen && hive.length > 0 && <div className="pane-empty skills-delivered-note">{tr(C.deliveredNote)}</div>}
+          {skills && combworkOpen && combwork.length > 0 && <div className="pane-empty skills-delivered-note">{tr(C.deliveredNote)}</div>}
           {skills && combworkOpen && assistantOnly > 0 && (
             <div className="pane-empty assistant-only-note">
               {sentences(tr(C.assistantOnly, { count: assistantOnly }), <a onClick={() => showView('skills')}>{tr(C.seeThem)}</a>)}

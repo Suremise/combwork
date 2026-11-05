@@ -148,7 +148,7 @@ const check = (name, ok, extra = '') => {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'pl')
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     await speak({ ...base, code: 'pl', locale: 'pl', messages })
     check('the list in Polish', !!(await lib.until(async () => !/Your message at/.test(await panel().locator('.assistant-actions').innerText().catch(() => 'Your message at')), HUNG_MS)), await panel().locator('.assistant-actions').innerText().catch(() => ''))
     await panel().screenshot({ path: path.join(lib.WORK, 'assistantundo-pl.png') })

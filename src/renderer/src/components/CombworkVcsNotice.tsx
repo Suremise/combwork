@@ -38,7 +38,7 @@ const M = {
  */
 export function CombworkVcsNotice({ project, dismissible = false }: { project: ProjectInfo; dismissible?: boolean }) {
   const key = project.path.toLowerCase()
-  const dismissed = useStore((s) => s.hiveVcsNotice[key])
+  const dismissed = useStore((s) => s.combworkVcsNotice[key])
   const [busy, setBusy] = useState(false)
   const v = project.combworkVcs
   const text = combworkVcsText(v)
@@ -97,7 +97,7 @@ export function CombworkVcsNotice({ project, dismissible = false }: { project: P
       <button className="btn small subtle" onClick={() => openGuideAt(CW_FOLDER_GUIDE)}>
         {tr(M.learnMore)}
       </button>
-      {dismissible && <IconButton icon="close" title={tr(M.dismiss)} onClick={() => rememberProjectPref('hiveVcsNotice', key, combworkVcsKey(v))} />}
+      {dismissible && <IconButton icon="close" title={tr(M.dismiss)} onClick={() => rememberProjectPref('combworkVcsNotice', key, combworkVcsKey(v))} />}
     </div>
   )
 }

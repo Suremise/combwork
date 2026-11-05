@@ -113,7 +113,7 @@ const eventOfLabel = (label: string): string => label.split('_').map((w) => w.ch
  * and file from its key (`<file>:<event>:<group>:<handler>`). `hive` is the command Hive passed for its own: an entry of
  * the session flags running exactly that is Hive's (its row is Hive's, with Codex's trust), never another.
  */
-export function codexListedHooks(listed: readonly CodexListedHook[], hive: { command: string; flagsFile: string }, secrets: readonly string[] = [], max = HOOK_ROWS_MAX): { rows: HookRow[]; combworkTrust: Map<string, HookStatus>; more: number } {
+export function codexListedHooks(listed: readonly CodexListedHook[], combwork: { command: string; flagsFile: string }, secrets: readonly string[] = [], max = HOOK_ROWS_MAX): { rows: HookRow[]; combworkTrust: Map<string, HookStatus>; more: number } {
   const rows: HookRow[] = []
   const combworkTrust = new Map<string, HookStatus>()
   let more = 0
@@ -123,8 +123,8 @@ export function codexListedHooks(listed: readonly CodexListedHook[], hive: { com
     const event = typeof h.eventName === 'string' ? h.eventName : m ? eventOfLabel(m[2]) : '?'
     const trust: HookStatus = h.trustStatus === 'trusted' ? 'trusted' : h.trustStatus === 'untrusted' ? 'untrusted' : h.trustStatus === 'modified' ? 'modified' : 'unknown'
     const command = typeof h.command === 'string' ? h.command : ''
-    const flags = h.source === 'sessionFlags' || (m?.[1] ?? '') === hive.flagsFile
-    if (flags && command === hive.command) {
+    const flags = h.source === 'sessionFlags' || (m?.[1] ?? '') === combwork.flagsFile
+    if (flags && command === combwork.command) {
       combworkTrust.set(event, trust)
       continue
     }

@@ -208,11 +208,11 @@ function CommandList({ list, values, onChange, run }: { list: CustomCommand[]; v
 }
 
 /** A point's commands in order, picked from the lists it may use, with what can't run there said. */
-function PointPicker({ point, lists, values, update, onChange }: { point: CommandPoint; lists: { hive: CustomCommand[]; workspace?: CustomCommand[] }; values: CommandValues; update: boolean; onChange: (next: CommandPoint) => void }) {
+function PointPicker({ point, lists, values, update, onChange }: { point: CommandPoint; lists: { combwork: CustomCommand[]; workspace?: CustomCommand[] }; values: CommandValues; update: boolean; onChange: (next: CommandPoint) => void }) {
   useLanguage()
-  const find = (r: CommandRef): CustomCommand | undefined => (r.scope === 'combwork' ? lists.hive : (lists.workspace ?? [])).find((c) => c.id === r.id)
+  const find = (r: CommandRef): CustomCommand | undefined => (r.scope === 'combwork' ? lists.combwork : (lists.workspace ?? [])).find((c) => c.id === r.id)
   const picked = (r: CommandRef): boolean => point.run.some((x) => x.scope === r.scope && x.id === r.id)
-  const choices: CommandRef[] = [...(lists.workspace ?? []).map((c) => ({ scope: 'workspace' as const, id: c.id })), ...lists.hive.map((c) => ({ scope: 'combwork' as const, id: c.id }))].filter((r) => !picked(r))
+  const choices: CommandRef[] = [...(lists.workspace ?? []).map((c) => ({ scope: 'workspace' as const, id: c.id })), ...lists.combwork.map((c) => ({ scope: 'combwork' as const, id: c.id }))].filter((r) => !picked(r))
   const label = (r: CommandRef): string => `${find(r)?.name ?? tr(M.gone)}${r.scope === 'combwork' && lists.workspace ? ` (${tr(M.combworkBadge)})` : ''}`
   return (
     <div className="close-command-settings">
@@ -278,11 +278,11 @@ function useWorkspace(): [CommandsWorkspace, (change: (current: CommandsWorkspac
 
 /** Settings → General → Commands: Hive's own commands. Deleting one takes it off When Hive quits too. */
 export function CombworkCommands() {
-  const [hive, save] = useCombwork()
+  const [combwork, save] = useCombwork()
   const values = useValues('manual')
   return (
     <CommandList
-      list={hive.list}
+      list={combwork.list}
       values={values}
       run={(id) => runIt({ scope: 'combwork', id })}
       onChange={(list) => save((cur) => ({ list, onQuit: { ...cur.onQuit, run: cur.onQuit.run.filter((r) => list.some((c) => c.id === r.id)) } }))}
@@ -292,8 +292,8 @@ export function CombworkCommands() {
 
 /** Settings → General → When Hive quits, run: Hive's commands, in order. */
 export function QuitPoint() {
-  const [hive, save] = useCombwork()
-  return <PointPicker point={hive.onQuit} lists={{ hive: hive.list }} values={{ reason: 'quit' }} update onChange={(onQuit) => save((cur) => ({ ...cur, onQuit }))} /> // i18n-ignore: {reason}'s value, as main fills it in
+  const [combwork, save] = useCombwork()
+  return <PointPicker point={combwork.onQuit} lists={{ combwork: combwork.list }} values={{ reason: 'quit' }} update onChange={(onQuit) => save((cur) => ({ ...cur, onQuit }))} /> // i18n-ignore: {reason}'s value, as main fills it in
 }
 
 /** Settings → Workspace → Commands: the workspace's own. Deleting one takes it off its open and close points. */
@@ -309,9 +309,9 @@ export function WorkspaceCommands() {
 /** Settings → Workspace → When this workspace opens, run, and When this workspace closes, run. */
 export function WorkspacePoint({ which }: { which: 'onOpen' | 'onClose' }) {
   const path = useStore((s) => s.workspace?.path ?? null)
-  const hive = useStore((s) => s.settings?.commands ?? EMPTY_CW)
+  const combwork = useStore((s) => s.settings?.commands ?? EMPTY_CW)
   const [ws, save] = useWorkspace()
   const values = useValues(which === 'onOpen' ? 'open' : 'window') // i18n-ignore: {reason}'s values, as main fills them in
   if (!path) return <div className="muted">{tr(M.noWorkspace)}</div>
-  return <PointPicker point={ws[which]} lists={{ hive: hive.list, workspace: ws.list }} values={values} update={which === 'onClose'} onChange={(p) => save((cur) => ({ ...cur, [which]: p }))} />
+  return <PointPicker point={ws[which]} lists={{ combwork: combwork.list, workspace: ws.list }} values={values} update={which === 'onClose'} onChange={(p) => save((cur) => ({ ...cur, [which]: p }))} />
 }

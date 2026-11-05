@@ -101,7 +101,7 @@ function report(r: Recording, now = false): void {
   const send = (): void => {
     r.timer = null
     r.sentAt = Date.now()
-    if (!r.wc.isDestroyed()) r.wc.send('hive:event', { type: 'console-recording', recording: { ...r.info } })
+    if (!r.wc.isDestroyed()) r.wc.send('cw:event', { type: 'console-recording', recording: { ...r.info } })
   }
   if (now) {
     if (r.timer) clearTimeout(r.timer)
@@ -255,7 +255,7 @@ export function startRecording(wc: WebContents, source: ConsoleSource, workspace
     const header: RecordingHeader = {
       type: 'recording',
       format: RECORDING_FORMAT,
-      hive: app.getVersion(),
+      combwork: app.getVersion(),
       startedAt: at.toISOString(),
       source: { kind: source.kind, label: source.label, ...(source.provider ? { provider: source.provider } : {}) },
       text: includeText,
@@ -343,7 +343,7 @@ export async function saveCapture(c: { source: Pick<ConsoleSource, 'kind' | 'lab
   await mkdir(dir, { recursive: true })
   const at = new Date()
   const { fh, name } = await reserve(dir, at, CAPTURE_KIND)
-  const header: RecordingHeader = { type: 'recording', format: RECORDING_FORMAT, hive: app.getVersion(), startedAt: at.toISOString(), source: { kind: c.source.kind, label: c.source.label, ...(c.source.provider ? { provider: c.source.provider } : {}) }, text: false, clis: clisNow(), capture: { trigger: c.trigger, what: c.what, ...(c.whatText ? { whatText: c.whatText } : {}) } }
+  const header: RecordingHeader = { type: 'recording', format: RECORDING_FORMAT, combwork: app.getVersion(), startedAt: at.toISOString(), source: { kind: c.source.kind, label: c.source.label, ...(c.source.provider ? { provider: c.source.provider } : {}) }, text: false, clis: clisNow(), capture: { trigger: c.trigger, what: c.what, ...(c.whatText ? { whatText: c.whatText } : {}) } }
   // i18n-ignore: a recording's end reason, a field value in its file
   const end: RecordingEnd = { type: 'end', at: new Date().toISOString(), events: c.events.length, dropped: 0, reason: 'captured' }
   const text = [header, ...c.events.map((e) => ({ type: 'event', ...e })), end].map((l) => `${JSON.stringify(l)}\n`).join('')

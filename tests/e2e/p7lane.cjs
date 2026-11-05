@@ -257,7 +257,7 @@ function helpers(h) {
     }, HUNG_MS)
     await listed.click()
   }
-  const command = (id) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
+  const command = (id) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args: [] })
   return { live, idle, tokenOf, intent, startReview, shell, card, facts, kinds, fact, done, lane, slots, slotOfLane, create, runs, shoot, showBoard, startLane, panel, showTab, laneTop, text, toProject, command }
 }
 
@@ -699,7 +699,7 @@ async function gallery(h, kept) {
   const base = (await inv('app:info')).language
   const dir = path.join(lib.ROOT, 'locales', 'de')
   const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   const english = async () => (await page.getByRole('button', { name: 'Task Board', exact: true }).count()) > 0
   /** `loc` (or what `open(lang)` opens in each language) shot in both themes, English then German; `close` after. */
   const shoot = async (name, { loc = page, open, close } = {}) => {

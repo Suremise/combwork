@@ -352,7 +352,7 @@ describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
     w.dead.add(1)
     const h2 = w.another(2)
     await h2.pool.refresh()
-    expect(h2.store.lease(a.lease.id)).toMatchObject({ why: 'hiveGone', returned: expect.any(String), freed: null })
+    expect(h2.store.lease(a.lease.id)).toMatchObject({ why: 'combworkGone', returned: expect.any(String), freed: null })
     expect(h2.store.copy(a.name)?.state).toBe('returning')
     expect(h2.store.copy(b.name)?.state).toBe('returning')
     // Never taken for quiet because Combwork restarted: free once their holders are idle.

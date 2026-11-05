@@ -1704,9 +1704,9 @@ class SessionManager {
       const on = assistant ? !!m.def && assistantMcpAdded(workspace.config.mcp).includes(m.name) : serverOnIn(m, pc.mcp, workspace.config.mcp.enabled)
       if (on && m.def && agentGetsMcp(forAgent, m.name) && !isReservedServerName(m.name)) mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
-    const hive = this.combworkMcp(projectPath, agent?.id)
+    const combwork = this.combworkMcp(projectPath, agent?.id)
     // Its instructions name only the skills the session gets (#1431).
-    if (hive) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...hive, env: { ...hive.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
+    if (combwork) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...combwork, env: { ...combwork.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : combwork
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
@@ -6919,9 +6919,9 @@ class SessionManager {
           {
             const said = ev?.kind === 'signIn' && ev.message?.slice(0, 500)
             // The CLI's own message, or Hive's (its English for agents, its text for the window).
-            const hive = said ? null : withValues(msg({ id: 'session.signIn.notSignedIn', defaultMessage: "{provider} isn't signed in.", description: "Why an agent's turn stopped, when its CLI didn't say: its sign-in was refused. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name })
+            const combwork = said ? null : withValues(msg({ id: 'session.signIn.notSignedIn', defaultMessage: "{provider} isn't signed in.", description: "Why an agent's turn stopped, when its CLI didn't say: its sign-in was refused. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name })
             // agent-stored: agentField says it for each agent where the status is sent (servers.ts statusMessageOf)
-            st.signIn = { message: said || englishText(hive!), since: new Date().toISOString(), ...(hive ? { messageText: hive } : {}) }
+            st.signIn = { message: said || englishText(combwork!), since: new Date().toISOString(), ...(combwork ? { messageText: combwork } : {}) }
           }
           this.signInLost(st)
           break

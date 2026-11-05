@@ -67,9 +67,9 @@ describe("HI-1368's single commands adopted (one way, the same again)", () => {
 
 describe('points and versions', () => {
   it("a point resolves in order, from its scopes' lists; a ref to a deleted command is null", () => {
-    const hive = [{ id: A, name: 'H', command: 'h' }]
+    const combwork = [{ id: A, name: 'H', command: 'h' }]
     const workspace = [{ id: B, name: 'W', command: 'w' }]
-    const r = resolvePoint({ run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }, { scope: 'combwork', id: B }] }, { hive, workspace })
+    const r = resolvePoint({ run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }, { scope: 'combwork', id: B }] }, { combwork, workspace })
     expect(r.map((x) => x.command?.name ?? null)).toEqual(['W', 'H', null])
   })
 

@@ -111,11 +111,50 @@ export function upgradedPoint(point: unknown): Record<string, unknown> | null {
   return { ...point, run: point.run.map((r: unknown) => (isObject(r) && r.scope === OLD_ID ? { ...r, scope: NEW_ID } : r)) }
 }
 
-/** config.json's data with its old values converted (workflow defaults, When Combwork quits, the Agent API's switch); null when none. */
-export function upgradedConfig(d: unknown): Record<string, unknown> | null {
-  if (!isObject(d) || !isObject(d.settings)) return null
-  const s = { ...d.settings }
+/** The tips' ids before 1.1 (HI-2591), as config.json's tips state may name them, and their ids now. */
+export const OLD_TIP_IDS: Readonly<Record<string, string>> = { 'hive-folder': 'combwork-folder', 'hive-merges': 'combwork-merges', 'hive-skills': 'combwork-skills' }
+
+/**
+ * config.json's `ui` with its names before 1.1 converted (HI-2591): the .combwork notice's dismissals (`hiveVcsNotice`,
+ * now `combworkVcsNotice`), the Skills tab's fold of Combwork's group (each project's `hive`, now `combwork`) and the tips
+ * seen or used under their old ids. A value under the new name wins over the old one. Null when none is old.
+ */
+export function upgradedUi(ui: unknown): Record<string, unknown> | null {
+  if (!isObject(ui)) return null
+  const out: Record<string, any> = { ...ui }
   let changed = false
+  if ('hiveVcsNotice' in out) {
+    const old = out.hiveVcsNotice
+    delete out.hiveVcsNotice
+    if (isObject(old)) out.combworkVcsNotice = { ...old, ...(isObject(out.combworkVcsNotice) ? out.combworkVcsNotice : {}) }
+    changed = true
+  }
+  if (isObject(out.skillsFold) && Object.values(out.skillsFold).some((f) => isObject(f) && 'hive' in f)) {
+    out.skillsFold = Object.fromEntries(Object.entries(out.skillsFold).map(([p, f]) => {
+      if (!isObject(f) || !('hive' in f)) return [p, f]
+      const { hive, ...rest } = f
+      return [p, 'combwork' in rest ? rest : { ...rest, combwork: hive }]
+    }))
+    changed = true
+  }
+  if (isObject(out.tips)) {
+    const ids = (x: unknown): unknown => (Array.isArray(x) ? [...new Set(x.map((id) => (typeof id === 'string' ? (OLD_TIP_IDS[id] ?? id) : id)))] : x)
+    const old = (x: unknown): boolean => Array.isArray(x) && x.some((id) => typeof id === 'string' && id in OLD_TIP_IDS)
+    if (old(out.tips.seen) || old(out.tips.used)) {
+      out.tips = { ...out.tips, seen: ids(out.tips.seen), ...('used' in out.tips ? { used: ids(out.tips.used) } : {}) }
+      changed = true
+    }
+  }
+  return changed ? out : null
+}
+
+/** config.json's data with its old values converted (workflow defaults, When Combwork quits, the Agent API's switch, the window's names in `ui`); null when none. */
+export function upgradedConfig(d: unknown): Record<string, unknown> | null {
+  if (!isObject(d)) return null
+  const ui = upgradedUi(d.ui)
+  if (!isObject(d.settings)) return ui ? { ...d, ui } : null
+  const s = { ...d.settings }
+  let changed = !!ui
   const workflow = upgradedLevels(s.workflow)
   if (workflow) {
     s.workflow = workflow
@@ -131,7 +170,7 @@ export function upgradedConfig(d: unknown): Record<string, unknown> | null {
     s.agentApi = 'provideCombworkMcp' in api ? api : { ...api, provideCombworkMcp: provideHiveMcp }
     changed = true
   }
-  return changed ? { ...d, settings: s } : null
+  return changed ? { ...d, settings: s, ...(ui ? { ui } : {}) } : null
 }
 
 /** A retired setting stored under its old id, dropped (it is no setting now): Connections' preview switch (HI-1774). */

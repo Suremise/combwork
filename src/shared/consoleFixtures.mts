@@ -12,7 +12,7 @@ export const RECORDING_FORMAT = 1
 export interface RecordingHeader {
   type: 'recording'
   format: number
-  hive: string
+  combwork: string
   startedAt: string
   source: { kind: string; label: string; provider?: string }
   /** Prompt and reply text kept (the user's opt-in for this recording); secrets are masked either way. */
@@ -85,7 +85,7 @@ export interface ConsoleFixture {
   provider: string | null
   /** The CLI's version it was recorded with. */
   cli: string | null
-  hive: string
+  combwork: string
   recordedAt: string
   events: FixtureEvent[]
 }
@@ -126,7 +126,7 @@ export function recordingToFixture(text: string): ConsoleFixture {
     format: RECORDING_FORMAT,
     provider,
     cli: r.header.clis.find((c) => c.provider === provider)?.version ?? null,
-    hive: r.header.hive,
+    combwork: r.header.combwork,
     recordedAt: r.header.startedAt,
     events
   }
@@ -333,6 +333,6 @@ export function diagnosticRecording(text: string, redact: (s: string) => string)
   const h = r.header
   const clis = h.clis.filter((c) => c.version).map((c) => `${c.provider} ${c.version}${c.tested ? ` (tested with ${c.tested})` : ''}`)
   const end = r.end ? `${r.end.events} events, ended (${r.end.reason})${r.end.dropped ? `, ${r.end.dropped} lost` : ''}` : `${r.events.length} events, not ended`
-  const summary = redact(`${h.capture ? `capture (${h.capture.trigger}: ${h.capture.what}) of a ` : ''}${h.source.kind} source${h.source.provider ? ` (${h.source.provider})` : ''}, started ${h.startedAt}, Combwork ${h.hive}; ${end}; CLIs: ${clis.join(', ') || 'none found'}; redacted; the newest ${lines.length}`)
+  const summary = redact(`${h.capture ? `capture (${h.capture.trigger}: ${h.capture.what}) of a ` : ''}${h.source.kind} source${h.source.provider ? ` (${h.source.provider})` : ''}, started ${h.startedAt}, Combwork ${h.combwork}; ${end}; CLIs: ${clis.join(', ') || 'none found'}; redacted; the newest ${lines.length}`)
   return { summary, lines }
 }

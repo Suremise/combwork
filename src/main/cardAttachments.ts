@@ -177,10 +177,10 @@ const allProjects = async (ws: WorkspaceService): Promise<string[]> => [...(awai
  * The innermost `.combwork` folder in a real path (a host's own: the Assistant's home is inside the workspace's), and what
  * follows it: only `attachments` (a session's or a card's files) may be read through one.
  */
-function throughCombwork(real: string): { hive: string; next: string | undefined } | null {
+function throughCombwork(real: string): { combwork: string; next: string | undefined } | null {
   const parts = real.split(sep)
   const i = parts.map((x) => x.toLowerCase()).lastIndexOf(CW_DIR)
-  return i < 0 ? null : { hive: parts.slice(0, i + 1).join(sep), next: parts[i + 1]?.toLowerCase() }
+  return i < 0 ? null : { combwork: parts.slice(0, i + 1).join(sep), next: parts[i + 1]?.toLowerCase() }
 }
 
 /**
@@ -226,7 +226,7 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
     return real
   }
   const projects = await allProjects(ws)
-  const hive = throughCombwork(real)
+  const combwork = throughCombwork(real)
   if (caller.kind === 'agent') {
     const own = projects.find((p) => basename(p).toLowerCase() === caller.project.toLowerCase())
     if (!own) refuse()
@@ -236,13 +236,13 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
     const others = (await Promise.all(projects.filter((p) => p !== own).map((p) => workFolders(ws, p)))).flat()
     if (within(real, [...others, ws.assistantHome, join(ws.path!, CW_DIR)])) refuse()
     // A .combwork only through its own project's attachments.
-    if (hive && !(hive.hive.toLowerCase() === realPath(join(own!, CW_DIR)).toLowerCase() && hive.next === ATTACHMENTS_DIR)) refuse()
+    if (combwork && !(combwork.combwork.toLowerCase() === realPath(join(own!, CW_DIR)).toLowerCase() && combwork.next === ATTACHMENTS_DIR)) refuse()
     if (!within(real, [...ownFolders, temp, ...more])) refuse()
     return real
   }
   // The Assistant and scripts: the workspace, every project's working folders wherever they are, the Assistant's home,
   // the temp folder and the listed folders; any .combwork only through its attachments.
-  if (hive && hive.next !== ATTACHMENTS_DIR) refuse()
+  if (combwork && combwork.next !== ATTACHMENTS_DIR) refuse()
   const all = (await Promise.all(projects.map((p) => workFolders(ws, p)))).flat()
   if (!within(real, [ws.path!, ...all, ws.assistantHome, temp, ...more])) refuse()
   return real

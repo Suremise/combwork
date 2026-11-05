@@ -42,34 +42,34 @@ function put(file: string, now: number, ageFromNow?: number): string {
 describe('sweeping the leftovers (#1016)', () => {
   it("sends a move's backups to the Recycle Bin two weeks after the move, by the time in their name, and nothing else (#1111)", async () => {
     const ws = tempDir('cw-leftovers-imported-')
-    const hive = join(ws, '.combwork')
+    const combwork = join(ws, '.combwork')
     const project = join(ws, 'alpha', '.combwork')
     const moved = Date.parse('2026-10-01T12:00:00.000Z')
     const now = moved + IMPORTED_AGE_MS + HOUR
     const name = (base: string, at = moved): string => `${base}.imported-${new Date(at).toISOString().replace(/[:.]/g, '-')}`
-    const folder = join(hive, name('tasks'))
+    const folder = join(combwork, name('tasks'))
     put(join(folder, '1.json'), now)
-    const gone = [folder, put(join(hive, 'metrics', name('metrics.json')), now), put(join(hive, name('lanes.json')), now), put(join(hive, 'assistant', name('sessions.json')), now), put(join(project, name('deliveries.json')), now)]
+    const gone = [folder, put(join(combwork, 'metrics', name('metrics.json')), now), put(join(combwork, name('lanes.json')), now), put(join(combwork, 'assistant', name('sessions.json')), now), put(join(project, name('deliveries.json')), now)]
     const kept = [
-      put(join(hive, 'metrics', name('metrics.json', moved + 2 * HOUR)), now), // moved less than two weeks ago
-      put(join(hive, name('notes.json')), now), // not a store that moved
-      put(join(hive, 'shared', name('metrics.json')), now), // not in its store's folder
-      put(join(hive, 'metrics', 'metrics.json.imported-yesterday'), now), // no time in its name
+      put(join(combwork, 'metrics', name('metrics.json', moved + 2 * HOUR)), now), // moved less than two weeks ago
+      put(join(combwork, name('notes.json')), now), // not a store that moved
+      put(join(combwork, 'shared', name('metrics.json')), now), // not in its store's folder
+      put(join(combwork, 'metrics', 'metrics.json.imported-yesterday'), now), // no time in its name
       put(join(project, name('project.json')), now)
     ]
     // A link named like a backup is never followed nor removed.
     const target = tempDir('cw-leftovers-target-')
     put(join(target, 'keep.json'), now)
-    const link = join(hive, name('watches.json'))
+    const link = join(combwork, name('watches.json'))
     junction(target, link)
     const binned: string[] = []
-    const swept = await sweepLeftovers([{ hive, stores: WORKSPACE_STORES }, { hive: project, stores: PROJECT_STORES }], { now, trash: async (p) => void binned.push(p) })
+    const swept = await sweepLeftovers([{ combwork, stores: WORKSPACE_STORES }, { combwork: project, stores: PROJECT_STORES }], { now, trash: async (p) => void binned.push(p) })
     expect(binned.sort()).toEqual([...gone].sort())
     expect(swept.imported).toBe(5)
     for (const f of kept) expect(existsSync(f), f).toBe(true)
     expect(existsSync(join(target, 'keep.json'))).toBe(true)
     // One the Recycle Bin refused stays for the next open, and isn't counted.
-    const again = await sweepLeftovers([{ hive, stores: WORKSPACE_STORES }], { now, trash: async () => Promise.reject(new Error('held')) })
+    const again = await sweepLeftovers([{ combwork, stores: WORKSPACE_STORES }], { now, trash: async () => Promise.reject(new Error('held')) })
     expect(again.imported).toBe(0)
   })
 
@@ -82,50 +82,50 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it("removes old temp files and the migration's old backups, and nothing else", async () => {
-    const hive = join(tempDir('cw-leftovers-'), '.combwork')
+    const combwork = join(tempDir('cw-leftovers-'), '.combwork')
     // Files made now are eight days old at `now`: older than both limits. Ones dated an hour before `now` are new.
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     const gone = [
-      put(join(hive, 'tasks', '1.json.before-ids.bak'), now),
-      put(join(hive, 'tasks', '2.json.before-ids.bak'), now),
-      put(join(hive, 'tasks', '975.json.4242-17.tmp'), now),
-      put(join(hive, 'metrics', 'metrics.json.4242-3.tmp'), now),
-      put(join(hive, 'watches.json.4242-a1b2c3d4.tmp'), now),
-      put(join(hive, 'lanes.json.before-ids.bak'), now),
-      put(join(hive, 'assistant', 'sessions', '0a1b2c3d-4e5f-6789-abcd-ef0123456789.jsonl.4242-5.tmp'), now)
+      put(join(combwork, 'tasks', '1.json.before-ids.bak'), now),
+      put(join(combwork, 'tasks', '2.json.before-ids.bak'), now),
+      put(join(combwork, 'tasks', '975.json.4242-17.tmp'), now),
+      put(join(combwork, 'metrics', 'metrics.json.4242-3.tmp'), now),
+      put(join(combwork, 'watches.json.4242-a1b2c3d4.tmp'), now),
+      put(join(combwork, 'lanes.json.before-ids.bak'), now),
+      put(join(combwork, 'assistant', 'sessions', '0a1b2c3d-4e5f-6789-abcd-ef0123456789.jsonl.4242-5.tmp'), now)
     ]
     const kept = [
-      put(join(hive, 'tasks', '1.json'), now),
-      put(join(hive, 'tasks', '3.json.before-ids.bak'), now, HOUR), // made an hour ago: kept for its week
-      put(join(hive, 'metrics', 'metrics.json.4242-9.tmp'), now, HOUR), // a write that may still be under way
-      put(join(hive, 'workspace.json.bak'), now), // a kept file's last good copy
-      put(join(hive, 'shared', 'notes.tmp'), now), // not a name Combwork's writes use
+      put(join(combwork, 'tasks', '1.json'), now),
+      put(join(combwork, 'tasks', '3.json.before-ids.bak'), now, HOUR), // made an hour ago: kept for its week
+      put(join(combwork, 'metrics', 'metrics.json.4242-9.tmp'), now, HOUR), // a write that may still be under way
+      put(join(combwork, 'workspace.json.bak'), now), // a kept file's last good copy
+      put(join(combwork, 'shared', 'notes.tmp'), now), // not a name Combwork's writes use
       // A temp file's or a backup's suffix on anything but a store's own files is never taken for a failed save (round 1):
-      put(join(hive, 'shared', 'research.123-abc.tmp'), now), // the user's notes
-      put(join(hive, 'shared', 'handovers', 'x.md.123-4.tmp'), now),
-      put(join(hive, 'attachments', 'session', 'report.123-abc.tmp'), now), // attachments
-      put(join(hive, 'unknown', 'user.json.before-ids.bak'), now), // a folder Combwork doesn't know
-      put(join(hive, 'unknown', 'metrics.json.1-2.tmp'), now),
-      put(join(hive, 'tasks', 'notes.json.1-2.tmp'), now), // in a store, but not one of its files
-      put(join(hive, 'tasks', 'board.json.before-ids.bak'), now), // a store file the migration never backed up
-      put(join(hive, 'metrics', 'other.json.1-2.tmp'), now),
-      put(join(hive, 'project.json.1-2.tmp'), now), // a project's file, not the workspace's
-      put(join(hive, 'skills', 'mine', 'draft.1-2.tmp'), now), // the user's skills are never looked into
-      put(join(hive, 'launch-a-1', 'x.json.1-2.tmp'), now)
+      put(join(combwork, 'shared', 'research.123-abc.tmp'), now), // the user's notes
+      put(join(combwork, 'shared', 'handovers', 'x.md.123-4.tmp'), now),
+      put(join(combwork, 'attachments', 'session', 'report.123-abc.tmp'), now), // attachments
+      put(join(combwork, 'unknown', 'user.json.before-ids.bak'), now), // a folder Combwork doesn't know
+      put(join(combwork, 'unknown', 'metrics.json.1-2.tmp'), now),
+      put(join(combwork, 'tasks', 'notes.json.1-2.tmp'), now), // in a store, but not one of its files
+      put(join(combwork, 'tasks', 'board.json.before-ids.bak'), now), // a store file the migration never backed up
+      put(join(combwork, 'metrics', 'other.json.1-2.tmp'), now),
+      put(join(combwork, 'project.json.1-2.tmp'), now), // a project's file, not the workspace's
+      put(join(combwork, 'skills', 'mine', 'draft.1-2.tmp'), now), // the user's skills are never looked into
+      put(join(combwork, 'launch-a-1', 'x.json.1-2.tmp'), now)
     ]
-    const swept = await sweepLeftovers([{ hive, stores: WORKSPACE_STORES }], { now })
+    const swept = await sweepLeftovers([{ combwork, stores: WORKSPACE_STORES }], { now })
     for (const f of gone) expect(existsSync(f), f).toBe(false)
     for (const f of kept) expect(existsSync(f), f).toBe(true)
     expect({ temp: swept.temp, bak: swept.bak }).toEqual({ temp: 4, bak: 3 })
     expect(swept.removed).toEqual(
       expect.arrayContaining([
-        { dir: hive, temp: 1, bak: 1, imported: 0 },
-        { dir: join(hive, 'tasks'), temp: 1, bak: 2, imported: 0 },
-        { dir: join(hive, 'metrics'), temp: 1, bak: 0, imported: 0 }
+        { dir: combwork, temp: 1, bak: 1, imported: 0 },
+        { dir: join(combwork, 'tasks'), temp: 1, bak: 2, imported: 0 },
+        { dir: join(combwork, 'metrics'), temp: 1, bak: 0, imported: 0 }
       ])
     )
     // A second open finds nothing.
-    expect((await sweepLeftovers([{ hive, stores: WORKSPACE_STORES }], { now })).removed).toEqual([])
+    expect((await sweepLeftovers([{ combwork, stores: WORKSPACE_STORES }], { now })).removed).toEqual([])
   })
 
   it("sweeps the workspace's .combwork and each project's, hidden ones too, and says what went in one line", async () => {
@@ -188,30 +188,30 @@ describe('sweeping the leftovers (#1016)', () => {
     junction(join(base, 'elsewhere', 'hive'), linkedCombwork) // the .combwork itself linked
     // A real store beside them is still swept.
     const real = put(join(ws, 'lanes.json.12-4.tmp'), now)
-    const swept = await sweepLeftovers([{ hive: ws, stores: WORKSPACE_STORES }, { hive: linkedCombwork, stores: WORKSPACE_STORES }], { now })
+    const swept = await sweepLeftovers([{ combwork: ws, stores: WORKSPACE_STORES }, { combwork: linkedCombwork, stores: WORKSPACE_STORES }], { now })
     for (const f of [viaTasks, viaTasksBak, viaMetrics, viaCombwork]) expect(existsSync(f), f).toBe(true)
     expect(existsSync(real)).toBe(false)
     expect({ temp: swept.temp, bak: swept.bak }).toEqual({ temp: 1, bak: 0 })
   })
 
   it("a project's stores are only its settings, sessions, deliveries and transcript backups", async () => {
-    const hive = join(tempDir('cw-leftovers-project-'), '.combwork')
+    const combwork = join(tempDir('cw-leftovers-project-'), '.combwork')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     // A backup compressed, or decompressed to archive it, part way when Combwork stopped (#1110).
-    const gone = [put(join(hive, 'project.json.1-1.tmp'), now), put(join(hive, 'sessions.json.bak.1-2.tmp'), now), put(join(hive, 'sessions', 'abc-123.jsonl.1-3.tmp'), now), put(join(hive, 'sessions', 'abc-123.jsonl.gz.1-7.tmp'), now), put(join(hive, 'archive', 'abc-123.jsonl.1-8.tmp'), now)]
-    const kept = [put(join(hive, 'attachments', 'a.png.1-4.tmp'), now), put(join(hive, 'archive', 'x.json.1-5.tmp'), now), put(join(hive, 'workspace.json.1-6.tmp'), now), put(join(hive, 'project.json.before-ids.bak'), now)]
-    expect((await sweepLeftovers([{ hive, stores: PROJECT_STORES }], { now })).temp).toBe(5)
+    const gone = [put(join(combwork, 'project.json.1-1.tmp'), now), put(join(combwork, 'sessions.json.bak.1-2.tmp'), now), put(join(combwork, 'sessions', 'abc-123.jsonl.1-3.tmp'), now), put(join(combwork, 'sessions', 'abc-123.jsonl.gz.1-7.tmp'), now), put(join(combwork, 'archive', 'abc-123.jsonl.1-8.tmp'), now)]
+    const kept = [put(join(combwork, 'attachments', 'a.png.1-4.tmp'), now), put(join(combwork, 'archive', 'x.json.1-5.tmp'), now), put(join(combwork, 'workspace.json.1-6.tmp'), now), put(join(combwork, 'project.json.before-ids.bak'), now)]
+    expect((await sweepLeftovers([{ combwork, stores: PROJECT_STORES }], { now })).temp).toBe(5)
     for (const f of gone) expect(existsSync(f), f).toBe(false)
     for (const f of kept) expect(existsSync(f), f).toBe(true)
   })
 
   it('stops when the workspace closes', async () => {
-    const hive = join(tempDir('cw-leftovers-closed-'), '.combwork')
+    const combwork = join(tempDir('cw-leftovers-closed-'), '.combwork')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
-    const f = put(join(hive, 'tasks', '1.json.4242-1.tmp'), now)
+    const f = put(join(combwork, 'tasks', '1.json.4242-1.tmp'), now)
     const life = new AbortController()
     life.abort()
-    expect((await sweepLeftovers([{ hive, stores: WORKSPACE_STORES }], { now, signal: life.signal })).temp).toBe(0)
+    expect((await sweepLeftovers([{ combwork, stores: WORKSPACE_STORES }], { now, signal: life.signal })).temp).toBe(0)
     expect(existsSync(f)).toBe(true)
   })
 })

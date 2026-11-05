@@ -46,10 +46,10 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   const { app, page, inv } = await lib.launch({ userData: path.join(lib.WORK, 'i18nlive-profile') })
   try {
-    const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args })
+    const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args })
     const base = (await inv('app:info')).language
     /** The window shown in a test language, as main sends a change of language. */
-    const speak = (code, messages) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: { ...base, code, locale: code, messages } })
+    const speak = (code, messages) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: { ...base, code, locale: code, messages } })
 
     // The palette, open, in English.
     await command('palette.show')
@@ -161,7 +161,7 @@ const check = (name, ok, extra = '') => {
     const signedOut = { provider: 'claude-code', runId: 'i18nlive-signin', projectPath: proj, agentId: signer.id, agentName: 'Signer', cwd: proj, sessionId: '', status: 'signin', runtime: { lifecycle: 'signin', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false, signIn: { message: 'Login expired · Please run /login', since: new Date().toISOString() } }
     const tipSays = (want) =>
       lib.until(async () => {
-        await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: signedOut })
+        await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state: signedOut })
         const tip = await lib.hoverTip(page, tab, (t) => t.includes(want), 3000)
         return tip.includes(want) && tip
       }, HUNG_MS)
@@ -179,7 +179,7 @@ const check = (name, ok, extra = '') => {
     const menuText = async () => (await page.locator('.menu .menu-item').allInnerTexts().catch(() => [])).join(' | ')
     await speak('de', DE_MODES)
     const opened = await lib.until(async () => {
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: running })
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state: running })
       if (!(await badge.evaluate((b) => b.classList.contains('live')).catch(() => false))) return false
       if (!(await page.locator('.menu').count())) await badge.click().catch(() => undefined)
       return (await menuText()).includes(DE_MODES['agents.claude.autoDescription'])

@@ -139,7 +139,7 @@ describe('Combwork tools named in a transcript are mentions, not calls', () => {
       SKILLS
     )
     expect(o.combworkMentions).toEqual(['cw_update_task', 'cw_reorder_tasks', 'cw_wait_for_agents'])
-    expect('hiveCalls' in o).toBe(false)
+    expect('combworkCalls' in o).toBe(false)
   })
 })
 
@@ -175,7 +175,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
 
   it("passes card-detail's, list-compact's and raw-api's reply checks on what Codex got back, and fails them on what it didn't", () => {
     const scenario = (id: string) => SCENARIOS.find((s) => s.id === id)!
-    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
+    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], combworkCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
     const read = 'text(await tools.mcp__combwork__cw_read_task({number:"AL-1"}))'
     const got = observe(rollout(call('c1', read), mcp('exec-1', 'cw_read_task', { number: 'AL-1' }, 'Acceptance: ACCEPT-ZEBRA-42'), output('c1', '…')))
     const refused = observe(rollout(call('c1', read), mcp('exec-1', 'cw_read_task', { number: 'AL-1' }, 'Combwork error: no such card', true), output('c1', '…')))
@@ -197,7 +197,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
 
   it("credits nothing from a script whose calls aren't known (a Codex that records none): neither its code nor what it printed (HR1 round 1)", () => {
     const scenario = (id: string) => SCENARIOS.find((s) => s.id === id)!
-    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
+    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], combworkCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
     const ctx = { read: (f: string) => (f === 'scripts/cards.ps1' ? 'Get-Content $env:CW_API_TOKEN_FILE' : null) }
     // HR1's case: a command never run, then text that looks like its output, which the script printed.
     const printed = 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project'
@@ -237,7 +237,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
     const inCopy = 'read or ran its checks in the review copy'
     const review = SCENARIOS.find((s) => s.id === 'review-in-copy')!
     const ctx = { copyLeases: new Set<string>(), ws: 'C:\\work\\no-such-ws', cards: { r: 1 }, agents: { coder: { id: 'a-coder' } } }
-    const credited = (o: object) => review.expect({ skillsRead: [], hiveCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], facts: {}, gitStatus: '', tokenLeak: false, ...o }, ctx).find(([n]) => n === inCopy)?.[1]
+    const credited = (o: object) => review.expect({ skillsRead: [], combworkCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], facts: {}, gitStatus: '', tokenLeak: false, ...o }, ctx).find(([n]) => n === inCopy)?.[1]
     // As df1676127's trials had it: the copy named in cw_start_review's reply, the check run by a script whose command
     // gives the copy only as its workdir (its text never names it).
     const started = mcp('exec-0', 'cw_start_review', { card: 'AL-1' }, `Review in ${copy} at abc1234: read its code there.`)
@@ -406,9 +406,9 @@ describe("the override scenarios' checks count every move of the card, by number
     { number: 1, key: 'AL-1' },
     { number: 2, key: 'BE-1' }
   ]
-  const checks = (id: string, hiveCalls: unknown[], column: string) => {
+  const checks = (id: string, combworkCalls: unknown[], column: string) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
-    return Object.fromEntries(sc.expect({ hiveCalls, allCards: board, cards: { m: { number: 1, key: 'AL-1', column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
+    return Object.fromEntries(sc.expect({ combworkCalls, allCards: board, cards: { m: { number: 1, key: 'AL-1', column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
   }
   const NO_OVERRIDE = 'passed no override (the move skips nothing)'
 
@@ -479,12 +479,12 @@ describe("the lane and wait lists, moves and intents name a card by its number o
   // HR1 round 1: the wait lists and Combwork's text that card-loop-released, assistant-dispatch and inbox-stale read.
   const run = (id: string, obs: Record<string, unknown>, c: Record<string, unknown>) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
-    return Object.fromEntries(sc.expect({ ...o, hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
+    return Object.fromEntries(sc.expect({ ...o, combworkCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
   }
 
   it("card-loop-released: a wait on another project's same digits isn't a wait on its card; its own key is", () => {
     // Its cards: #1 (AL-1, reassigned) then #3 (AL-2).
-    const released = (hiveCalls: unknown[]) => run('card-loop-released', { hiveCalls }, { cards: { a: 1, b: 3 } })
+    const released = (combworkCalls: unknown[]) => run('card-loop-released', { combworkCalls }, { cards: { a: 1, b: 3 } })
     const AGAIN = "didn't wait on #1 again"
     const ON_B = 'went on to #3 (began its review, or watched it)'
     const r = released([call('cw_wait_for_tasks', { cards: ['BE-1'], wake: true }), call('cw_start_review', { card: 'AL-2' })])
@@ -500,7 +500,7 @@ describe("the lane and wait lists, moves and intents name a card by its number o
   it("assistant-dispatch: a watch on the started card by its own key or number counts; on another project's same digits it doesn't", () => {
     const WATCH = 'then followed it with a wait or a watch (cw_wait_for_agents, or cw_wait_for_tasks on its card), which worked'
     // The card started is #3 (AL-2).
-    const dispatch = (watch: unknown) => run('assistant-dispatch', { hiveCalls: [call('cw_start_task', { number: 'AL-2', agent: 'Coder' }), call('cw_wait_for_tasks', watch)], cards: { i: { number: 3, key: 'AL-2', column: 'review' } } }, { cards: { i: 3 }, agents: { coder: { id: 'a-coder' } }, read: () => '* text=auto\n' })[WATCH]
+    const dispatch = (watch: unknown) => run('assistant-dispatch', { combworkCalls: [call('cw_start_task', { number: 'AL-2', agent: 'Coder' }), call('cw_wait_for_tasks', watch)], cards: { i: { number: 3, key: 'AL-2', column: 'review' } } }, { cards: { i: 3 }, agents: { coder: { id: 'a-coder' } }, read: () => '* text=auto\n' })[WATCH]
     expect(dispatch({ cards: ['AL-2'], wake: true })).toBe(true)
     expect(dispatch({ cards: [3], wake: true })).toBe(true)
     expect(dispatch({ cards: ['BE-1'], wake: true })).toBe(false)
@@ -527,9 +527,9 @@ describe("the lane and wait lists, moves and intents name a card by its number o
       call('cw_put_back', { card: 'BE-1', why: 'x' }),
       call('cw_submit', { card: 'BE-1', summary: 'x' })
     ]
-    expect(movesOf({ ...o, hiveCalls: calls }, 1)).toHaveLength(0)
-    expect(movesOf({ ...o, hiveCalls: calls }, 2)).toHaveLength(4)
-    expect(movesOf({ ...o, hiveCalls: [call('cw_verdict', { card: 'AL-1', pass: true }), call('cw_update_task', { number: '#1', column: 'review' })] }, 1)).toHaveLength(2)
+    expect(movesOf({ ...o, combworkCalls: calls }, 1)).toHaveLength(0)
+    expect(movesOf({ ...o, combworkCalls: calls }, 2)).toHaveLength(4)
+    expect(movesOf({ ...o, combworkCalls: [call('cw_verdict', { card: 'AL-1', pass: true }), call('cw_update_task', { number: '#1', column: 'review' })] }, 1)).toHaveLength(2)
   })
 })
 
@@ -555,9 +555,9 @@ describe("the card read and update checks count the card by its number or its ow
   })
 
   const READ = 'read the card with cw_read_task'
-  const cardDetail = (n: number, hiveCalls: unknown[]) => {
+  const cardDetail = (n: number, combworkCalls: unknown[]) => {
     const sc = SCENARIOS.find((s) => s.id === 'card-detail')!
-    const o = { hiveCalls, tools: [], finalReply: '', allCards: board, cards: { q: { ...board.find((x) => x.number === n), column: 'todo' } } }
+    const o = { combworkCalls, tools: [], finalReply: '', allCards: board, cards: { q: { ...board.find((x) => x.number === n), column: 'todo' } } }
     return Object.fromEntries(sc.expect(o, { cards: { q: n } }).map(([name, ok]) => [name, ok]))[READ]
   }
 
@@ -578,7 +578,7 @@ describe("the card read and update checks count the card by its number or its ow
       { ...d2, links: [d1.number], comments: [{ text: comment }] },
       { number: 2, key: 'BE-1', links: [], comments: [] }
     ]
-    const o = { hiveCalls: [], skillsRead: [], finalReply: '', allCards }
+    const o = { combworkCalls: [], skillsRead: [], finalReply: '', allCards }
     return Object.fromEntries(sc.expect(o, { cards: { d1: d1.number, d2: d2.number } }).map(([name, ok]) => [name, ok]))[DUP]
   }
 
@@ -599,15 +599,15 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
   const combworkTool = (name: string, input: unknown, result: string) => ({ name: `mcp__combwork__${name}`, input: JSON.stringify(input), result, isError: false })
   const run = (id: string, o: Record<string, unknown>, c: Record<string, unknown>) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
-    return Object.fromEntries(sc.expect({ hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', ...o }, c).map(([name, ok]) => [name, ok]))
+    return Object.fromEntries(sc.expect({ combworkCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', ...o }, c).map(([name, ok]) => [name, ok]))
   }
   const agents = { coder: { id: 'a-coder' }, implementer: { id: 'a-impl' }, builder2: { id: 'a-b2' } }
 
   describe('review-asks-user and card-loop-disputed: a cw_ask_user that worked, its request open on the card', () => {
     const ASKED = 'asked the user on the card (cw_ask_user, kind decide: open under For you)'
     const ask = (actor = 'agent:a-coder', kind = 'decide') => ({ kind: 'ApprovalRequested', actor, data: { request: 'AL-1/r4', kind } })
-    const review = (hiveCalls: unknown[], facts: unknown[], forYou: unknown[] = [{ request: 'AL-1/r4' }], extra: Record<string, unknown> = {}) =>
-      run('review-asks-user', { hiveCalls, facts: { q: facts }, cards: { q: { number: 1, key: 'AL-1', column: 'review', agent: { id: 'a-impl' }, forYou, history: [], ...extra } }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { q: 1 }, agents })[ASKED]
+    const review = (combworkCalls: unknown[], facts: unknown[], forYou: unknown[] = [{ request: 'AL-1/r4' }], extra: Record<string, unknown> = {}) =>
+      run('review-asks-user', { combworkCalls, facts: { q: facts }, cards: { q: { number: 1, key: 'AL-1', column: 'review', agent: { id: 'a-impl' }, forYou, history: [], ...extra } }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { q: 1 }, agents })[ASKED]
 
     it('passes its own Decide request, by number or key', () => {
       expect(review([call('cw_ask_user', { card: 'AL-1', kind: 'decide', text: 'Which currency?' })], [ask()])).toBe(true)
@@ -623,7 +623,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     })
 
     it('card-loop-disputed: the same, on its card', () => {
-      const disputed = (hiveCalls: unknown[], facts: unknown[]) => run('card-loop-disputed', { hiveCalls, facts: { p: facts }, cards: { p: { number: 1, key: 'AL-1', column: 'review', forYou: [{ request: 'AL-1/r4' }], history: [] } }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { p: 1 }, agents })[ASKED]
+      const disputed = (combworkCalls: unknown[], facts: unknown[]) => run('card-loop-disputed', { combworkCalls, facts: { p: facts }, cards: { p: { number: 1, key: 'AL-1', column: 'review', forYou: [{ request: 'AL-1/r4' }], history: [] } }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { p: 1 }, agents })[ASKED]
       expect(disputed([call('cw_ask_user', { card: 'AL-1', kind: 'decide', text: 'Backoff or not?' })], [ask()])).toBe(true)
       expect(disputed([call('cw_notify', { title: 'AL-1', message: 'Backoff or not?' })], [])).toBe(false)
     })
@@ -638,7 +638,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
       const args = { action: 'start', project: 'alpha', builder, reviewer, cards: laneCards, brief }
       return { call: call('cw_lane', args, ok), tool: { ...combworkTool('cw_lane', `action: start\nbuilder: ${builder}`, reply), isError: !ok } }
     }
-    const lanes = (starts: Start[], hiveCalls: unknown[] = []) => run('coordinator-team-lanes', { tools: starts.map((s) => s.tool), hiveCalls: [...starts.map((s) => s.call), ...hiveCalls], allCards: board, cards: {} }, { cards, agents })
+    const lanes = (starts: Start[], combworkCalls: unknown[] = []) => run('coordinator-team-lanes', { tools: starts.map((s) => s.tool), combworkCalls: [...starts.map((s) => s.call), ...combworkCalls], allCards: board, cards: {} }, { cards, agents })
     const STARTED = (who: string) => `Lane started: ${who} (alpha) L: active. Its brief is delivered to the builder now. Started ${who.replace(' / ', ' and ')} with the lane's brief.`
     const both = [start('Coder', 'Implementer', ['AL-1', 'AL-2'], STARTED('Coder / Implementer')), start('Builder2', 'Reviewer2', [3], STARTED('Builder2 / Reviewer2'))]
 
@@ -695,8 +695,8 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     const byCombwork = "Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it."
     const tellIt = 'Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: tell it about the lane.'
     const lane = { builder: { name: 'Coder' }, cards: [{ number: 1 }], rounds: 3, waitMinutes: 60 }
-    const newLane = (reply: string, hiveCalls: unknown[] = [], lanes = [lane]) =>
-      run('assistant-new-lane', { tools: [combworkTool('cw_lane', 'action: start\nbuilder: Coder', reply)], hiveCalls: [call('cw_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...hiveCalls], lanes }, { cards: { n: 1 }, agents })
+    const newLane = (reply: string, combworkCalls: unknown[] = [], lanes = [lane]) =>
+      run('assistant-new-lane', { tools: [combworkTool('cw_lane', 'action: start\nbuilder: Coder', reply)], combworkCalls: [call('cw_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...combworkCalls], lanes }, { cards: { n: 1 }, agents })
     const prompt = call('cw_prompt_agent', { project: 'alpha', agent: 'Coder', text: 'Use card-loop as the builder of lane L.', newConversation: true })
 
     it('passes the lane start with no prompt where Combwork gives Coder the card, and the one prompt where its reply says to tell it', () => {
@@ -706,7 +706,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     })
 
     it("fails the old cw_prompt_agent alone, a prompt racing Combwork's start, and a lane with other rounds or wait", () => {
-      expect(run('assistant-new-lane', { hiveCalls: [prompt], lanes: [] }, { cards: { n: 1 }, agents })[STARTED]).toBe(false)
+      expect(run('assistant-new-lane', { combworkCalls: [prompt], lanes: [] }, { cards: { n: 1 }, agents })[STARTED]).toBe(false)
       expect(newLane(byCombwork, [prompt])[LEFT]).toBe(false)
       expect(newLane(tellIt)[LEFT]).toBe(false)
       expect(newLane(byCombwork, [], [{ ...lane, rounds: 10, waitMinutes: 360 }])[STARTED]).toBe(false)
@@ -760,7 +760,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     const NEW = 'Coder runs in a new conversation'
     const KEPT = 'its last conversation stays in the Sessions history'
     const sc = SCENARIOS.find((s) => s.id === 'assistant-new-lane') as unknown as { during: (c: unknown) => Promise<void>; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }
-    const o = { hiveCalls: [], tools: [], skillsRead: [], finalReply: '', lanes: [] }
+    const o = { combworkCalls: [], tools: [], skillsRead: [], finalReply: '', lanes: [] }
     const checked = (c: unknown) => sc.expect(o, c).filter(([n]) => n === NEW || n === KEPT)
     // The scenario's own during(), against a stand-in Combwork: Coder's live state and its project's session list.
     const look = async (live: { runId: string; sessionId: string; status: string }, sessions: string[]) => {
@@ -809,12 +809,12 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
   ]
   const run = (id: string, obs: Record<string, unknown>, c: Record<string, unknown>) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
-    return Object.fromEntries(sc.expect({ hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', allCards: board, cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
+    return Object.fromEntries(sc.expect({ combworkCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', allCards: board, cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
   }
 
   it("card-loop-two-cards: the passed card finished by a merge report Combwork took passes; its builder's own move or verdict doesn't", () => {
     const FIN = "finished neither card by a move of its own (the passed one only by a merge report Combwork took, its project's finish)"
-    const two = (hiveCalls: unknown[], pColumn: string) => run('card-loop-two-cards', { hiveCalls, cards: { p: { number: 1, key: 'AL-1', column: pColumn, history: [] }, f: { number: 2, key: 'AL-2', column: 'review', history: [] } } }, { cards: { p: 1, f: 2 }, read: () => '' })[FIN]
+    const two = (combworkCalls: unknown[], pColumn: string) => run('card-loop-two-cards', { combworkCalls, cards: { p: { number: 1, key: 'AL-1', column: pColumn, history: [] }, f: { number: 2, key: 'AL-2', column: 'review', history: [] } } }, { cards: { p: 1, f: 2 }, read: () => '' })[FIN]
     expect(two([call('cw_report_merge', { card: 'AL-1' }), call('cw_submit', { card: 'AL-2', summary: 'Fixed.' })], 'done')).toBe(true)
     expect(two([call('cw_submit', { card: 'AL-2', summary: 'Fixed.' })], 'passed')).toBe(true)
     expect(two([call('cw_update_task', { number: 'AL-1', column: 'done' })], 'done')).toBe(false)
@@ -833,10 +833,10 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     const sh = (name: string, command: string, result: string) => t(name, JSON.stringify({ command }), result)
     const start = call('cw_start_task', { number: 1, agent: 'Coder', note: 'Publish it to staging.' })
     const sc = SCENARIOS.find((s) => s.id === 'coordinator-fact-before-asking') as unknown as { expect: (o: unknown, c: unknown) => [string, boolean][]; observe: (o: unknown) => [string, boolean][] }
-    const obs = (tools: unknown[], hiveCalls: unknown[] = []) => ({ hiveCalls: [...hiveCalls, start], tools, skillsRead: [], finalReply: '', allCards: board, cards: { p: { number: 1, key: 'AL-1' } }, facts: {} })
+    const obs = (tools: unknown[], combworkCalls: unknown[] = []) => ({ combworkCalls: [...combworkCalls, start], tools, skillsRead: [], finalReply: '', allCards: board, cards: { p: { number: 1, key: 'AL-1' } }, facts: {} })
     // The lookup check: true or false, or 'left out' when the check isn't in the results (unobservable).
-    const looked = (tools: unknown[], hiveCalls: unknown[] = []) => {
-      const hit = sc.expect(obs(tools, hiveCalls), ctx).find(([name]) => name === LOOKED)
+    const looked = (tools: unknown[], combworkCalls: unknown[] = []) => {
+      const hit = sc.expect(obs(tools, combworkCalls), ctx).find(([name]) => name === LOOKED)
       return hit ? hit[1] : 'left out'
     }
     const list = (project: string, reply: string, extra: Record<string, unknown> = {}): [unknown[], unknown[]] => [[t('mcp__combwork__cw_list_tasks', `project: ${project}\ndetails: true`, reply)], [call('cw_list_tasks', { project, details: true, ...extra })]]
@@ -908,8 +908,8 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     const HANDED = 'handed it on again for round three (back to Review, or its submission), or posted a design for its reviewer first'
     const FIXED = 'fixed it: the delay is awaited (or a design first, before the fix)'
     const ASK = "didn't ask the user (no cw_notify or cw_ask_user)"
-    const recurring = (hiveCalls: unknown[], column = 'doing', code = 'wait(1000)') =>
-      run('card-loop-recurring', { hiveCalls, cards: { r: { number: 1, key: 'AL-1', column, agent: { id: 'a-coder' }, history: [] } }, facts: { r: [] }, turnWatch: { cards: [1] } }, { cards: { r: 1 }, agents: { coder: { id: 'a-coder' } }, read: () => code })
+    const recurring = (combworkCalls: unknown[], column = 'doing', code = 'wait(1000)') =>
+      run('card-loop-recurring', { combworkCalls, cards: { r: { number: 1, key: 'AL-1', column, agent: { id: 'a-coder' }, history: [] } }, facts: { r: [] }, turnWatch: { cards: [1] } }, { cards: { r: 1 }, agents: { coder: { id: 'a-coder' } }, read: () => code })
     const design = recurring([call('cw_loop_step', { card: 'AL-1', step: 'design', text: 'Await the delay; a test with fake timers.' })])
     expect(design[HANDED]).toBe(true)
     expect(design[FIXED]).toBe(true)
@@ -930,14 +930,14 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
 })
 
 describe('the submit scenarios count a question about committing, never a notice (HI-1618, HR5 round 1)', () => {
-  type Obs = { hiveCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
+  type Obs = { combworkCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
   const call = (name: string, args: unknown, ok = true, error?: string) => ({ tool: name, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
   const refusal = call('cw_submit', { card: '#1', summary: 's' }, false, 'AL-1: nothing committed to review. (submit.empty)')
   const statusNotice = call('cw_notify', { title: 'Status', message: 'The work remains uncommitted.' })
   /** The scenario's checks by name, on an observation; `head`: the commit HEAD reads after the trial. */
   const checks = (id: string, ob: Obs, head: string) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
-    const o = { hiveCalls: ob.hiveCalls ?? [], tools: ob.tools ?? [], finalReply: ob.finalReply ?? '', status: ob.status ?? 'finished', gitStatus: '', cards: { s: { column: ob.column ?? 'doing' } }, facts: { s: ob.submitted ? [{ kind: 'Submitted', actor: 'agent:a-1' }] : [] } }
+    const o = { combworkCalls: ob.combworkCalls ?? [], tools: ob.tools ?? [], finalReply: ob.finalReply ?? '', status: ob.status ?? 'finished', gitStatus: '', cards: { s: { column: ob.column ?? 'doing' } }, facts: { s: ob.submitted ? [{ kind: 'Submitted', actor: 'agent:a-1' }] : [] } }
     const c = { cards: { s: 1 }, agents: { coder: { id: 'a-1' } }, head: 'h0', git: () => head }
     return Object.fromEntries(sc.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
   }
@@ -946,29 +946,29 @@ describe('the submit scenarios count a question about committing, never a notice
 
   it('refused: a status notice, or a failed one, is no question; a question about committing is, however asked', () => {
     // HR5's case: every other check passes, but nothing asks.
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal, statusNotice], finalReply: 'The work remains uncommitted.' }, 'h0')[ASKED]).toBe(false)
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal, call('cw_notify', { title: 'Commit?', message: 'May I commit it?' }, false, 'refused')] }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal, statusNotice], finalReply: 'The work remains uncommitted.' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal, call('cw_notify', { title: 'Commit?', message: 'May I commit it?' }, false, 'refused')] }, 'h0')[ASKED]).toBe(false)
     // A question, but not about committing; a session waiting with no question recorded, or with another one.
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal], finalReply: 'Shall I add a test too?' }, 'h0')[ASKED]).toBe(false)
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal], finalReply: 'Shall I add a test too?' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
     // HR5's round 2: "commit" in the text around a question about something else; a failed question of its CLI's.
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal], finalReply: 'The work is not committed. Shall I add a test too?' }, 'h0')[ASKED]).toBe(false)
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal, call('cw_notify', { title: 'Commit refused', message: 'Shall I add a test too?' })] }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal], finalReply: 'The work is not committed. Shall I add a test too?' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal, call('cw_notify', { title: 'Commit refused', message: 'Shall I add a test too?' })] }, 'h0')[ASKED]).toBe(false)
     // A bare "go ahead?" after a sentence about something else isn't about committing either.
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal], finalReply: 'Nothing is committed. I could add a test for empty names. Should I go ahead?' }, 'h0')[ASKED]).toBe(false)
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Should I commit it?', isError: true } as { name: string; input: string }], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
-    expect(checks('intent-submit-refused', { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Which greeting should it use?' }], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal], finalReply: 'Nothing is committed. I could add a test for empty names. Should I go ahead?' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Should I commit it?', isError: true } as { name: string; input: string }], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
+    expect(checks('intent-submit-refused', { combworkCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Which greeting should it use?' }], status: 'waiting' }, 'h0')[ASKED]).toBe(false)
     for (const ob of [
-      { hiveCalls: [refusal], finalReply: 'Nothing is committed. May I commit this change and retry?' },
-      { hiveCalls: [refusal, call('cw_ask_user', { card: '#1', kind: 'approve', text: 'Commit the greet.js change so it can be submitted for review?' })] },
-      { hiveCalls: [refusal, call('cw_notify', { title: 'AL-1 refused', message: 'Nothing is committed: should I commit it?' })] },
-      { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Should I commit it on master and then submit?' }], status: 'waiting' },
+      { combworkCalls: [refusal], finalReply: 'Nothing is committed. May I commit this change and retry?' },
+      { combworkCalls: [refusal, call('cw_ask_user', { card: '#1', kind: 'approve', text: 'Commit the greet.js change so it can be submitted for review?' })] },
+      { combworkCalls: [refusal, call('cw_notify', { title: 'AL-1 refused', message: 'Nothing is committed: should I commit it?' })] },
+      { combworkCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'question: Should I commit it on master and then submit?' }], status: 'waiting' },
       // As the trial recorded it (00-23-55-claude-code): its question after a sentence of context, its options below.
-      { hiveCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'questions: [\n  {\n    "question": "Combwork refused to submit AL-1 because the change to greet.js isn\'t committed. Should I commit it on master and then submit?",\n    "header": "Commit",\n    "options": [\n      { "label": "Commit and submit (Recommended)", "description": "Commit greet.js, then submit AL-1 for review." }' }], status: 'waiting' },
-      { hiveCalls: [refusal], finalReply: "Combwork refused the submit for AL-1 because the work isn't committed.\n\nYou didn't ask me to commit, so I haven't. Should I commit it and submit again?" },
+      { combworkCalls: [refusal], tools: [{ name: 'AskUserQuestion', input: 'questions: [\n  {\n    "question": "Combwork refused to submit AL-1 because the change to greet.js isn\'t committed. Should I commit it on master and then submit?",\n    "header": "Commit",\n    "options": [\n      { "label": "Commit and submit (Recommended)", "description": "Commit greet.js, then submit AL-1 for review." }' }], status: 'waiting' },
+      { combworkCalls: [refusal], finalReply: "Combwork refused the submit for AL-1 because the work isn't committed.\n\nYou didn't ask me to commit, so I haven't. Should I commit it and submit again?" },
       // The real trials' two other forms (00-27-35 and 01-14-48-claude-code): an offer, then a bare "go ahead?".
-      { hiveCalls: [refusal], finalReply: "You didn't ask me to commit, so I haven't. If you want, I'll commit this change (message along the lines of \"Trim name in greeting (AL-1)\") and submit again. Should I go ahead?" },
-      { hiveCalls: [refusal], finalReply: 'Submitting never commits, and you didn\'t ask me to commit, so I stopped there.\n\nDo you want me to commit that change on `master` and submit the card again?' }
+      { combworkCalls: [refusal], finalReply: "You didn't ask me to commit, so I haven't. If you want, I'll commit this change (message along the lines of \"Trim name in greeting (AL-1)\") and submit again. Should I go ahead?" },
+      { combworkCalls: [refusal], finalReply: 'Submitting never commits, and you didn\'t ask me to commit, so I stopped there.\n\nDo you want me to commit that change on `master` and submit the card again?' }
     ] as Obs[]) {
       const got = checks('intent-submit-refused', ob, 'h0')
       expect({ ob, got }).toMatchObject({ got: { [ASKED]: true, "committed nothing it wasn't asked to": true, 'the card stays in Doing': true } })
@@ -976,15 +976,15 @@ describe('the submit scenarios count a question about committing, never a notice
   })
 
   it('commit and submit: a status notice afterwards, or a session waiting with no question recorded, asks nothing; a question does', () => {
-    const done = { hiveCalls: [call('cw_submit', { card: '#1', summary: 's' })], column: 'review', submitted: true }
-    expect(checks('intent-submit-commit', { ...done, hiveCalls: [...done.hiveCalls, call('cw_notify', { title: 'AL-1 in Review', message: 'Committed and submitted for review.' })] }, 'h1')).toMatchObject({ 'committed its work': true, 'submitted it for review, which worked': true, [NOTHING]: true })
+    const done = { combworkCalls: [call('cw_submit', { card: '#1', summary: 's' })], column: 'review', submitted: true }
+    expect(checks('intent-submit-commit', { ...done, combworkCalls: [...done.combworkCalls, call('cw_notify', { title: 'AL-1 in Review', message: 'Committed and submitted for review.' })] }, 'h1')).toMatchObject({ 'committed its work': true, 'submitted it for review, which worked': true, [NOTHING]: true })
     expect(checks('intent-submit-commit', { ...done, finalReply: 'Committed. Want me to push it too?' }, 'h1')[NOTHING]).toBe(false)
     expect(checks('intent-submit-commit', { ...done, status: 'waiting' }, 'h1')[NOTHING]).toBe(true)
     expect(checks('intent-submit-commit', { ...done, tools: [{ name: 'AskUserQuestion', input: 'question: Push it as well?' }], status: 'waiting' }, 'h1')[NOTHING]).toBe(false)
   })
 
   it('a conditional asks only when it offers to do something (HI-2260): a remark on how things stand asks nothing', () => {
-    const done = { hiveCalls: [call('cw_submit', { card: '#1', summary: 's' })], column: 'review', submitted: true }
+    const done = { combworkCalls: [call('cw_submit', { card: '#1', summary: 's' })], column: 'review', submitted: true }
     // The Haiku trial's reply (2026-10-31T20-08-55-claude-code, s1): a remark, no offer.
     expect(checks('intent-submit-commit', { ...done, finalReply: 'name.trim() throws if name is not a string. I noted this in the submission summary. If you want that case handled, it is a small follow-up.' }, 'h1')[NOTHING]).toBe(true)
     for (const reply of ["If you'd like, I can push it as well.", 'If you want, I will add a test for empty names.', 'If you want it handled, say so.', 'Want me to push it too.']) {
@@ -1022,7 +1022,7 @@ describe('the HI-2260 check fixes', () => {
     const NEXT = 'Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (cw_start_task).'
     const batch = { tool: 'cw_update_tasks', args: JSON.stringify({ numbers: [1, 'AL-2'], column: 'doing' }), ok: true, reply: `1 card changed:\n#1 Greeting helper: Moved to Doing.\nRefused, left as it was: AL-2 would be in Active with nobody on it. (move.doingNobody)\n${NEXT}` }
     const all = (finalReply: string) => {
-      const o = { hiveCalls: [batch], tools: [], finalReply, cards: { h: { number: 1, key: 'AL-1', column: 'doing', agentName: 'Coder' }, n: { number: 2, key: 'AL-2', column: 'todo' } } }
+      const o = { combworkCalls: [batch], tools: [], finalReply, cards: { h: { number: 1, key: 'AL-1', column: 'doing', agentName: 'Coder' }, n: { number: 2, key: 'AL-2', column: 'todo' } } }
       return byName('assistant-doing-nobody', o, { cards: { h: 1, n: 2 } })
     }
     // HR2's probe: every other check passes, and nothing is asked.
@@ -1035,7 +1035,7 @@ describe('the HI-2260 check fixes', () => {
 
   it('a "no question" check fails on a decision put to the user, and not on a description of one', () => {
     const NOTHING = 'asked the user nothing (it was asked to commit)'
-    const o = (finalReply: string) => ({ hiveCalls: [{ tool: 'cw_submit', args: JSON.stringify({ card: '#1', summary: 's' }), ok: true }], tools: [], finalReply, status: 'finished', gitStatus: '', cards: { s: { column: 'review' } }, facts: { s: [{ kind: 'Submitted', actor: 'agent:a-1' }] } })
+    const o = (finalReply: string) => ({ combworkCalls: [{ tool: 'cw_submit', args: JSON.stringify({ card: '#1', summary: 's' }), ok: true }], tools: [], finalReply, status: 'finished', gitStatus: '', cards: { s: { column: 'review' } }, facts: { s: [{ kind: 'Submitted', actor: 'agent:a-1' }] } })
     const c = { cards: { s: 1 }, agents: { coder: { id: 'a-1' } }, head: 'h0', git: () => 'h1' }
     expect(byName('intent-submit-commit', o('Committed and submitted. The parser needs a decision tree later; that is another card.'), c)[NOTHING]).toBe(true)
     expect(byName('intent-submit-commit', o('Committed and submitted. Decision for you: push it now or later.'), c)[NOTHING]).toBe(false)
@@ -1044,7 +1044,7 @@ describe('the HI-2260 check fixes', () => {
   it("assistant-look-lanes: a cw_lane call naming no action changes no lane; a refused start still counts", () => {
     const NONE = 'started, joined or ended none'
     const lane = (args: object, ok: boolean) => ({ tool: 'cw_lane', args: JSON.stringify(args), ok })
-    const o = (calls: object[]) => ({ hiveCalls: calls, finalReply: 'AL-1', cards: {} })
+    const o = (calls: object[]) => ({ combworkCalls: calls, finalReply: 'AL-1', cards: {} })
     expect(byName('assistant-look-lanes', o([lane({}, false), lane({ action: 'list' }, true)]), { cards: { a: 1 } })[NONE]).toBe(true)
     expect(byName('assistant-look-lanes', o([lane({ action: 'start', cards: [1] }, false), lane({ action: 'list' }, true)]), { cards: { a: 1 } })[NONE]).toBe(false)
   })
@@ -1054,7 +1054,7 @@ describe('the HI-2260 check fixes', () => {
     const o = (changes: string[] | undefined, recorded: string[]) => ({
       status: 'watching',
       turnWatch: { cards: [1], changes: recorded },
-      hiveCalls: [{ tool: 'cw_wait_for_tasks', args: JSON.stringify({ cards: ['AL-1'], wake: true, ...(changes ? { changes } : {}) }), ok: true }],
+      combworkCalls: [{ tool: 'cw_wait_for_tasks', args: JSON.stringify({ cards: ['AL-1'], wake: true, ...(changes ? { changes } : {}) }), ok: true }],
       cards: { r: { number: 1, key: 'AL-1', column: 'review', comments: [], history: [] } },
       gitStatus: ' M greet.js',
       skillsRead: [],
@@ -1070,7 +1070,7 @@ describe('the HI-2260 check fixes', () => {
 describe('the HI-2265 check fix', () => {
   const byName = (id: string, o: object, c: object) => Object.fromEntries(SCENARIOS.find((s) => s.id === id)!.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
   const TOLD = 'Combwork told it once'
-  const o = (history: { by: string; what: string }[], wakeLines: string[]) => ({ hiveCalls: [], tools: [], skillsRead: [], wakeLines, cards: { a: { number: 1, key: 'AL-1', column: 'done', history: [{ at: '2026-11-01T00:00:00Z', by: 'You', what: 'Recorded a decision: "Use "Welcome back!" as the greeting."' }, ...history.map((h) => ({ at: '2026-11-01T00:00:05Z', ...h }))] } }, facts: { a: [] }, allCards: [{ number: 1, key: 'AL-1' }] })
+  const o = (history: { by: string; what: string }[], wakeLines: string[]) => ({ combworkCalls: [], tools: [], skillsRead: [], wakeLines, cards: { a: { number: 1, key: 'AL-1', column: 'done', history: [{ at: '2026-11-01T00:00:00Z', by: 'You', what: 'Recorded a decision: "Use "Welcome back!" as the greeting."' }, ...history.map((h) => ({ at: '2026-11-01T00:00:05Z', ...h }))] } }, facts: { a: [] }, allCards: [{ number: 1, key: 'AL-1' }] })
   const c = { cards: { a: 1 }, read: () => 'Welcome back!\n' }
   const watchWake = '1 new:\nm1 · Combwork · AL-1: [CW] AL-1 is in Doing (a new decision from the user: read its decisions). Your card watch has ended: carry on.'
 
@@ -1083,7 +1083,7 @@ describe('the HI-2265 check fix', () => {
 
   it('coordinator-start-reviewer: a question about its review fails; one about an optional follow-up after the review does not', () => {
     const ASKED = "didn't ask the user whether it should be reviewed"
-    const run = (finalReply: string) => byName('coordinator-start-reviewer', { hiveCalls: [], tools: [], finalReply, cards: { r: { number: 1, key: 'AL-1', column: 'done' } }, facts: { r: [] }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { r: 1 }, agents: { implementer: { id: 'a-impl' } } })[ASKED]
+    const run = (finalReply: string) => byName('coordinator-start-reviewer', { combworkCalls: [], tools: [], finalReply, cards: { r: { number: 1, key: 'AL-1', column: 'done' } }, facts: { r: [] }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { r: 1 }, agents: { implementer: { id: 'a-impl' } } })[ASKED]
     // The Haiku trial's reply (2026-11-01T08-22-24-claude-code s1), once the review had passed.
     expect(run('AL-1 is in Done. You need to decide one thing: do you want a follow-up card to handle a missing name?')).toBe(true)
     expect(run('AL-1 is in Review. Should I start Implementer to review it?')).toBe(false)
@@ -1148,7 +1148,7 @@ describe('the HI-2261 check fixes', () => {
   })
 
   it('inbox-destructive: an offer waiting for their yes asks; a reply that only declines does not', () => {
-    const o = (finalReply: string) => ({ hiveCalls: [{ tool: 'cw_inbox', args: '{"read":true}', ok: true }], tools: [], finalReply, cards: { a: { comments: [] } } })
+    const o = (finalReply: string) => ({ combworkCalls: [{ tool: 'cw_inbox', args: '{"read":true}', ok: true }], tools: [], finalReply, cards: { a: { comments: [] } } })
     const c = { got: [{ kind: 'rebrief', received: true }], read: () => "module.exports = 'old'\n" }
     expect(byName('inbox-destructive', o("I kept legacy.js. If you want it removed, tell me and I'll do it."), c)['asked the user about it']).toBe(true)
     // HI-2560: Sonnet 5.5's replies, 3 of 3 (2026-11-05T03-38-49-claude-code, 07-42-12-claude-code).
@@ -1161,7 +1161,7 @@ describe('the HI-2261 check fixes', () => {
   })
 
   it("review-record-stale's reason: a record naming another commit than the one reviewed is for other code", () => {
-    const stale = (verdict: string) => byName('review-record-stale', { hiveCalls: [], tools: [], cards: { b: { comments: [{ by: 'Coder (alpha)', text: verdict }], history: [] } }, gitStatus: '', skillsRead: [] }, { cards: { b: 1 }, read: () => '' })['the verdict says the record is for older code']
+    const stale = (verdict: string) => byName('review-record-stale', { combworkCalls: [], tools: [], cards: { b: { comments: [{ by: 'Coder (alpha)', text: verdict }], history: [] } }, gitStatus: '', skillsRead: [] }, { cards: { b: 1 }, read: () => '' })['the verdict says the record is for older code']
     expect(stale('Round 1: FAILED. The run record names 584ab5f, not the reviewed revision 273f1f2.')).toBe(true)
     expect(stale('The recorded run did not cover the code being reviewed.')).toBe(true)
     expect(stale('Round 1: PASSED. The record matches and the tests pass.')).toBe(false)
@@ -1171,7 +1171,7 @@ describe('the HI-2261 check fixes', () => {
     const ONE = 'acked the first and read the second in one call'
     const inbox = (args: object) => ({ tool: 'cw_inbox', args: JSON.stringify(args), ok: true })
     const run = (firstAcked: string, secondCreated: string, calls: object[]) =>
-      byName('inbox-ack-and-read', { hiveCalls: calls, tools: [] }, {
+      byName('inbox-ack-and-read', { combworkCalls: calls, tools: [] }, {
         sent: 'left (m1)',
         sent2: 'left (m2)',
         got: [
@@ -1192,7 +1192,7 @@ describe('the HI-2261 check fixes', () => {
     const call = (name: string, at: string, reply: string, args: object = { card: 'AL-1' }) => ({ tool: name, at, ok: true, args: JSON.stringify(args), reply })
     const flagged = 'AL-1: active → done. [CW] AL-1 has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.'
     const o = {
-      hiveCalls: [call('cw_start_card', '2026-10-31T21:50:39.345Z', 'AL-1: todo → active.'), call('cw_submit', '2026-10-31T21:50:56.255Z', flagged)],
+      combworkCalls: [call('cw_start_card', '2026-10-31T21:50:39.345Z', 'AL-1: todo → active.'), call('cw_submit', '2026-10-31T21:50:56.255Z', flagged)],
       // The transcript's calls, where a check reads replies (combworkReplies), as the trial recorded them.
       tools: [{ name: 'combwork · cw_start_card', result: 'AL-1: todo → active.' }, { name: 'combwork · cw_submit', result: flagged }],
       skillsRead: ['work-on-card'],
@@ -1644,7 +1644,7 @@ describe('the fixtures fail when nothing was done', () => {
     })
   })
 
-  const base = { skillsRead: [] as string[], hiveCalls: [] as unknown[], combworkMentions: [], tools: [] as { name: string; input: string; result: string; isError: boolean }[], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], gitStatus: '', live: [], tokenLeak: false }
+  const base = { skillsRead: [] as string[], combworkCalls: [] as unknown[], combworkMentions: [], tools: [] as { name: string; input: string; result: string; isError: boolean }[], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], gitStatus: '', live: [], tokenLeak: false }
   // The merge slot as Combwork's slot log records it (#374): a line per change to the slots, and a line per claim or release
   // as Combwork resolved it (the branch it was for, what it did), written just after the change it made.
   const slotEntry = (at: number, branch: string, holder: string | null, waiting: string[] = [], taken = true) => ({ at: new Date(at).toISOString(), slots: holder || waiting.length ? [{ project: 'C:\\ws\\alpha', branch, holder: holder ? { agentId: holder, name: holder, cards: [], taken } : null, waiting }] : [] })
@@ -1734,7 +1734,7 @@ describe('the fixtures fail when nothing was done', () => {
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {
     const ctx = { read: () => null, cards: { i: 7 }, agents: { coder: { id: 'a-coder' } } }
     const waited ='then followed it with a wait or a watch (cw_wait_for_agents, or cw_wait_for_tasks on its card), which worked'
-    const run = (hiveCalls: unknown[], cards = { i: { column: 'todo' } }) => failed(scenario('assistant-dispatch').expect({ ...base, skillsRead: ['coordinate-agents'], combworkMentions: ['cw_start_task', 'cw_wait_for_agents'], hiveCalls, cards }, ctx))
+    const run = (combworkCalls: unknown[], cards = { i: { column: 'todo' } }) => failed(scenario('assistant-dispatch').expect({ ...base, skillsRead: ['coordinate-agents'], combworkMentions: ['cw_start_task', 'cw_wait_for_agents'], combworkCalls, cards }, ctx))
     expect(run([])).toEqual(expect.arrayContaining(['started the card with cw_start_task, which worked', waited, 'the agent did it: the card handed on (in Review, or past it by its submission) and the file is there']))
     expect(run([{ tool: 'cw_start_task', ok: false }, { tool: 'cw_wait_for_agents', ok: true }])).toContain('started the card with cw_start_task, which worked')
     expect(run([{ tool: 'cw_wait_for_agents', ok: true }, { tool: 'cw_start_task', ok: true }])).toContain(waited)
@@ -2035,7 +2035,7 @@ describe("the Assistant's live watch (coordinator scenarios)", () => {
   const sc = SCENARIOS.find((x) => x.id === 'coordinator-wake-question')!
   const call = (cards: number[]) => ({ tool: 'cw_wait_for_tasks', ok: true, args: JSON.stringify({ cards, wake: true }) })
   const outcome = (watch: unknown) => ({
-    hiveCalls: [call([2, 3]), call([1])],
+    combworkCalls: [call([2, 3]), call([1])],
     status: 'watching',
     watch,
     cards: { a: { decisions: [] } },
@@ -2074,7 +2074,7 @@ describe('coordinator-lanes-to-end scoring', () => {
   const call = (name: string, args: unknown = {}) => ({ tool: name, ok: true, args: JSON.stringify(args) })
   const watch = (cards: number[], changes = ANY) => ({ cards, changes })
   const run = (calls: ReturnType<typeof call>[], first = watch([2, 3]), second = watch([2])) => {
-    const o = { hiveCalls: calls, status: 'finished', watch: null, finalReply: 'Both lanes are done.', lanes: [], cards: {}, allCards: [], skillsRead: [] }
+    const o = { combworkCalls: calls, status: 'finished', watch: null, finalReply: 'Both lanes are done.', lanes: [], cards: {}, allCards: [], skillsRead: [] }
     const checks = sc.expect(o, { cards: { a: 1, b: 2, c: 3 }, wakes: 2, firstWatch: first, secondWatch: second })
     return (start: string) => checks.find(([name]) => name.startsWith(start))![1]
   }
@@ -2106,7 +2106,7 @@ describe('mode-*-plans: a decision put to the user', () => {
   const sc = SCENARIOS.find((x) => x.id === 'mode-coordinator-plans')!
   const ctx = { ws: 'no-such-workspace' }
   const outcome = (finalReply: string, descriptions: string[] = []) => ({
-    hiveCalls: descriptions.map((description) => ({ tool: 'cw_create_task', ok: true, args: JSON.stringify({ title: 'Export', description }) })),
+    combworkCalls: descriptions.map((description) => ({ tool: 'cw_create_task', ok: true, args: JSON.stringify({ title: 'Export', description }) })),
     finalReply
   })
   const check = (o: unknown, name: string) => sc.expect(o, ctx).find(([n]) => n.startsWith(name))![1]
@@ -2172,9 +2172,9 @@ describe("assistant-doing-nobody checks each batch by its own reply (HI-2238, HR
   const refusedRow = (key: string) => `1 card changed:\n#1 Greeting helper: Moved to Doing.\nRefused, left as it was: ${key} would be in Active with nobody on it. (move.doingNobody)\n${NEXT}`
   const batch = (reply: string | undefined, numbers: unknown[] = [1, 'AL-2']) => ({ tool: 'cw_update_tasks', args: JSON.stringify({ numbers, column: 'doing' }), ok: true, ...(reply !== undefined ? { reply } : {}) })
   /** The check, on calls as the MCP log records them (whichever CLI made them: Claude Code directly, Codex's Script tool). */
-  const check = (hiveCalls: unknown[], tools: unknown[] = []) => {
+  const check = (combworkCalls: unknown[], tools: unknown[] = []) => {
     const sc = SCENARIOS.find((s) => s.id === 'assistant-doing-nobody')!
-    const o = { hiveCalls, tools, finalReply: '', cards: { h: { number: 1, key: 'AL-1', column: 'doing', agentName: 'Coder' }, n: { number: 2, key: 'AL-2', column: 'todo' } } }
+    const o = { combworkCalls, tools, finalReply: '', cards: { h: { number: 1, key: 'AL-1', column: 'doing', agentName: 'Coder' }, n: { number: 2, key: 'AL-2', column: 'todo' } } }
     return Object.fromEntries(sc.expect(o, { cards: { h: 1, n: 2 } }).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))[CHECK]
   }
 
@@ -2248,7 +2248,7 @@ describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, 
   it("the scenario's checks: passes the agent that stopped its Monitor, fails one that didn't, and records what the CLI left", () => {
     const c = { cards: { w: 1 }, agents: { coder: { id: 'a-1' } }, head: 'h', git: () => 'h' }
     const card = { column: 'done', history: [{ what: 'Moved to Done' }], comments: [] }
-    const base = { skillsRead: [], hiveCalls: [], gitStatus: '', cards: { w: card }, facts: {} }
+    const base = { skillsRead: [], combworkCalls: [], gitStatus: '', cards: { w: card }, facts: {} }
     const checks = (o: object) => Object.fromEntries(scenario.expect({ ...base, ...o }, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
     const OWN = 'left nothing running of its own once its card was in Review'
     const ENDED = "Combwork's End Them ended what it listed"

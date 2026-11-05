@@ -207,7 +207,7 @@ function sizes(home) {
   await page.evaluate(([k, d]) => window.__cwTerminalOutput(k, d), [writer.key, `${marker}\r\n`])
   // The narrowest window, with the Progress panel open.
   await lib.fitWindow(app, page, { width: 900, height: 650 })
-  if (!(await page.locator('.progress-panel').count())) await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+  if (!(await page.locator('.progress-panel').count())) await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
   check('reflow: the Progress panel opens', !!(await lib.until(async () => (await page.locator('.progress-panel').count()) > 0, HUNG_MS)))
   check('reflow: the terminal narrows', !!(await lib.until(async () => (await state(writer.key)).cols < wide && (await fitted()), HUNG_MS)), JSON.stringify({ wide, now: await state(writer.key) }))
   check('reflow: the wide line and the exit line are whole after narrowing', !!(await lib.until(async () => { const t = await drawn(); return t.includes(marker) && t.includes('[process exited with code') }, HUNG_MS)), JSON.stringify({ wide, cols: (await state(writer.key)).cols, drawn: await drawn() }))
@@ -221,7 +221,7 @@ function sizes(home) {
   // Fitted, and drawn inside its pane: one too small to fit counts as fitted, so its screen is measured too.
   const inside = () => page.evaluate(() => window.__cwTerminalsInside())
   const fewer = (n) => lib.until(async () => (await panes()) === n && (await fitted()) && (await inside()), HUNG_MS)
-  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
   // At this width the toolbar folds the layouts into one button with a menu (#886).
   await page.locator('.layout-switch button.layout-menu').click()
   await page.getByRole('menuitem', { name: 'Two columns' }).click()

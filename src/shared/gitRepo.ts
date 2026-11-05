@@ -163,7 +163,7 @@ export interface GitWorktreeRow {
   branch: string | null
   head: string | null
   /** One of Hive's own (HI-1710): a review copy, or the merge queue's folder. Never an unused worktree, never removed here. */
-  hive?: 'copy' | 'queue'
+  combwork?: 'copy' | 'queue'
 }
 
 export interface GitIdentityPart {

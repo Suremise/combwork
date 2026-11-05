@@ -24,7 +24,7 @@ const reviewers = (n: number, provider = 'codex'): TemplateAgent[] => Array.from
 /** Builder n with reviewer n, for each n both have (by their numbered names, `pairNames`). */
 const paired = (n: number): TemplatePair[] => Array.from({ length: n }, (_, i) => ({ builder: `{key}-B${i + 1}`, reviewer: `{key}-R${i + 1}` }))
 
-function hive(file: string, name: Msg, description: Msg, layout: PageLayout, agents: TemplateAgent[], suggestedPreset: SuggestedPreset, extra: { pairs?: TemplatePair[]; reviewerMode?: ReviewerMode } = {}): CombworkTemplate {
+function combwork(file: string, name: Msg, description: Msg, layout: PageLayout, agents: TemplateAgent[], suggestedPreset: SuggestedPreset, extra: { pairs?: TemplatePair[]; reviewerMode?: ReviewerMode } = {}): CombworkTemplate {
   // Its name in English: what a copy is called before the window's language names it (main names copies in its own).
   return { file, name, description, template: { version: TEMPLATE_VERSION, name: name.defaultMessage, savedAt: '', layout, description: description.defaultMessage, agents, suggestedPreset, ...extra, workflow: presetWorkflow(suggestedPreset, extra.reviewerMode, agents.length) } }
 }
@@ -45,7 +45,7 @@ export function presetWorkflow(id: SuggestedPreset, reviewerMode?: ReviewerMode,
 
 /** Hive's templates, in the order they are listed. */
 export const CW_TEMPLATES: readonly CombworkTemplate[] = [
-  hive(
+  combwork(
     'solo.json',
     msg({ id: 'assistant.combworkTemplates.solo', defaultMessage: 'Solo', description: "Name of one of Combwork's own agent templates: one builder (glossary: builder). Like the preset Solo." }),
     msg({ id: 'assistant.combworkTemplates.soloText', defaultMessage: 'One builder (Claude Code), working alone.', description: "Description of Combwork's template Solo (glossary: builder)." }),
@@ -53,7 +53,7 @@ export const CW_TEMPLATES: readonly CombworkTemplate[] = [
     builders(1),
     'solo'
   ),
-  hive(
+  combwork(
     'pair.json',
     msg({ id: 'assistant.combworkTemplates.pair', defaultMessage: 'Pair', description: "Name of one of Combwork's own agent templates: a builder and a reviewer. Like the preset Pair." }),
     msg({ id: 'assistant.combworkTemplates.pairText', defaultMessage: 'A builder (Claude Code) and a reviewer (Codex) that reviews its cards.', description: "Description of Combwork's template Pair (glossary: builder, reviewer)." }),
@@ -62,7 +62,7 @@ export const CW_TEMPLATES: readonly CombworkTemplate[] = [
     'pair',
     { pairs: paired(1) }
   ),
-  hive(
+  combwork(
     'pair-one-provider.json',
     msg({ id: 'assistant.combworkTemplates.pairOne', defaultMessage: 'Pair: one provider', description: "Name of one of Combwork's own agent templates: a builder and a reviewer on the same coding agent (provider: Claude Code, Codex…)." }),
     msg({ id: 'assistant.combworkTemplates.pairOneText', defaultMessage: 'A builder and a reviewer, both Claude Code: for when only one coding agent is installed.', description: "Description of Combwork's template Pair: one provider (glossary: builder, reviewer)." }),
@@ -71,7 +71,7 @@ export const CW_TEMPLATES: readonly CombworkTemplate[] = [
     'pair',
     { pairs: paired(1) }
   ),
-  hive(
+  combwork(
     'team-3x3.json',
     msg({ id: 'assistant.combworkTemplates.team3', defaultMessage: 'Team 3×3', description: "Name of one of Combwork's own agent templates: three builders and three reviewers. Keep 3×3." }),
     msg({ id: 'assistant.combworkTemplates.team3Text', defaultMessage: 'Three builders (Claude Code), each with its own reviewer (Codex).', description: "Description of Combwork's template Team 3×3 (glossary: builder, reviewer)." }),
@@ -80,7 +80,7 @@ export const CW_TEMPLATES: readonly CombworkTemplate[] = [
     'team',
     { pairs: paired(3) }
   ),
-  hive(
+  combwork(
     'team-6x6.json',
     msg({ id: 'assistant.combworkTemplates.team6', defaultMessage: 'Team 6×6', description: "Name of one of Combwork's own agent templates: six builders and six reviewers. Keep 6×6." }),
     msg({ id: 'assistant.combworkTemplates.team6Text', defaultMessage: 'Six builders (Claude Code), each with its own reviewer (Codex), on two pages.', description: "Description of Combwork's template Team 6×6 (glossary: builder, reviewer)." }),
@@ -89,7 +89,7 @@ export const CW_TEMPLATES: readonly CombworkTemplate[] = [
     'team',
     { pairs: paired(6) }
   ),
-  hive(
+  combwork(
     'team-6-pool.json',
     msg({ id: 'assistant.combworkTemplates.team6Pool', defaultMessage: 'Team 6 + pool', description: "Name of one of Combwork's own agent templates: six builders and a shared pool of reviewers." }),
     msg({ id: 'assistant.combworkTemplates.team6PoolText', defaultMessage: 'Six builders (Claude Code) and two reviewers (Codex) shared by all of them.', description: "Description of Combwork's template Team 6 + pool (glossary: builder, reviewer)." }),

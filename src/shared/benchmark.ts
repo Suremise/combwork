@@ -165,9 +165,9 @@ export const SCENARIO_MEASURES: MeasureDef[] = [
   { key: 'toolBytes', label: msg({ id: 'performance.compare.measure.toolBytes', defaultMessage: 'Tool replies (bytes)', description: "A measure in Performance → Compare: the size of the replies of Combwork's tools, in bytes." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolBytes', defaultMessage: 'UTF-8 bytes of the same replies.', description: 'Tooltip of the Tool replies (bytes) measure in Performance → Compare.' }) },
   { key: 'toolCalls', label: msg({ id: 'performance.compare.measure.toolCalls', defaultMessage: 'Tool calls', description: "A measure in Performance → Compare: how many times agents called Combwork's tools." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.toolCalls', defaultMessage: 'Combwork tool calls measured by the bridge.', description: "Tooltip of the Tool calls measure in Performance → Compare. Keep Combwork (the app's name); the bridge is Combwork's MCP server between the CLI and Combwork." }) },
   { key: 'toolDetailCalls', label: msg({ id: 'performance.compare.measure.toolDetailCalls', defaultMessage: 'Detail calls', description: "A measure in Performance → Compare: calls of Combwork's tools that asked for the full reply." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.toolDetailCalls', defaultMessage: 'Calls that asked for the full form.', description: 'Tooltip of the Detail calls measure in Performance → Compare.' }) },
-  { key: 'hiveCalls', label: msg({ id: 'performance.compare.measure.combworkCalls', defaultMessage: 'Calls run', description: "A measure in Performance → Compare: calls of Combwork's tools that Combwork ran." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.combworkCalls', defaultMessage: 'Combwork tool calls the server ran (its own log).', description: "Tooltip of the Calls run measure in Performance → Compare. Keep Combwork (the app's name)." }) },
+  { key: 'combworkCalls', label: msg({ id: 'performance.compare.measure.combworkCalls', defaultMessage: 'Calls run', description: "A measure in Performance → Compare: calls of Combwork's tools that Combwork ran." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.combworkCalls', defaultMessage: 'Combwork tool calls the server ran (its own log).', description: "Tooltip of the Calls run measure in Performance → Compare. Keep Combwork (the app's name)." }) },
   { key: 'repeatedCalls', label: msg({ id: 'performance.compare.measure.repeatedCalls', defaultMessage: 'Repeated calls', description: 'A measure in Performance → Compare: tool calls identical to an earlier one.' }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.repeatedCalls', defaultMessage: 'Calls identical to one already made: work done twice.', description: 'Tooltip of the Repeated calls measure in Performance → Compare.' }) },
-  { key: 'hiveCallErrors', label: msg({ id: 'performance.compare.measure.combworkCallErrors', defaultMessage: 'Failed calls', description: "A measure in Performance → Compare: calls of Combwork's tools that failed." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.combworkCallErrors', defaultMessage: 'Combwork tool calls that failed.', description: "Tooltip of the Failed calls measure in Performance → Compare. Keep Combwork (the app's name)." }) },
+  { key: 'combworkCallErrors', label: msg({ id: 'performance.compare.measure.combworkCallErrors', defaultMessage: 'Failed calls', description: "A measure in Performance → Compare: calls of Combwork's tools that failed." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.combworkCallErrors', defaultMessage: 'Combwork tool calls that failed.', description: "Tooltip of the Failed calls measure in Performance → Compare. Keep Combwork (the app's name)." }) },
   { key: 'toolErrors', label: msg({ id: 'performance.compare.measure.toolErrors', defaultMessage: 'Tool errors', description: 'A measure in Performance → Compare: tool replies that were errors.' }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.toolErrors', defaultMessage: 'Tool replies that were errors (the bridge’s count).', description: "Tooltip of the Tool errors measure in Performance → Compare. The bridge is Combwork's MCP server between the CLI and Combwork." }) },
   { key: 'apiFailed', label: msg({ id: 'performance.compare.measure.apiFailed', defaultMessage: 'API failures', description: "A measure in Performance → Compare: requests to Combwork's Agent API that failed." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.apiFailed', defaultMessage: 'Refused, failed or cancelled requests.', description: 'Tooltip of the API failures measure in Performance → Compare.' }) },
   { key: 'apiCancelled', label: msg({ id: 'performance.compare.measure.apiCancelled', defaultMessage: 'API cancelled', description: "A measure in Performance → Compare: requests to Combwork's Agent API that the caller cancelled." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.apiCancelled', defaultMessage: 'Requests the client gave up on.', description: 'Tooltip of the API cancelled measure in Performance → Compare.' }) },
@@ -368,7 +368,7 @@ const MEASURE_KEYS = new Set([...SCENARIO_MEASURES.map((m) => m.key).filter((k) 
  * A part's measures (HI-2186: the subject's, the other agents'): the scenario's own, less what isn't any one agent's (the
  * skill service's work, drops) and what the harness counts for the subject alone (its calls, the skills it read).
  */
-const NOT_SPLIT = new Set(['hiveCalls', 'hiveCallErrors', 'repeatedCalls', 'skillsRead', 'skillRefsRead', 'skillScans', 'skillHits', 'skillMisses', 'skillInvalidations', 'skillBytesRead', 'skillTooLarge', 'dropped'])
+const NOT_SPLIT = new Set(['combworkCalls', 'combworkCallErrors', 'repeatedCalls', 'skillsRead', 'skillRefsRead', 'skillScans', 'skillHits', 'skillMisses', 'skillInvalidations', 'skillBytesRead', 'skillTooLarge', 'dropped'])
 const SPLIT_KEYS = new Set([...MEASURE_KEYS].filter((k) => !NOT_SPLIT.has(k)))
 const USAGE_KEYS = new Set([...USAGE_MEASURES.map((m) => m.key), 'contextTokens'])
 const EXPORT_KEYS = new Set(['requests', 'failed', 'responseBytes', 'requestBytes', 'toolCalls', 'toolChars', 'detailCalls', 'launches', 'guidanceBytes', 'toolListStarts', 'toolListChars', ...SIDE_TOTALS.flatMap(sided)])
@@ -413,7 +413,7 @@ export interface AgentCalls {
   agent: string
   role: 'assistant' | 'builder' | 'reviewer' | 'agent'
   side: 'subject' | 'other'
-  hiveCalls: number
+  combworkCalls: number
   /** Unknown (absent) where the log can't say. */
   toolListStarts?: number
   /** An `overflow` row: how many agents it sums. */
@@ -428,11 +428,11 @@ function readAgents(v: unknown): AgentCalls[] | undefined {
   const out: AgentCalls[] = []
   for (const x of v.slice(0, BENCHMARK_LIMITS.agents)) {
     const o = obj(x)
-    const calls = num(o?.hiveCalls)
+    const calls = num(o?.combworkCalls)
     if (!o || typeof o.agent !== 'string' || !o.agent || calls === null || !(AGENT_ROLES as readonly string[]).includes(String(o.role)) || (o.side !== 'subject' && o.side !== 'other')) continue
     const starts = num(o.toolListStarts)
     const agents = num(o.agents)
-    out.push({ agent: text(o.agent, 64), role: o.role as AgentCalls['role'], side: o.side, hiveCalls: calls, ...(starts !== null ? { toolListStarts: starts } : {}), ...(agents !== null ? { agents } : {}) })
+    out.push({ agent: text(o.agent, 64), role: o.role as AgentCalls['role'], side: o.side, combworkCalls: calls, ...(starts !== null ? { toolListStarts: starts } : {}), ...(agents !== null ? { agents } : {}) })
   }
   return out
 }
@@ -1058,7 +1058,7 @@ function checkCounts(samples: Sample[]): Map<string, { passed: number; failed: n
 const avg = (xs: Sample[], f: (s: Sample) => number): number => (xs.length ? xs.reduce((n, s) => n + f(s), 0) / xs.length : 0)
 
 /** Measures that mean more failures or more work when they grow: a growth is a regression, whatever the size did. */
-const FAILURE_KEYS = ['hiveCallErrors', 'toolErrors', 'apiFailed', 'apiCancelled', 'repeatedCalls', 'hiveCalls']
+const FAILURE_KEYS = ['combworkCallErrors', 'toolErrors', 'apiFailed', 'apiCancelled', 'repeatedCalls', 'combworkCalls']
 
 /** Why a sample is left out: Hive's own reasons as messages, the harness's own words (or an older Hive's) as written. */
 const SAMPLE_PROBLEMS = [M.tooManyChecks, M.invalidCheck, M.checkTwice, M.checksNotList, M.countsDiffer, M.failedNoCheck, M.noCheckRan, M.didntComplete]
@@ -1170,7 +1170,7 @@ function agentDeltas(b: Sample[], r: Sample[]): AgentCallsDelta[] | null {
     for (const s of xs) {
       const row = s.agents!.find((a) => key(a) === k)
       if (row) {
-        n += row.hiveCalls
+        n += row.combworkCalls
         if (row.agents !== undefined) most = Math.max(most ?? 0, row.agents)
       } else if (s.agents!.some((a) => a.agent === 'overflow')) return { v: null }
     }

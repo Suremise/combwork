@@ -33,7 +33,7 @@ const check = (name, ok, extra = '') => {
   const notify = async () => {
     n++
     await app.evaluate(({ BrowserWindow }, i) => {
-      BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'toast', toast: { id: `t${i}`, level: 'info', title: `Notice ${i}`, timestamp: new Date().toISOString() } })
+      BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'toast', toast: { id: `t${i}`, level: 'info', title: `Notice ${i}`, timestamp: new Date().toISOString() } })
     }, n)
     await lib.sleep(150)
   }
@@ -135,7 +135,7 @@ const check = (name, ok, extra = '') => {
   if ((await page.locator('.notif-panel').count()) > 0) await page.locator('.notif-panel button[aria-label="Close"]').click()
   await until(async () => (await page.locator('.notif-panel').count()) === 0)
   await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'toast', toast: { id: 'stays', kind: 'needsYou', level: 'info', title: 'Waiting for you', timestamp: new Date().toISOString() } })
+    BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'toast', toast: { id: 'stays', kind: 'needsYou', level: 'info', title: 'Waiting for you', timestamp: new Date().toISOString() } })
   })
   const waiting = page.locator('.popups .popup', { hasText: 'Waiting for you' })
   check('a pop-up that needs you shows', !!(await until(async () => (await waiting.count()) === 1)))

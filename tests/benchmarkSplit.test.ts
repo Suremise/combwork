@@ -54,7 +54,7 @@ const list = (who: Who, at = LATER) => ({ at, id: `9.${++seq}`, kind: 'list', ro
 /** The `reported` line for these lines' report. */
 const reported = (lines: { id?: string }[], when = IN) => ({ kind: 'reported', ids: lines.map((l) => l.id), ...when })
 /** A log: these calls and lists, each reported between the snapshots unless `reports` says otherwise. */
-const log = (calls: any[], lists: any[] = [], reports?: object[]) => ({ hiveCalls: [], allHiveCalls: calls, mcpLists: lists, mcpReports: reports ?? [reported([...calls.filter((c) => !c.direct), ...lists])] })
+const log = (calls: any[], lists: any[] = [], reports?: object[]) => ({ combworkCalls: [], allCombworkCalls: calls, mcpLists: lists, mcpReports: reports ?? [reported([...calls.filter((c) => !c.direct), ...lists])] })
 /** Each agent's call and tool list (one a call), reported between the snapshots: what `report` counts. */
 const logOf = (...who: Who[]) => log(who.map((w) => call(w)), who.map((w) => list(w)))
 const assistantSubject = (extra: object = {}) => ({ kind: 'assistant', agentId: 'assistant', snapshots, complete: true, roster, lanes, ...extra })
@@ -88,7 +88,7 @@ describe('the harness measures the subject apart from the other agents (benchmar
     // The total's meaning is unchanged: what it was without a split.
     expect(measuresOf(report(0, 0), withStartView(report(2, 3)), observed, null)).toEqual(Object.fromEntries(Object.entries(m).filter(([k]) => !['subject', 'others', 'agents', 'split'].includes(k))))
     expect(metricsTotals(report(2, 3)).apiRequests).toBe(5)
-    expect(m.agents.map((r: any) => [r.agent, r.hiveCalls, r.toolListStarts])).toEqual([
+    expect(m.agents.map((r: any) => [r.agent, r.combworkCalls, r.toolListStarts])).toEqual([
       ['Assistant', 2, 2],
       ['Coder', 1, 1],
       ['Implementer', 2, 2]
@@ -100,7 +100,7 @@ describe('the harness measures the subject apart from the other agents (benchmar
     expect(m).not.toHaveProperty('subject')
     expect(m).not.toHaveProperty('others')
     expect(m.split).toBe('partial')
-    expect(m.agents).toEqual([{ agent: 'Assistant', role: 'assistant', side: 'subject', hiveCalls: 1, toolListStarts: 1 }])
+    expect(m.agents).toEqual([{ agent: 'Assistant', role: 'assistant', side: 'subject', combworkCalls: 1, toolListStarts: 1 }])
   })
 
   it('an agent as subject: its tool calls and lists from the log by agent; its API and launches unknown', () => {
@@ -124,13 +124,13 @@ describe('the harness measures the subject apart from the other agents (benchmar
     expect(m.subject).toMatchObject({ toolCalls: 2, toolListStarts: 2 })
     for (const k of ['launches', 'coreBytes', 'apiRequests']) expect(m.subject).not.toHaveProperty(k)
     expect(m.others).toMatchObject({ toolCalls: 0, toolListStarts: 1 })
-    expect(m.agents.find((r: any) => r.agent === 'Implementer')).toEqual({ agent: 'Implementer', role: 'reviewer', side: 'other', hiveCalls: 0, toolListStarts: 1 })
+    expect(m.agents.find((r: any) => r.agent === 'Implementer')).toEqual({ agent: 'Implementer', role: 'reviewer', side: 'other', combworkCalls: 0, toolListStarts: 1 })
   })
 
   it('a fake’s board move straight to the API ran no server: a hive call of the window, never a tool call or a tool list', () => {
     const m = measuresOf(report(0, 0), report(0, 1), log([call(CODER), call(CODER, LATER, true, { direct: true })], [list(CODER)]), null, coderSubject())
     expect(m.subject).toMatchObject({ toolCalls: 1, toolListStarts: 1 })
-    expect(m.agents[0]).toEqual({ agent: 'Coder', role: 'builder', side: 'subject', hiveCalls: 2, toolListStarts: 1 })
+    expect(m.agents[0]).toEqual({ agent: 'Coder', role: 'builder', side: 'subject', combworkCalls: 2, toolListStarts: 1 })
   })
 
   it('agents by their fixture identity, the subject first, whatever order their calls came in', () => {
@@ -138,10 +138,10 @@ describe('the harness measures the subject apart from the other agents (benchmar
     const rows = (ws: Who[]) => measuresOf(report(0, 0), report(1, 4), logOf(...ws), null, assistantSubject()).agents
     const one = rows(who)
     expect(one).toEqual([
-      { agent: 'Assistant', role: 'assistant', side: 'subject', hiveCalls: 1, toolListStarts: 1 },
-      { agent: 'Builder2', role: 'builder', side: 'other', hiveCalls: 2, toolListStarts: 2 },
-      { agent: 'Coder', role: 'builder', side: 'other', hiveCalls: 1, toolListStarts: 1 },
-      { agent: 'unattributed', role: 'agent', side: 'other', hiveCalls: 1, toolListStarts: 1 }
+      { agent: 'Assistant', role: 'assistant', side: 'subject', combworkCalls: 1, toolListStarts: 1 },
+      { agent: 'Builder2', role: 'builder', side: 'other', combworkCalls: 2, toolListStarts: 2 },
+      { agent: 'Coder', role: 'builder', side: 'other', combworkCalls: 1, toolListStarts: 1 },
+      { agent: 'unattributed', role: 'agent', side: 'other', combworkCalls: 1, toolListStarts: 1 }
     ])
     expect(rows([...who].reverse())).toEqual(one)
   })
@@ -159,7 +159,7 @@ describe('the harness measures the subject apart from the other agents (benchmar
       expect([m.toolCalls, m.toolChars]).toEqual([1, 100])
       expect(m.subject).toMatchObject({ toolCalls: 0, toolChars: 0 })
       expect(m.others).toMatchObject({ toolCalls: 1, toolChars: 100 })
-      expect(m.agents.map((r: any) => [r.agent, r.hiveCalls])).toEqual([
+      expect(m.agents.map((r: any) => [r.agent, r.combworkCalls])).toEqual([
         ['Coder', 0],
         ['Implementer', 1]
       ])
@@ -197,7 +197,7 @@ describe('the harness measures the subject apart from the other agents (benchmar
       const m = measuresOf(agentsReport(1, 10), agentsReport(2, 20), log([setup, own, late, unreportedLate], [], [reported([setup], EARLY), reported([own]), reported([late], { sentAt: '2026-10-31T01:01:00.080Z', doneAt: '2026-10-31T01:01:00.090Z' })]), null, coderSubject())
       expect(m.subject).toMatchObject({ toolCalls: 1 })
       expect(m.others).toMatchObject({ toolCalls: 0 })
-      expect(m.agents.map((r: any) => [r.agent, r.hiveCalls])).toEqual([['Coder', 1]])
+      expect(m.agents.map((r: any) => [r.agent, r.combworkCalls])).toEqual([['Coder', 1]])
     })
 
     it('placed, but counts that still differ from the metrics’: the log unused', () => {
@@ -213,11 +213,11 @@ describe('the harness measures the subject apart from the other agents (benchmar
     const who = [{ agent: 'a-13' }, ...many.flatMap((a, i) => Array.from({ length: i + 1 }, () => ({ agent: a.id })))]
     const m = measuresOf(report(0, 0), report(0, who.length), logOf(...who), null, coderSubject({ agentId: 'a-13', roster: many, lanes: [] }))
     expect(m.agents.length).toBe(10)
-    expect(m.agents[0]).toMatchObject({ agent: 'Agent13', side: 'subject', hiveCalls: 15 })
+    expect(m.agents[0]).toMatchObject({ agent: 'Agent13', side: 'subject', combworkCalls: 15 })
     expect(m.agents[9]).toMatchObject({ agent: 'overflow', side: 'other', agents: 5 })
-    expect(m.agents.reduce((n: number, r: any) => n + r.hiveCalls, 0)).toBe(who.length)
+    expect(m.agents.reduce((n: number, r: any) => n + r.combworkCalls, 0)).toBe(who.length)
     // The subject's row is there even when it made no call.
-    expect(measuresOf(report(0, 0), report(0, 1), logOf(IMPL), null, coderSubject()).agents[0]).toEqual({ agent: 'Coder', role: 'builder', side: 'subject', hiveCalls: 0, toolListStarts: 0 })
+    expect(measuresOf(report(0, 0), report(0, 1), logOf(IMPL), null, coderSubject()).agents[0]).toEqual({ agent: 'Coder', role: 'builder', side: 'subject', combworkCalls: 0, toolListStarts: 0 })
   })
 })
 
@@ -237,8 +237,8 @@ const withSplit = (subjectCalls: number, otherCalls: number, split = true): Arti
     m.subject = { toolCalls: subjectCalls, toolChars: subjectCalls * 10, apiRequests: subjectCalls * 2 }
     m.others = { toolCalls: otherCalls, toolChars: otherCalls * 10, apiRequests: otherCalls * 2 }
     m.agents = [
-      { agent: 'Assistant', role: 'assistant', side: 'subject', hiveCalls: subjectCalls },
-      { agent: 'Coder', role: 'builder', side: 'other', hiveCalls: otherCalls, toolListStarts: otherCalls }
+      { agent: 'Assistant', role: 'assistant', side: 'subject', combworkCalls: subjectCalls },
+      { agent: 'Coder', role: 'builder', side: 'other', combworkCalls: otherCalls, toolListStarts: otherCalls }
     ]
   }
   return art(parseArtifact(JSON.stringify(b), WS))
@@ -253,7 +253,7 @@ describe('Compare shows the subject apart from the other agents (shared/benchmar
     expect(c.split!.others.find((d) => d.key === 'toolCalls')).toMatchObject({ delta: 3 })
     // Unknown in a part (not measured there) stays unknown, never 0.
     expect(c.split!.subject.find((d) => d.key === 'toolBytes')).toMatchObject({ base: null, run: null, incomplete: true })
-    expect(c.split!.subject.some((d) => ['hiveCalls', 'skillScans', 'seconds'].includes(d.key))).toBe(false)
+    expect(c.split!.subject.some((d) => ['combworkCalls', 'skillScans', 'seconds'].includes(d.key))).toBe(false)
     expect(c.agents).toEqual([
       { agent: 'Assistant', role: 'assistant', side: 'subject', base: 1, run: 1 },
       { agent: 'Coder', role: 'builder', side: 'other', base: 1, run: 4 }
@@ -276,7 +276,7 @@ describe('Compare shows the subject apart from the other agents (shared/benchmar
   it('kept and read back, the split and the agents are kept; bad agent rows are left out', () => {
     const a = withSplit(2, 3)
     const kept = JSON.parse(JSON.stringify(a))
-    kept.scenarios[0].samples[0].agents.push({ agent: 'x', role: 'boss', side: 'other', hiveCalls: 1 }, { agent: 'y', role: 'agent', side: 'other', hiveCalls: -1 })
+    kept.scenarios[0].samples[0].agents.push({ agent: 'x', role: 'boss', side: 'other', combworkCalls: 1 }, { agent: 'y', role: 'agent', side: 'other', combworkCalls: -1 })
     const back = readKept(kept)!
     const s = back.scenarios!.find((x) => x.id === 'work-on-card')!.samples[0]
     expect(s.split!.subject).toMatchObject({ toolCalls: 2, toolChars: 20, apiRequests: 4 })

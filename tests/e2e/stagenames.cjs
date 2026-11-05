@@ -166,7 +166,7 @@ function projectJson(dir, platform, workflow) {
     await header('doing').waitFor({ timeout: HUNG_MS })
     await boardShot('en')
     const base = (await inv('app:info')).language
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const words = { de: ['In Arbeit', 'Genehmigt'], pl: ['Aktywne', 'Zatwierdzone'], 'zh-CN': ['进行中', '已批准'] }
     for (const [code, [active, approved]] of Object.entries(words)) {
       const dir = path.join(lib.ROOT, 'locales', code)

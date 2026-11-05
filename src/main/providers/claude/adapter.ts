@@ -665,7 +665,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     this.hooksByRun.delete(ctx.runId)
     const secrets = [ctx.hookAuthFile, ctx.env.CW_HOOK_TOKEN ?? '']
     const off = this.hooksOffIn(ctx)
-    const hive = rowsOfHooksTable(passed, { source: 'combwork', status: off ? 'disabled' : 'passed', ...(off ? { why: off } : {}), observed: true }, secrets)
+    const combwork = rowsOfHooksTable(passed, { source: 'combwork', status: off ? 'disabled' : 'passed', ...(off ? { why: off } : {}), observed: true }, secrets)
     const read = (): ReturnType<typeof settingsScopes> => settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
     // What of a scope decides its hooks: their table and the switches that turn them off.
     const print = (json: unknown): string => {
@@ -675,10 +675,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const first = read()
     const atLaunch = new Map(first.map((s) => [s.file ?? s.label, print(s.json)]))
     const own = claudeScopeHooks(first, secrets)
-    const listing: HookListing = { basis: 'launch', rows: [...hive.rows, ...own.rows], notes: own.notes }
+    const listing: HookListing = { basis: 'launch', rows: [...combwork.rows, ...own.rows], notes: own.notes }
     return {
       listing,
-      receivers: Object.fromEntries(hive.rows.map((r) => [r.event, r.type])),
+      receivers: Object.fromEntries(combwork.rows.map((r) => [r.event, r.type])),
       now: async () => {
         const changed = read().filter((s) => s.file && atLaunch.get(s.file) !== print(s.json))
         return { ...listing, notes: [...listing.notes, ...changed.map((s) => ({ kind: 'changed' as const, file: s.file! }))] }

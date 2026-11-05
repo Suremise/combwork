@@ -2394,7 +2394,7 @@ route('POST', '/v1/team/resume', async () => {
 })
 
 /** A held writer as the Agent API lists it (#1561): who holds it, its run and Hive, and the processes Hive lists of it. */
-const publicHeld = (w: HeldRow) => ({ slot: w.slot, agent: w.agentName, run: w.run, hive: w.hive.self ? say(API.slot.heldThisCombwork) : say(API.slot.heldGone, { pid: String(w.hive.pid) }), processes: w.processes ? { list: w.processes.list.map((p) => ({ pid: p.pid, label: p.label })), more: w.processes.more } : null })
+const publicHeld = (w: HeldRow) => ({ slot: w.slot, agent: w.agentName, run: w.run, combwork: w.combwork.self ? say(API.slot.heldThisCombwork) : say(API.slot.heldGone, { pid: String(w.combwork.pid) }), processes: w.processes ? { list: w.processes.list.map((p) => ({ pid: p.pid, label: p.label })), more: w.processes.more } : null })
 
 /** Release Slot's refusals (#1561) as the Agent API answers them. */
 const slotRefusal = (e: unknown): unknown => (e instanceof SlotReleaseRefused ? httpFrom(e.status, e) : e)

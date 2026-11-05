@@ -213,7 +213,7 @@ const check = (name, ok, extra = '') => {
   }
   const oneRow = () => page.locator('.project-header').evaluate((el) => el.getBoundingClientRect().height < 48)
   const statusText = () => page.locator('.project-header .badge-text').innerText().catch(() => '')
-  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
   // The Progress panel open at 900 px: the header about 265 px.
   await page.evaluate(() => document.activeElement?.blur())
   await toggleProgress()

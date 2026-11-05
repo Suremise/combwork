@@ -77,7 +77,7 @@ const M = {
   imported: msg({ id: 'assistant.templates.imported', defaultMessage: 'Template imported', description: "A notice after a template file was imported; where it is kept follows." }),
   importedDetail: msg({ id: 'assistant.templates.importedDetail', defaultMessage: '"{name}", in {scope, select, workspace {the workspace} other {{project}}}.{hasUnknown, select, yes { {unknown}} other {}}', description: "Under Template imported: the template and where it is kept; {unknown} says when its coding agents aren't known here." }),
   workspace: msg({ id: 'assistant.templates.workspace', defaultMessage: 'Workspace', description: "A badge, a group and a filter: the workspace's templates (for every project)." }),
-  hive: msg({ id: 'assistant.templates.cw', defaultMessage: 'Combwork', description: "A badge, a group and a filter: Combwork's own templates (#1436, shipped with Combwork, read-only)." }),
+  combwork: msg({ id: 'assistant.templates.cw', defaultMessage: 'Combwork', description: "A badge, a group and a filter: Combwork's own templates (#1436, shipped with Combwork, read-only)." }),
   combworkSummary: msg({ id: 'assistant.templates.combworkSummary', defaultMessage: "{count, plural, one {# agent} other {# agents}}, {layout}. One of Combwork's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.", description: 'Over one of Combwork\'s own templates\' agents: how many, its layout ("two columns layout"). <b> is bold; Duplicate… is the button.' }),
   suggests: msg({ id: 'assistant.templates.suggests', defaultMessage: 'Suggests the {preset} preset: loading it offers to switch the project’s workflow options to it.{pool, select, yes { Its reviewers are a pool shared by every builder.} other {}}', description: "Over a template's agents: the workflow preset it suggests ({preset}: Solo, Pair, Team); pool when its reviewers are shared by all builders rather than one per lane. Glossary: preset, workflow, reviewer, builder, lane." }),
   pairedWith: msg({ id: 'assistant.templates.pairedWith', defaultMessage: 'paired: {name}', description: "A template's table, under an agent's role: the agent it is paired with ({name}). Lower case. The name after a colon (glossary §1 rule 4)." }),
@@ -327,7 +327,7 @@ export async function importTemplate(initial: string): Promise<TemplateEntry | n
 }
 
 function ScopeBadge({ t }: { t: TemplateEntry }) {
-  if (t.scope === 'combwork') return <span className="badge accent">{tr(M.hive)}</span>
+  if (t.scope === 'combwork') return <span className="badge accent">{tr(M.combwork)}</span>
   return t.scope === 'workspace' ? <span className="badge accent">{tr(M.workspace)}</span> : <span className="badge">{projectName(t.project)}</span>
 }
 
@@ -749,7 +749,7 @@ export function TemplatesPanel() {
   const shownFilter = filter === ALL || filter === HIVE || filter === WORKSPACE || projects.some((p) => p.path === filter) ? filter : ALL
   const all = data ?? []
   const groups: { key: string; title: string; items: TemplateEntry[] }[] = [
-    { key: HIVE, title: tr(M.hive), items: all.filter((t) => t.scope === 'combwork') },
+    { key: HIVE, title: tr(M.combwork), items: all.filter((t) => t.scope === 'combwork') },
     { key: WORKSPACE, title: tr(M.workspace), items: all.filter((t) => t.scope === 'workspace') },
     ...projects.map((p) => ({ key: p.path, title: p.name, items: all.filter((t) => t.scope === 'project' && sameProject(t.project, p.path)) }))
   ].filter((g) => (shownFilter === ALL ? g.key === HIVE || g.key === WORKSPACE || g.items.length > 0 : g.key === shownFilter))
@@ -768,7 +768,7 @@ export function TemplatesPanel() {
         <div style={{ padding: '0 8px 6px 12px' }}>
           <select className="select" style={{ width: '100%' }} aria-label={tr(M.showOf)} value={shownFilter} onChange={(e) => set({ templateFilter: e.target.value })}>
             <option value={ALL}>{tr(M.allTemplates)}</option>
-            <option value={HIVE}>{tr(M.hive)}</option>
+            <option value={HIVE}>{tr(M.combwork)}</option>
             <option value={WORKSPACE}>{tr(M.workspace)}</option>
             {projects.map((p) => (
               <option key={p.path} value={p.path}>
@@ -844,7 +844,7 @@ export function ProjectTemplatesTab({ project }: { project: ProjectInfo }) {
   const list = loaded.data
   const mine = (list ?? []).filter((t) => t.scope === 'project')
   const shared = (list ?? []).filter((t) => t.scope === 'workspace')
-  const hive = (list ?? []).filter((t) => t.scope === 'combwork')
+  const combwork = (list ?? []).filter((t) => t.scope === 'combwork')
   const current = selected ? list?.find((t) => templateKey(t) === selected) : undefined
   const row = (t: TemplateEntry) => <TemplateRow key={templateKey(t)} t={t} showScope selected={selected === templateKey(t)} onSelect={() => setSelected(templateKey(t))} />
   // The list beside the template, or above it when the tab is narrow (#890; app.css `.templates-split`, as Changes').
@@ -881,9 +881,9 @@ export function ProjectTemplatesTab({ project }: { project: ProjectInfo }) {
               {shared.length === 0 && <div className="pane-empty">{tr(M.noWorkspaceTemplates)}</div>}
               {shared.map(row)}
               <div className="skill-group">
-                {tr(M.hive)} <span className="count">{hive.length}</span>
+                {tr(M.combwork)} <span className="count">{combwork.length}</span>
               </div>
-              {hive.map(row)}
+              {combwork.map(row)}
               <p className="hint" style={{ padding: '4px 14px' }}>
                 {Children.toArray(tRich<React.ReactNode>(M.tabHint, { b: bold, view: templatesViewLink }))}
               </p>

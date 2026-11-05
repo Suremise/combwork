@@ -101,11 +101,11 @@ export async function freeName(dir: string, name: string, suffix: (i: number) =>
  * it is with what it holds.
  */
 async function moveOldFolder(host: string): Promise<void> {
-  const hive = join(host, CW_DIR)
-  const old = join(hive, OLD_ATTACHMENTS_DIR)
+  const combwork = join(host, CW_DIR)
+  const old = join(combwork, OLD_ATTACHMENTS_DIR)
   if (!(await lstat(old).catch(() => null))) return
-  if (!(await isOwnFolder(host, hive)) || !(await isOwnFolder(host, old))) return log.warn(`${userText(old)} is a link or not a folder: Combwork leaves it alone`)
-  const dest = join(hive, ATTACHMENTS_DIR)
+  if (!(await isOwnFolder(host, combwork)) || !(await isOwnFolder(host, old))) return log.warn(`${userText(old)} is a link or not a folder: Combwork leaves it alone`)
+  const dest = join(combwork, ATTACHMENTS_DIR)
   const there = await lstat(dest).catch(() => null)
   if (there && !(await isOwnFolder(host, dest))) return log.warn(`${userText(dest)} is a link or not a folder: the images folder stays`)
   if (!there) {

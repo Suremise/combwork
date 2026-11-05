@@ -1027,10 +1027,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     })
     observed.guidance = result.guidance
     // What the Combwork MCP servers ran: the subject's own calls, and everyone's (an agent the Assistant started).
-    observed.allHiveCalls = readMcpLog(mcpLog)
+    observed.allCombworkCalls = readMcpLog(mcpLog)
     observed.mcpLists = readMcpLists(mcpLog)
     observed.mcpReports = readJsonLines(mcpLog).filter((l) => l.kind === 'reported')
-    observed.hiveCalls = observed.allHiveCalls.filter((c) => (sc.role === 'assistant' ? c.role === 'assistant' : c.agent === coder.id))
+    observed.combworkCalls = observed.allCombworkCalls.filter((c) => (sc.role === 'assistant' ? c.role === 'assistant' : c.agent === coder.id))
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.

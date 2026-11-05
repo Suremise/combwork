@@ -155,7 +155,7 @@ if (require.main === module) {
          */
         authored: (text, within) => english?.authored.push({ text, within }),
         /** Runs a command by its id, as the menu does (App.tsx's menu-command event). */
-        command: (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args }),
+        command: (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args }),
         /** The Agent API, with the test copy's token. */
         api: async (method, route, body) => {
           const r = await fetch(`http://127.0.0.1:${port}${route}`, { method, headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })

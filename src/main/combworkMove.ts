@@ -42,7 +42,7 @@ import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolde
  *   links and a conversation's folder are translated through the map alone (shared/combworkFolderMove.ts).
  */
 
-const log = createLogger('hiveMove')
+const log = createLogger('combworkMove')
 
 /** The lock's file, in the workspace folder itself: the one place that doesn't move. */
 export const MOVE_LOCK_FILE = '.combwork-move.lock'

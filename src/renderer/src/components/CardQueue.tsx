@@ -83,7 +83,7 @@ const M = {
 }
 
 /** The window event For you's "Show the files and commands" sends: the card dialog's Work section shows its queue part. */
-export const SHOW_QUEUE_WORK = 'hive:show-queue-work'
+export const SHOW_QUEUE_WORK = 'cw:show-queue-work'
 
 /** The card's place in its target's queue, counting the one testing (1: next), or null when not known here. */
 function placeOf(v: QueueView | null, entry: string): number | null {

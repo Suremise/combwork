@@ -45,7 +45,7 @@ export function runsCloseCommands(env: NodeJS.ProcessEnv, packaged: boolean): bo
  * placeholders are filled as each step runs), or why none runs. A ref to a command no longer there is left out, and
  * said in `gone`.
  */
-export function planList(point: CommandPoint | null | undefined, lists: { hive: readonly CustomCommand[]; workspace?: readonly CustomCommand[] }, reason: CommandReason, o: { runs: boolean }): { steps: ListStep[]; gone: number } | { skip: Skip } {
+export function planList(point: CommandPoint | null | undefined, lists: { combwork: readonly CustomCommand[]; workspace?: readonly CustomCommand[] }, reason: CommandReason, o: { runs: boolean }): { steps: ListStep[]; gone: number } | { skip: Skip } {
   const resolved = point ? resolvePoint(point, lists) : []
   const steps = resolved.flatMap(({ command: c }) => (c ? [{ name: c.name, command: c.command, folder: c.folder ?? '', needed: !!c.needed }] : []))
   if (!steps.length) return { skip: 'none' }

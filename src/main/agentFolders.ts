@@ -491,7 +491,7 @@ export async function heldWriter(projectPath: string, slot: string): Promise<Hel
     slot,
     agent: w.agent,
     run: w.run,
-    hive: { pid: w.pid, self, alive },
+    combwork: { pid: w.pid, self, alive },
     live: self && writerHost.live.has(w.run),
     processes,
     // Only Windows' own idle brokers listed (HI-2309, the one rule): Release Slot… says releasing is safe.
@@ -507,7 +507,7 @@ export async function heldWriter(projectPath: string, slot: string): Promise<Hel
  */
 export async function slotHeldWords(projectPath: string, slot: string, nameOf: (agentId: string) => string): Promise<string | null> {
   const w = await heldWriter(projectPath, slot)
-  if (!w || !w.hive.self) return null
+  if (!w || !w.combwork.self) return null
   const who = nameOf(w.agent)
   const list = w.processes?.list ?? []
   if (!list.length) return w.live ? `${slot} is in use by ${who}'s session there` : `${slot} is still held by ${who}'s last run, not known to have ended (Release Slot… in ${who}'s ⋯ frees it)` // i18n-ignore: agent-facing
@@ -534,15 +534,15 @@ export async function goneWriterSettles(projectPath: string, w: { run: string; a
     log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} of a Combwork that has gone (process ${w.pid}) settled: its processes were seen to end`)
     return Object.freeze({ run: w.run, helper: null })
   }
-  const hive = `${w.pid}:${w.started}`
-  const kept = await keeperState(w.run, hive)
+  const combwork = `${w.pid}:${w.started}`
+  const kept = await keeperState(w.run, combwork)
   if (kept?.state === 'ended') {
     log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Combwork, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
     return Object.freeze({ run: w.run, helper: kept.helper })
   }
   // Its keeper's "live" is a snapshot, never proof (HI-2309): its keeper is asked for the run now (HI-2313), and the one
   // rule decides on that answer alone: nothing, or only Windows' own idle brokers. No answer, or any doubt: held.
-  const now = await keeperObservation(w.run, hive)
+  const now = await keeperObservation(w.run, combwork)
   if (now && (await nothingHolds(now.members, now.more, w.agent))) {
     // Revoked while it was asked: held (the clear checks the binding again inside its write).
     if (!keeperStillBound(w.run, now.helper)) return false
@@ -674,7 +674,7 @@ export async function releaseHeldWriter(projectPath: string, slot: string, run: 
   const w = await heldWriter(projectPath, slot)
   if (!w || w.run !== run) throw changed()
   if (w.live) throw combworkError(msg({ id: 'slots.release.live', defaultMessage: "{slot}'s writer is still running in this Combwork: stop the agent, or end or keep what it left running, first.", description: "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Combwork, or Combwork still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them)." }), { slot }, { kind: 'conflict' })
-  if (!w.hive.self && w.hive.alive !== false) throw combworkError(msg({ id: 'slots.release.otherCombwork', defaultMessage: '{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.', description: 'Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).' }), { slot, pid: w.hive.pid }, { kind: 'conflict' })
+  if (!w.combwork.self && w.combwork.alive !== false) throw combworkError(msg({ id: 'slots.release.otherCombwork', defaultMessage: '{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.', description: 'Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).' }), { slot, pid: w.combwork.pid }, { kind: 'conflict' })
   if (o.end && w.processes) o.guard?.()
   if (o.end && w.processes?.from === 'leftovers') await settleLeftovers(projectPath, w.agent, 'end', run)
   if (o.end && w.processes?.from === 'restart' && !(await endProcessesExactly(w.processes.list))) {
@@ -684,6 +684,6 @@ export async function releaseHeldWriter(projectPath: string, slot: string, run: 
   if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run, o.guard))) throw changed()
   resolveOffer(`slot:${run}`, tr(OUTCOME.released))
   writerCleared(run)
-  log.info(`The slot writer ${run} on ${userText(slot)} released by the user (its Combwork ${w.hive.self ? 'this one' : `process ${w.hive.pid}, gone`}${o.end && w.processes ? ', its listed processes ended first' : ''})`)
+  log.info(`The slot writer ${run} on ${userText(slot)} released by the user (its Combwork ${w.combwork.self ? 'this one' : `process ${w.combwork.pid}, gone`}${o.end && w.processes ? ', its listed processes ended first' : ''})`)
   await writerHost.drained(projectPath, slot)
 }

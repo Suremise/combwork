@@ -145,7 +145,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const german = Object.assign({}, ...fs.readdirSync(DE).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(DE, f), 'utf8'))))
   const base = (await inv('app:info')).language
   /** The window shown in a language, as main sends a change of language (i18nlive's way). */
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   const archivedBox = () => page.locator('.sessions-filters label').innerText().catch(() => '')
   const narrowShots = async (name, el) => {
     const width = await list.evaluate((e) => e.style.width)

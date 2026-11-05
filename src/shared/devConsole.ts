@@ -24,7 +24,7 @@ export const CONSOLE_KINDS = ['hook', 'statusline', 'transcript', 'terminal', 'i
 export type ConsoleKind = (typeof CONSOLE_KINDS)[number]
 
 export interface ConsoleSource {
-  /** Stable for an agent across its launches: `session:<project path, lower case>#<agent id>`; `hive:<workspace path, lower case>`. */
+  /** Stable for an agent across its launches: `session:<project path, lower case>#<agent id>`; `combwork:<workspace path, lower case>`. */
   id: string
   kind: ConsoleSourceKind
   /** "hive · HB6", "Assistant", "Combwork". */

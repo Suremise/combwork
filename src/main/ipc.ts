@@ -1646,7 +1646,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
         })
       }
       const deliver = (events: ConsoleEvent[], dropped: number): void => {
-        if (!wc.isDestroyed()) wc.send('hive:event', { type: 'console-events', events, ...(dropped ? { dropped } : {}) })
+        if (!wc.isDestroyed()) wc.send('cw:event', { type: 'console-events', events, ...(dropped ? { dropped } : {}) })
       }
       // Text only while the setting is on, whatever the page asks.
       return Object.fromEntries(devConsole.subscribe(id, ids, { deliver, includeText: consoleShowsText() }))
@@ -1750,8 +1750,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const info = await repoInfo(p, await workTargetOf(p))
       // Hive's own worktrees said as such (HI-1710): its review copies and the merge queue's folder.
       return { ...info, worktrees: info.worktrees.map((w) => {
-        const hive = combworkWorktreeOf(p, w.path)
-        return hive ? { ...w, hive } : w
+        const combwork = combworkWorktreeOf(p, w.path)
+        return combwork ? { ...w, combwork } : w
       }) }
     },
     'git:deleteBranches': (p, items, unmerged) => deleteBranches(p, Array.isArray(items) ? items : [], !!unmerged),

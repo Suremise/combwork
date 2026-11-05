@@ -613,11 +613,11 @@ export interface AppConfig {
     /** The provider each project's Skills tab last showed, by project path in lower case (#118). */
     skillsProvider?: Record<string, ProviderId>
     /** Each project's Skills tab groups as the user last left them open or folded, by project path in lower case (#118). */
-    skillsFold?: Record<string, { hive?: boolean; provider?: boolean }>
+    skillsFold?: Record<string, { combwork?: boolean; provider?: boolean }>
     /** Each project's Sessions tree branches the user opened (true) or folded (false), by project path in lower case (#239). */
     sessionsTree?: Record<string, Record<string, boolean>>
     /** The .combwork version control notice each project's Overview no longer shows (#345): the situation dismissed (`combworkVcsKey`), by project path in lower case. */
-    hiveVcsNotice?: Record<string, string>
+    combworkVcsNotice?: Record<string, string>
     /** The connections notice's entries dismissed (HI-1770): `<project path in lower case>|<moved entry's id>`. */
     connectionsNoticeDismissed?: string[]
     /** The one-time notice that agents run on connections (HI-1774) was dismissed, or a connection was added: never shown again. */
@@ -1740,7 +1740,7 @@ export interface HeldWriter {
   agent: string
   run: string
   /** The Hive holding it: this one (`self`), or another and whether that one still runs (null: can't be told). */
-  hive: { pid: number; self: boolean; alive: boolean | null }
+  combwork: { pid: number; self: boolean; alive: boolean | null }
   /** Its run is still live in this Hive (its session, or the processes it left still followed): Release is refused. */
   live: boolean
   /**

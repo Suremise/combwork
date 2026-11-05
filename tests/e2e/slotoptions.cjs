@@ -241,7 +241,7 @@ function board(sql, ...args) {
     const speak = async (code) => {
       const dir = path.join(lib.ROOT, 'locales', code)
       const messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: messages ? { ...lang, code, locale: code, messages } : lang })
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...lang, code, locale: code, messages } : lang })
       return messages
     }
     await openWorkflow(fx.alpha)

@@ -69,8 +69,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(alpha, id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const combwork = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return combwork ? JSON.parse(fs.readFileSync(combwork.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const writerA = () => inv('slots:heldWriter', alpha, 'slot-a')
     const carriedHb2 = async () => (await inv('slots:list', alpha)).find((s) => s.name === 'hb2')?.lease?.kind === 'carried'
@@ -92,7 +92,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 
     // --- 1. What there is to release, for a script and for a project agent of the project.
     const listed = await releasable()
-    check('GET releasable: hb2 kept for B2, slot-a held by B1\'s ended run (its Combwork gone, nothing known of its processes)', listed.status === 200 && JSON.stringify(listed.body?.carried) === JSON.stringify([{ slot: 'hb2', agent: 'B2' }]) && listed.body?.held?.length === 1 && listed.body.held[0].slot === 'slot-a' && listed.body.held[0].agent === 'B1' && listed.body.held[0].run === 'r-crashed' && listed.body.held[0].hive === `gone (process ${gone})` && listed.body.held[0].processes === null, JSON.stringify(listed.body))
+    check('GET releasable: hb2 kept for B2, slot-a held by B1\'s ended run (its Combwork gone, nothing known of its processes)', listed.status === 200 && JSON.stringify(listed.body?.carried) === JSON.stringify([{ slot: 'hb2', agent: 'B2' }]) && listed.body?.held?.length === 1 && listed.body.held[0].slot === 'slot-a' && listed.body.held[0].agent === 'B1' && listed.body.held[0].run === 'r-crashed' && listed.body.held[0].combwork === `gone (process ${gone})` && listed.body.held[0].processes === null, JSON.stringify(listed.body))
     await inv('session:start', alpha, { agentId: r1.id })
     const r1Token = await tokenOf(r1.id)
     check('R1 (a project agent) has its token', !!r1Token)

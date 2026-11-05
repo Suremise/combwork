@@ -124,7 +124,7 @@ function pathWithoutGit() {
   // --- A narrow window with the Projects sidebar, Progress and the Assistant's rail (#906): the list goes above the
   // detail, which keeps the tab's width (not squeezed to nothing behind Progress), its buttons clickable; then a wide one
   // as before, the list beside it.
-  const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args })
+  const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args })
   const layout = () =>
     page.evaluate(() => {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect() ?? null

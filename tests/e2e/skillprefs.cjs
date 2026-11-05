@@ -62,7 +62,7 @@ const skillsTab = async (page, name) => {
   }, 5000)
   const ui = saved ?? (await inv('ui:get'))
   check("window 2's change keeps window 1's project: both providers saved", ui.skillsProvider?.[ka] === 'codex' && !(kb in (ui.skillsProvider ?? {})), JSON.stringify(ui.skillsProvider))
-  check('…and both projects’ open groups', JSON.stringify(ui.skillsFold?.[ka]) === '{"hive":false,"provider":false}' && JSON.stringify(ui.skillsFold?.[kb]) === '{"hive":true,"provider":true}', JSON.stringify(ui.skillsFold))
+  check('…and both projects’ open groups', JSON.stringify(ui.skillsFold?.[ka]) === '{"combwork":false,"provider":false}' && JSON.stringify(ui.skillsFold?.[kb]) === '{"combwork":true,"provider":true}', JSON.stringify(ui.skillsFold))
 
   // The Sessions tree's branches go the same way; ui:set leaves the per-project maps alone; a wrong value is refused.
   await inv('ui:setProjectPref', 'sessionsTree', alpha, { 'provider:codex': false })

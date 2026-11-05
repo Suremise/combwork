@@ -102,7 +102,7 @@ describe('starting', () => {
     devConsole.capture([A1], hook('Stop'))
     const done = await stopRecording(wc.id, 'stopped')
     const r = lines(info.file)
-    expect(r.header).toMatchObject({ type: 'recording', hive: '0.7.0-test', text: false, clis: [{ provider: 'claude-code', version: '2.1.296', tested: '2.1.296' }] })
+    expect(r.header).toMatchObject({ type: 'recording', combwork: '0.7.0-test', text: false, clis: [{ provider: 'claude-code', version: '2.1.296', tested: '2.1.296' }] })
     expect(r.events.map((e) => e.name)).toEqual(['Stop'])
     expect(r.end).toMatchObject({ events: 1, reason: 'stopped' })
     expect(done).toMatchObject({ recording: false, events: 1, reason: 'stopped' })
@@ -286,7 +286,7 @@ describe('latestRecording', () => {
     // Far in the future, so this test's are the newest in the folder.
     const at = new Date(2099, 0, 2, 3, 4, 5, 6)
     const write = (n: number, text: boolean): void => {
-      const h = { type: 'recording', format: 1, hive: '0.7.0-test', startedAt: new Date(at.getTime() + n).toISOString(), source: { kind: 'session', label: 'x' }, text, clis: [] }
+      const h = { type: 'recording', format: 1, combwork: '0.7.0-test', startedAt: new Date(at.getTime() + n).toISOString(), source: { kind: 'session', label: 'x' }, text, clis: [] }
       writeFileSync(join(dir, recordingName(at, n, 'session')), `${JSON.stringify(h)}\n`)
     }
     write(1, false)

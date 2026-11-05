@@ -33,8 +33,8 @@ describe('projectPrefValue', () => {
   })
 
   it('keeps only the two booleans of skillsFold', () => {
-    expect(projectPrefValue('skillsFold', { hive: false, provider: true, extra: 1 })).toEqual({ hive: false, provider: true })
-    expect(projectPrefValue('skillsFold', { hive: 'yes' })).toEqual({})
+    expect(projectPrefValue('skillsFold', { combwork: false, provider: true, extra: 1 })).toEqual({ combwork: false, provider: true })
+    expect(projectPrefValue('skillsFold', { combwork: 'yes' })).toEqual({})
     expect(projectPrefValue('skillsFold', [true])).toBeUndefined()
     expect(projectPrefValue('skillsFold', null)).toBeUndefined()
   })
@@ -54,9 +54,9 @@ describe('projectPrefValue', () => {
   })
 
   it('knows which preferences are per project', () => {
-    expect(projectPrefValue('hiveVcsNotice', 'none|OneDrive')).toBe('none|OneDrive')
-    expect(projectPrefValue('hiveVcsNotice', 3)).toBeUndefined()
-    expect(['skillsProvider', 'skillsFold', 'sessionsTree', 'hiveVcsNotice', 'assistantFold'].every(isProjectPref)).toBe(true)
+    expect(projectPrefValue('combworkVcsNotice', 'none|OneDrive')).toBe('none|OneDrive')
+    expect(projectPrefValue('combworkVcsNotice', 3)).toBeUndefined()
+    expect(['skillsProvider', 'skillsFold', 'sessionsTree', 'combworkVcsNotice', 'assistantFold'].every(isProjectPref)).toBe(true)
     expect(isProjectPref('sidebarWidth')).toBe(false)
     expect(isProjectPref('tips')).toBe(false)
   })

@@ -1921,13 +1921,13 @@ export class Workflow {
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
     // Under Hive merges (the card's own ruleset) the queue merges, never a report: refused saying where it is (#1354).
-    const hive = r.options.finish === 'combworkMerges'
+    const combwork = r.options.finish === 'combworkMerges'
     const queued = this.combworkMergesRefusal(card, s)
     if (queued) return this.refuse(card, actor, 'report merge', queued, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     // Only where the builder merges (or nothing is checked); with workflow rules off, a card Hive merges is reported as
     // before 1.0 too, approved or waiting in the queue, whose entry it drops (a merge outside the queue, as S7's).
-    const from = s.stage === 'approved' || (hive && s.stage === 'merging') || awaitsAgentMerge(r, s)
-    if (!from || (!hive && r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    const from = s.stage === 'approved' || (combwork && s.stage === 'merging') || awaitsAgentMerge(r, s)
+    if (!from || (!combwork && r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const before = await this.evidenceOf(card, s, r.options)
     const target = s.started?.target ?? ''
     const rev = s.approved?.revision ?? s.latest?.revision ?? null
@@ -1949,7 +1949,7 @@ export class Workflow {
       const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
-      const open = hive ? openEntry(w.state()) : undefined
+      const open = combwork ? openEntry(w.state()) : undefined
       if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'integratedOutside' }) // i18n-ignore: a fact's kind and codes, not text
       // Unchecked, its result is the builder's claim (HI-2014): kept on its finish, never read as the merge commit.
       if (contained !== true) w.claimed = args.result ?? null

@@ -740,7 +740,7 @@ export class CopyPool {
       if (l.returned) continue
       const mine = l.pid === me.pid && l.started === me.started
       const over = mine ? await this.deps.leaseOver(l) : (await this.deps.holder.alive(l.pid, l.started)) === false
-      if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'hiveGone')
+      if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'combworkGone')
     }
     for (const c of this.store.copies()) {
       if (c.state === 'returning') await this.tryFree(c.name)

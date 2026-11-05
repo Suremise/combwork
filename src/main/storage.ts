@@ -199,14 +199,14 @@ function startMeasuring(projectPath: string, refresh: boolean): Measuring {
 
 async function measure(projectPath: string, refresh: boolean, signal: AbortSignal): Promise<ProjectStorage> {
   const assistant = workspace.isAssistantHome(projectPath)
-  const hive = join(projectPath, CW_DIR)
+  const combwork = join(projectPath, CW_DIR)
   const cache = refresh ? 'refresh' : 'use'
   // Backups grow in place, so they are always measured afresh (a few files).
-  const backups = await folderSize(join(hive, 'sessions'), 'none', signal)
-  const archive = await folderSize(join(hive, 'archive'), 'none', signal)
+  const backups = await folderSize(join(combwork, 'sessions'), 'none', signal)
+  const archive = await folderSize(join(combwork, 'archive'), 'none', signal)
   // What they hold before compression (#1110).
-  const sessionsRaw = await beforeCompression(join(hive, 'sessions'), backups)
-  const archiveRaw = await beforeCompression(join(hive, 'archive'), archive)
+  const sessionsRaw = await beforeCompression(join(combwork, 'sessions'), backups)
+  const archiveRaw = await beforeCompression(join(combwork, 'archive'), archive)
   const attachmentsRoot = await attachmentsDir(projectPath)
   // Cards' attachments (HI-1700) on a row of their own: the sessions' are the rest of the folder.
   const cardAttachments = await folderSize(join(attachmentsRoot, CARD_ATTACHMENTS_DIR), cache, signal)

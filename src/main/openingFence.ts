@@ -65,9 +65,9 @@ export const isAdmitted = (place: string): boolean => admitted.has(place)
  * already its real location (`realPath`), not resolved again (HI-1887: each usage history request's).
  */
 export function ownerOf(file: string, real = false): string | null {
-  const hive = CW_DIR.toLowerCase()
+  const combwork = CW_DIR.toLowerCase()
   for (let d = dirname(real ? file.toLowerCase() : placeKey(file)); ; ) {
-    if (basename(d) === hive) return dirname(d)
+    if (basename(d) === combwork) return dirname(d)
     const up = dirname(d)
     if (up === d) return null
     d = up

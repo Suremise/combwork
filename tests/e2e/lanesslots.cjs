@@ -192,10 +192,10 @@ const lines = (file) => {
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await page.locator('[role="tab"][data-section="branches"]').click()
-    const copyRow = page.locator('.git-worktree[data-hive="copy"]')
+    const copyRow = page.locator('.git-worktree[data-cw="copy"]')
     const copyLine = `copy-1: R1 reviewing ${key1} at ${rev.slice(0, 7)}`
     check(`Branches & remotes lists copy-1 under "Review copies (Combwork’s)": "${copyLine}"`, !!(await until(async () => (await page.locator('[data-worktrees="copies"]').count()) === 1 && ((await copyRow.textContent().catch(() => '')) ?? '').includes(copyLine), HUNG_MS)), await copyRow.allInnerTexts().catch(() => []))
-    check('…with no button, and not among the worktrees', (await copyRow.locator('button').count()) === 0 && (await page.locator('.git-worktree:not([data-hive])', { hasText: 'copy-1' }).count()) === 0)
+    check('…with no button, and not among the worktrees', (await copyRow.locator('button').count()) === 0 && (await page.locator('.git-worktree:not([data-cw])', { hasText: 'copy-1' }).count()) === 0)
     await shoot('branches-copies', page.locator('.git-branches'))
 
     // --- 3. R1 fails it: the lane's hover names R1's verdict.
@@ -219,7 +219,7 @@ const lines = (file) => {
     const reread = page.locator('[data-action="reload-branches"]')
     await until(async () => !(await reread.locator('.spin, [class*="spin"]').count()), HUNG_MS)
     await reread.click()
-    check('…copy-1, read again, idle in the pool', !!(await until(async () => ((await page.locator('.git-worktree[data-hive="copy"]').textContent().catch(() => '')) ?? '').includes('copy-1: idle in the pool'), HUNG_MS)), await page.locator('.git-worktree[data-hive="copy"]').allInnerTexts().catch(() => []))
+    check('…copy-1, read again, idle in the pool', !!(await until(async () => ((await page.locator('.git-worktree[data-cw="copy"]').textContent().catch(() => '')) ?? '').includes('copy-1: idle in the pool'), HUNG_MS)), await page.locator('.git-worktree[data-cw="copy"]').allInnerTexts().catch(() => []))
     await shoot('branches-idle', page.locator('.git-branches'))
 
     /** Screenshots in both themes (English): `target` (null: the window, its hover made again by `show`). */

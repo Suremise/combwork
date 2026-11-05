@@ -111,7 +111,7 @@ const selfIn = (actor: TaskActor, project: string): string | null =>
 
 /** Who changed a card, as its history, comments and decisions store it: English, read by agents (the window words them, shared/taskHistory.ts BY_TEXT). */
 // agent-protocol: who changed a card, as its history stores it (names, read back: recorder.ts)
-const BY = { you: 'You', assistant: 'Assistant', hive: 'Combwork', repair: 'Repair' } as const // i18n-ignore: stored with cards in English, as agents read them
+const BY = { you: 'You', assistant: 'Assistant', combwork: 'Combwork', repair: 'Repair' } as const // i18n-ignore: stored with cards in English, as agents read them
 
 export const actorName = (a: TaskActor): string => (a.kind === 'user' ? BY.you : a.kind === 'assistant' ? BY.assistant : a.name)
 
@@ -2577,7 +2577,7 @@ async function reviewChange(card: TaskCard, patch: TaskPatch, actor: TaskActor, 
 export async function noteOnCard(n: number, what: string | StoredText, ws: WorkspaceService = workspace): Promise<void> {
   await boardLock(ws, async () => {
     const card = await getTask(n, ws)
-    note(card, BY.hive, what)
+    note(card, BY.combwork, what)
     await saveCard(ws, n, card)
     changed(ws)
   })
@@ -2597,8 +2597,8 @@ export async function commentAsCombwork(n: number, said: string | StoredText | {
     // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
     if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
     // Agents' English beside the window's message (and, where it is worded apart, what it is said from: `agent`).
-    if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.hive, said.text, said.shown, key)
-    else addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
+    if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.combwork, said.text, said.shown, key)
+    else addComment(card, BY.combwork, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
     await saveCard(ws, n, card)
     changed(ws)
     return true
@@ -2638,7 +2638,7 @@ export async function cleanUpAttachments(
       if (done.unsafe) return leave('unsafe')
       if (done.removed.length) {
         const said = storedText(HISTORY.attachmentsCleaned, { n: done.removed.length, names: done.removed.map((f) => f.name).join(', '), days })
-        addComment(card, BY.hive, englishSaid(said), said)
+        addComment(card, BY.combwork, englishSaid(said), said)
         await saveCard(ws, n, card)
         changed(ws)
       }
@@ -2678,7 +2678,7 @@ async function endReviewsUnbatched(project: string, agentId: string, why: Review
     const ended = await (async () => {
       const card = await getTask(c.number, ws)
       if (card.review?.agent !== agentId) return false
-      note(card, BY.hive, storedText(HISTORY.reviewEnded, { agent: card.review.agentName, why: REVIEW_END[why] }))
+      note(card, BY.combwork, storedText(HISTORY.reviewEnded, { agent: card.review.agentName, why: REVIEW_END[why] }))
       delete card.review
       await saveCard(ws, c.number, card)
       return true
@@ -2719,7 +2719,7 @@ export async function endReviewsWithoutSession(ws: WorkspaceService, live: (proj
       const ended = await (async () => {
         const card = await getTask(c.number, ws)
         if (!alive() || !card.review || card.review.agent !== c.review!.agent || live(c.project, card.review.agent)) return false
-        note(card, BY.hive, storedText(HISTORY.reviewEnded, { agent: card.review.agentName, why: REVIEW_END['its session ended'] }))
+        note(card, BY.combwork, storedText(HISTORY.reviewEnded, { agent: card.review.agentName, why: REVIEW_END['its session ended'] }))
         delete card.review
         await saveCard(ws, c.number, card)
         return true
@@ -3199,7 +3199,7 @@ async function archiveOldDoneUnbatched(ws: WorkspaceService, now: number): Promi
       if (!fresh || fresh.archived || fresh.column !== 'done' || doneSince(fresh) > cutoff) return
       fresh.archived = true
       fresh.archivedFor = 'done'
-      note(fresh, BY.hive, storedText(HISTORY.archivedDone, { days }))
+      note(fresh, BY.combwork, storedText(HISTORY.archivedDone, { days }))
       await saveCard(ws, c.number, fresh)
       out.push(c.number)
     })()

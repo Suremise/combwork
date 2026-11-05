@@ -492,7 +492,7 @@
     "note": "cw_release_slot list: a slot kept for an agent (kind is what release takes)."
   },
   "reply.release.held": {
-    "text": "{slot}: held by {agent}'s ended run {run}, its Combwork {hive} (kind writer, confirm '{'\"slot\":\"{slot}\",\"run\":\"{run}\"'}').",
+    "text": "{slot}: held by {agent}'s ended run {run}, its Combwork {combwork} (kind writer, confirm '{'\"slot\":\"{slot}\",\"run\":\"{run}\"'}').",
     "note": "cw_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is)."
   },
   "reply.release.none": {

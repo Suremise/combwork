@@ -346,7 +346,7 @@ const MAX_KEEPER_BYTES = 64 * 1024
  * that run to and hasn't revoked, `observed: complete`, and a state: "ended" with no member and total 0, or "live" with
  * its members by id, start time and name. Anything else, null: its writer stays held.
  */
-export async function keeperState(run: string, hive: string): Promise<KeeperState | null> {
+export async function keeperState(run: string, combwork: string): Promise<KeeperState | null> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(run)) return null
   await readRecords()
   const file = join(keeperDir(), `keeper-${run}.json`)
@@ -358,7 +358,7 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   } catch {
     return null
   }
-  if (!s || typeof s !== 'object' || s.v !== 1 || s.run !== run || s.app !== hive || s.observed !== 'complete') return null
+  if (!s || typeof s !== 'object' || s.v !== 1 || s.run !== run || s.app !== combwork || s.observed !== 'complete') return null
   const helper = s.helper
   if (typeof helper !== 'string' || !HELPER_ID.test(helper) || !keeperStillBound(run, helper)) return null
   const total = s.total
@@ -393,13 +393,13 @@ export type KeeperObservation = { helper: string; members: AgentProcess[]; more:
  * described. Anything else (no binding, no pipe, no answer within KEEPER_ASK_MS, unsure, a job it doesn't hold): null,
  * and its writer stays held. It ends nothing; what it says is decided by the one rule (nothingHolds).
  */
-export async function keeperObservation(run: string, hive: string): Promise<KeeperObservation | null> {
+export async function keeperObservation(run: string, combwork: string): Promise<KeeperObservation | null> {
   if (process.platform !== 'win32' || !/^[A-Za-z0-9_-]{1,64}$/.test(run)) return null
   await readRecords()
   const helper = runHelpers.get(run)
   if (!helper || !HELPER_ID.test(helper) || !keeperStillBound(run, helper)) return null
   const line = await askKeeper(keeperPipe(helper), `observe ${run}\n`) // i18n-ignore: the keeper's request, a protocol word
-  return line === null ? null : parseObservation(line, run, helper, hive)
+  return line === null ? null : parseObservation(line, run, helper, combwork)
 }
 
 /** One line asked of a keeper's pipe, and its answer's one line; null when none came whole within KEEPER_ASK_MS. */
@@ -431,14 +431,14 @@ async function askKeeper(pipe: string, ask: string): Promise<string | null> {
 }
 
 /** A keeper's answer (HI-2313) taken only whole and its own (keeperObservation); exported for the unit tests. */
-export function parseObservation(line: string, run: string, helper: string, hive: string): KeeperObservation | null {
+export function parseObservation(line: string, run: string, helper: string, combwork: string): KeeperObservation | null {
   let s: Record<string, unknown>
   try {
     s = JSON.parse(line) as Record<string, unknown>
   } catch {
     return null
   }
-  if (!s || typeof s !== 'object' || Array.isArray(s) || s.v !== 1 || s.run !== run || s.helper !== helper || s.app !== hive || s.state !== 'now' || s.observed !== 'complete') return null
+  if (!s || typeof s !== 'object' || Array.isArray(s) || s.v !== 1 || s.run !== run || s.helper !== helper || s.app !== combwork || s.state !== 'now' || s.observed !== 'complete') return null
   const total = s.total
   if (typeof total !== 'number' || !Number.isSafeInteger(total) || total < 0 || !Array.isArray(s.members) || s.members.length > MAX_LISTED || total < s.members.length) return null
   const members: AgentProcess[] = []

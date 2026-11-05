@@ -85,7 +85,7 @@ function metricsTotals(r, role) {
  */
 function measuresOf(before, after, observed, usage, subject) {
   const m = between(before, after)
-  const calls = observed?.hiveCalls ?? []
+  const calls = observed?.combworkCalls ?? []
   const seen = new Set()
   let repeated = 0
   for (const c of calls) {
@@ -93,8 +93,8 @@ function measuresOf(before, after, observed, usage, subject) {
     if (seen.has(k)) repeated++
     seen.add(k)
   }
-  m.hiveCalls = calls.length
-  m.hiveCallErrors = calls.filter((c) => !c.ok).length
+  m.combworkCalls = calls.length
+  m.combworkCallErrors = calls.filter((c) => !c.ok).length
   m.repeatedCalls = repeated
   m.skillsRead = observed?.skillsRead?.length ?? 0
   m.skillRefsRead = observed?.skillRefsRead?.length ?? 0
@@ -182,7 +182,7 @@ function placeOf(x, reports, { before, after }) {
  * The subject apart from the other agents (HI-2186), each from its own series or log lines, never one as the total less
  * the other. `subject`: { kind: 'assistant' | 'agent', agentId, snapshots ({ before, after }: each metrics snapshot's
  * request, { start, end }), complete (the metrics' coverage was whole), roster: [{ id, name, workflowRole }], lanes (the
- * run's, for builder and reviewer) }. `observed.allHiveCalls`, `observed.mcpLists` and `observed.mcpReports`: the hive
+ * run's, for builder and reviewer) }. `observed.allCombworkCalls`, `observed.mcpLists` and `observed.mcpReports`: the hive
  * servers' test log.
  *
  * The log is used only when it says, for every served call and tool list in it, on which side of each snapshot Combwork took
@@ -203,7 +203,7 @@ function splitOf(before, after, observed, subject) {
   const snaps = subject.snapshots
   const reports = new Map()
   for (const r of observed?.mcpReports ?? []) for (const id of r.ids ?? []) reports.set(id, r)
-  const logged = observed?.allHiveCalls ?? []
+  const logged = observed?.allCombworkCalls ?? []
   const served = logged.filter((c) => !c.direct)
   const listed = observed?.mcpLists ?? []
   const places = snaps?.before && snaps?.after ? new Map([...served, ...listed].map((x) => [x, placeOf(x, reports, snaps)])) : null
@@ -256,7 +256,7 @@ function agentRows(calls, lists, subject, mine) {
   for (const c of calls) rowOf(c).calls.push(c)
   for (const l of lists) rowOf(l).lists.push(l)
   const shaped = [...rows.values()].map((r) => {
-    return { agent: r.agent, role: r.role, side: r.side, hiveCalls: r.calls.length, toolListStarts: r.lists.length }
+    return { agent: r.agent, role: r.role, side: r.side, combworkCalls: r.calls.length, toolListStarts: r.lists.length }
   })
   const rank = (r) => (r.side === 'subject' ? 0 : r.agent === 'unattributed' ? 2 : 1)
   shaped.sort((a, b) => rank(a) - rank(b) || a.agent.localeCompare(b.agent, 'en') || a.role.localeCompare(b.role, 'en'))
@@ -264,7 +264,7 @@ function agentRows(calls, lists, subject, mine) {
   const kept = shaped.slice(0, AGENT_ROWS - 1)
   const rest = shaped.slice(AGENT_ROWS - 1)
   const starts = rest.every((r) => r.toolListStarts !== undefined) ? { toolListStarts: rest.reduce((n, r) => n + r.toolListStarts, 0) } : {}
-  return [...kept, { agent: 'overflow', role: 'agent', side: 'other', agents: rest.length, hiveCalls: rest.reduce((n, r) => n + r.hiveCalls, 0), ...starts }]
+  return [...kept, { agent: 'overflow', role: 'agent', side: 'other', agents: rest.length, combworkCalls: rest.reduce((n, r) => n + r.combworkCalls, 0), ...starts }]
 }
 
 /**

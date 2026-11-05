@@ -237,7 +237,7 @@ const check = (name, ok, extra = '') => {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'pl')
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     await speak({ ...base, code: 'pl', locale: 'pl', messages })
     const plDialog = page.locator('.dialog', { hasText: 'mimo to?' })
     const plDone = page.locator('.board-column', { has: page.locator('.board-column-label', { hasText: 'Gotowe' }) })

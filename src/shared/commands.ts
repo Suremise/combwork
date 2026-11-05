@@ -135,8 +135,8 @@ export function migrateCombworkCommands(raw: { commands?: unknown; onQuit?: unkn
 }
 
 /** A point's commands in order, each found in its scope's list; a ref to one no longer there is null. */
-export function resolvePoint(point: CommandPoint, lists: { hive: readonly CustomCommand[]; workspace?: readonly CustomCommand[] }): { ref: CommandRef; command: CustomCommand | null }[] {
-  return point.run.map((ref) => ({ ref, command: (ref.scope === 'combwork' ? lists.hive : (lists.workspace ?? [])).find((c) => c.id === ref.id) ?? null }))
+export function resolvePoint(point: CommandPoint, lists: { combwork: readonly CustomCommand[]; workspace?: readonly CustomCommand[] }): { ref: CommandRef; command: CustomCommand | null }[] {
+  return point.run.map((ref) => ({ ref, command: (ref.scope === 'combwork' ? lists.combwork : (lists.workspace ?? [])).find((c) => c.id === ref.id) ?? null }))
 }
 
 /** A scope's version: a hash of its commands and points, for a change proposed against them (HI-1954/s21). */

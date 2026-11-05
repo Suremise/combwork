@@ -27,13 +27,13 @@ function send(wins: BrowserWindow[], channel: string, ...args: unknown[]): void 
 
 /** Sends an event to the window(s) it is for and to in-process listeners (e.g. the Agent API event stream). */
 export function emit(event: CombworkEvent): void {
-  send(router.forEvent(event), 'hive:event', event)
+  send(router.forEvent(event), 'cw:event', event)
   for (const l of listeners) l(event)
 }
 
 /** Sends an event to one window (e.g. its own maximized state, or its workspace's changes). */
 export function emitTo(win: BrowserWindow, event: CombworkEvent): void {
-  send([win], 'hive:event', event)
+  send([win], 'cw:event', event)
   for (const l of listeners) l(event)
 }
 

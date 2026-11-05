@@ -173,7 +173,7 @@ const check = (name, ok, extra = '') => {
 
   // --- More than fit: five waiting for you are all kept ("+1 more" shows the fifth), and finished ones never push
   // a waiting one out. Sent to the window as main sends them.
-  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
+  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), e)
   const entry = (id, kind, title, message) => ({ type: 'toast', toast: { id, kind, level: kind === 'finished' ? 'success' : 'info', title, message, target: { kind: 'project', projectPath: alpha, project: 'alpha' }, timestamp: new Date().toISOString() } })
   const waitingNotice = (i) => entry(`w${i}`, 'needsYou', `Waiting ${i}`, 'Allow Bash?')
   const resolved = (ids) => sendEvent({ type: 'toast-resolved', ids, outcome: 'Answered' })

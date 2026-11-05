@@ -24,7 +24,7 @@ const noteArrived = (what: string): void => {
   arrived.push({ at, what, n: 1 })
   if (arrived.length > 300) arrived.shift()
 }
-ipcRenderer.on('hive:event', (_: IpcRendererEvent, event: CombworkEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: combwork.log, in English
+ipcRenderer.on('cw:event', (_: IpcRendererEvent, event: CombworkEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: combwork.log, in English
 ipcRenderer.on('pty:data', () => noteArrived('terminal output')) // i18n-ignore: combwork.log, in English
 ipcRenderer.on('pty:exit', () => noteArrived('terminal exit')) // i18n-ignore: combwork.log, in English
 
@@ -39,8 +39,8 @@ const bridge: CombworkBridge = {
     ),
   onEvent(listener) {
     const handler = (_: IpcRendererEvent, event: CombworkEvent): void => listener(event)
-    ipcRenderer.on('hive:event', handler)
-    return () => ipcRenderer.removeListener('hive:event', handler)
+    ipcRenderer.on('cw:event', handler)
+    return () => ipcRenderer.removeListener('cw:event', handler)
   },
   onPtyData(listener) {
     const handler = (_: IpcRendererEvent, key: string, data: string): void => listener(key, data)

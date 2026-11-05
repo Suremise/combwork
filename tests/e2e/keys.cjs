@@ -200,7 +200,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   const base = (await inv('app:info')).language
   const deDir = path.join(lib.ROOT, 'locales', 'de')
   const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   await lib.fitWindow(app, page, { width: 1000, height: 900 })
   await speak({ ...base, code: 'de', locale: 'de', messages: deMessages })
   const tabsFit = () => page.locator('.kb-tabs').evaluate((list) => {

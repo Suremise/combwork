@@ -216,7 +216,7 @@ const check = (name, ok, extra = '') => {
     // It folds further: + Add to its +, then Panes | Tiles to their icons (their names on hover and for screen readers),
     // then the chip's counts are cut (five agents' "1 waiting · 1 working · 3 idle" go that far); nothing of it is past
     // its edge or cut inside a button. Widened, all comes back.
-    const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+    const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
     const toolbar = () => page.evaluate(() => {
       const bar = document.querySelector('.session-toolbar')
       const right = bar.getBoundingClientRect().right

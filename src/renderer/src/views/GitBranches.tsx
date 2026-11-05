@@ -409,9 +409,9 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
           return tr(M.slotLease, { kind: l ? (l.kind === 'carried' ? 'carried' : l.card !== null ? 'card' : 'lane') : 'none', slot: v.name, agent, card, lane })
         }
         // The worktrees as the user's (agents', slots', unused ones) and Hive's own (HI-1710).
-        const theirs = info.worktrees.filter((w) => !w.hive)
-        const combworkCopies = info.worktrees.filter((w) => w.hive === 'copy')
-        const combworkQueue = info.worktrees.filter((w) => w.hive === 'queue')
+        const theirs = info.worktrees.filter((w) => !w.combwork)
+        const combworkCopies = info.worktrees.filter((w) => w.combwork === 'copy')
+        const combworkQueue = info.worktrees.filter((w) => w.combwork === 'queue')
         const copyText = (path: string): string => {
           const c = copies.find((x) => samePath(x.folder, path))
           const l = c?.lease && !c.lease.returned ? c.lease : null
@@ -709,7 +709,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 <p className="hint">{tr(M.copiesHint)}</p>
                 <div className="git-rows">
                   {combworkCopies.map((w) => (
-                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-hive="copy">
+                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-cw="copy">
                       <Icon name="shield" />
                       <span className="git-name">{copyText(w.path)}</span>
                       <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
@@ -727,7 +727,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 <p className="hint">{tr(M.queueHint)}</p>
                 <div className="git-rows">
                   {combworkQueue.map((w) => (
-                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-hive="queue">
+                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-cw="queue">
                       <Icon name="git-merge" />
                       <span className="git-name">{tr(M.queueRow)}</span>
                       <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>

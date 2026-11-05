@@ -396,10 +396,10 @@ function appServerAnswer(executable: string, args: string[], cwd: string, method
  * per-tool `tools.<tool>.approval_mode`); none with the switch off (#1281). Hive's server is always on (`enabled`): a
  * native server of that name merges into Hive's table key by key, and could turn it off.
  */
-function combworkTable(name: string, hive: CombworkServerOptions): Record<string, unknown> {
+function combworkTable(name: string, combwork: CombworkServerOptions): Record<string, unknown> {
   if (name !== TOOLS_SERVER) return {}
-  if (!hive.preApprove) return { enabled: true }
-  if (hive.trusted) return { enabled: true, tools: Object.fromEntries(hive.trusted.map((t) => [t, { approval_mode: 'approve' }])) }
+  if (!combwork.preApprove) return { enabled: true }
+  if (combwork.trusted) return { enabled: true, tools: Object.fromEntries(combwork.trusted.map((t) => [t, { approval_mode: 'approve' }])) }
   return { enabled: true, default_tools_approval_mode: 'approve' }
 }
 
@@ -410,8 +410,8 @@ export interface CombworkServerOptions {
 }
 
 /** An MCP server definition (Claude Code's JSON format) as a Codex mcp_servers table; null if it can't be passed safely. */
-export function codexMcpServer(name: string, def: McpServerDef, hive: CombworkServerOptions = { preApprove: true }): { table: Record<string, unknown> | null; warning?: string } {
-  const approval = (n: string): Record<string, unknown> => combworkTable(n, hive)
+export function codexMcpServer(name: string, def: McpServerDef, combwork: CombworkServerOptions = { preApprove: true }): { table: Record<string, unknown> | null; warning?: string } {
+  const approval = (n: string): Record<string, unknown> => combworkTable(n, combwork)
   const ref = (v: unknown): string | null => {
     const m = typeof v === 'string' ? /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$|^\$([A-Za-z_][A-Za-z0-9_]*)$/.exec(v.trim()) : null
     return m ? (m[1] ?? m[2]) : null
@@ -971,12 +971,12 @@ export class CodexAdapter implements ProviderAdapter {
     if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
     const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
-    const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveCombworkTools'), trusted: ctx.trustedCombworkTools }
+    const combwork = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveCombworkTools'), trusted: ctx.trustedCombworkTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
-      const { table, warning } = codexMcpServer(name, def, hive)
+      const { table, warning } = codexMcpServer(name, def, combwork)
       if (warning) log.warn(warning)
       if (!table) continue
-      if (name === TOOLS_SERVER) Object.assign(table, outrankNativeCombwork(files, table, hive.preApprove ? (hive.trusted ?? 'all') : [], ctx.cwd))
+      if (name === TOOLS_SERVER) Object.assign(table, outrankNativeCombwork(files, table, combwork.preApprove ? (combwork.trusted ?? 'all') : [], ctx.cwd))
       args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
     }
     // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code; with the
@@ -1016,8 +1016,8 @@ export class CodexAdapter implements ProviderAdapter {
     this.configByRun.delete(ctx.runId)
     const command = hookCommand(ctx.hookUrl, ctx.hookAuthFile)
     const secrets = [ctx.hookAuthFile, ctx.env.CW_HOOK_TOKEN ?? '']
-    const hive: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'combwork', type: 'command', command: withoutCombworkAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
-    const listing: HookListing = { basis: 'cli', rows: hive, notes: [] }
+    const combwork: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'combwork', type: 'command', command: withoutCombworkAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
+    const listing: HookListing = { basis: 'cli', rows: combwork, notes: [] }
     return {
       listing,
       receivers: Object.fromEntries(HOOKS.map((h) => [h.event, 'command'])),
@@ -1028,7 +1028,7 @@ export class CodexAdapter implements ProviderAdapter {
         const got = codexListedHooks(all as never[], { command, flagsFile: SESSION_FLAGS }, secrets)
         // Hive's as passed while Codex trusts them; else as Codex has them, or unknown where it doesn't list them (a later
         // -c of the user's own for that event replaced Hive's).
-        const rows = hive.map((r): HookRow => {
+        const rows = combwork.map((r): HookRow => {
           const trust = got.combworkTrust.get(r.event) ?? 'unknown'
           return { ...r, status: trust === 'trusted' ? 'passed' : trust }
         })

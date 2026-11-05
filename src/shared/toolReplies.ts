@@ -231,7 +231,7 @@ const R = {
   releaseCarried: agentMsg({ id: 'reply.release.carried', text: '{slot}: kept for {agent} (kind carried).', note: 'cw_release_slot list: a slot kept for an agent (kind is what release takes).' }),
   releaseProcs: agentMsg({ id: 'reply.release.processes', text: 'Its run left running: {processes} (end: true ends them first).', note: "cw_release_slot list: a held writer's processes still running." }),
   releaseUnknown: agentMsg({ id: 'reply.release.unknown', text: "Combwork doesn't know which of its processes still run.", note: "cw_release_slot list: a held writer's processes are not known." }),
-  releaseHeld: agentMsg({ id: 'reply.release.held', text: '{slot}: held by {agent}\'s ended run {run}, its Combwork {hive} (kind writer, confirm \'{\'"slot":"{slot}","run":"{run}"\'}\').', note: 'cw_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is).' }),
+  releaseHeld: agentMsg({ id: 'reply.release.held', text: '{slot}: held by {agent}\'s ended run {run}, its Combwork {combwork} (kind writer, confirm \'{\'"slot":"{slot}","run":"{run}"\'}\').', note: 'cw_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is).' }),
   releasedCarried: agentMsg({ id: 'reply.release.releasedCarried', text: 'Released {slot} in {project}: no longer kept for {agent}; its folder and branch stay.', note: 'cw_release_slot release of a carried slot.' }),
   releasedWriter: agentMsg({ id: 'reply.release.releasedWriter', text: "Released {slot} in {project}: {agent}'s ended run no longer holds it{ended, select, yes {, its listed processes ended first} other {}}.", note: "cw_release_slot release of a writer's slot." }),
   context200k: agentMsg({ id: 'reply.connection.context200k', text: '200K', note: "A connection's value: the 200K context window." }),
@@ -1340,7 +1340,7 @@ export function teamText(t: TeamPublic): string {
 export interface ReleasablePublic {
   project: string
   carried: { slot: string; agent: string }[]
-  held: { slot: string; agent: string; run: string; hive: string; processes: { list: { pid: number; label: string }[]; more: number } | null }[]
+  held: { slot: string; agent: string; run: string; combwork: string; processes: { list: { pid: number; label: string }[]; more: number } | null }[]
 }
 
 /** How many processes a held writer's line names (the rest counted). */
@@ -1357,7 +1357,7 @@ export function releasableText(r: ReleasablePublic): string {
     const more = h.processes ? h.processes.list.length + h.processes.more - PROCESSES_SHOWN : 0
     const listed = h.processes ? h.processes.list.slice(0, PROCESSES_SHOWN).map((p) => `${clip(p.label, 40)} (${p.pid})`).join(', ') : ''
     const procs = h.processes?.list.length ? ` ${say(R.releaseProcs, { processes: more > 0 ? say(R.queueFilesMore, { files: listed, n: more }) : listed })}` : ` ${say(R.releaseUnknown)}`
-    lines.push(`${say(R.releaseHeld, { slot: h.slot, agent: h.agent, run: h.run, hive: h.hive })}${procs}`)
+    lines.push(`${say(R.releaseHeld, { slot: h.slot, agent: h.agent, run: h.run, combwork: h.combwork })}${procs}`)
   }
   return lines.join('\n')
 }

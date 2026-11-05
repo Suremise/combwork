@@ -73,7 +73,7 @@ export async function releasableSlots(projectPath: string): Promise<Releasable> 
   const held: HeldRow[] = []
   for (const s of facts.slots.filter((x) => x.writer)) {
     const w = await heldWriter(projectPath, s.name)
-    if (w && !w.live && (w.hive.self || w.hive.alive === false)) held.push({ ...w, agentName: name(w.agent) })
+    if (w && !w.live && (w.combwork.self || w.combwork.alive === false)) held.push({ ...w, agentName: name(w.agent) })
   }
   return { carried, held }
 }

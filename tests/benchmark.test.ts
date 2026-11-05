@@ -77,7 +77,7 @@ describe('scenario benchmarks', () => {
   it('more failures, errors or retries are worse even when every check passes and it is smaller', () => {
     const base = bench('baseline')
     for (const [k, v] of [
-      ['hiveCallErrors', 2],
+      ['combworkCallErrors', 2],
       ['apiFailed', 2],
       ['toolErrors', 1],
       ['apiCancelled', 1],
@@ -449,7 +449,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       { name: 'b', ok: true },
       { name: 'only a model', ok: null }
     ],
-    measures: measuresOf(report(0), report(2), { hiveCalls: [{ tool: 'cw_read_task', ok: true, args: '{"number":1}' }], skillsRead: ['work-on-card'] }, null),
+    measures: measuresOf(report(0), report(2), { combworkCalls: [{ tool: 'cw_read_task', ok: true, args: '{"number":1}' }], skillsRead: ['work-on-card'] }, null),
     coverage: { recording: true, dropped: 0, partial: [] },
     guidance: { atStart: { revision: 'g1' }, delivered: { guidance: 'g1', skills: { 'work-on-card': 'rev-a' } } },
     metricsOverheadMs: 12,

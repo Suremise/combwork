@@ -69,8 +69,8 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const combwork = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return combwork ? JSON.parse(fs.readFileSync(combwork.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const status = async () => Object.fromEntries((await api('GET', '/v1/projects/alpha')).body.agents.map((a) => [a.name, a]))
     const activity = async (id) => (await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(id)}/activity`)).body

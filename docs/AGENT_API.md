@@ -611,7 +611,7 @@ From api.version 9 (#1561). The two releases an agent's ⋯ menu offers in Combw
 ```json
 { "project": "alpha",
   "carried": [{ "slot": "hb2", "agent": "B2" }],
-  "held": [{ "slot": "slot-a", "agent": "B1", "run": "3f9a1c…", "hive": "gone (process 4120)",
+  "held": [{ "slot": "slot-a", "agent": "B1", "run": "3f9a1c…", "combwork": "gone (process 4120)",
              "processes": { "list": [{ "pid": 5150, "label": "node serve.js" }], "more": 0 } }] }
 ```
 

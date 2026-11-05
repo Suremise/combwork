@@ -264,7 +264,7 @@ const check = (name, ok, extra = '') => {
   fs.renameSync(inner.ws, fifth.ws)
   const ours = (p) => (JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).antivirus?.added ?? []).some((x) => path.resolve(x).toLowerCase() === path.resolve(p).toLowerCase())
   setFixture({ exclusions: [scratch.trees, tools.ws, inner.ws, fourth.trees], cancelled: true })
-  const command = (app, id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
+  const command = (app, id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args: [] })
   {
     const { app, page, inv } = await launch()
     try {

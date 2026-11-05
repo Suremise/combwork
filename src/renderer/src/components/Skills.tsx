@@ -204,11 +204,11 @@ export async function addSkill(mode: 'new' | 'file', target: SkillTarget, also?:
 }
 
 export async function deleteSkill(s: SkillInfo): Promise<boolean> {
-  const hive = s.level === 'combwork'
+  const combwork = s.level === 'combwork'
   const ok = await confirm({
     title: tr(M.deleteTitle),
     message: tr(M.deleteMessage, { name: s.name }),
-    detail: hive ? (s.problem ? tr(M.deleteNobody, { problem: skillProblem(s) ?? '' }) : tr(M.deleteCombwork, { audience: s.audience ?? 'agents' })) : tr(M.deleteLocal, agentsOf(s)),
+    detail: combwork ? (s.problem ? tr(M.deleteNobody, { problem: skillProblem(s) ?? '' }) : tr(M.deleteCombwork, { audience: s.audience ?? 'agents' })) : tr(M.deleteLocal, agentsOf(s)),
     confirmLabel: tr(M.delete),
     danger: true
   })

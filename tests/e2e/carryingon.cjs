@@ -81,7 +81,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const notices = (a) => lines(path.join(homeOf(a), 'fake-notices.jsonl')).filter((n) => n.agent === a.name)
     const wakes = (a) => lines(path.join(homeOf(a), 'fake-wakes.jsonl')).filter((w) => w.agent === a.name).map((w) => w.text)
     const setSwitch = (which, value) => inv('advanced:set', `cw.inbox.${which}`, value)
-    const command = (id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
+    const command = (id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args: [] })
     const ownNow = async (key) => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === alpha.toLowerCase())?.config[key]
     /** The project's own value, chosen in Project Settings → Sessions (inherit, on, off), then back to the Session tab. */
     const setOwn = async (key, value) => {

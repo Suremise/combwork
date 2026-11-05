@@ -61,7 +61,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  const command = (id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id })
+  const command = (id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id })
   const until = async (fn, ms) => {
     const t = Date.now()
     let v

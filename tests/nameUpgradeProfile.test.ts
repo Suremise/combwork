@@ -85,6 +85,27 @@ describe("the profile's stored values", () => {
     expect(upgradedConfig({ settings: { workflow: { git: { finish: 'combworkMerges' } } } })).toBeNull()
   })
 
+  it("config.json's ui (HI-2591): the .combwork notice's dismissals, the Skills tab's fold and the tips seen take the new names", () => {
+    const ui = {
+      panes: { a: 1 },
+      hiveVcsNotice: { p1: 'k1', p2: 'k2' },
+      skillsFold: { p1: { hive: false, provider: true }, p2: { provider: false }, p3: { hive: true, combwork: false } },
+      tips: { seen: ['files-tab', 'hive-folder', 'combwork-folder', 'hive-merges'], moments: ['m'], used: ['view.board'], shownOn: '2026-11-01' }
+    }
+    const now = upgradedConfig({ version: 9, settings: { agentApi: { enabled: true } }, ui }) as { settings: unknown; ui: Record<string, any> }
+    expect(now.settings).toEqual({ agentApi: { enabled: true } })
+    expect(now.ui).toEqual({
+      panes: { a: 1 },
+      combworkVcsNotice: { p1: 'k1', p2: 'k2' },
+      skillsFold: { p1: { combwork: false, provider: true }, p2: { provider: false }, p3: { combwork: false } },
+      tips: { seen: ['files-tab', 'combwork-folder', 'combwork-merges'], moments: ['m'], used: ['view.board'], shownOn: '2026-11-01' }
+    })
+    expect(upgradedConfig(now)).toBeNull()
+    // A dismissal kept under the new name wins; a config with no settings still has its ui converted.
+    expect((upgradedConfig({ ui: { hiveVcsNotice: { p1: 'old', p2: 'k2' }, combworkVcsNotice: { p1: 'new' } } }) as any).ui).toEqual({ combworkVcsNotice: { p1: 'new', p2: 'k2' } })
+    expect(upgradedConfig({ settings: {}, ui: { panes: {}, tips: { seen: ['files-tab'], moments: [], used: [] } } })).toBeNull()
+  })
+
   it("advanced.json: hive.* and the CLIs' pre-approve ids renamed, the retired switch dropped, a new id kept over its old one", () => {
     const now = upgradedAdvanced(ADVANCED_10) as { values: Record<string, unknown>; madeFor: Record<string, unknown> }
     expect(now.values).toEqual({ 'cw.processes.orphanNotice': false, 'claude-code.override.preApproveCombworkTools': false, 'cw.agents.perProject': 4, 'cw.assistant.otherMcpServers': true })

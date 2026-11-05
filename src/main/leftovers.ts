@@ -65,8 +65,8 @@ export const PROJECT_STORES: Store[] = [
  * Whether a store's folder is where it says, inside its .combwork: the .combwork and every folder down to it a real folder, never
  * a link or junction (which would make a folder outside it look like Hive's store).
  */
-async function plainDir(hive: string, dir: string): Promise<boolean> {
-  let at = hive
+async function plainDir(combwork: string, dir: string): Promise<boolean> {
+  let at = combwork
   for (const part of ['', ...dir.split(/[\\/]/).filter((x) => x && x !== '.')]) {
     at = part ? join(at, part) : at
     const st = await lstat(at).catch(() => null)
@@ -92,15 +92,15 @@ export interface Swept {
  * The backups kept when a store moved into the workspace database (#1111: the board's `tasks` folder, metrics.json…) go
  * two weeks after the move, by the time in their name, to the Recycle Bin (`trash`, given for tests), a folder whole.
  */
-export async function sweepLeftovers(roots: { hive: string; stores: Store[] }[], opts: { now?: number; signal?: AbortSignal; trash?: (path: string) => Promise<void> } = {}): Promise<Swept> {
+export async function sweepLeftovers(roots: { combwork: string; stores: Store[] }[], opts: { now?: number; signal?: AbortSignal; trash?: (path: string) => Promise<void> } = {}): Promise<Swept> {
   const now = opts.now ?? Date.now()
   const toBin = opts.trash ?? trash
   const out: Swept = { removed: [], temp: 0, bak: 0, imported: 0 }
   for (const root of roots) {
     for (const store of root.stores) {
       if (opts.signal?.aborted) return out
-      const dir = join(root.hive, store.dir)
-      if (!(await plainDir(root.hive, store.dir))) continue
+      const dir = join(root.combwork, store.dir)
+      if (!(await plainDir(root.combwork, store.dir))) continue
       const names = await readdir(dir).catch(() => [] as string[])
       let temp = 0
       let bak = 0
@@ -154,7 +154,7 @@ export async function sweepWorkspaceLeftovers(ws: WorkspaceService): Promise<Swe
   if (!still()) return null
   const hidden = await ws.listProjectPaths({ hidden: true })
   if (!still()) return null
-  const roots = [{ hive: join(path, CW_DIR), stores: WORKSPACE_STORES }, ...[...shown, ...hidden].map((p) => ({ hive: join(p, CW_DIR), stores: PROJECT_STORES }))]
+  const roots = [{ combwork: join(path, CW_DIR), stores: WORKSPACE_STORES }, ...[...shown, ...hidden].map((p) => ({ combwork: join(p, CW_DIR), stores: PROJECT_STORES }))]
   const swept = await sweepLeftovers(roots, { signal: life })
   if (swept.temp || swept.bak || swept.imported) {
     const where = swept.removed.map((r) => `${userText(relative(path, r.dir))} (${[r.bak ? `${r.bak} .before-ids.bak` : '', r.temp ? `${r.temp} .tmp` : '', r.imported ? `${r.imported} .imported to the Recycle Bin` : ''].filter(Boolean).join(', ')})`).join('; ')

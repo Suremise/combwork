@@ -90,7 +90,7 @@ function writeProject(dir, cfg) {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'de')
     const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const confirmSwitch = async () => {
       await dialog.getByRole('button', { name: 'Switch', exact: true }).click()
       return !!(await until(async () => (await dialog.count()) === 0, HUNG_MS))

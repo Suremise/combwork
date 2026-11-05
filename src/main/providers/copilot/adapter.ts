@@ -437,8 +437,8 @@ export class CopilotAdapter implements ProviderAdapter {
    */
   launchHooks(ctx: LaunchContext): LaunchHooks {
     const token = ctx.env.CW_HOOK_TOKEN ?? ''
-    const hive = rowsOfHooksTable(copilotHooks(ctx.hookUrl, token).hooks, { source: 'plugin', status: 'passed', observed: true }, [token])
-    const rows = hive.rows.map((r) => ({ ...r, source: 'combwork' as const }))
+    const combwork = rowsOfHooksTable(copilotHooks(ctx.hookUrl, token).hooks, { source: 'plugin', status: 'passed', observed: true }, [token])
+    const rows = combwork.rows.map((r) => ({ ...r, source: 'combwork' as const }))
     return { listing: { basis: 'launch', rows, notes: [{ kind: 'othersUnread' }] }, receivers: Object.fromEntries(rows.map((r) => [r.event, r.type])) }
   }
 

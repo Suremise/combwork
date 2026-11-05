@@ -276,9 +276,9 @@ interface State {
   /** The provider each project's Skills tab last showed, by project path in lower case (#118; saved in ui). */
   skillsProvider: Record<string, string>
   /** Each project's Skills tab groups, open or folded as last left (#118; saved in ui). */
-  skillsFold: Record<string, { hive?: boolean; provider?: boolean }>
+  skillsFold: Record<string, { combwork?: boolean; provider?: boolean }>
   sessionsTree: Record<string, Record<string, boolean>>
-  hiveVcsNotice: Record<string, string>
+  combworkVcsNotice: Record<string, string>
   assistantFold: Record<string, boolean>
   /** Each workspace's board: collapsed columns and folded cards (#170; saved in ui), by workspace path in lower case. */
   boardFold: Record<string, BoardFold>
@@ -594,7 +594,7 @@ export const useStore = create<State>(() => ({
   skillsProvider: {},
   skillsFold: {},
   sessionsTree: {},
-  hiveVcsNotice: {},
+  combworkVcsNotice: {},
   assistantFold: {},
   boardFold: {},
   progressFilter: {},

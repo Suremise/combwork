@@ -1138,11 +1138,11 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
 
 /** The user's commands as the settings tools read them (HI-1954): the lists' names, each point's names in order. */
 function commandsSettingValue(id: string, settings: AppSettings, ws?: Pick<WorkspaceConfig, 'commands'> | null): string[] | undefined {
-  const hive = settings.commands ?? EMPTY_CW
+  const combwork = settings.commands ?? EMPTY_CW
   const own = ws?.commands ?? EMPTY_WORKSPACE
-  const names = (point: CommandPoint, workspace?: CustomCommand[]): string[] => resolvePoint(point, { hive: hive.list, workspace }).map((r) => r.command?.name ?? '(deleted)') // i18n-ignore: the tools' text
-  if (id === 'general.commands') return hive.list.map((c) => c.name)
-  if (id === 'general.onQuit') return names(hive.onQuit)
+  const names = (point: CommandPoint, workspace?: CustomCommand[]): string[] => resolvePoint(point, { combwork: combwork.list, workspace }).map((r) => r.command?.name ?? '(deleted)') // i18n-ignore: the tools' text
+  if (id === 'general.commands') return combwork.list.map((c) => c.name)
+  if (id === 'general.onQuit') return names(combwork.onQuit)
   if (id === 'workspace.commands') return own.list.map((c) => c.name)
   if (id === 'workspace.onOpen') return names(own.onOpen, own.list)
   if (id === 'workspace.onClose') return names(own.onClose, own.list)

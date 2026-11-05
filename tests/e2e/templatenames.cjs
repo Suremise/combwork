@@ -171,7 +171,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // column shows without scrolling sideways; German shot.
     await d.getByRole('button', { name: 'Cancel' }).click()
     const base = (await inv('app:info')).language
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     for (const code of ['de', 'pl']) {
       const dir = path.join(lib.ROOT, 'locales', code)
       const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))

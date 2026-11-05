@@ -156,7 +156,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await leftNote.locator('button', { hasText: 'Show B1' }).click()
     check("…its Show opens the Sessions tab on B1's conversation", !!(await until(async () => (await h.page.locator('text=Ran in B1').count()) > 0, HUNG_MS)))
     // Back to the agents' panes.
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: 'project.tab.session', args: [] })
+    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: 'project.tab.session', args: [] })
     check('…slot-a still free', !(await slotList()).find((s) => s.name === 'slot-a')?.lease)
 
     // --- 3. A new card gets slot-a meanwhile: B1's conversation is refused with why; two launches for slot-a at once.

@@ -359,7 +359,7 @@ const row = (r) => {
   const passed = r.checks.filter((c) => c.ok === true).length
   const failed = r.checks.filter((c) => c.ok === false)
   const skipped = r.checks.filter((c) => c.ok === null).length
-  return `| ${r.scenario} | ${r.error ? `error: ${r.error.split('\n')[0]}` : failed.length ? `**${failed.length} failed**: ${failed.map((c) => c.name).join('; ')}` : 'pass'} | ${passed}/${r.checks.length}${skipped ? ` (${skipped} skipped)` : ''} | ${r.observed?.skillsRead.join(', ') || '–'} | ${[...new Set(r.observed?.hiveCalls.map((c) => c.tool) ?? [])].join(', ') || '–'} | ${combworkCost(r.measures)} | ${r.usage?.costUsd != null ? `$${r.usage.costUsd.toFixed(3)}` : '–'}, ${r.seconds}s |`
+  return `| ${r.scenario} | ${r.error ? `error: ${r.error.split('\n')[0]}` : failed.length ? `**${failed.length} failed**: ${failed.map((c) => c.name).join('; ')}` : 'pass'} | ${passed}/${r.checks.length}${skipped ? ` (${skipped} skipped)` : ''} | ${r.observed?.skillsRead.join(', ') || '–'} | ${[...new Set(r.observed?.combworkCalls.map((c) => c.tool) ?? [])].join(', ') || '–'} | ${combworkCost(r.measures)} | ${r.usage?.costUsd != null ? `$${r.usage.costUsd.toFixed(3)}` : '–'}, ${r.seconds}s |`
 }
 const cli = results.find((r) => r.cliVersion)?.cliVersion ?? 'unknown'
 save(
