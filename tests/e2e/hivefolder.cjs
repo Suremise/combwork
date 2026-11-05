@@ -75,6 +75,10 @@ function folders() {
     [path.join(alpha, '.combwork'), path.join(alpha, '.hive')]
   ])
     if (fs.existsSync(from)) fs.renameSync(from, to)
+  // And the board's file under 1.0's name (HI-2587's names upgrade moves it back).
+  for (const s of ['', '-wal', '-shm']) if (fs.existsSync(path.join(ws, '.hive', `combwork.db${s}`))) fs.renameSync(path.join(ws, '.hive', `combwork.db${s}`), path.join(ws, '.hive', `hive.db${s}`))
+  // 1.0 had no record of the names upgrade (this build wrote one as it made the workspace).
+  fs.rmSync(path.join(ws, '.hive', 'combwork-names.json'), { force: true })
   const exclude = path.join(alpha, '.git', 'info', 'exclude')
   fs.writeFileSync(exclude, fs.readFileSync(exclude, 'utf8').replace(/^\/\.combwork\/$/m, '/.hive/'))
   {
@@ -90,6 +94,8 @@ function folders() {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws, HUNG_MS)
     check('every .hive moved to .combwork, none left', folders().join() === ['.combwork', path.join('.combwork', 'assistant', '.combwork'), path.join('alpha', '.combwork')].sort().join(), folders().join())
+    const files = fs.readdirSync(path.join(ws, '.combwork'))
+    check("the board's file is combwork.db, nothing of hive.db left, the names upgrade recorded (HI-2587)", files.includes('combwork.db') && !files.some((f) => f.startsWith('hive.db')) && files.includes('combwork-names.json'), files.join())
     const cards = await inv('tasks:list')
     const card = cards.find((c) => c.number === numbers[0])
     check('the board has its cards', numbers.every((n) => cards.some((c) => c.number === n)), cards.map((c) => c.number).join())
