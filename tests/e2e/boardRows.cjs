@@ -26,6 +26,9 @@ function readDocs(db, numbers) {
  */
 function readCitingDocs(db) {
   if (legacy(db)) return readDocs(db)
+  // A board this build hasn't opened yet (the installed Combwork's, before the names upgrade's step 25, HI-2587): its
+  // comments' column has the old name. Read through a view of this connection's own, so the file is never changed.
+  if (db.prepare("SELECT 1 FROM pragma_table_info('card_comments') WHERE name = 'hive_text'").get() !== undefined) db.exec('CREATE TEMP VIEW IF NOT EXISTS card_comments AS SELECT *, hive_text AS app_text FROM main.card_comments')
   const { readCardRows, composeCard } = cardRows()
   return readCardRows(db, { where: "archived = 0 AND col <> 'done'", parts: ['comments'] }).map((r) => ({ number: r.card.number, doc: composeCard(r) }))
 }
