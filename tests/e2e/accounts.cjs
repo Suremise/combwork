@@ -359,8 +359,8 @@ const check = (name, ok, extra = '') => {
     const placed = await boxes()
     check('…under its row and above the next account', !!placed.row && !!placed.panel && !!placed.next && placed.panel.y >= placed.row.y + placed.row.height - 1 && placed.panel.y + placed.panel.height <= placed.next.y + 1, JSON.stringify(placed))
     check('…scrolled into view', await panel.locator('.task-terminal').evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }))
-    await lib.until(async () => (await middle.locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)
-    check('…and stays there as its row is read again', (await middle.locator('.account-signin .task-terminal').count()) === 1 && (await page.locator('.accounts-settings > .account-signin').count()) === 0)
+    // Opening it re-reads the list (its row's sign-in state): the terminal stays in the card, nothing under the list.
+    check('…and stays there as the list is read again', !!(await lib.until(async () => (await list()).connections.find((a) => a.id === middleId)?.signingIn === true, HUNG_MS)) &&(await middle.locator('.account-signin .task-terminal').count()) === 1 && (await page.locator('.accounts-settings > .account-signin').count()) === 0)
     await shots('set-up-middle')
     check('…closed, its card is as it was', !!(await closeRunning(true)) && !!(await lib.until(async () => (await panel.count()) === 0, HUNG_MS)))
 
