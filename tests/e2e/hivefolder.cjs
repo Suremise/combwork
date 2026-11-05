@@ -26,7 +26,15 @@ const check = (name, ok, extra = '') => {
 function folders() {
   const out = []
   const walk = (dir, depth) => {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch (e) {
+      // Gone since its parent was listed: a swap's staging folder the app was installing a skill through, say.
+      if (e.code === 'ENOENT') return
+      throw e
+    }
+    for (const e of entries) {
       if (!e.isDirectory() || e.name === '.git' || e.name === 'node_modules') continue
       const p = path.join(dir, e.name)
       if (e.name === '.hive' || e.name === '.combwork') out.push(path.relative(ws, p))
