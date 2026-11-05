@@ -826,12 +826,12 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(await w.pool.remove('slot-a')).toBeNull()
   })
 
-  it("removes Combwork's own unchanged skill copies first, and keeps a slot whose .agents/skills still holds a hive-* folder (#1500)", async () => {
+  it("removes Combwork's own unchanged skill copies first, and keeps a slot whose .agents/skills still holds a cw-* folder (#1500)", async () => {
     const { w, folder } = await freeSlot()
     // Combwork's copies are git-ignored (info/exclude, as Combwork keeps them), so the dirty guard doesn't count them.
     writeFileSync(join(w.project, '.git', 'info', 'exclude'), '.agents/\n')
     const skills = join(folder, '.agents', 'skills')
-    for (const name of ['hive-merge-ready', 'hive-edited']) {
+    for (const name of ['cw-merge-ready', 'cw-edited']) {
       mkdirSync(join(skills, name), { recursive: true })
       writeFileSync(join(skills, name, 'SKILL.md'), name)
     }
@@ -841,16 +841,16 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
       ...w.pool.deps,
       removeSkillCopies: async (f) => {
         removedIn.push(f)
-        rmSync(join(f, '.agents', 'skills', 'hive-merge-ready'), { recursive: true, force: true })
+        rmSync(join(f, '.agents', 'skills', 'cw-merge-ready'), { recursive: true, force: true })
       }
     })
-    expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['hive-edited'] })
+    expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['cw-edited'] })
     expect(removedIn).toEqual([folder])
-    expect(existsSync(join(skills, 'hive-merge-ready'))).toBe(false)
-    expect(existsSync(join(skills, 'hive-edited'))).toBe(true)
+    expect(existsSync(join(skills, 'cw-merge-ready'))).toBe(false)
+    expect(existsSync(join(skills, 'cw-edited'))).toBe(true)
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
     // Only unchanged copies left (here none): the slot goes.
-    rmSync(join(skills, 'hive-edited'), { recursive: true, force: true })
+    rmSync(join(skills, 'cw-edited'), { recursive: true, force: true })
     expect(await pool.remove('slot-a')).toBeNull()
     expect(existsSync(folder)).toBe(false)
     expect(w.store.slot('slot-a')).toBeNull()
@@ -860,8 +860,8 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     const { w, folder } = await freeSlot()
     writeFileSync(join(w.project, '.git', 'info', 'exclude'), '.agents/\n')
     const skills = join(folder, '.agents', 'skills')
-    mkdirSync(join(skills, 'hive-edited'), { recursive: true })
-    writeFileSync(join(skills, 'hive-edited', 'SKILL.md'), 'edited')
+    mkdirSync(join(skills, 'cw-edited'), { recursive: true })
+    writeFileSync(join(skills, 'cw-edited', 'SKILL.md'), 'edited')
     const pool = new SlotPool({ ...w.pool.deps, removeSkillCopies: async () => undefined })
     fault.readdir = skills
     try {
@@ -869,7 +869,7 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     } finally {
       fault.readdir = null
     }
-    expect(readFileSync(join(skills, 'hive-edited', 'SKILL.md'), 'utf8')).toBe('edited')
+    expect(readFileSync(join(skills, 'cw-edited', 'SKILL.md'), 'utf8')).toBe('edited')
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
     // The skills folder proved absent: nothing left to keep it.
     rmSync(join(folder, '.agents'), { recursive: true, force: true })
@@ -877,7 +877,7 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(existsSync(folder)).toBe(false)
   })
 
-  it('keeps a slot whose .agents/skills holds a hive-* junction or link, never following it (#1500)', async () => {
+  it('keeps a slot whose .agents/skills holds a cw-* junction or link, never following it (#1500)', async () => {
     const { w, folder } = await freeSlot()
     writeFileSync(join(w.project, '.git', 'info', 'exclude'), '.agents/\n')
     const skills = join(folder, '.agents', 'skills')
@@ -885,18 +885,18 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     const target = join(tempDir('slots-skill-target-'), 'mine')
     mkdirSync(target, { recursive: true })
     writeFileSync(join(target, 'SKILL.md'), 'mine')
-    junction(target, join(skills, 'hive-user'))
+    junction(target, join(skills, 'cw-user'))
     const pool = new SlotPool({ ...w.pool.deps, removeSkillCopies: async () => undefined })
-    expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['hive-user'] })
-    expect(existsSync(join(skills, 'hive-user'))).toBe(true)
+    expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['cw-user'] })
+    expect(existsSync(join(skills, 'cw-user'))).toBe(true)
     // A symbolic link too, where this machine lets a test make one (Developer Mode or admin).
     let linked = true
     try {
-      symlinkSync(target, join(skills, 'hive-linked'), 'dir')
+      symlinkSync(target, join(skills, 'cw-linked'), 'dir')
     } catch {
       linked = false
     }
-    if (linked) expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['hive-linked', 'hive-user'] })
+    if (linked) expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['cw-linked', 'cw-user'] })
     expect(readFileSync(join(target, 'SKILL.md'), 'utf8')).toBe('mine')
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
   })

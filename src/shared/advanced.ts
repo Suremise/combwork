@@ -372,7 +372,7 @@ export const CARD_ATTACHMENT_FOLDERS_ID = 'cw.cards.attachmentFolders'
 export const AGENT_TEMP_FOLDER_ID = 'cw.agents.tempFolder'
 
 /**
- * Where Hive removes its skill copies (.agents/skills/hive-*) once no agent of Hive's works in the folder (#1431, #966 row
+ * Where Hive removes its skill copies (.agents/skills/cw-*) once no agent of Hive's works in the folder (#1431, #966 row
  * 15): `slots` in every folder but the project folder, `everywhere`, or `never`. Read by main's skillCopies.ts.
  */
 export const SKILLS_REMOVE_IDLE_COPIES = 'cw.skills.removeIdleCopies'

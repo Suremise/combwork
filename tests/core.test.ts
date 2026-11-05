@@ -175,8 +175,9 @@ describe('MCP definitions', () => {
     expect(findSecretWarnings({ command: 'x', env: { LOG_LEVEL: 'debug' } })).toHaveLength(0)
   })
 
-  it('strips description and expands HIVE_MCP_DIR', () => {
-    expect(toLaunchDef({ description: 'd', command: 'node', args: ['${HIVE_MCP_DIR}/srv/index.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['C:/ws/.combwork/mcp/srv/index.js'] })
+  it('strips description and expands CW_MCP_DIR (only: HI-2594)', () => {
+    expect(toLaunchDef({ description: 'd', command: 'node', args: ['${CW_MCP_DIR}/srv/index.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['C:/ws/.combwork/mcp/srv/index.js'] })
+    expect(toLaunchDef({ command: 'node', args: ['${HIVE_MCP_DIR}/srv/index.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['${HIVE_MCP_DIR}/srv/index.js'] })
   })
 })
 

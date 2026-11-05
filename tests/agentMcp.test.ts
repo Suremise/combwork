@@ -35,16 +35,17 @@ describe("an agent's choice", () => {
     expect([agentChoosesMcp({}), agentChoosesMcp({ mcpServers: [] })]).toEqual([false, true])
   })
 
-  it('is cleaned as it is saved: names only, each once, never hive', () => {
+  it('is cleaned as it is saved: names only, each once, never combwork (hive an ordinary name: HI-2594)', () => {
     expect(cleanMcpServers(undefined)).toBeUndefined()
     expect(cleanMcpServers(null)).toBeUndefined()
     expect(cleanMcpServers([' notes', 'sandbox', 'notes'])).toEqual(['notes', 'sandbox'])
     expect(cleanMcpServers([])).toEqual([])
     expect(() => cleanMcpServers('notes')).toThrow("list of the project's server names")
-    expect(() => cleanMcpServers(['hive'])).toThrow('the built-in combwork server is always given')
+    expect(() => cleanMcpServers(['combwork'])).toThrow('the built-in combwork server is always given')
+    expect(cleanMcpServers(['hive'])).toEqual(['hive'])
     expect(() => cleanMcpServers(['../x'])).toThrow("isn't an MCP server's name")
     expect(() => cleanMcpServers(Array.from({ length: 51 }, (_, i) => `s${i}`))).toThrow('at most 50')
-    expect([isMcpServerName('windows-sandbox'), isMcpServerName('hive'), isMcpServerName('-x')]).toEqual([true, false, false])
+    expect([isMcpServerName('windows-sandbox'), isMcpServerName('combwork'), isMcpServerName('hive'), isMcpServerName('-x')]).toEqual([true, false, true, false])
   })
 
   it('is said in words, naming a chosen server that is not on', () => {
@@ -58,7 +59,7 @@ describe("an agent's choice", () => {
     expect(t.agents.map((a) => a.mcpServers)).toEqual([['windows-sandbox'], undefined])
     const read = readTemplate(JSON.parse(JSON.stringify(t)))
     expect(isAgentTemplate(read) && read.agents.map((a) => a.mcpServers)).toEqual([['windows-sandbox'], undefined])
-    const bad = readTemplate({ ...t, agents: [{ ...t.agents[0], mcpServers: ['hive'] }] })
+    const bad = readTemplate({ ...t, agents: [{ ...t.agents[0], mcpServers: ['combwork'] }] })
     expect(!isAgentTemplate(bad) && englishText(bad)).toBe("Tester's MCP servers aren't a list Combwork can use.")
   })
 })
@@ -159,7 +160,7 @@ describe('saving it', () => {
         expect((await updateAgent(proj, 'a1', { mcpServers: [] })).mcpServers).toEqual([])
         const cleared = await updateAgent(proj, 'a1', { mcpServers: null })
         expect('mcpServers' in JSON.parse(JSON.stringify(cleared))).toBe(false)
-        await expect(updateAgent(proj, 'a1', { mcpServers: ['hive'] })).rejects.toThrow('always given')
+        await expect(updateAgent(proj, 'a1', { mcpServers: ['combwork'] })).rejects.toThrow('always given')
         // A change that doesn't name it leaves it as it is.
         expect((await updateAgent(proj, added.id, { role: 'tester' })).mcpServers).toEqual(['sandbox'])
       })

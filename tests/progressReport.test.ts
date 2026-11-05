@@ -2,7 +2,7 @@
 // test runners (main/progressReporters/report.mts), against a stand-in for #136's Agent API: output and exit codes pass
 // through; Combwork reachable, unreachable or absent; step lines; estimates after one run; updates coalesced.
 import { spawnSync } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createServer, type Server } from 'http'
 import { join } from 'path'
 import { createRequire } from 'module'
@@ -11,6 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { estimateFor, evictionOrder, KEEP_KEYS, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
 import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, KEEPALIVE_MS, keepAliveDue, parseArgs, parseProcessList, replyTimeoutMs, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted, type WrapperIo } from '../src/main/progressReporters/wrapper'
 import { installShims, shimFiles, withBinOnPath } from '../src/main/progressReporters/shims'
+import { removeOldShims } from '../src/main/nameUpgradeProfile'
 import { hiveInstructions, progressRule, wrapsLongCommands } from '../src/shared/hiveGuidance'
 import { STALE_GRACE_MS } from '../src/shared/progress'
 import { launchParts } from '../src/main/guidance'
@@ -165,22 +166,22 @@ describe('the hive-progress command line', () => {
   })
 
   it('reads wait lines: what it waits for (the rest of the line), or nothing when it waits no more (#549)', () => {
-    expect(stepLine('##hive-progress wait=waiting for a test slot: held by B4 (hb4)\n')).toEqual({ wait: 'waiting for a test slot: held by B4 (hb4)' })
-    expect(stepLine('##hive-progress wait=\r\n')).toEqual({ wait: '' })
+    expect(stepLine('##cw-progress wait=waiting for a test slot: held by B4 (hb4)\n')).toEqual({ wait: 'waiting for a test slot: held by B4 (hb4)' })
+    expect(stepLine('##cw-progress wait=\r\n')).toEqual({ wait: '' })
   })
 
-  it('reads step lines under both names (##cw-progress, and ##hive-progress from before HI-2463); anything else is not one', () => {
+  it('reads step lines (##cw-progress); anything else is not one, the old ##hive-progress included (HI-2594)', () => {
     expect(stepLine('##cw-progress step=4 total=12 name=carddialog\n')).toEqual({ step: 4, total: 12, name: 'carddialog' })
     expect(stepLine('##cw-progress wait=waiting for a test slot\r\n')).toEqual({ wait: 'waiting for a test slot' })
-    expect(stepLine('##cw-progressive step=1')).toBeNull()
-    expect(stepLine('##hive-progress step=4 total=12 name=carddialog\n')).toEqual({ step: 4, total: 12, name: 'carddialog' })
-    expect(stepLine('##hive-progress step=2 name=unit tests: tips\r\n')).toEqual({ step: 2, name: 'unit tests: tips' })
-    expect(stepLine('##hive-progress total=3')).toEqual({ total: 3 })
+    expect(stepLine('##hive-progress step=4 total=12 name=carddialog\n')).toBeNull()
+    expect(stepLine('##hive-progress wait=x\n')).toBeNull()
+    expect(stepLine('##cw-progress step=2 name=unit tests: tips\r\n')).toEqual({ step: 2, name: 'unit tests: tips' })
+    expect(stepLine('##cw-progress total=3')).toEqual({ total: 3 })
     // A log the command wrote (#220): the rest of the line, spaces and all.
-    expect(stepLine('##hive-progress log=C:\\logs\\my run\\run-record.md\r\n')).toEqual({ log: 'C:\\logs\\my run\\run-record.md' })
-    expect(stepLine('##hive-progress step=x')).toEqual({})
-    expect(stepLine('##hive-progressive step=1')).toBeNull()
-    expect(stepLine(' ##hive-progress step=1')).toBeNull()
+    expect(stepLine('##cw-progress log=C:\\logs\\my run\\run-record.md\r\n')).toEqual({ log: 'C:\\logs\\my run\\run-record.md' })
+    expect(stepLine('##cw-progress step=x')).toEqual({})
+    expect(stepLine('##cw-progressive step=1')).toBeNull()
+    expect(stepLine(' ##cw-progress step=1')).toBeNull()
   })
 
   it('takes step lines out of the output, however the chunks split, and holds back nothing else', () => {
@@ -193,15 +194,16 @@ describe('the hive-progress command line', () => {
       f.end()
       return { before, out: out.join(''), steps }
     }
-    expect(run(['a\n##hive-pro', 'gress step=1 total=2 name=x\nb\n'])).toEqual({ before: 'a\nb\n', out: 'a\nb\n', steps: [{ step: 1, total: 2, name: 'x' }] })
     expect(run(['a\n##cw-pro', 'gress step=1 total=2 name=x\nb\n'])).toEqual({ before: 'a\nb\n', out: 'a\nb\n', steps: [{ step: 1, total: 2, name: 'x' }] })
+    // The old opening is the command's own output (HI-2594), however it splits.
+    expect(run(['a\n##hive-pro', 'gress step=1 total=2 name=x\nb\n'])).toEqual({ before: 'a\n##hive-progress step=1 total=2 name=x\nb\n', out: 'a\n##hive-progress step=1 total=2 name=x\nb\n', steps: [] })
     expect(run(['##c', 'w-progressive\n'])).toMatchObject({ out: '##cw-progressive\n', steps: [] })
     // A prompt without a newline shows at once; a held line that ends up not a step line comes out whole.
     expect(run(['Continue? '])).toMatchObject({ before: 'Continue? ' })
-    expect(run(['##hive', '-progressive\n'])).toMatchObject({ out: '##hive-progressive\n', steps: [] })
-    expect(run(['x ##hive-progress step=1\n'])).toMatchObject({ out: 'x ##hive-progress step=1\n', steps: [] })
+    expect(run(['##cw', '-progressive\n'])).toMatchObject({ out: '##cw-progressive\n', steps: [] })
+    expect(run(['x ##cw-progress step=1\n'])).toMatchObject({ out: 'x ##cw-progress step=1\n', steps: [] })
     // The last line without a newline: a step all the same.
-    expect(run(['done\n##hive-progress step=3'])).toMatchObject({ out: 'done\n', steps: [{ step: 3 }] })
+    expect(run(['done\n##cw-progress step=3'])).toMatchObject({ out: 'done\n', steps: [{ step: 3 }] })
   })
 
   it('shows the command line quoted where needed, and keeps timings under a hash, not the command', () => {
@@ -515,7 +517,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
 
 describe('reporting a run', () => {
   it('reports start, steps and finish as the agent, passes output and the exit code through, and estimates after one run', async () => {
-    const script = `console.log('one'); console.log('##hive-progress step=1 total=2 name=first'); console.error('warn'); console.log('##hive-progress step=2 name=second'); seen((c) => c.some((x) => x.body.stepName === 'second')).then(() => process.exit(3))`
+    const script = `console.log('one'); console.log('##cw-progress step=1 total=2 name=first'); console.error('warn'); console.log('##cw-progress step=2 name=second'); seen((c) => c.some((x) => x.body.stepName === 'second')).then(() => process.exit(3))`
     const r = await wrap(['--title', 'Build', '--', ...seenNode, '-e', script], env())
     expect(r).toEqual({ code: 3, out: 'one\n', err: 'warn\n' })
     // The first step line gives the total, so the run starts with it: step 1 of 2 starting is 0 finished.
@@ -580,7 +582,7 @@ describe('reporting a run', () => {
 
   it('a total given after the run started (no step line at first) is sent once, with the first update that has it (#145)', async () => {
     // The step lines come only once the start has been reported; the second total is ignored.
-    const script = `seen((c) => c.length > 0).then(() => { console.log('##hive-progress step=2 total=5 name=late'); return seen((c) => c.some((x) => x.method === 'PATCH')) }).then(() => { console.log('##hive-progress step=3 total=9 name=later'); return seen((c) => c.some((x) => x.body.stepName === 'later')) })`
+    const script = `seen((c) => c.length > 0).then(() => { console.log('##cw-progress step=2 total=5 name=late'); return seen((c) => c.some((x) => x.method === 'PATCH')) }).then(() => { console.log('##cw-progress step=3 total=9 name=later'); return seen((c) => c.some((x) => x.body.stepName === 'later')) })`
     await wrap(['--', ...seenNode, '-e', script], env(), 0)
     expect(calls[0].body).not.toHaveProperty('total')
     // No title of its own: its title is its command line, and the reporter says so, for the Agent API to name it by its program alone (#620).
@@ -621,7 +623,7 @@ describe('reporting a run', () => {
   })
 
   it('a wait (#549): the run starts waiting at once, says what for and when it waits no more; then its steps', async () => {
-    const script = `console.log('##hive-progress wait=waiting for a test slot: held by B4'); seen((c) => c.some((x) => x.body.waiting)).then(() => { console.log('##hive-progress wait='); console.log('##hive-progress step=1 total=2 name=first'); return seen((c) => c.some((x) => x.body.stepName === 'first')) })`
+    const script = `console.log('##cw-progress wait=waiting for a test slot: held by B4'); seen((c) => c.some((x) => x.body.waiting)).then(() => { console.log('##cw-progress wait='); console.log('##cw-progress step=1 total=2 name=first'); return seen((c) => c.some((x) => x.body.stepName === 'first')) })`
     const r = await wrap(['--title', 'Queued', '--', ...seenNode, '-e', script], env())
     expect(r.code).toBe(0)
     expect(calls[0]).toMatchObject({ method: 'POST', body: { title: 'Queued', waiting: 'waiting for a test slot: held by B4', pid: process.pid } })
@@ -666,7 +668,7 @@ describe('reporting a run', () => {
   })
 
   it('coalesces quick updates: the latest state wins, in order, and the finish comes last', async () => {
-    const lines = Array.from({ length: 200 }, (_, i) => `##hive-progress step=${i + 1} total=200 name=s${i + 1}`).join('\\n')
+    const lines = Array.from({ length: 200 }, (_, i) => `##cw-progress step=${i + 1} total=200 name=s${i + 1}`).join('\\n')
     await wrap(['--', ...seenNode, '-e', `console.log('${lines}'); seen((c) => c.some((x) => x.body.stepName === 's200'))`], env())
     const patches = calls.filter((c) => c.method === 'PATCH')
     expect(patches.length).toBeGreaterThan(0)
@@ -739,7 +741,7 @@ describe('the shared reporter and timings', () => {
     expect(lines).toEqual(['##cw-progress log=C:\\logs\\run 2'])
     // The wrapper takes the line out of the output and sends the log with the command's exit code.
     calls.length = 0
-    const script = `console.log('##hive-progress log=C:\\\\logs\\\\run-record.md'); console.log('done'); process.exit(4)`
+    const script = `console.log('##cw-progress log=C:\\\\logs\\\\run-record.md'); console.log('done'); process.exit(4)`
     expect(await wrap(['--', ...seenNode, '-e', script], env(), 0)).toEqual({ code: 4, out: 'done\n', err: '' })
     expect(calls.at(-1)).toMatchObject({ path: '/v1/progress/run-1/finish', body: { ok: false, summary: 'exit code 4', exitCode: 4, logPath: 'C:\\logs\\run-record.md' } })
   })
@@ -844,8 +846,7 @@ describe("the hive-progress command on a session's PATH (main/progressReporters/
     // The caller's own ELECTRON_RUN_AS_NODE (usually none) is kept for the command, beside the shim's.
     const base = { ...process.env }
     delete base.ELECTRON_RUN_AS_NODE
-    // cw-progress, and hive-progress, its name before HI-2463 (a shell alias only): the same shim, the same run.
-    for (const name of ['cw-progress', 'hive-progress'])
+    const name = 'cw-progress'
     for (const callers of [null, '1']) {
       const callerEnv = callers ? { ...base, ELECTRON_RUN_AS_NODE: callers } : base
       if (process.platform === 'win32') {
@@ -865,11 +866,25 @@ describe("the hive-progress command on a session's PATH (main/progressReporters/
     const { mtimeMs } = statSync(join(bin, 'cw-progress.cmd'))
     await installShims(bin, { exec: node, script, data })
     expect(statSync(join(bin, 'cw-progress.cmd')).mtimeMs).toBe(mtimeMs)
-    const files = shimFiles({ exec: 'C:\\H\\Hive.exe', script: 'C:\\H\\x.js', data: 'C:\\D' })
-    expect([files['hive-progress'], files['hive-progress.cmd']]).toEqual([files['cw-progress'], files['cw-progress.cmd']])
+    // Only cw-progress: the old name isn't made (HI-2594).
+    expect(existsSync(join(bin, 'hive-progress'))).toBe(false)
+    expect(existsSync(join(bin, 'hive-progress.cmd'))).toBe(false)
+    const files = shimFiles({ exec: 'C:\\H\\Combwork.exe', script: 'C:\\H\\x.js', data: 'C:\\D' })
+    expect(Object.keys(files).sort()).toEqual(['cw-progress', 'cw-progress.cmd'])
     expect(files['cw-progress']).toBe(
-      "#!/bin/sh\nCW_PROGRESS_RUN_AS_NODE=\"${ELECTRON_RUN_AS_NODE-}\" ELECTRON_RUN_AS_NODE=1 CW_PROGRESS_DATA='C:/D' exec 'C:/H/Hive.exe' 'C:/H/x.js' \"$@\"\n"
+      "#!/bin/sh\nCW_PROGRESS_RUN_AS_NODE=\"${ELECTRON_RUN_AS_NODE-}\" ELECTRON_RUN_AS_NODE=1 CW_PROGRESS_DATA='C:/D' exec 'C:/H/Combwork.exe' 'C:/H/x.js' \"$@\"\n"
     )
+  })
+
+  it("the names upgrade removes the old command's shims from the bin folder, and leaves cw-progress's (HI-2594)", async () => {
+    const bin = join(dir, 'old bin')
+    mkdirSync(bin, { recursive: true })
+    for (const f of ['hive-progress', 'hive-progress.cmd', 'cw-progress', 'cw-progress.cmd', 'other.cmd']) writeFileSync(join(bin, f), f)
+    await removeOldShims(bin)
+    expect(readdirSync(bin).sort()).toEqual(['cw-progress', 'cw-progress.cmd', 'other.cmd'])
+    // Again, and on a folder that isn't there: nothing to do.
+    await removeOldShims(bin)
+    await removeOldShims(join(dir, 'no bin'))
   })
 
   it("the command doesn't get what started hive-progress: in Combwork's executable, ELECTRON_RUN_AS_NODE is the caller's own again", async () => {

@@ -21,7 +21,6 @@ import { cardNamesOf } from './projectKeys'
 import { fmt, msg, tr } from '../shared/i18n'
 import { cardRef } from '../shared/projectKeys'
 import { CW_DIR } from '../shared/defaults'
-import { LEGACY_HIVE_DIR } from '../shared/hiveFolderMove'
 import { movedPath } from './combworkMove'
 
 const M = {
@@ -207,7 +206,7 @@ export async function recoverMergeSlots(workspacePath: string): Promise<void> {
   const ws = workspaceFor(workspacePath)
   const ids = (await ws?.projectIds({ fresh: true })) ?? NO_PROJECT_IDS
   const last = ws?.movedFrom
-  const from = last && !existsSync(join(last, CW_DIR)) && !existsSync(join(last, LEGACY_HIVE_DIR)) && !workspaceFor(last) ? last : null
+  const from = last && !existsSync(join(last, CW_DIR)) && !workspaceFor(last) ? last : null
   const place = (h: SlotRecord): Promise<string | null> => (ws ? placeHold(ws, ids, from, h) : Promise.resolve(h.projectPath))
   const gone = [...(await orphansIn(recordFile(workspacePath), workspacePath, place)), ...(from ? await orphansIn(recordFile(from), null, place) : [])]
   // Each hold's cards as this workspace names them (HI-1661: by key); this runs outside any workspace's work.

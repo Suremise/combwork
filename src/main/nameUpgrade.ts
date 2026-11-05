@@ -32,7 +32,7 @@ const log = createLogger('nameUpgrade')
 
 /** Written once every step has worked for the workspace: the names upgrade's version. */
 export const NAMES_DONE_FILE = 'combwork-names.json'
-const NAMES_VERSION = 1
+const NAMES_VERSION = 2
 
 export type WorkspaceStep = 'board' | 'files' | 'projects'
 

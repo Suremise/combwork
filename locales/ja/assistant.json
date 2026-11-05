@@ -350,7 +350,7 @@
   "assistant.sidebar.saveFirst": "先に{name}の変更を保存するか破棄してください",
   "assistant.sidebar.saveFirstDetail": "未保存の編集があります。このままでは古い名前で保存されてしまいます。",
   "assistant.sidebar.serverFromFile": "ファイルからMCPサーバーを追加（.jsonまたは.zip）…",
-  "assistant.sidebar.serverNameRule": "英字、数字、「-」、「_」を使ってください。「combwork」と「hive」は予約されています。",
+  "assistant.sidebar.serverNameRule": "英字、数字、「-」、「_」を使ってください。「combwork」は予約されています。",
   "assistant.sidebar.sharedNotes": "共有ノート",
   "assistant.sidebar.skillFromFile": "ファイルからスキルを追加（.mdまたは.zip）…",
   "assistant.sidebar.skills": "スキル",

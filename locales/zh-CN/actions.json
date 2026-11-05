@@ -61,7 +61,7 @@
   "actions.mcp.add": "添加",
   "actions.mcp.addFailed": "无法添加服务器",
   "actions.mcp.addTitle": "从文件添加 MCP 服务器",
-  "actions.mcp.badName": "只能使用字母、数字、“-”和“_”。“combwork”和“hive”为保留名称。",
+  "actions.mcp.badName": "只能使用字母、数字、“-”和“_”。“combwork”为保留名称。",
   "actions.mcp.copied": "已将 {names} 复制到工作区",
   "actions.mcp.copyFailed": "无法复制 MCP 服务器",
   "actions.mcp.deleteAdded": "{where}：删除后也会从那里移除。",

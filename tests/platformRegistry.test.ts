@@ -282,7 +282,7 @@ describe('every git call goes through git()', () => {
     gitInit(p)
     await excludeCopies(p)
     expect(started).toContainEqual(['rev-parse', '--git-common-dir'])
-    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toContain('/.agents/skills/hive-*/')
+    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toContain('/.agents/skills/cw-*/')
     // Outside a repository: nothing written, nothing thrown.
     await excludeCopies(tempDir('hive-platform-norepo-'))
     expect((await git(p, ['status', '--short'])).ok).toBe(true)

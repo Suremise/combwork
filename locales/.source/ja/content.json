@@ -2,7 +2,7 @@
   "content.mcp.badArgs": "\"args\" must be a list of strings.",
   "content.mcp.badCommand": "\"command\" must be the program to run.",
   "content.mcp.badCwd": "\"cwd\" must be a folder.",
-  "content.mcp.badName": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" and \"hive\" are reserved.",
+  "content.mcp.badName": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" is reserved.",
   "content.mcp.badRecord": "\"{field}\" must be an object of strings.",
   "content.mcp.badUrl": "\"url\" must be an http:// or https:// address.",
   "content.mcp.changedAdd": "{name} has changed since it was shown to you. Check what it runs and add it again.",

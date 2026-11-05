@@ -56,7 +56,7 @@ import { idleKey } from '../shared/laneBar'
 import { cardRef } from '../shared/projectKeys'
 import type { AppSettings, ProjectConfig, WorkspaceConfig } from '../shared/types'
 import { slotCopyOf, type SlotLevels } from '../shared/slotDefaults'
-import { COPY_PREFIX, LEGACY_COPY_PREFIX } from './providers/common'
+import { COPY_PREFIX } from './providers/common'
 
 const log = createLogger('slots')
 
@@ -244,7 +244,7 @@ export type SlotKept =
   | { why: 'archiveFailed'; error: string; log: string | null }
   | { why: 'busy'; state: SlotState }
   | { why: 'gitRefused'; detail: string }
-  /** Hive's skill copies removed first (#1500), `.agents/skills` still holds a `hive-*` folder: an edited copy, or the user's own. */
+  /** Combwork's skill copies removed first (#1500), `.agents/skills` still holds a `cw-*` folder: an edited copy, or the user's own. */
   | { why: 'editedSkillCopy'; copies: string[] }
 
 /** A refusal in English, for agents and the log (the window words its own from the same fields). */
@@ -1209,17 +1209,18 @@ export interface SlotRenamer {
   where(from: string, to: string, tree: string): Promise<'from' | 'to' | 'elsewhere' | null>
 }
 /**
- * The `cw-*` entries in a folder's `.agents/skills` (where Combwork puts its skill copies), and `hive-*` ones (its
- * copies' names before HI-2463), by name: folders, and links or anything else with that name too (never followed). None
- * only when the skills folder is proved absent; any other error reading it throws, so the slot is kept (cantCheck)
- * rather than removed unseen.
+ * The `cw-*` entries in a folder's `.agents/skills` (where Combwork puts its skill copies; git-ignored, so the guards
+ * don't count them), by name: folders, and links or anything else with that name too (never followed). None only when
+ * the skills folder is proved absent; any other error reading it throws, so the slot is kept (cantCheck) rather than
+ * removed unseen. Any other folder there (a `hive-*` one included, after the names upgrade: HI-2594) isn't ignored, and
+ * keeps the slot as an untracked file does.
  */
 async function hiveSkillFolders(folder: string): Promise<string[]> {
   const entries = await readdir(join(folder, '.agents', 'skills'), { withFileTypes: true }).catch((e: NodeJS.ErrnoException) => {
     if (e.code === 'ENOENT') return []
     throw e
   })
-  return entries.filter((e) => [COPY_PREFIX, LEGACY_COPY_PREFIX].some((p) => e.name.toLowerCase().startsWith(p))).map((e) => e.name)
+  return entries.filter((e) => e.name.toLowerCase().startsWith(COPY_PREFIX)).map((e) => e.name)
 }
 const newJob = (): string => `slot-${randomBytes(6).toString('hex')}`
 
@@ -2063,7 +2064,7 @@ export class SlotPool {
           kept = await this.guard(slot)
           if (kept) return await keep(kept)
           // Hive's skill copies are git-ignored, so the guards don't count them (#1500): its own unchanged ones go first,
-          // and a `hive-*` folder left (an edited copy, or the user's own) keeps the slot.
+          // and a `cw-*` folder left (an edited copy, or the user's own) keeps the slot.
           await this.deps.removeSkillCopies?.(slot.folder)
           const copies = await hiveSkillFolders(slot.folder)
           if (copies.length) return await keep({ why: 'editedSkillCopy', copies })

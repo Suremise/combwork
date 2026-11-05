@@ -350,7 +350,7 @@
   "assistant.sidebar.saveFirst": "Save or discard your changes to {name} first",
   "assistant.sidebar.saveFirstDetail": "It has unsaved edits, which would otherwise be saved under its old name.",
   "assistant.sidebar.serverFromFile": "Add MCP Server from File (.json or .zip)…",
-  "assistant.sidebar.serverNameRule": "Use letters, numbers, \"-\" and \"_\". \"combwork\" and \"hive\" are reserved.",
+  "assistant.sidebar.serverNameRule": "Use letters, numbers, \"-\" and \"_\". \"combwork\" is reserved.",
   "assistant.sidebar.sharedNotes": "Shared Notes",
   "assistant.sidebar.skillFromFile": "Add Skill from File (.md or .zip)…",
   "assistant.sidebar.skills": "Skills",

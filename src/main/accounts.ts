@@ -32,7 +32,7 @@ import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStor
 import { coverageView } from './keyCoverage'
 import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel, withRemote } from '../shared/serverConnection'
 import type { ServerCaps } from '../shared/providers'
-import { dataFolder } from './hiveFolder'
+import { treeOf } from './combworkMove'
 
 /**
  * Hive's accounts (HI-980, SPEC §11.2): a CLI login per folder, under `<accounts>\<id>\`, each signed in through the
@@ -69,7 +69,7 @@ const CONFIRM_ROUNDS = 3
 /**
  * The accounts folder: the installed app's `%LOCALAPPDATA%\Combwork\accounts`, a dev build's `Combwork-Dev`'s, and a
  * test profile's own (under CW_USER_DATA), so no test reaches the user's. The local profile folder is the one this run
- * uses (HI-2461: the old `Hive` folder while the installer hasn't moved it).
+ * uses (HI-2461; Hive's old one moved to it before, by the installer or at start: HI-2594).
  */
 export function accountsRoot(): string {
   // The local folder this run chose first: a test copy's (CW_TEST_PROFILE_CHOOSE) too.
@@ -1672,7 +1672,7 @@ export async function migrateConnectionOrder(): Promise<void> {
   const before = list().map((a) => a.id).join()
   const tops = new Map<ProviderId, string>()
   for (const ws of config.get().recentWorkspaces) {
-    const cfg = await readKeptJson<Partial<WorkspaceConfig>>(join(dataFolder(ws, 'workspace'), 'workspace.json'), {})
+    const cfg = await readKeptJson<Partial<WorkspaceConfig>>(join(treeOf(ws), 'workspace.json'), {})
     for (const [p, w] of Object.entries(cfg.connections ?? {}) as [ProviderId, WorkspaceConnections | undefined][]) {
       const id = w?.default
       if (id && !tops.has(p) && getAccount(id)?.provider === p) tops.set(p, id)

@@ -152,7 +152,7 @@ describe('diagnostics redaction', () => {
       for (const c of CHARS) prefixed.push(p + c.repeat(N), (p + c).repeat(Math.floor(N / (p.length + 1))))
     }
     const vmContext = createContext({ maskText, redactLog, ctx, text: '' })
-    const start = `2026-10-02T10:00:00.000Z [INFO] [main] Hive 0.7.0 starting (${MARKED_LOG})\n`
+    const start = `2026-10-02T10:00:00.000Z [INFO] [main] Combwork 1.1.0 starting (${MARKED_LOG})\n`
     for (const text of [...pairs, ...prefixed]) {
       vmContext.text = text
       // A pattern that reads a run again from inside it would blow the bound; vm stops it and the test fails.
@@ -233,17 +233,17 @@ describe('diagnostics redaction of the log', () => {
   it("lines logged before Combwork marked the user's text keep only their time, level and scope", () => {
     const lines = [
       `${T} [tasks] #7 created by You: Earlier run, unknown version`,
-      `${T} [main] Hive 0.3.1 starting (Electron 44.5.1)`,
+      `${T} [main] Combwork 1.1.0 starting (Electron 44.5.1)`,
       `${T} [tasks] #1 created by You: Confidential customer merger notes`,
-      `${T} [main] Hive 0.4.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
+      `${T} [main] Combwork 1.1.1 starting (Electron 44.5.1; ${MARKED_LOG})`,
       `${T} [tasks] #2 created by ${userText('You')}: ${userText('Another secret plan')}`,
       `${T} [updates] Update settings: check on`
     ]
     expect(redactLog(lines.join('\n'), ctx).split('\n')).toEqual([
       `${T} [tasks] ${OLDER_LINE}`,
-      `${T} [main] Hive 0.3.1 starting (Electron 44.5.1)`,
+      `${T} [main] Combwork 1.1.0 starting (Electron 44.5.1)`,
       `${T} [tasks] ${OLDER_LINE}`,
-      `${T} [main] Hive 0.4.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
+      `${T} [main] Combwork 1.1.1 starting (Electron 44.5.1; ${MARKED_LOG})`,
       `${T} [tasks] #2 created by <text>: <text>`,
       `${T} [updates] Update settings: check on`
     ])
@@ -251,17 +251,17 @@ describe('diagnostics redaction of the log', () => {
     expect(redactLog(`${T} [tasks] #3 created by ${userText('You')}: ${userText('x')}`, ctx)).toBe(`${T} [tasks] #3 created by <text>: <text>`)
   })
 
-  it('a start line says Combwork since the rename (HI-2572), and one saying Hive still counts', () => {
+  it("a start line under another name (a log from before 1.1) is an older version's, marked or not: more left out, never less (HI-2594)", () => {
     const lines = [
-      `${T} [main] Hive 0.4.0 starting (Electron 44.5.1)`,
-      `${T} [tasks] #1 created by You: Confidential customer merger notes`,
+      `${T} [main] Hive 1.0.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
+      `${T} [tasks] #1 created by ${userText('You')}: Confidential customer merger notes`,
       `${T} [main] Combwork 1.1.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
       `${T} [tasks] #2 created by ${userText('You')}: ${userText('Another secret plan')}`,
       `${T} [main] Combwork 1.1.1 starting (Electron 44.5.1)`,
       `${T} [tasks] #3 created by You: Unmarked again`
     ]
     expect(redactLog(lines.join('\n'), ctx).split('\n')).toEqual([
-      `${T} [main] Hive 0.4.0 starting (Electron 44.5.1)`,
+      `${T} [main] ${OLDER_LINE}`,
       `${T} [tasks] ${OLDER_LINE}`,
       `${T} [main] Combwork 1.1.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
       `${T} [tasks] #2 created by <text>: <text>`,

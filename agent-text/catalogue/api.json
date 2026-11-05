@@ -137,7 +137,7 @@
   },
   "api.agentMcp.notAServer": {
     "text": "\"{name}\" isn't an MCP server's name{reserved, select, yes { (the built-in {server} server is always given)} other {}}.",
-    "note": "A refusal of an agent's MCP servers: name is what was given; reserved: yes when it is Combwork's own server's name (or its old one); server: that name (combwork)."
+    "note": "A refusal of an agent's MCP servers: name is what was given; reserved: yes when it is Combwork's own server's name; server: that name (combwork)."
   },
   "api.ask.agentsOnly": {
     "text": "Only a project's agents ask the Assistant on a card.",

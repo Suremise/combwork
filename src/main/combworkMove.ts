@@ -14,7 +14,7 @@ import { HiveError, errorText, hiveError } from './hiveError'
 import { excludeLine, gitDirOf, vcsOf } from './hiveVcs'
 import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
-import { dataFolder, ours, type HostKind } from './hiveFolder'
+import { ours, type HostKind } from './hiveFolder'
 import { withNamedLock } from './repoLock'
 import { projectNamesDone, record as recordNames, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
@@ -175,8 +175,16 @@ export async function hostsOf(ws: string): Promise<{ host: string; kind: HostKin
   return out
 }
 
-/** The workspace's tree in use: `.combwork` once there, else its own `.hive`, else `.combwork` (to be made). */
-export const treeOf = (ws: string): string => dataFolder(ws, 'workspace')
+/**
+ * The workspace's tree as the move finds it: `.combwork` once there, else its own `.hive` (the move's input, and a 0.9
+ * profile's connection order's, accounts.ts), else `.combwork` (to be made). Never makes either.
+ */
+export function treeOf(ws: string): string {
+  const now = join(ws, CW_DIR)
+  if (existsSync(now)) return now
+  const old = join(ws, LEGACY_HIVE_DIR)
+  return existsSync(old) && ours(old, 'workspace') ? old : now
+}
 
 /**
  * The moves a workspace's folders show now (s65): each host whose `.combwork` holds the marker. The Assistant's home's

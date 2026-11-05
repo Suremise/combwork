@@ -7,7 +7,7 @@
   "mcp.addFile.messageAdded": "Ajoute {file} à l’espace de travail (.combwork/mcp){files, plural, =0 {} one {, avec son fichier dans un dossier à lui} many {, avec ses # fichiers dans un dossier à lui} other {, avec ses # fichiers dans un dossier à lui}}, ajouté encore à aucun projet. Ajoute-le là où il doit tourner : l’onglet MCP d’un projet, la vue de l’Assistant ou Ajouter à… ici. Il exécute :",
   "mcp.addFile.replaceDetailAdded": "Remplacer place l’ancien (et le dossier d’un serveur ajouté depuis un .zip) dans la Corbeille et ajoute celui-ci à aucun projet pour l’instant : les projets et l’Assistant qui avaient l’ancien le perdent. Sinon, choisis un autre nom.",
   "mcp.catalog.allSources": "Toutes les sources",
-  "mcp.catalog.badName": "Les noms de serveur peuvent contenir des lettres, des chiffres, « - » et « _ » (64 caractères au plus). « combwork » et « hive » sont réservés.",
+  "mcp.catalog.badName": "Les noms de serveur peuvent contenir des lettres, des chiffres, « - » et « _ » (64 caractères au plus). « combwork » est réservé.",
   "mcp.catalog.badgeInstalled": "Installé",
   "mcp.catalog.badgeNeeds": "Ne tourne pas ici",
   "mcp.catalog.badgeOther": "Nom déjà pris",

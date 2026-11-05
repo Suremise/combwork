@@ -19,6 +19,7 @@ const base = tempDir('nameupgrade-')
 const { MOVE_LOCK_FILE, finishMove, moveFolders, recordNewWorkspace } = await import('../src/main/combworkMove')
 const { NAMES_DONE_FILE, projectNamesDone } = await import('../src/main/nameUpgrade')
 const { boardMoveTestHooks } = await import('../src/main/boardFileMove')
+const { contentHash } = await import('../src/main/fsutil')
 const { WORKSPACE_README, BOARD_GITIGNORE } = await import('../src/main/workspace')
 
 let n = 0
@@ -29,9 +30,33 @@ const write = (p: string, text: string): void => {
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' })
 
 const OLD_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
-const OLD_EXCLUDE = "# Hive project metadata (added by Hive)\n/.combwork/\n# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n/.agents/skills/cw-*/\n"
+const OLD_EXCLUDE = "# Hive project metadata (added by Hive)\n/.combwork/\n# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n/.agents/skills/cw-*/\n/.agents/skills/.cw-*/\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\n"
 
-/** A workspace as 1.0 (`.hive`) or an RC2 (`.combwork`) left it, with its board, a project in git with a skill copy, and a slot. */
+/**
+ * A copy Combwork made before HI-2463 (`hive-<skill>`, with the old marker), its marker's hash its content's: provably
+ * Combwork's and unchanged (HI-2594). `edited`: changed since, so its content is no longer the hash.
+ */
+async function oldCopy(folder: string, skill: string, edited = false): Promise<string> {
+  const dir = join(folder, '.agents', 'skills', `hive-${skill}`)
+  write(join(dir, 'SKILL.md'), `# ${skill}`)
+  const hash = await contentHash(dir)
+  write(join(dir, '.hive-copy'), JSON.stringify({ source: 's', hash }))
+  if (edited) writeFileSync(join(dir, 'SKILL.md'), `# ${skill}, edited`)
+  return dir
+}
+
+/**
+ * A workspace as 1.0 (`.hive`) or an RC2 (`.combwork`) left it, with its board, a project in git with a skill copy, and a
+ * slot; with `copies`, each also holds copies under the old prefix (HI-2594): Combwork's unchanged, one edited since, and
+ * a folder of the user's.
+ */
+async function withOldCopies(w: { ws: string; alpha: string; slot: string }): Promise<{ gone: string[]; kept: string[] }> {
+  const gone = [await oldCopy(w.alpha, 'merge-ready'), await oldCopy(w.slot, 'merge-ready')]
+  const kept = [await oldCopy(w.alpha, 'handover', true), join(w.alpha, '.agents', 'skills', 'hive-mine')]
+  write(join(kept[1], 'SKILL.md'), '# mine')
+  return { gone, kept }
+}
+
 function workspace(kind: '1.0' | 'rc2'): { ws: string; alpha: string; slot: string } {
   const ws = join(base, `ws${++n}`)
   const tree = kind === '1.0' ? '.hive' : '.combwork'
@@ -81,11 +106,13 @@ function expectUpgraded(w: { ws: string; alpha: string; slot: string }): void {
     expect(JSON.parse(readFileSync(join(copy, '.combwork-copy'), 'utf8')).hash).toBe(hash)
   }
   const exclude = readFileSync(join(w.alpha, '.git', 'info', 'exclude'), 'utf8')
-  expect(exclude).not.toMatch(/Hive/)
+  expect(exclude).not.toMatch(/Hive|hive/)
   expect(exclude).toContain('# Combwork project metadata (added by Combwork)')
+  // The old copies' lines gone (HI-2594), Combwork's own kept.
+  expect(exclude.split('\n').filter((l) => l.startsWith('/.agents/'))).toEqual(['/.agents/skills/cw-*/', '/.agents/skills/.cw-*/'])
   const head = git(w.alpha, 'rev-parse', 'HEAD').trim()
   expect(git(w.alpha, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/hive', 'refs/cw').trim().split('\n').sort()).toEqual([`refs/cw/cards/AL-1/1 ${head}`, `refs/cw/queue/AL-1-e1 ${head}`])
-  expect(JSON.parse(readFileSync(join(dir, NAMES_DONE_FILE), 'utf8')).version).toBe(1)
+  expect(JSON.parse(readFileSync(join(dir, NAMES_DONE_FILE), 'utf8')).version).toBe(2)
 }
 
 /** An open's move: the folders, then (a 1.0 workspace) its late phases, as the workspace's open runs them. */
@@ -112,6 +139,33 @@ describe('the names upgrade at the open', () => {
       expect(readFileSync(join(w.ws, '.combwork', NAMES_DONE_FILE), 'utf8')).toBe(record)
     })
   }
+
+  for (const kind of ['1.0', 'rc2'] as const) {
+    it(`a ${kind} workspace's copies under the old prefix: Combwork's unchanged ones retired, in the project and in a slot; an edited one and the user's kept (HI-2594)`, async () => {
+      const w = workspace(kind)
+      const { gone, kept } = await withOldCopies(w)
+      await open(w.ws)
+      expectUpgraded(w)
+      for (const d of gone) expect(existsSync(d), d).toBe(false)
+      for (const d of kept) expect(existsSync(join(d, 'SKILL.md')), d).toBe(true)
+      expect(readFileSync(join(kept[0], 'SKILL.md'), 'utf8')).toBe('# handover, edited')
+      // Its marker renamed (it is still the copy Combwork made), its content the user's.
+      expect(existsSync(join(kept[0], '.combwork-copy'))).toBe(true)
+      // The cw- copies are untouched.
+      expect(existsSync(join(w.alpha, '.agents', 'skills', 'cw-handover', '.combwork-copy'))).toBe(true)
+    })
+  }
+
+  it("a workspace the first version of the upgrade recorded (version 1): every step runs again, and the old copies left go (HI-2594)", async () => {
+    const w = workspace('rc2')
+    await open(w.ws)
+    writeFileSync(join(w.ws, '.combwork', NAMES_DONE_FILE), JSON.stringify({ version: 1, at: '2026-11-05T00:00:00.000Z' }) + '\n')
+    writeFileSync(join(w.alpha, '.combwork', NAMES_DONE_FILE), JSON.stringify({ version: 1, at: '2026-11-05T00:00:00.000Z' }) + '\n')
+    const { gone } = await withOldCopies(w)
+    await open(w.ws)
+    expectUpgraded(w)
+    for (const d of gone) expect(existsSync(d), d).toBe(false)
+  })
 
   it('a run stopped after the board moved: no record yet, so the next open does every step and finishes', async () => {
     const w = workspace('rc2')
