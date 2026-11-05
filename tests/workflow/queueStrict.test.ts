@@ -68,8 +68,8 @@ describe('strict (G8): the queue brings the reviewed revision up to date', () =>
       // The update contains the moved target; the merge brought it in, with the reviewed and the updated revision named.
       expect(sh(e.project, 'merge-base', '--is-ancestor', moved1, up.to)).toBe('')
       const message = sh(e.project, 'log', '-1', '--format=%B', 'main')
-      expect(message).toContain(`Hive-Revision: ${revision}`)
-      expect(message).toContain(`Hive-Updated: ${up.to}`)
+      expect(message).toContain(`Combwork-Revision: ${revision}`)
+      expect(message).toContain(`Combwork-Updated: ${up.to}`)
       expect(sh(e.project, 'show', 'main:a.txt')).toBe('A')
       expect(sh(e.project, 'show', 'main:other.txt')).toBe('meanwhile')
       // Never on the builder's line: its ref, HEAD and status as they were.
@@ -100,7 +100,7 @@ describe('strict (G8): the queue brings the reviewed revision up to date', () =>
     const { card } = await approved(e, 'A', { 'a.txt': 'A\n' })
     expect((await e.queue().drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
     expect(e.store.facts(card.id).some((f) => f.kind === 'Updated')).toBe(false)
-    expect(sh(e.project, 'log', '-1', '--format=%B', 'main')).not.toContain('Hive-Updated')
+    expect(sh(e.project, 'log', '-1', '--format=%B', 'main')).not.toContain('Combwork-Updated')
   })
 
   it('reconciliation after an update sees the reviewed revision: no Stale, nothing carried over again', async () => {

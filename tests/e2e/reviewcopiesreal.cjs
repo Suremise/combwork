@@ -157,7 +157,7 @@ const namingCopies = () => {
       const s = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/start`)
       fs.writeFileSync(path.join(alpha, `card-${i}.txt`), `${r.key}\n`)
       gitIn(alpha, 'add', '-A')
-      gitIn(alpha, 'commit', '-qm', `card ${n}`, '-m', `Hive-Card: ${key}`)
+      gitIn(alpha, 'commit', '-qm', `card ${n}`, '-m', `Combwork-Card: ${key}`)
       r.card = n
       r.revision = gitIn(alpha, 'rev-parse', 'HEAD')
       const sub = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: `Card ${n} done.`, revision: r.revision })

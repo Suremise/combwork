@@ -67,14 +67,14 @@ export const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp)$/i
 export const quotePath = (p: string): string => (/\s/.test(p) ? `"${p}"` : p)
 
 /** Drag payload for files dragged out of the Files and Attachments tabs. */
-export const HIVE_FILES_MIME = 'application/x-hive-files'
+export const FILES_MIME = 'application/x-combwork-files'
 
 export function carriesFiles(dt: DataTransfer | null): boolean {
-  return !!dt && (dt.types.includes('Files') || dt.types.includes(HIVE_FILES_MIME))
+  return !!dt && (dt.types.includes('Files') || dt.types.includes(FILES_MIME))
 }
 
 /** URL the renderer can load a workspace image from (served by the main process). */
-export const imageUrl = (path: string): string => `hive-img://img/${encodeURIComponent(path)}`
+export const imageUrl = (path: string): string => `combwork-img://img/${encodeURIComponent(path)}`
 
 /** When a limit resets, relative if soon: "in 2 h 14 min", else "Mon 09:00". */
 export function resetsIn(iso: string, now = Date.now()): string {

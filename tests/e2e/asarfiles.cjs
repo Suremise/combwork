@@ -97,8 +97,8 @@ const deleteFromOutside = (file) => {
   const found = await inv('files:find', alpha, 'asar')
   // dist is ignored by git, which Find leaves out.
   check('Find files finds bundle.asar as a file', found.some((e) => e.name === 'bundle.asar' && !e.isDir), JSON.stringify(found.map((e) => e.relPath)))
-  const inside = `hive-img://img/${encodeURIComponent(path.join(builtAsar, 'icon.png'))}`
-  // As an <img>, the way the window shows them (its CSP allows hive-img: there, not to fetch).
+  const inside = `combwork-img://img/${encodeURIComponent(path.join(builtAsar, 'icon.png'))}`
+  // As an <img>, the way the window shows them (its CSP allows combwork-img: there, not to fetch).
   const shown = await page.evaluate(
     (u) =>
       new Promise((r) => {
@@ -125,12 +125,24 @@ const deleteFromOutside = (file) => {
           img.addEventListener('error', () => r('refused'))
           img.src = u
         }),
-      `hive-img://img/${encodeURIComponent(file)}`
+      `combwork-img://img/${encodeURIComponent(file)}`
     )
   const artShown = await show(path.join(artDir, 'icon.png'))
   check('an image in a real folder named art.asar shows', artShown === 'loaded 1x1', artShown)
   const plainShown = await show(path.join(alpha, 'plain.png'))
   check('… as does one in an ordinary folder', plainShown === 'loaded 1x1', plainShown)
+  // HI-2588: the scheme's name before 1.1 is renamed outright: neither registered nor allowed.
+  const oldScheme = await page.evaluate(
+    (u) =>
+      new Promise((r) => {
+        const img = new Image()
+        img.addEventListener('load', () => r('loaded'))
+        img.addEventListener('error', () => r('refused'))
+        img.src = u
+      }),
+    `hive-img://img/${encodeURIComponent(path.join(alpha, 'plain.png'))}`
+  )
+  check('… and by the old hive-img: scheme it is not shown', oldScheme === 'refused', oldScheme)
   const missingShown = await show(path.join(artDir, 'missing.png'))
   check('… and a missing one is refused', missingShown === 'refused', missingShown)
   const artRead = await inv('file:read', path.join(artDir, 'notes.md')).catch((e) => `error: ${e}`)

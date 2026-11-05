@@ -100,7 +100,7 @@ const lines = (file) => {
     check("B1's lane, E1 its reviewer", lane.status === 200, JSON.stringify(lane.body))
     const s = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/start`)
     fs.writeFileSync(path.join(alpha, 'a.ts'), 'export const a = 2\n')
-    gitIn(alpha, 'commit', '-qam', 'card', '-m', `Hive-Card: ${key}`)
+    gitIn(alpha, 'commit', '-qam', 'card', '-m', `Combwork-Card: ${key}`)
     const first = gitIn(alpha, 'rev-parse', 'HEAD')
     const sub = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: 'Done.' })
     check(`B1 builds and submits ${key}`, s.status === 200 && sub.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, sub: sub.body }))
@@ -111,7 +111,7 @@ const lines = (file) => {
 
     // --- B1 commits what E1 asked for and submits it as a follow-up, through its hive tool.
     fs.writeFileSync(path.join(alpha, 'a.ts'), 'export const a = 3\n')
-    gitIn(alpha, 'commit', '-qam', 'asked for', '-m', `Hive-Card: ${key}`)
+    gitIn(alpha, 'commit', '-qam', 'asked for', '-m', `Combwork-Card: ${key}`)
     const head = gitIn(alpha, 'rev-parse', 'HEAD')
     const wakes = path.join(claudeHome, 'fake-wakes.jsonl')
     const wakesBefore = lines(wakes).length
@@ -148,7 +148,7 @@ const lines = (file) => {
     await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(mkey)}/start`)
     fs.writeFileSync(path.join(alpha, 'b.ts'), 'export const b = 1\n')
     gitIn(alpha, 'add', 'b.ts')
-    gitIn(alpha, 'commit', '-qm', 'b', '-m', `Hive-Card: ${mkey}`)
+    gitIn(alpha, 'commit', '-qm', 'b', '-m', `Combwork-Card: ${mkey}`)
     await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(mkey)}/submit`, { summary: 'Done.' })
     await call(te1, 'POST', `/v1/tasks/${encodeURIComponent(mkey)}/start-review`, {})
     const back = await call(te1, 'PATCH', `/v1/tasks/${m}`, { column: 'doing', reply: 'short' })

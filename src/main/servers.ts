@@ -431,7 +431,7 @@ export function findWorkspace(want: string): WorkspaceService | null {
   return hits[0] ?? null
 }
 
-/** The workspace a request names (X-Hive-Workspace header, or ?workspace=), else the only open one. */
+/** The workspace a request names (X-Combwork-Workspace header, or ?workspace=), else the only open one. */
 function requestWorkspace(req: IncomingMessage, url: URL): WorkspaceService | null {
   const own = assistantCaller()
   if (own) {
@@ -446,7 +446,7 @@ function requestWorkspace(req: IncomingMessage, url: URL): WorkspaceService | nu
     if (!w) throw new HttpError(409, say(API.workspace.agentNotOpen))
     return w
   }
-  const header = req.headers['x-hive-workspace']
+  const header = req.headers['x-combwork-workspace']
   const raw = typeof header === 'string' && header ? decodeURIComponent(header) : url.searchParams.get('workspace')
   if (raw) {
     const w = findWorkspace(raw)
@@ -4503,7 +4503,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     const before = flagged ? await decisionsNew(ws) : null
     const result = ws ? await inWorkspace(ws, run) : await run()
     const notice = flagged ? await withCardNames(ws, () => decisionsNotice(ws, before, began), callerScope()) : null
-    send(res, 200, result ?? null, notice ? { 'X-Hive-Notice': encodeURIComponent(notice) } : {})
+    send(res, 200, result ?? null, notice ? { 'X-Combwork-Notice': encodeURIComponent(notice) } : {})
   } catch (e) {
     const { status, body } = apiErrorReply(e)
     if (status === 500) log.error(`API ${req.method} ${url.pathname}`, e)

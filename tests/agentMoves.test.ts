@@ -283,7 +283,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     commit(repo, { 'x.txt': 'x\n' }, 'no trailer')
     const r = await refused(update(w, card, builder, { column: 'review' }, 'x'))
     expect(r?.rule).toBe('submit.trailer')
-    expect(r?.next).toContain(`git commit --amend --no-edit --trailer "Hive-Card: ${key}"`)
+    expect(r?.next).toContain(`git commit --amend --no-edit --trailer "Combwork-Card: ${key}"`)
     expect(stage(w, card)).toBe('active')
   })
 

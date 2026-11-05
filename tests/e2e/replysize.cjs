@@ -919,7 +919,7 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   const builtCommit = (file) => {
     fs.writeFileSync(path.join(builtFolder, file), `${file}\n`)
     lib.git(builtFolder, ['add', file])
-    lib.git(builtFolder, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', `${K(builtCard)}: ${file}`, '--trailer', `Hive-Card: ${K(builtCard)}`])
+    lib.git(builtFolder, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', `${K(builtCard)}: ${file}`, '--trailer', `Combwork-Card: ${K(builtCard)}`])
   }
   // The suite's own untracked files in alpha (attachments, a long doc) kept out of the card's clean check meanwhile.
   const exclude = path.join(alpha, '.git', 'info', 'exclude')

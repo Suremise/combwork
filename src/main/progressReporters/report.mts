@@ -297,7 +297,7 @@ export class ProgressRun {
       const res = await this.fetchImpl(t.url + path, {
         method,
         // agent-protocol: HTTP's Authorization header
-        headers: { Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json', ...(t.workspace ? { 'X-Hive-Workspace': encodeURIComponent(t.workspace) } : {}) },
+        headers: { Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json', ...(t.workspace ? { 'X-Combwork-Workspace': encodeURIComponent(t.workspace) } : {}) },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs)
       })
@@ -375,7 +375,7 @@ async function resolveOnce(target: ProgressTarget, ask: RunAsk, opts: { fetch?: 
     const res = await fetchImpl(`${target.url}/v1/progress/resolve`, {
       method: 'POST',
       // agent-protocol: HTTP's Authorization header
-      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Hive-Workspace': encodeURIComponent(target.workspace) } : {}) },
+      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Combwork-Workspace': encodeURIComponent(target.workspace) } : {}) },
       body: JSON.stringify(ask),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 5000)
     })
@@ -420,7 +420,7 @@ export async function assignIsolated(target: ProgressTarget, a: { lease: string;
     const res = await fetchImpl(`${target.url}/v1/progress/isolated`, {
       method: 'POST',
       // agent-protocol: HTTP's Authorization header
-      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Hive-Workspace': encodeURIComponent(target.workspace) } : {}) },
+      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Combwork-Workspace': encodeURIComponent(target.workspace) } : {}) },
       body: JSON.stringify(a),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 15000)
     })

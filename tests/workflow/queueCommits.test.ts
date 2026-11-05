@@ -177,9 +177,9 @@ describe("Combwork's queue commits (#1350)", () => {
     expect(sh(e.project, 'rev-list', '--parents', '-1', 'main').split(' ')).toEqual([expect.any(String), before])
     const body = sh(e.project, 'log', '-1', '--format=%B', 'main')
     expect(body).toContain(`${next.key}: Squashed again`)
-    expect(body).toContain(`Hive-Card: ${next.key}`)
-    expect(body).toMatch(/^Hive-Revision: [0-9a-f]{40}$/m)
-    expect(body).toContain('Hive-Reviewed-By: ')
+    expect(body).toContain(`Combwork-Card: ${next.key}`)
+    expect(body).toMatch(/^Combwork-Revision: [0-9a-f]{40}$/m)
+    expect(body).toContain('Combwork-Reviewed-By: ')
   })
 
   it('signing that waits for a passphrase: ended within the bound, paused "signing waits for you", the worktree clean, the target unchanged', async () => {

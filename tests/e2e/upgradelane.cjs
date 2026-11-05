@@ -170,7 +170,7 @@ function driver(app, page) {
     script('Reviewer', [n1, n2, n3].map((n) => `boardreview ${n} start then boardreview ${n} passed passed`))
     // Its moves are now the cards' intents (#1268): a move to Review submits the card, so the builder commits its work
     // first, with the card's trailer (everyone works in the project folder), as an agent would.
-    const work = (n) => `shell: echo card ${n}>card${n}.txt && git add -A && git -c user.email=b@t -c user.name=Builder commit -qm "card ${n}" --trailer "Hive-Card: alpha-${n}"`
+    const work = (n) => `shell: echo card ${n}>card${n}.txt && git add -A && git -c user.email=b@t -c user.name=Builder commit -qm "card ${n}" --trailer "Combwork-Card: alpha-${n}"`
     // Under the upgrade's options (G5 Not checked, a reviewer agent) a passed card is Approved until its builder reports
     // its merge, and the lane's next card starts once the one before it is Done (Darren on HI-1985: 1.0's rule holds for
     // a lane carried over, as card-loop says): woken by each verdict, the builder reports that card's merge first.

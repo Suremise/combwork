@@ -275,7 +275,7 @@ const log = () => {
     q.steer(fx, 'pass')
     const two = await q.approveBy(fx, h, builder, reviewer, 'With the key', { 'two.txt': 'two\n' })
     check('a card with the choice made is approved', Object.values(two.steps).every((s) => s.status === 200), JSON.stringify(two.steps))
-    check("…merged with no question: Combwork's message, its key and trailers", !!(await until(async () => (await h.card(two.n))?.column === 'done', HUNG_MS)) && /^[A-Z][A-Z0-9]*-\d+: With the key\n\nHive-Card: [A-Z][A-Z0-9]*-\d+\nHive-Revision: /.test(msgOf()) && parents() === 1, msgOf())
+    check("…merged with no question: Combwork's message, its key and trailers", !!(await until(async () => (await h.card(two.n))?.column === 'done', HUNG_MS)) && /^[A-Z][A-Z0-9]*-\d+: With the key\n\nCombwork-Card: [A-Z][A-Z0-9]*-\d+\nCombwork-Revision: /.test(msgOf()) && parents() === 1, msgOf())
     const queueWarnings = log().split(/\r?\n/).filter((l) => /\[WARN\] \[queue\]/.test(l))
     check('…and the queue warned of nothing', queueWarnings.length === 0, queueWarnings.join(' | '))
   } catch (e) {

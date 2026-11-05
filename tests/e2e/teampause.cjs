@@ -74,7 +74,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (token, method, p, body) => {
       // Two workspaces open: a workspace token names its own (an Assistant's token is its workspace's anyway).
-      const res = await fetch(`${API}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(token === workspaceToken ? { 'X-Hive-Workspace': path.basename(wsA) } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      const res = await fetch(`${API}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(token === workspaceToken ? { 'X-Combwork-Workspace': path.basename(wsA) } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
     const deliveries = async (agent) => {

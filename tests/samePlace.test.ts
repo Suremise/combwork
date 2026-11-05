@@ -3,7 +3,7 @@
 // Repair's Locate), project removal's guards (and Delete) and resuming a session compare places
 // (`samePlace`/`containsPlace`), not spellings. Each test uses a junction, which makes another name on any machine
 // (tests/pathAliases.ts). Windows (windowShowing, switching a window's workspace) are in the e2e suite `windows`. The
-// Agent API's X-Hive-Workspace header finds a workspace named another way, and locked files and transcript paths read
+// Agent API's X-Combwork-Workspace header finds a workspace named another way, and locked files and transcript paths read
 // relative to a folder named the other way (#494).
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -190,7 +190,7 @@ describe('places by real path (#455)', () => {
     }
   })
 
-  it('the X-Hive-Workspace header finds the open workspace named through a junction', () => {
+  it('the X-Combwork-Workspace header finds the open workspace named through a junction', () => {
     const ws = alias(wsPath, 'ws-header')
     expect(findWorkspace(ws)).toBe(w)
     expect(findWorkspace(join(ws, '.'))).toBe(w)

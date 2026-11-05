@@ -129,10 +129,10 @@ function initialize(def) {
     }
   }, HUNG_MS)
   // What the API says: a route it doesn't have (api.http.noRoute), or with `body` a POST of a body that isn't JSON
-  // (api.http.bodyJson, refused before its route runs); `at` names the workspace by query, `header` by X-Hive-Workspace.
+  // (api.http.bodyJson, refused before its route runs); `at` names the workspace by query, `header` by X-Combwork-Workspace.
   const said = async (token, { at, header, body } = {}) => {
     const url = `http://127.0.0.1:${PORT}${body !== undefined ? '/v1/tasks' : '/v1/no-such-route'}${at ? `?workspace=${encodeURIComponent(at)}` : ''}`
-    const r = await fetch(url, { method: body !== undefined ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}`, ...(header ? { 'X-Hive-Workspace': encodeURIComponent(header) } : {}) }, ...(body !== undefined ? { body } : {}) })
+    const r = await fetch(url, { method: body !== undefined ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}`, ...(header ? { 'X-Combwork-Workspace': encodeURIComponent(header) } : {}) }, ...(body !== undefined ? { body } : {}) })
     return (await r.json().catch(() => ({}))).error ?? `(status ${r.status})`
   }
   const noRouteSaid = (token) => said(token)
@@ -234,7 +234,7 @@ function initialize(def) {
   // B's window opened last: a request naming no workspace would fall back to it by focus.
   check("?workspace= naming A is said A's text, with B's window opened last", (await said(wsToken, { at: ws })).startsWith('A-ROUTE GET'), await said(wsToken, { at: ws }))
   check("?workspace= naming B is said B's", (await said(wsToken, { at: wsB })).startsWith('B-ROUTE GET'), await said(wsToken, { at: wsB }))
-  check("X-Hive-Workspace naming A is said A's, and naming B, B's", (await said(wsToken, { header: ws })).startsWith('A-ROUTE GET') && (await said(wsToken, { header: wsB })).startsWith('B-ROUTE GET'), `${await said(wsToken, { header: ws })} | ${await said(wsToken, { header: wsB })}`)
+  check("X-Combwork-Workspace naming A is said A's, and naming B, B's", (await said(wsToken, { header: ws })).startsWith('A-ROUTE GET') && (await said(wsToken, { header: wsB })).startsWith('B-ROUTE GET'), `${await said(wsToken, { header: ws })} | ${await said(wsToken, { header: wsB })}`)
   check('naming neither of the two open: the Default', (await said(wsToken)).startsWith('No route for GET'), await said(wsToken))
   check("an error reply (a body that isn't JSON) is said in the named workspace's wording: B's, and A's Default", (await said(wsToken, { at: wsB, body: '{' })) === 'B-JSON' && (await said(wsToken, { at: ws, body: '{' })) === 'Body must be JSON', `${await said(wsToken, { at: wsB, body: '{' })} | ${await said(wsToken, { at: ws, body: '{' })}`)
   await app.close()

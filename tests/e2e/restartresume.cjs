@@ -90,7 +90,7 @@ async function start() {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   const token = () => JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, route, body) => {
-    const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', 'X-Hive-Workspace': ws }, ...(body ? { body: JSON.stringify(body) } : {}) })
+    const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', 'X-Combwork-Workspace': ws }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: r.status, body: await r.json().catch(() => null) }
   }
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
