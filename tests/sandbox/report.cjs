@@ -9,7 +9,9 @@
  * The one exception: a run kind in meta.notRun ({ kind: { reason, installer } }) wasn't checked at all (its installer
  * was refused by an App Control policy before anything could run). Its checks are left out and, unless another check
  * failed, the report is NOT RUN with that reason.
+ * Scenario 9 (HI-2592, run kind clean) is the rename's acceptance test: its scan (clean.cjs) must find no "hive" anywhere.
  */
+const { cleanChecks, hitsMarkdown } = require('./clean.cjs')
 const SCENARIOS = {
   1: 'Fresh install and first launch',
   2: 'First run with no coding-agent CLIs',
@@ -18,9 +20,10 @@ const SCENARIOS = {
   5: 'Uninstall',
   6: 'A new workspace in the fresh install (for the fresh-install comparison)',
   7: 'Install by hand over the previous release, running (/S --force-run)',
-  8: "The installer's edge cases over the previous release, and a notification under the new app ID"
+  8: "The installer's edge cases over the previous release, and a notification under the new app ID",
+  9: 'A clean install used as a new user would, then searched: no "hive" anywhere (HI-2592)'
 }
-const KINDS = ['fresh', 'upgrade', 'manual', 'edges']
+const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'clean']
 /** electron-builder's APP_GUID for appId it.surmise.combwork (HI-2460): its uninstall entry's key. */
 const COMBWORK_GUID = '10a7595a-0e90-558c-b6b6-ae33bdd80748'
 
@@ -36,7 +39,13 @@ const REQUIRED = {
   },
   upgrade: overPrevious(4, 's4'),
   manual: overPrevious(7, 's7'),
-  edges: { drivers: { s8: { scenario: 8, ids: ['8.notification'], facts: ['exe'] } }, shots: ['s8-notified.png', 's8-desktop.jpg'] }
+  edges: { drivers: { s8: { scenario: 8, ids: ['8.notification'], facts: ['exe'] } }, shots: ['s8-notified.png', 's8-desktop.jpg'] },
+  // HI-2592: a new user's first session (drive.cjs clean), then the scan (inside/clean-scan.cjs, its checks clean.cjs's).
+  clean: {
+    // Each a step a new user takes.
+    drivers: { s9: { scenario: 9, ids: ['9.first-run', '9.provider-on', '9.account', '9.workspace', '9.git-project', '9.agent-started', '9.agent-env', '9.card', '9.settings', '9.diagnostics', '9.export', '9.quit'], facts: ['version', 'workspace', 'exportDir'] } },
+    shots: ['s9-desktop.jpg', 's9-start.png', 's9-agent.png', 's9-board.png', 's9-settings.png']
+  }
 }
 
 /** The edge cases' checks edges.ps1 must record (HI-2460). */
@@ -91,6 +100,7 @@ function evaluate(meta, files) {
   const version = meta.installerVersion
   // The build's names (checks.cjs appNames: HI-2458's productName, HI-2460's shortcut and exe).
   const app = meta.app || { productName: 'Hive Desktop', shortcutName: 'Hive Desktop', exeName: 'Hive' }
+  let asarNote = null
 
   const unknown = ran.filter(k => !KINDS.includes(k))
   if ((!asked.length) || unknown.length) add(0, 'The scenarios asked for ran', false, unknown.length ? `unknown: ${unknown.join(', ')}` : 'none ran')
@@ -174,11 +184,22 @@ function evaluate(meta, files) {
     driver('edges', 's8')
   }
 
+  if (ran.includes('clean')) {
+    const run = need(9, 's9-run')
+    if (run) add(9, `Silent install (/S) on a Windows that never had Hive or Combwork (${run.seconds} s)`, run.exitCode === 0, `exit ${run.exitCode}`)
+    driver('clean', 's9')
+    const scan = need(9, 's9-scan')
+    if (scan) {
+      const asar = cleanChecks(scan, (id, name, ok, detail) => add(9, name, ok, detail))
+      asarNote = `**app.asar** holds ${asar.total} "hive" hit(s) (${asar.files.map(a => `${a.place}: ${a.count}`).join(', ') || 'none found'}): counted, not failed. The app's own code, with the upgrade code that knows the 1.0 names.`
+    }
+  }
+
   for (const id of meta.leftRunning || []) add(0, `CLEANUP: Sandbox ${id} confirmed stopped`, false, `CLEANUP NOT CONFIRMED: Sandbox ${id} may still be running`)
   if (!checks.length && !notRun.length) add(0, 'At least one check ran', false, 'nothing was checked')
 
   const passed = checks.filter(c => c.ok).length
-  const differences = []
+  const differences = asarNote ? [asarNote] : []
   if ((ran.includes('upgrade') || ran.includes('manual')) && meta.previousVersion === meta.installerVersion) {
     differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The "Hive Desktop updated to …" notice can't show.`)
   }
@@ -232,10 +253,13 @@ function markdown(r) {
     for (const c of cs) lines.push(`| ${esc(c.name)} | ${c.ok ? 'pass' : `**FAIL**: ${esc(c.detail || '').slice(0, 300)}`} |`)
     lines.push('')
   }
+  // Scenario 9's hits, each with its place and text (HI-2592).
+  const hits = hitsMarkdown(r.files?.['s9-scan'])
+  if (hits.length) lines.push('## 9. Where "hive" was found', '', ...hits)
   if (r.differences.length) lines.push('## Notes and fresh-install differences', '', ...r.differences.map(d => `- ${d}`), '')
   if (m.timings && Object.keys(m.timings).length) lines.push('## Timings', '', ...Object.entries(m.timings).map(([k, v]) => `- ${k}: ${v}`), '')
   if (m.shots?.length) lines.push('## Screenshots', '', ...m.shots.map(s => `- [${s}](${encodeURI(s)})`), '')
   return lines.join('\n')
 }
 
-module.exports = { evaluate, markdown, verdict, SCENARIOS, KINDS, REQUIRED }
+module.exports = { evaluate, markdown, verdict, SCENARIOS, KINDS, REQUIRED, COMBWORK_GUID }
