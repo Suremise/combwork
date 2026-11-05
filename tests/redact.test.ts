@@ -227,7 +227,7 @@ describe('diagnostics redaction of the log', () => {
     expect(out).not.toContain('<path>')
     const sessions: RedactContext = { ...ctx, names: [{ name: 'sessions', as: '<project>' }] }
     expect(redactLog(`${T} [sessions] sessions finished`, sessions)).toBe(`${T} [sessions] <project> finished`)
-    expect(redactLog(`${T} [main] D:\\dev\\hive\\out\\main\\index.js:5`, { ...ctx, app: 'D:\\dev\\hive' })).toBe(`${T} [main] <hive>\\out\\main\\index.js:5`)
+    expect(redactLog(`${T} [main] D:\\dev\\hive\\out\\main\\index.js:5`, { ...ctx, app: 'D:\\dev\\hive' })).toBe(`${T} [main] <combwork>\\out\\main\\index.js:5`)
   })
 
   it("lines logged before Combwork marked the user's text keep only their time, level and scope", () => {

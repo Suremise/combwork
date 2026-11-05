@@ -1284,7 +1284,7 @@ export class MergeQueue {
     // G19 (HI-1697): Hive's, or the branch's own (its commits since it left the target, merges left out).
     const how = this.commitMessage()
     const own = how === 'branch' ? await G.messages(this.project, `${base || (await this.mergeBaseOf(revision, expected))}..${revision}`) : []
-    if (isUnknown(own)) return again(`Hive couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
+    if (isUnknown(own)) return again(`Combwork couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
     const message = mergeMessage(how, { card, revision, updated, reviewers, messages: own })
     revision = updated ?? revision
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
@@ -1751,7 +1751,7 @@ export class MergeQueue {
     if (!changed.ok) return again(changed.err)
     const files = nulList(changed.out)
     const edited = await this.editedOf(folder, files)
-    if (!Array.isArray(edited)) return again(edited.err || `Hive couldn't read the status of ${folder}.`) // i18n-ignore: git's side of a pause, in English as git's messages are
+    if (!Array.isArray(edited)) return again(edited.err || `Combwork couldn't read the status of ${folder}.`) // i18n-ignore: git's side of a pause, in English as git's messages are
     if (edited.length) return { pause: 'unstagedChanges', files: edited }
 
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder })
