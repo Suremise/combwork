@@ -1,7 +1,7 @@
 import { lstat, mkdir, readdir, readFile, rm, rmdir } from 'original-fs/promises'
 import { join } from 'path'
-import { contentHash, readJson, SwapAbandoned, swapOut, withFileLock, writeJsonAtomic, writeTextAtomic } from './fsutil'
-import { ifAbsent } from './fsPresence'
+import { contentHash, SwapAbandoned, swapOut, withFileLock, writeJsonAtomic, writeTextAtomic } from './fsutil'
+import { ifAbsent, lstatOrNullAsync } from './fsPresence'
 import { createLogger, userText } from './logger'
 import HISTORY from './bundledHistory.json'
 
@@ -163,44 +163,70 @@ export async function upgradeWorkspaceFiles(dir: string, readme: string): Promis
 /** Bundled skills Hive shipped under the name Combwork's now replaces (HI-2463): the old name, and the new one. */
 export const RENAMED_SKILLS: Readonly<Record<string, string>> = { 'use-hive-api': 'use-cw-api' }
 
+/** What retireRenamedSkills looks with: tests give a failing one (HR1's round 1 on HI-2611). */
+export interface RetireOps {
+  /** A path's own entry, or null only when it isn't there; throws on anything else. */
+  lstat?: (path: string) => Promise<unknown>
+  hash?: (path: string) => Promise<string>
+  /** A file's text, or null only when it isn't there; throws on anything else. */
+  read?: (path: string) => Promise<string | null>
+}
+
 /**
  * The workspace's copy of a skill Hive shipped under its old name (RENAMED_SKILLS) goes while it is a version Hive
  * shipped, never changed: the workspace's sync adds the new name's as it opens, so agents get the skill once. One the
  * user changed is theirs and stays. Its entry in `bundled.json` goes too. Afterwards there is nothing old, so this
- * happens once. `dir`: the workspace's `.combwork`. False: a copy couldn't be removed now (a file in it open), left for
- * the next open.
+ * happens once. `dir`: the workspace's `.combwork`. False (not settled: the upgrade's record isn't written, and the next
+ * open does it again): a copy or the manifest couldn't be looked at, removed or written now (another program holds it,
+ * access denied). Only a confirmed absence counts as gone: a copy that couldn't be looked at keeps its manifest entry.
  */
-export async function retireRenamedSkills(dir: string): Promise<boolean> {
+export async function retireRenamedSkills(dir: string, o: RetireOps = {}): Promise<boolean> {
   const history = HISTORY as Record<string, Record<string, string[]>>
+  const look = o.lstat ?? lstatOrNullAsync
+  const hash = o.hash ?? ((p: string) => contentHash(p))
+  const read = o.read ?? ((p: string) => readFile(p, 'utf8').catch(ifAbsent(null)))
   const manifest = join(dir, 'bundled.json')
   const gone: string[] = []
   let settled = true
+  const later = (what: string, e: unknown): void => {
+    log.warn(`${what}; the names upgrade tries again at the next open`, e)
+    settled = false
+  }
   for (const id of Object.keys(RENAMED_SKILLS)) {
     const dest = join(dir, 'skills', id)
-    if (await lstat(dest).then(() => true, () => false)) {
-      const copy = await contentHash(dest).catch(() => 'unreadable')
-      if (!(history.skills[id] ?? []).includes(copy)) continue
-      try {
+    try {
+      if (await look(dest)) {
+        const copy = await hash(dest)
+        if (!(history.skills[id] ?? []).includes(copy)) continue
         // Only while it is still that copy: an edit of the user's meanwhile stays (swapOut).
         await swapOut(dest, copy)
         log.info(`Removed the bundled skill ${userText(id)}: it ships as ${userText(RENAMED_SKILLS[id])} now`)
-      } catch (e) {
-        if (e instanceof SwapAbandoned) log.info(`Kept the skill ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
-        else {
-          log.warn(`Could not remove the renamed skill ${userText(id)}; trying again at the next open`, e)
-          settled = false
-        }
-        continue
       }
+    } catch (e) {
+      if (e instanceof SwapAbandoned) log.info(`Kept the skill ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
+      else later(`Could not look at or remove the renamed skill ${userText(id)}`, e)
+      continue
     }
     gone.push(id)
   }
   if (!gone.length) return settled
-  await withFileLock(manifest, async () => {
-    const m = await readJson<{ skills?: Record<string, unknown> } | null>(manifest, null)
-    if (!m?.skills || !gone.some((id) => id in m.skills!)) return
-    for (const id of gone) delete m.skills[id]
-    await writeJsonAtomic(manifest, m)
-  })
+  try {
+    await withFileLock(manifest, async () => {
+      const text = await read(manifest)
+      if (text === null) return
+      let m: { skills?: Record<string, unknown> } | null
+      try {
+        m = JSON.parse(text.replace(/^﻿/, '')) as { skills?: Record<string, unknown> } | null
+      } catch {
+        // Not JSON: the workspace's sync starts it again; nothing of the old skill is in it to drop.
+        return
+      }
+      if (!m || typeof m !== 'object' || !m.skills || typeof m.skills !== 'object' || !gone.some((id) => id in m.skills!)) return
+      for (const id of gone) delete m.skills[id]
+      await writeJsonAtomic(manifest, m)
+    })
+  } catch (e) {
+    later("Could not drop the renamed skill from the workspace's bundled.json", e)
+  }
   return settled
 }

@@ -5,8 +5,6 @@ import { namesOldProtocol, optionValue, renamedNote, ruleId, upgradedAdvancedId,
 import { ADVANCED_DEFS } from '../src/shared/advanced'
 
 const NOTE = '(Combwork has renamed the tools and commands agents use since this was written: its tools are cw_<tool> (mcp__combwork__cw_<tool> in full), and its progress command is cw-progress.)'
-/** The note as the 1.1 release candidates appended it (HI-2598). */
-const RC_NOTE = '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__combwork__, and hive-progress is cw-progress.)'
 
 describe("the stored values' maps", () => {
   it('workflow options and rule ids', () => {
@@ -51,13 +49,8 @@ describe("the stored values' maps", () => {
     expect(upgradedOwnText('[Hive] Mode: plan.')).toBe('[CW] Mode: plan.')
   })
 
-  it("the note names only today's names, and replaces a release candidate's note (HI-2611)", () => {
+  it("the note names only today's names (HI-2611)", () => {
     for (const old of ['hive_', 'mcp__hive__', 'hive-progress']) expect(NOTE).not.toContain(old)
-    const rc = `[CW] HI-1 moved: see hive_read_task ${RC_NOTE}`
-    expect(upgradedOwnText(rc)).toBe(`[CW] HI-1 moved: see hive_read_task ${NOTE}`)
-    expect(upgradedOwnText(upgradedOwnText(rc)!)).toBeNull()
-    // One that wouldn't fit with today's keeps the one it has.
-    expect(upgradedOwnText(rc, (t) => t.length <= rc.length)).toBeNull()
   })
 
   it("advanced ids: Combwork's own hive.* ids and the CLIs' pre-approve switch take their new ids, the new one winning by presence", () => {

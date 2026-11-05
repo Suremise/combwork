@@ -33,8 +33,9 @@ const log = createLogger('nameUpgrade')
 
 /** Written once every step has worked for the workspace: the names upgrade's version. */
 export const NAMES_DONE_FILE = 'combwork-names.json'
-// 3: HI-2598's stored values (2: HI-2594). A workspace or project recorded at an older version runs every step again.
-export const NAMES_VERSION = 3
+// 4: HI-2611's retired skill, moved here from the bundled sync (3: HI-2598's stored values; 2: HI-2594). A workspace or
+// project recorded at an older version runs every step again (each is idempotent).
+export const NAMES_VERSION = 4
 
 export type WorkspaceStep = 'board' | 'files' | 'projects'
 
