@@ -339,6 +339,10 @@
     "defaultMessage": "That template is no longer there.",
     "description": "An error: the template was deleted or renamed meanwhile."
   },
+  "content.templates.importFrom10": {
+    "defaultMessage": "It is an agent template exported from Hive 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.",
+    "description": "An error importing a template (HI-2611): the file was exported by Hive 1.0, the app before it was renamed Combwork, and holds workflow settings under its old names. Keep \"Hive 1.0\" as it is."
+  },
   "content.templates.importNotJson": {
     "defaultMessage": "It isn't a Combwork agent template (not JSON).",
     "description": "An error importing a template: the file isn't JSON."

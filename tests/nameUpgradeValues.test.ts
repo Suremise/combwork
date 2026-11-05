@@ -2,8 +2,8 @@
 // settings files: project.json's workflow options (its own and each kept platform's), workspace.json's workflow
 // defaults, command refs to Combwork's own list and advanced ids, and every template's sections, in the workspace and in
 // each project. A fresh workspace changes nothing; a 1.0 one and a partly converted RC2 end the same; a second run writes
-// nothing; a late project gets its own; a file that doesn't parse is left as it is. And a 1.0 export imported keeps its
-// git section, its `hiveMerges` read as `combworkMerges` (§6: at import only).
+// nothing; a late project gets its own; a file that doesn't parse is left as it is. And a 1.0 export with Hive's values
+// is refused at import, never converted (HI-2611, replacing §6's import exception).
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
@@ -128,13 +128,14 @@ describe("the names upgrade's stored values (HI-2598)", () => {
     expect(read(join(w.ws, '.combwork', 'templates', 'team.json'))).toEqual(template('combworkMerges'))
   })
 
-  it("an import of a 1.0 export with 'hiveMerges' keeps its git section, as 'combworkMerges' (§6)", async () => {
+  it("an import of a 1.0 export with 'hiveMerges' is refused, saying why; one with Combwork's values imports (HI-2611)", async () => {
     const file = join(base, `export${++n}.combwork-template.json`)
     const t = template('hiveMerges') as Record<string, unknown>
     json(file, { ...t, workflow: { git: { preset: null, options: { finish: 'hiveMerges', folder: 'slots' } } } })
-    const got = await readImport(file)
-    expect(got.workflowDropped ?? []).toEqual([])
-    expect(got.workflow?.git?.options).toEqual({ finish: 'combworkMerges', folder: 'slots' })
+    await expect(readImport(file)).rejects.toThrow(/exported from Hive 1\.0, whose workflow settings Combwork doesn't import/)
+    const now = join(base, `export${++n}.combwork-template.json`)
+    json(now, { ...t, workflow: { git: { preset: null, options: { finish: 'combworkMerges', folder: 'slots' } } } })
+    expect((await readImport(now)).workflow?.git?.options).toEqual({ finish: 'combworkMerges', folder: 'slots' })
   })
 
   it('a file it cannot read now (another program holds it) is left for the next open: not settled, so nothing is recorded, and the rest still converts', async () => {

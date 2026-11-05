@@ -7,7 +7,7 @@ import { writeTextAtomic } from './fsutil'
 import { CombworkError, errorText, combworkError } from './combworkError'
 import { createLogger } from './logger'
 import { ifAbsent, present } from './fsPresence'
-import { upgradeWorkspaceFiles } from './nameUpgradeFiles'
+import { retireRenamedSkills, upgradeWorkspaceFiles } from './nameUpgradeFiles'
 import { upgradeProject } from './nameUpgradeProjects'
 import { upgradeProjectValues, upgradeWorkspaceValues } from './nameUpgradeValues'
 
@@ -33,8 +33,9 @@ const log = createLogger('nameUpgrade')
 
 /** Written once every step has worked for the workspace: the names upgrade's version. */
 export const NAMES_DONE_FILE = 'combwork-names.json'
-// 3: HI-2598's stored values (2: HI-2594). A workspace or project recorded at an older version runs every step again.
-export const NAMES_VERSION = 3
+// 4: HI-2611's retired skill, moved here from the bundled sync (3: HI-2598's stored values; 2: HI-2594). A workspace or
+// project recorded at an older version runs every step again (each is idempotent).
+export const NAMES_VERSION = 4
 
 export type WorkspaceStep = 'board' | 'files' | 'projects'
 
@@ -116,6 +117,8 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
   await step('files', o.stop, async () => {
     const cards = await upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README)
     if (cards) await o.setAside?.(cards)
+    // A bundled skill Hive shipped under its old name (HI-2463), before the workspace's sync adds the new one.
+    if (!(await retireRenamedSkills(dir))) settled = false
     // workspace.json's and the templates' stored values (HI-2598, nameUpgradeValues.ts), before its load reads them.
     if (!(await upgradeWorkspaceValues(ws))) settled = false
   })

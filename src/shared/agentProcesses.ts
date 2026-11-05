@@ -22,7 +22,7 @@ export interface AgentProcess {
  */
 export function progressRunTitle(commandLine: string): string | undefined {
   const args = splitCommandLine(commandLine)
-  const at = args.findIndex((a) => /(^|[\\/])(?:cw|hive)-progress\.js$/i.test(a))
+  const at = args.findIndex((a) => /(^|[\\/])cw-progress\.js$/i.test(a))
   if (at < 0) return undefined
   const rest = args.slice(at + 1)
   const dash = rest.indexOf('--')
@@ -68,7 +68,7 @@ export function groupProgressRuns(processes: readonly AgentProcess[]): { runs: P
   const tops = new Map<number, AgentProcess>()
   for (const r of processes.filter((p) => p.run)) {
     let top = r
-    for (let s = parentOf(r); s && !s.run && /\b(?:cw|hive)-progress\b/i.test(s.label) && !shellOf.has(s.pid); s = parentOf(s)) {
+    for (let s = parentOf(r); s && !s.run && /\bcw-progress\b/i.test(s.label) && !shellOf.has(s.pid); s = parentOf(s)) {
       shellOf.set(s.pid, r)
       top = s
     }
@@ -90,7 +90,7 @@ export function groupProgressRuns(processes: readonly AgentProcess[]): { runs: P
 }
 
 /**
- * Of the processes still running, those in hive-progress runs and the rest (#1008), the runs found among all that were
+ * Of the processes still running, those in cw-progress runs and the rest (#1008), the runs found among all that were
  * kept (running holds the same processes, as id and start time): a run whose own process has ended, with what it started
  * still running, is still that run. Each run lists only its processes still running; runs with none are left out.
  */

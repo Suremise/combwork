@@ -273,6 +273,24 @@ describe('spawn log lines', () => {
     expect(forLog('x'.repeat(1000)).length).toBeLessThan(340)
     expect(forLog('--model')).toBe('--model')
   })
+
+  it('hide any secret setting, whatever its name or case, never just the ones named for Combwork (HI-2611)', async () => {
+    const { forLog } = await import('../src/main/ptyHost')
+    for (const [given, logged] of [
+      ['CW_API_TOKEN=abcdef123456', 'CW_API_TOKEN=***'],
+      ['GITHUB_TOKEN=ghp_abcdef123456', 'GITHUB_TOKEN=***'],
+      ['OPENAI_API_KEY=sk-abc123', 'OPENAI_API_KEY=***'],
+      ['AWS_SECRET_ACCESS_KEY=abc/123', 'AWS_SECRET_ACCESS_KEY=***'],
+      ['db_password=hunter2', 'db_password=***'],
+      ['--api-key=abc123', '--api-key=***'],
+      ['--token=abc123', '--token=***'],
+      ['x CW_API_TOKEN="two words" y', 'x CW_API_TOKEN=*** y'],
+      ["GH_TOKEN='quoted' z", 'GH_TOKEN=*** z'],
+      ['-c env.MY_SECRET=abc', '-c env.MY_SECRET=***'],
+    ]) expect(forLog(given)).toBe(logged)
+    // What isn't a secret's setting stays as it is.
+    for (const kept of ['--model=sonnet', 'TERM=xterm-256color', 'token', '--max-tokens 100', 'PATH=C:\\bin']) expect(forLog(kept)).toBe(kept)
+  })
 })
 
 describe('path guards', () => {

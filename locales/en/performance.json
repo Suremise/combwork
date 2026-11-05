@@ -279,6 +279,10 @@
     "defaultMessage": "It is the whole workspace’s: compare it with the whole workspace selected.",
     "description": "Why a Performance export is not imported to Performance → Compare."
   },
+  "performance.compare.error.from10": {
+    "defaultMessage": "It is a Performance export from Hive 1.0, which Combwork doesn’t import. Export again from Combwork to compare.",
+    "description": "Why a file is not imported to Performance → Compare (HI-2611): it was exported by Hive 1.0, the app before it was renamed Combwork. Keep \"Hive 1.0\" as it is."
+  },
   "performance.compare.error.holdsOther": {
     "defaultMessage": "It says it is {project}’s, but it also holds {other, select, projects {other projects’} other {the workspace’s own}} data: not imported.",
     "description": "Why a project's Performance export is not imported: it also holds other projects' data, or the workspace's own work's. {project} is the project's name."

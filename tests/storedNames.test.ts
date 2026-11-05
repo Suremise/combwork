@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { namesOldProtocol, optionValue, renamedNote, ruleId, upgradedAdvancedId, upgradedAdvancedIds, upgradedOptions, upgradedOwnText, upgradedRunName, upgradedToolName } from '../src/main/storedNames'
 import { ADVANCED_DEFS } from '../src/shared/advanced'
 
-const NOTE = '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__combwork__, and hive-progress is cw-progress.)'
+const NOTE = '(Combwork has renamed the tools and commands agents use since this was written: its tools are cw_<tool> (mcp__combwork__cw_<tool> in full), and its progress command is cw-progress.)'
 
 describe("the stored values' maps", () => {
   it('workflow options and rule ids', () => {
@@ -47,6 +47,10 @@ describe("the stored values' maps", () => {
     expect(namesOldProtocol(plain)).toBe(false)
     expect(upgradedOwnText('[CW] call cw_inbox.')).toBeNull()
     expect(upgradedOwnText('[Hive] Mode: plan.')).toBe('[CW] Mode: plan.')
+  })
+
+  it("the note names only today's names (HI-2611)", () => {
+    for (const old of ['hive_', 'mcp__hive__', 'hive-progress']) expect(NOTE).not.toContain(old)
   })
 
   it("advanced ids: Combwork's own hive.* ids and the CLIs' pre-approve switch take their new ids, the new one winning by presence", () => {

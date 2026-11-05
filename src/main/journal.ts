@@ -33,6 +33,8 @@ const COMPRESS_OVER = 1024
 
 export const JOURNAL_MIGRATIONS: Migration[] = [
   {
+    // Only ever run on a new journal (every older one has it already), so its source is Combwork's name now (HI-2611): a
+    // new journal never holds Hive's, even until version 3. A journal 1.0 made has source IN ('hive', 'assistant').
     version: 1,
     name: 'entries',
     up: (db) =>
@@ -46,7 +48,7 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
           detail        TEXT,
           detail_z      BLOB,
           why           TEXT,
-          source        TEXT    NOT NULL CHECK (source IN ('hive', 'assistant')),
+          source        TEXT    NOT NULL CHECK (source IN ('combwork', 'assistant')),
           importance    INTEGER NOT NULL DEFAULT 1 CHECK (importance BETWEEN 0 AND 3),
           superseded_by INTEGER REFERENCES entries(id) ON DELETE SET NULL,
           digest_of     TEXT,

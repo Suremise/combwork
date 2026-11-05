@@ -39,7 +39,11 @@ interface Source {
 
 const same = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((c, i) => c === b[i])
 
-/** Moves the runtime's lanes into lanes.ts's tables and drops its own (the step's whole work). */
+/**
+ * Moves the runtime's lanes into lanes.ts's tables and drops its own (the step's whole work). Its code is the released
+ * 1.0.0's (combworkMove10.test.ts holds it there): the lanes it adds are by 'hive', which the names upgrade's values
+ * step (valuesStep.ts) makes Combwork's. A new board has no runtime lanes, so it adds none (HI-2611): nothing of Hive's.
+ */
 export function moveLaneRecords(db: DatabaseSync, now = new Date().toISOString()): LanesMoved {
   for (const sql of LANE_RECORD_ADD) db.exec(sql)
   const out: LanesMoved = { lanes: 0, added: 0, dropped: 0 }

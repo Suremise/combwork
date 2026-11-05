@@ -69,6 +69,7 @@
   "performance.compare.error.benchmarkOnProject": "Benchmark scenariuszy dotyczy jego własnego testowego obszaru roboczego, a nie któregoś z Twoich projektów: porównaj go w widoku Wydajność (pasek aktywności) przy wybranym całym obszarze roboczym.",
   "performance.compare.error.exportIsOwn": "To eksport własnej pracy obszaru roboczego: porównaj go przy wybranej opcji „Własna praca obszaru roboczego”.",
   "performance.compare.error.exportIsWhole": "To eksport całego obszaru roboczego: porównaj go przy wybranym całym obszarze roboczym.",
+  "performance.compare.error.from10": "To eksport wydajności z Hive 1.0, którego Combwork nie importuje. Aby porównać, wyeksportuj go ponownie z Combwork.",
   "performance.compare.error.holdsOther": "Według opisu należy do projektu {project}, ale zawiera też dane {other, select, projects {innych projektów} other {własnej pracy obszaru roboczego}}: nie zaimportowano.",
   "performance.compare.error.invalidBenchmark": "To nie jest poprawny benchmark scenariuszy (brak przebiegu, wersji fixtures lub scenariuszy).",
   "performance.compare.error.invalidExport": "To nie jest poprawny eksport wydajności (brak raportu, zakresu lub projektów).",

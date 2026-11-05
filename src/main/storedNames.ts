@@ -54,8 +54,8 @@ export const OLD_NOTICE_PREFIX = '[Hive] '
 
 const RENAMED = agentMsg({
   id: 'inbox.renamedNote',
-  text: '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__{server}__, and hive-progress is cw-progress.)',
-  note: "HI-2463, HI-2598: added once, by the names upgrade, after a stored line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename). Its words are kept as written (they may be a person's or an agent's): this says how the old names map. server: Combwork's MCP server's name."
+  text: "(Combwork has renamed the tools and commands agents use since this was written: its tools are cw_<tool> (mcp__{server}__cw_<tool> in full), and its progress command is cw-progress.)",
+  note: "HI-2463, HI-2598, HI-2611: added once, by the names upgrade, after a stored line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename). Its words are kept as written (they may be a person's or an agent's): this points at the current names, without listing the old ones. server: Combwork's MCP server's name."
 })
 
 /** What a person or an agent wrote, as Combwork's text quotes it: whole between <<< >>> (a relayed answer), or in quotes. */

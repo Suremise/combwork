@@ -21,8 +21,8 @@ import { moneyLabel } from './usageTotals'
 export const BENCHMARK_SCHEMA = 'combwork-benchmark/1'
 export const METRICS_EXPORT_SCHEMA = 'combwork-metrics/1'
 /**
- * A Performance export's id as 1.0 wrote it (HI-2587): still imported, as a 1.0 user's kept exports would otherwise be
- * lost. A benchmark's old id isn't: those files are development runs', made again with the new one.
+ * A Performance export's id as 1.0 wrote it: not imported (HI-2611, Darren's decision: no 1.0 export is kept), only
+ * recognised, so the refusal says what it is.
  */
 const OLD_METRICS_EXPORT_SCHEMA = 'hive-metrics/1'
 
@@ -98,6 +98,7 @@ const M = {
   // Why a file isn't imported.
   tooLarge: msg({ id: 'performance.compare.error.tooLarge', defaultMessage: 'It is over {mb, number} MB.', description: 'Why a file is not imported to Performance → Compare: it is larger than {mb} MB.' }),
   notJson: msg({ id: 'performance.compare.error.notJson', defaultMessage: 'It isn’t JSON.', description: 'Why a file is not imported to Performance → Compare.' }),
+  from10: msg({ id: 'performance.compare.error.from10', defaultMessage: 'It is a Performance export from Hive 1.0, which Combwork doesn’t import. Export again from Combwork to compare.', description: 'Why a file is not imported to Performance → Compare (HI-2611): it was exported by Hive 1.0, the app before it was renamed Combwork. Keep "Hive 1.0" as it is.' }),
   notCombwork: msg({ id: 'performance.compare.error.notCombwork', defaultMessage: 'It isn’t a Combwork benchmark or Performance export.', description: 'Why a file is not imported to Performance → Compare.' }),
   benchmarkOnProject: msg({ id: 'performance.compare.error.benchmarkOnProject', defaultMessage: 'A scenario benchmark is its own test workspace’s, not one of your projects: compare it in the Performance view (activity bar), with the whole workspace selected.', description: "Why a scenario benchmark (a test run's measurements) is not imported on a project's Performance page." }),
   benchmarkOnOwn: msg({ id: 'performance.compare.error.benchmarkOnOwn', defaultMessage: 'A scenario benchmark is its whole test workspace’s, not the workspace’s own work: compare it with the whole workspace selected.', description: 'Why a scenario benchmark is not imported to Performance → Compare with "Workspace\'s own work" selected.' }),
@@ -770,7 +771,8 @@ export function parseArtifact(textValue: string, scope: CompareScope, opts: { us
     // i18n-ignore: a kept comparison's default name, stored in its file and renamed by the user (#1104: stays as written)
     return { artifact: { schema: BENCHMARK_SCHEMA, kind: 'scenarios', label: text(data.label) || `${run.provider} benchmark`, ...(text(data.label) ? {} : { labelKind: 'benchmark' as const }), createdAt: iso(data.createdAt), appVersion: text(app?.version, 40), scope: { kind: 'workspace' }, run, scenarios } }
   }
-  if (data.schema === METRICS_EXPORT_SCHEMA || data.schema === OLD_METRICS_EXPORT_SCHEMA) {
+  if (data.schema === OLD_METRICS_EXPORT_SCHEMA) return refuse(M.from10)
+  if (data.schema === METRICS_EXPORT_SCHEMA) {
     const report = obj(data.report)
     const fileScope = readScope(report?.scope)
     const projects = obj(report?.projects)

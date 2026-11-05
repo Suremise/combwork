@@ -420,9 +420,9 @@ export async function readImport(path: string): Promise<AgentTemplate> {
   } catch {
     throw refusal(msg({ id: 'content.templates.importNotJson', defaultMessage: "It isn't a Combwork agent template (not JSON).", description: "An error importing a template: the file isn't JSON." }))
   }
-  // A 1.0 export's sections under Hive's values (`finish: 'hiveMerges'`) as Combwork's, here only: mapped at import only
-  // because an existing 1.0 export would otherwise be lost (its git section dropped: HI-2598/s9 §6). Nothing else reads them.
-  raw = upgradedTemplate(raw) ?? raw
+  // A 1.0 export whose sections hold Hive's values (`finish: 'hiveMerges'`): refused, never converted (HI-2611, Darren's
+  // decision): only a workspace's own templates are upgraded, once (nameUpgradeValues.ts).
+  if (upgradedTemplate(raw)) throw refusal(msg({ id: 'content.templates.importFrom10', defaultMessage: "It is an agent template exported from Hive 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.", description: 'An error importing a template (HI-2611): the file was exported by Hive 1.0, the app before it was renamed Combwork, and holds workflow settings under its old names. Keep "Hive 1.0" as it is.' }))
   const t = readTemplate(raw)
   // agent-text: readTemplate
   if (!isAgentTemplate(t)) throw new TemplateError(t)

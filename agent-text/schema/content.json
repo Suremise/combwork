@@ -299,6 +299,9 @@
   "content.templates.gone": {
     "placeholders": {}
   },
+  "content.templates.importFrom10": {
+    "placeholders": {}
+  },
   "content.templates.importNotJson": {
     "placeholders": {}
   },

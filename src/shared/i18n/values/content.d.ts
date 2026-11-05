@@ -86,6 +86,7 @@ interface CombworkMessageValues {
   'content.templates.failed': { error: string | number }
   'content.templates.fenced': undefined
   'content.templates.gone': undefined
+  'content.templates.importFrom10': undefined
   'content.templates.importNotJson': undefined
   'content.templates.importTooLarge': { kb: string | number }
   'content.templates.loading': undefined
