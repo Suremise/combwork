@@ -38,9 +38,10 @@ describe("the merge's commit message (G19)", () => {
     expect(branchMessage(['Combwork-Card: RE-229'], card.title)).toBe(card.title)
   })
 
-  it("HI-2588: a Hive- trailer line from before 1.1 is the commit's own text, kept; no message Combwork makes has one", () => {
+  it("HI-2588: no message Combwork makes has a Hive- trailer, a branch's commit from before 1.1 carrying one included", () => {
     // Historical data on purpose: the trailer Hive wrote before 1.1.
-    expect(branchMessage(['Fix it\n\nHive-Card: RE-229'], card.title)).toBe('Fix it\n\nHive-Card: RE-229')
+    expect(branchMessage(['Fix it\n\nHive-Card: RE-229\nHive-Revision: abc\nCo-Authored-By: Someone <x@y>'], card.title)).toBe('Fix it\n\nCo-Authored-By: Someone <x@y>')
+    expect(mergeMessage('branch', { card, revision: 'abc', messages: ['Fix it\n\nHive-Card: RE-229'] })).toBe('Fix it')
     const made = [mergeMessage('hive', { card, revision: 'abc', updated: 'def', reviewers: 'a-1', messages: [] }), updateMessage('hive', 'main', 'RE-229', 'abc')]
     for (const m of made) {
       expect(m).toMatch(/^Combwork-Card: RE-229$/m)
@@ -93,7 +94,7 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     const s = e.wf.state(c)
     expect(s.stage).toBe('done')
     expect(body(e)).toBe('CI: drop the nightly run\n\nStress tests run on manual dispatch.')
-    expect(body(e)).not.toMatch(new RegExp(`${c.key}|Hive-`))
+    expect(body(e)).not.toMatch(new RegExp(`${c.key}|Combwork-|Hive-`))
     expect(parents(e)).toBe(1)
     // Attributed by the queue's own record of what it merged, not by a trailer.
     expect(s.integrated?.result).toBe(sh(e.project, 'rev-parse', 'main').trim())
@@ -108,12 +109,23 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     expect(parents(e)).toBe(2)
   })
 
+  it("HI-2588: the branch's own, squash, a commit from before 1.1 with Hive-Card: the new commit carries no Hive- line, the branch's commit keeps it", async () => {
+    const e = merging({ style: 'squash', commitMessage: 'branch' })
+    // Historical data on purpose: a branch commit with the trailer Hive wrote before 1.1.
+    const c = await approved(e, 'Old trailer', [[`Fix it\n\nHive-Card: OLD-1`, 'fix.txt']])
+    const branchCommit = e.wf.state(c).latest!.revision!
+    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(body(e)).toBe('Fix it')
+    expect(body(e)).not.toMatch(/^(Hive|Combwork)-/m)
+    expect(body(e, branchCommit)).toBe('Fix it\n\nHive-Card: OLD-1')
+  })
+
   it("a new project (G19 as every preset sets it, HI-1997): the branch's own message, no key, no trailer", async () => {
     const e = merging({ style: 'squash' })
     const c = await approved(e, 'Names someone private', [['Its own message', 'n.txt']])
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
     expect(body(e)).toBe('Its own message')
-    expect(body(e)).not.toMatch(new RegExp(`${c.key}|Hive-|private`))
+    expect(body(e)).not.toMatch(new RegExp(`${c.key}|Combwork-|Hive-|private`))
   })
 
   it("Combwork's, chosen: the card's key and title with its trailers, as before", async () => {
