@@ -1,6 +1,6 @@
 import { ConnectionDialog, MovedNoticeBanner, connectionSummary, connectionUsers, effortUnusableText } from './ConnectionDefaults'
 import { connectionCells, currentLimits, planName, resetText, usageLevel, windowOf, type ConnectionCell } from './accountCard'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Account, PlanLimit, ProviderId } from '@shared/types'
 import { accountState, connectionReadiness, duplicateLogins, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState } from '@shared/accounts'
 import { COPILOT_ACCOUNT } from '@shared/connectionDefaults'
@@ -470,6 +470,30 @@ export function AccountsSettings() {
     )
   }
 
+  // The one sign-in or Set Up terminal (a second replaces it), shown in its account's card (HI-2541): keyed by its
+  // pty, so another account's opens fresh and scrolls into view, while the list re-rendering keeps it as it is.
+  const terminalInCard = !!terminal && shown.some((x) => !x.home && x.id === terminal.id)
+  const terminalPanel = (t: Terminal) => (
+    <ScrollIntoView key={t.key}>
+      <div className="account-signin" data-terminal-of={t.id}>
+        <p className="hint">{t.setUp ? setUpHint(t.provider) : tr(M.signingIn)}</p>
+        {t.in && (
+          <p className="hint" data-set-up-in>
+            {t.in.workspace ? tr(M.setUpInWorkspace, { folder: t.in.folder, cli: providerDescriptor(t.provider).name }) : tr(M.setUpIn, { project: t.in.project ?? '', folder: t.in.folder, cli: providerDescriptor(t.provider).name })}
+          </p>
+        )}
+        <div className="task-terminal">
+          <TerminalView ptyKey={t.key} visible onExit={() => setTerminal((x) => (x?.key === t.key ? { ...x, ended: true } : x))} />
+        </div>
+        <div className="flex">
+          {/* Set Up after Sign In (HI-1826): the CLI's first-run screens, answered once here rather than in an agent's pane. */}
+          {t.ended && !t.setUp && signedInAfter && <button className="btn primary" data-set-up-after onClick={() => void setUp(signedInAfter.id, signedInAfter.provider)}>{setUpLabel()}</button>}
+          <button className="btn" data-close-terminal onClick={() => void close()}>{tr(M.close)}</button>
+        </div>
+      </div>
+    </ScrollIntoView>
+  )
+
   return (
     <div className="accounts-settings">
       {menu.element}
@@ -584,6 +608,8 @@ export function AccountsSettings() {
                   <IconButton icon="ellipsis" title={tr(M.more, { name: a.name })} action="account-menu" onClick={(e) => openMenu(e, items)} />
                 </div>
               </div>
+              {/* Its sign-in or Set Up terminal, in its own card under its row (HI-2541), not under the whole list. */}
+              {terminal?.id === a.id && terminalPanel(terminal)}
               {connections(a)}
             </div>
           )
@@ -618,24 +644,18 @@ export function AccountsSettings() {
           </Modal>
         )
       })()}
-      {terminal && (
-        <div className="account-signin">
-          <p className="hint">{terminal.setUp ? setUpHint(terminal.provider) : tr(M.signingIn)}</p>
-          {terminal.in && (
-            <p className="hint" data-set-up-in>
-              {terminal.in.workspace ? tr(M.setUpInWorkspace, { folder: terminal.in.folder, cli: providerDescriptor(terminal.provider).name }) : tr(M.setUpIn, { project: terminal.in.project ?? '', folder: terminal.in.folder, cli: providerDescriptor(terminal.provider).name })}
-            </p>
-          )}
-          <div className="task-terminal">
-            <TerminalView ptyKey={terminal.key} visible onExit={() => setTerminal((t) => (t?.key === terminal.key ? { ...t, ended: true } : t))} />
-          </div>
-          <div className="flex">
-            {/* Set Up after Sign In (HI-1826): the CLI's first-run screens, answered once here rather than in an agent's pane. */}
-            {terminal.ended && !terminal.setUp && signedInAfter && <button className="btn primary" data-set-up-after onClick={() => void setUp(signedInAfter.id, signedInAfter.provider)}>{setUpLabel()}</button>}
-            <button className="btn" data-close-terminal onClick={() => void close()}>{tr(M.close)}</button>
-          </div>
-        </div>
-      )}
+      {/* An account not in the list yet (just added, read again next): under the list until its card is there. */}
+      {terminal && !terminalInCard && terminalPanel(terminal)}
     </div>
   )
+}
+
+/** Shows its element once, as it first appears (HI-2541: a Set Up terminal opened under a card further down). */
+function ScrollIntoView({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  // A block, never its value: Electron's Chromium returns a promise from scrollIntoView, which React would call as the clean-up.
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'nearest' })
+  }, [])
+  return <div ref={ref}>{children}</div>
 }
