@@ -2,7 +2,8 @@ import { readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
-import { APP_NAME, DEV_APP_NAME, appName, legacyProfileFolder, profileFolder } from '../src/shared/appName'
+import { APP_NAME, DEV_APP_NAME, appName, profileFolder } from '../src/shared/appName'
+import { oldProfileFolder } from '../src/main/nameUpgradeProfile'
 import { RELEASES_REPO } from '../src/shared/defaults'
 
 // #443, HI-2458: the app is displayed as "Combwork" ("Hive Desktop" before), and nothing users have stored moves. These pin the names Windows and
@@ -33,13 +34,13 @@ describe('the app name (#443, HI-2458)', () => {
     expect(pkg.name).toBe('hive')
   })
 
-  it("names the profile folders Combwork and Combwork-Dev (HI-2461), Hive's and Hive-Dev's the fallback, set in main rather than taken from productName", () => {
+  it("names the profile folders Combwork and Combwork-Dev (HI-2461), set in main rather than taken from productName; Hive's and Hive-Dev's only the names upgrade's input (HI-2594)", () => {
     expect(profileFolder(true)).toBe('Combwork')
     expect(profileFolder(false)).toBe('Combwork-Dev')
-    expect(legacyProfileFolder(true)).toBe('Hive')
-    expect(legacyProfileFolder(false)).toBe('Hive-Dev')
+    expect(oldProfileFolder(true)).toBe('Hive')
+    expect(oldProfileFolder(false)).toBe('Hive-Dev')
     const index = read('src/main/index.ts')
-    expect(index).toContain('chooseProfile(roamingParent, legacyProfileFolder(packaged), profileFolder(packaged))')
+    expect(index).toContain('chooseProfile(roamingParent, oldProfileFolder(packaged), profileFolder(packaged))')
     expect(index).toContain("else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local'), app.isPackaged)")
     expect(index).toContain("app.setPath('userData', roaming.use)")
   })

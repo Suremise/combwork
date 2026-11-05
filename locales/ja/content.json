@@ -2,7 +2,7 @@
   "content.mcp.badArgs": "「args」は文字列のリストにしてください。",
   "content.mcp.badCommand": "「command」には実行するプログラムを指定してください。",
   "content.mcp.badCwd": "「cwd」にはフォルダーを指定してください。",
-  "content.mcp.badName": "サーバー名に使えるのは英字、数字、「-」、「_」です（最大64文字）。「combwork」と「hive」は予約されています。",
+  "content.mcp.badName": "サーバー名に使えるのは英字、数字、「-」、「_」です（最大64文字）。「combwork」は予約されています。",
   "content.mcp.badRecord": "「{field}」は値がすべて文字列のオブジェクトにしてください。",
   "content.mcp.badUrl": "「url」はhttp://またはhttps://で始まるアドレスにしてください。",
   "content.mcp.changedAdd": "{name}は表示されたあとに変更されました。実行内容を確認してから、もう一度追加してください。",

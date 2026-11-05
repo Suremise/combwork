@@ -350,7 +350,7 @@
   "assistant.sidebar.saveFirst": "Primero guarda o descarta tus cambios en {name}",
   "assistant.sidebar.saveFirstDetail": "Tiene ediciones sin guardar, que si no se guardarían con su nombre anterior.",
   "assistant.sidebar.serverFromFile": "Agregar servidor MCP desde un archivo (.json o .zip)…",
-  "assistant.sidebar.serverNameRule": "Usa letras, números, “-” y “_”. “combwork” y “hive” están reservados.",
+  "assistant.sidebar.serverNameRule": "Usa letras, números, “-” y “_”. “combwork” está reservado.",
   "assistant.sidebar.sharedNotes": "Notas compartidas",
   "assistant.sidebar.skillFromFile": "Agregar habilidad desde un archivo (.md o .zip)…",
   "assistant.sidebar.skills": "Habilidades",

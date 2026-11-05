@@ -21,7 +21,7 @@ export { findSecretWarnings }
 /** MCP servers' refusals and what a server runs, in the window's language (#849); the Agent API's list reads `error` in English. */
 const M = {
   invalidName: msg({ id: 'mcp.error.invalidName', defaultMessage: 'Invalid server name', description: 'An error: an MCP server name Combwork refuses.' }),
-  badName: msg({ id: 'content.mcp.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" and "hive" are reserved.', description: 'An error adding an MCP server: its name has a character a server name can\'t have, is too long, or is combwork or hive (Combwork\'s own server and its name before HI-2463: keep them).' }),
+  badName: msg({ id: 'content.mcp.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" is reserved.', description: 'An error adding an MCP server: its name has a character a server name can\'t have, is too long, or is combwork (Combwork\'s own server: keep it as it is).' }),
   exists: msg({ id: 'content.mcp.exists', defaultMessage: 'A server named "{name}" already exists', description: 'An error making a new MCP server: the workspace has one called {name}.' }),
   notJson: msg({ id: 'content.mcp.notJson', defaultMessage: "{file} isn't valid JSON ({reason}).", description: "An error adding an MCP server from a file: its definition {file} can't be read as JSON. {reason} is the JSON reader's own words (English)." }),
   runs: msg({ id: 'content.mcp.runs', defaultMessage: 'Runs: {command}', description: 'What an MCP server runs, shown before it is turned on: {command} is its command line, as it is.' }),
@@ -93,12 +93,11 @@ export async function listMcp(places = false): Promise<McpServerInfo[]> {
 }
 
 /**
- * The variable a definition points at the workspace's MCP folder with (HI-2503): `${CW_MCP_DIR}`, and `${HIVE_MCP_DIR}`
- * as definitions installed before the rename (and the catalogue up to v1.1.1) still write it. What Combwork writes uses
- * the new one.
+ * The variable a definition points at the workspace's MCP folder with (HI-2503): `${CW_MCP_DIR}`, the only one read
+ * (HI-2594). The names upgrade converts definitions stored before 1.1 (nameUpgradeFiles.ts).
  */
 export const MCP_DIR_VAR = '${CW_MCP_DIR}'
-const MCP_DIR_VARIABLE = /\$\{(?:CW|HIVE)_MCP_DIR\}/g
+const MCP_DIR_VARIABLE = /\$\{CW_MCP_DIR\}/g
 
 /** Converts a stored definition into the entry written to launch/mcp.json. */
 export function toLaunchDef(def: McpServerDef, mcpDir: string): McpServerDef {
@@ -413,8 +412,8 @@ function usesFolder(def: McpServerDef, folder: string): boolean {
 }
 
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-/** `${CW_MCP_DIR}/<folder>` (or the old `${HIVE_MCP_DIR}`) followed by a slash or the end, either slash, any case (Windows paths). */
-const folderRef = (folder: string): RegExp => new RegExp(`\\$\\{(?:CW|HIVE)_MCP_DIR\\}[\\\\/]${escapeRe(folder)}(?=[\\\\/]|$|["'\\s])`, 'gi')
+/** `${CW_MCP_DIR}/<folder>` followed by a slash or the end, either slash, any case (Windows paths). */
+const folderRef = (folder: string): RegExp => new RegExp(`\\$\\{CW_MCP_DIR\\}[\\\\/]${escapeRe(folder)}(?=[\\\\/]|$|["'\\s])`, 'gi')
 
 /** The strings of a definition that can name its files. */
 function mcpValues(def: McpServerDef): string[] {
@@ -426,13 +425,12 @@ function mcpValues(def: McpServerDef): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * The definition a server .zip carries, the first found: Combwork's own name, then the mcp repo's example (USER_GUIDE);
- * then the same before the rename (HI-2503), as the catalogue up to v1.1.1 and older zips name them. The others beside
- * the one read are definitions too, never copied into the server's folder.
+ * The definition a server .zip carries, the first found: Combwork's own name, then the mcp repo's example (USER_GUIDE).
+ * The other beside the one read is a definition too, never copied into the server's folder.
  */
-export const MCP_ZIP_DEFINITIONS = ['combwork-mcp.json', 'combwork-mcp.example.json', 'hive-mcp.json', 'hive-mcp.example.json']
-/** The names a refusal suggests: the current ones. */
-const MCP_ZIP_DEFINITIONS_SHOWN = MCP_ZIP_DEFINITIONS.slice(0, 2)
+export const MCP_ZIP_DEFINITIONS = ['combwork-mcp.json', 'combwork-mcp.example.json']
+/** The names a refusal suggests. */
+const MCP_ZIP_DEFINITIONS_SHOWN = MCP_ZIP_DEFINITIONS
 /** Limits, so a mistaken pick (a big archive) fails quickly instead of filling the disk. */
 const MCP_ZIP_MAX_FILES = 5000
 const MCP_ZIP_MAX_BYTES = 200 * 1024 * 1024
@@ -532,7 +530,7 @@ export function serverFromZip(data: Uint8Array): { def: McpServerDef; files: Map
   return { def, files, folder }
 }
 
-/** A name for a server from a file: letters, numbers, "-" and "_"; never "hive". */
+/** A name for a server from a file: letters, numbers, "-" and "_"; never "combwork". */
 function serverName(raw: string): string {
   const n = raw.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^[-_]+|-+$/g, '').slice(0, 64)
   return n && !isReservedServerName(n) ? n : 'server'
@@ -571,7 +569,7 @@ async function readServerFile(file: string): Promise<{ def: McpServerDef; files:
       throw hiveError(M.notJson, { file: basename(file), reason: (e as Error).message }, { cause: e })
     }
     const stem = basename(file, ext)
-    // The mcp repo's hive-mcp.example.json is named after its folder.
+    // The mcp repo's combwork-mcp.example.json is named after its folder.
     const name = MCP_ZIP_DEFINITIONS.includes(basename(file).toLowerCase()) ? basename(dirname(file)) : stem
     return { def: checkMcpDef(raw), files: null, folder: null, name: serverName(name) }
   }

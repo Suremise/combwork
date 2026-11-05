@@ -259,8 +259,13 @@ const ABSOLUTE_PATH = /(?<![\w<>])(?:[A-Za-z]:[\\/](?:Program Files(?: \(x86\))?
 
 /** In the line Hive logs as it starts, once its log marks the user's own text. */
 export const MARKED_LOG = 'your text marked'
-/** Its start line: "Combwork <version> starting (…)", or "Hive …" in a log from before the rename (HI-2572). */
-const START_LINE = /^\S+ \[INFO\] \[main\] (?:Combwork|Hive) \S+ starting \((.*)\)$/
+/**
+ * A start line: "<name> <version> starting (…)". Only Combwork's is read for whether the run marked the user's text; any
+ * other name (a log from before 1.1, whose lines say another) is an older version's, its lines and the start line itself
+ * keeping only their time, level and scope (HI-2594): more left out, never less.
+ */
+const START_LINE = /^\S+ \[INFO\] \[main\] (\S+) \d\S* starting \((.*)\)$/
+const OURS = 'Combwork'
 /** What a line logged before Hive marked the user's text shows instead of its message. */
 export const OLDER_LINE = '<message left out: logged by an older version of Combwork>'
 
@@ -283,9 +288,10 @@ export function redactLog(text: string, ctx: RedactContext): string {
     .map((line) => {
       const start = START_LINE.exec(line)
       if (start) {
-        marked = start[1].includes(MARKED_LOG)
+        const ours = start[1] === OURS
+        marked = ours && start[2].includes(MARKED_LOG)
         carried = false
-        return line
+        if (ours) return line
       }
       if (carried) {
         carried = continues(line)

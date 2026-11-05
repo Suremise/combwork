@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { createHash } from 'crypto'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
+import { copyFileSync, existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
 import type { StatementSync } from 'node:sqlite'
@@ -411,37 +411,6 @@ const M = {
 
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
 
-/** The README left in the cards' old folder for anyone (or any older Hive) looking there. */
-const README = [
-  'The task board moved to .combwork/combwork.db in Hive 0.9 (#1017).', // i18n-ignore: a file left for people and older Hive versions, in English
-  'An older Hive opening this workspace shows an empty board; cards it adds here are set aside in .combwork/tasks.set-aside when Hive 0.9 or later opens again, for you to review.', // i18n-ignore: as above
-  'To use the board in an older Hive, use Export Board to JSON in Hive 0.9 and copy the exported files into this folder, with Hive closed.', // i18n-ignore: as above
-  ''
-].join('\r\n')
-
-/** The stub of the old folder: the next number (so an older Hive never reuses one) and the README. */
-function writeStub(hive: string, next: number): void {
-  const dir = join(hive, TASKS)
-  try {
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n')
-    if (!existsSync(join(dir, 'README.txt'))) writeFileSync(join(dir, 'README.txt'), README)
-  } catch (e) {
-    log.warn('writing the board folder for older versions', e)
-  }
-}
-
-/** Moves the stub's next number on (an older Hive never takes one this board has used), if the stub is there. */
-function writeStubNext(hive: string, next: number): void {
-  const file = join(hive, TASKS, 'board.json')
-  if (!existsSync(join(hive, TASKS))) return
-  try {
-    writeFileSync(file, JSON.stringify({ version: 1, next }, null, 2) + '\n')
-  } catch (e) {
-    log.warn('moving on the next number older versions read', e)
-  }
-}
-
 /** The highest card number among card files' names, damaged files' too: none of them is ever given to another card. */
 const highestName = (names: string[]): number => names.reduce((m, f) => Math.max(m, Number(f.slice(0, -5)) || 0), 0)
 
@@ -500,8 +469,7 @@ function renameNow(from: string, to: string): boolean {
  * Moves the cards' files into a new database (#1017), once, in one transaction: every `<n>.json` (never .bak, .tmp or
  * anything else) as its text was, board.json's next number and the archive batches. Checked before it commits: as many
  * rows as card files read, each with its file's number, column and archived. A file that isn't a card is left where it
- * is (in the backup folder after the move) and named. Then the folder becomes `tasks.imported-<time>`, kept as a backup,
- * and a stub takes its place for older versions.
+ * is (in the backup folder after the move) and named. Then the folder becomes `tasks.imported-<time>`, kept as a backup.
  */
 function importFiles(b: Board, hive: string, appVersion: string): void {
   const db = b.db.writer
@@ -549,7 +517,7 @@ function importFiles(b: Board, hive: string, appVersion: string): void {
   finishMove(b, hive, record)
 }
 
-/** Renames the old folder to its backup name and leaves the stub (or, refused, tries again at the next open). */
+/** Renames the old folder to its backup name (or, refused, tries again at the next open). */
 function finishMove(b: Board, hive: string, record: Imported): void {
   const dir = join(hive, TASKS)
   if (record.pendingRename && existsSync(dir)) {
@@ -560,61 +528,35 @@ function finishMove(b: Board, hive: string, record: Imported): void {
     log.info(`the card files are kept in ${userText(join(hive, record.folder))}`)
   }
   if (record.pendingRename) setMeta(b.db.writer, 'imported', JSON.stringify({ ...record, pendingRename: false }))
-  writeStub(hive, nextOf(b.db.writer))
 }
 
 /** Where cards an older Hive saved in the stub are set aside, intact, for the user to review (Darren, 17 Oct). */
 export const SET_ASIDE = `${TASKS}.set-aside`
 
 /**
- * Card files an older Hive saved in the stub folder (#1017's downgrade; Darren's decision, 17 Oct): after the move to the
- * database nothing is taken back on its own. Every `<n>.json` found there is set aside, intact, in `.combwork/tasks.set-aside`,
- * free number or not, and the user is told once ("n cards made by an older Hive were found: review them"; the review to
- * add or discard them is #1044). Each file goes once: one whose very content is set aside already isn't kept twice, and
- * another file of the same name is kept beside it under a name of its own. A copy is made before the file leaves the
- * stub, so a file Windows won't let go of (or Hive ending part way) is only removed at a later open. Their numbers are
- * never given to new cards.
+ * The numbers of the cards set aside for the user to review (#1044; those an older Hive saved in the stub 0.9 to 1.0
+ * left, which the names upgrade sets aside: nameUpgradeFiles.ts moveOldStub, HI-2594) are never given to new cards: the
+ * next number is moved past them at each open, in the board's own write. Reads only the set-aside folder.
  */
-function setAsideStub(b: Board, hive: string): void {
-  const dir = join(hive, TASKS)
-  const names = cardFiles(dir)
-  if (!names.length) return
+function keepSetAsideNumbers(b: Board, hive: string): void {
+  let names: string[]
+  try {
+    names = readdirSync(join(hive, SET_ASIDE)).filter((f) => SET_ASIDE_NAME.test(f))
+  } catch {
+    return
+  }
+  const highest = names.reduce((m, f) => Math.max(m, Number(SET_ASIDE_NAME.exec(f)![1])), 0)
   const db = b.db.writer
-  // Numbers given from here are past every file's in the stub, and the older Hive's own next number.
-  const board = readJsonFile<{ next?: unknown }>(join(dir, 'board.json'), {})
-  setMeta(db, 'next', String(Math.max(nextOf(db), Number(board.next) || 1, highestName(names) + 1)))
-  const aside = join(hive, SET_ASIDE)
-  mkdirSync(aside, { recursive: true })
-  const kept = new Set(readdirSync(aside).map((f) => readFileSync(join(aside, f), 'utf8')))
-  let found = 0
-  for (const f of names) {
-    let text: string
-    try {
-      text = readFileSync(join(dir, f), 'utf8')
-    } catch (e) {
-      log.warn(`couldn't read ${f} in ${userText(dir)}: tried again at the next open`, e)
-      continue
-    }
-    if (!kept.has(text)) {
-      const to = existsSync(join(aside, f)) ? `${f.slice(0, -5)}.${stamp()}-${found}.json` : f
-      writeFileSync(join(aside, to), text)
-      kept.add(text)
-      found++
-    }
-    try {
-      rmSync(join(dir, f))
-    } catch (e) {
-      log.warn(`couldn't remove ${f} from ${userText(dir)} (its copy is in ${SET_ASIDE}): tried again at the next open`, e)
-    }
-  }
-  if (found) {
-    log.info(`${found} card file(s) an older Hive saved in ${userText(dir)} set aside in ${SET_ASIDE}`)
-    notify(b.path, { kind: 'setAside', cards: found, folder: SET_ASIDE })
-  }
-  writeStub(hive, nextOf(db))
+  if (highest >= nextOf(db)) setMeta(db, 'next', String(highest + 1))
 }
 
-/** A set-aside file's name as setAsideStub gives it: `<n>.json`, or `<n>.<time>-<i>.json` beside one of that name. */
+/** Tells the user cards an older version saved were set aside (the names upgrade, HI-2594): the board's notice. */
+export function tellSetAside(path: string, cards: number): void {
+  log.info(`${cards} card file(s) an older Hive saved set aside in ${SET_ASIDE}`)
+  notify(path, { kind: 'setAside', cards, folder: SET_ASIDE })
+}
+
+/** A set-aside file's name as it is given (moveOldStub): `<n>.json`, or `<n>.<time>-<i>.json` beside one of that name. */
 const SET_ASIDE_NAME = /^(\d+)(?:\.[0-9TZ-]+)?\.json$/
 const textHash = (text: string): string => createHash('sha256').update(text).digest('hex')
 
@@ -805,7 +747,7 @@ function openBoard(path: string, upgrade: boolean): Board {
       const imported = raw ? (JSON.parse(raw) as Imported) : null
       if (!imported) importFiles(b, hive, appVersion())
       else if (imported.pendingRename) finishMove(b, hive, imported)
-      else setAsideStub(b, hive)
+      else keepSetAsideNumbers(b, hive)
     }
     b.dataVersion = (b.version.get() as { data_version: number }).data_version
     markPresent(hive)
@@ -967,11 +909,6 @@ function closeOne(key: string, b: Board): void {
     if (![...boards.values()].some((o) => o.place === b.place)) removePresence(b.hive, presenceId())
   } catch (e) {
     log.warn('removing the workspace presence marker', e)
-  }
-  try {
-    if (writable(b.db) && existsSync(join(b.hive, TASKS))) writeStub(b.hive, nextOf(b.db.writer))
-  } catch (e) {
-    log.warn('bringing the board folder up to date', e)
   }
   // A save holding a lease on it goes on with this connection (#1383): closed as the save's lease ends.
   if (b.leases > 0) b.detached = true
@@ -1822,17 +1759,9 @@ export function deleteCard(ws: WorkspaceService, n: number): boolean {
   return writeOp(ws, (b) => Number(b.db.writer.prepare('DELETE FROM cards WHERE number = ?').run(n).changes) > 0) // i18n-ignore: SQL
 }
 
-/**
- * The next card number, taken (inside boardWrite): never one a card has or had. The stub an older Hive reads is moved past
- * it at once (#1017 round 1): after Hive is ended without closing, an older Hive still never gives a card a number this
- * board has used (a change undone leaves only a number unused, as the old allocator could).
- */
+/** The next card number, taken (inside boardWrite): never one a card has or had. */
 export function takeNumber(ws: WorkspaceService): number {
-  return writeOp(ws, (b) => {
-    const n = takeNumberIn(b.db.writer)
-    writeStubNext(b.hive, n + 1)
-    return n
-  })
+  return writeOp(ws, (b) => takeNumberIn(b.db.writer))
 }
 
 /** The next card number, taken on a connection inside its transaction (the fact store's cards, #1215): as takeNumber, but for the stub. */

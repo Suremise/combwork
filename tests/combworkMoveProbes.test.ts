@@ -171,7 +171,7 @@ describe('HI-2510: an ordinary open looks at each host once', () => {
     const hosts = 2 + projects.length
     json(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'), {})
     // Its names upgraded (HI-2587): an ordinary open of a 1.1 workspace.
-    json(join(ws, '.combwork', 'combwork-names.json'), { version: 1 })
+    json(join(ws, '.combwork', 'combwork-names.json'), { version: 2 })
     for (const fresh of [true, false]) {
       if (!fresh) {
         // As a move leaves them: every host marked, the rewrites finished for the map.

@@ -11,7 +11,7 @@
   "mcp.allProjects.confirmMessage": "New sessions in every project start it, except in projects that turned it off in their MCP tab. To use it in one project only, turn it on in that project's MCP tab instead. It runs:",
   "mcp.allProjects.confirmTitle": "Turn on {name} for all projects?",
   "mcp.catalog.allSources": "All sources",
-  "mcp.catalog.badName": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" and \"hive\" are reserved.",
+  "mcp.catalog.badName": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" is reserved.",
   "mcp.catalog.badgeInstalled": "Installed",
   "mcp.catalog.badgeNeeds": "Can't run here",
   "mcp.catalog.badgeOther": "Name in use",

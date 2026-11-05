@@ -350,7 +350,7 @@
   "assistant.sidebar.saveFirst": "Najpierw zapisz lub odrzuć zmiany w {name}",
   "assistant.sidebar.saveFirstDetail": "Ma niezapisane zmiany, które w przeciwnym razie zapisałyby się pod starą nazwą.",
   "assistant.sidebar.serverFromFile": "Dodaj serwer MCP z pliku (.json lub .zip)…",
-  "assistant.sidebar.serverNameRule": "Użyj liter, cyfr, „-” i „_”. Nazwy „combwork” i „hive” są zarezerwowane.",
+  "assistant.sidebar.serverNameRule": "Użyj liter, cyfr, „-” i „_”. Nazwa „combwork” jest zarezerwowana.",
   "assistant.sidebar.sharedNotes": "Notatki wspólne",
   "assistant.sidebar.skillFromFile": "Dodaj umiejętność z pliku (.md lub .zip)…",
   "assistant.sidebar.skills": "Umiejętności",

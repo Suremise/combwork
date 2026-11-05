@@ -63,7 +63,7 @@ function prepare() {
   lib.gitProject(proj)
   fs.mkdirSync(path.dirname(stampLog), { recursive: true })
   fs.writeFileSync(path.join(path.dirname(stampLog), 'server.js'), STAMP_SERVER)
-  fs.writeFileSync(path.join(ws, '.combwork', 'mcp', 'stamp.json'), JSON.stringify({ command: process.execPath, args: ['${HIVE_MCP_DIR}/stamp/server.js'] }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'mcp', 'stamp.json'), JSON.stringify({ command: process.execPath, args: ['${CW_MCP_DIR}/stamp/server.js'] }))
   fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['stamp'] } }))
   lib.trustForCodex(proj)
   lib.enableProviders(userData, ['claude-code', 'codex'])

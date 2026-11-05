@@ -194,27 +194,23 @@ export function parseArgs(argv: string[]): WrapperArgs {
   return done([], false)
 }
 
+/** Step lines' opening, the only one read (HI-2594): any other line is the command's own output. */
 const STEP_PREFIX = '##cw-progress'
-/**
- * Step lines' opening before HI-2463, still read: a project's own scripts and test runners print it (it was documented),
- * and keep working. Combwork prints only STEP_PREFIX.
- */
-const LEGACY_STEP_PREFIX = '##hive-progress'
 
 /** What a step line says: the step starting now (from 1), how many there are, and its name; or a log the command wrote. */
 export interface StepLine {
   step?: number
   total?: number
   name?: string
-  /** "##hive-progress log=<path>": a log or run record (the rest of the line), for the run's details. */
+  /** "##cw-progress log=<path>": a log or run record (the rest of the line), for the run's details. */
   log?: string
-  /** "##hive-progress wait=<what>": it waits for that (the rest of the line, #549); '' when it waits no more. */
+  /** "##cw-progress wait=<what>": it waits for that (the rest of the line, #549); '' when it waits no more. */
   wait?: string
 }
 
-/** A step line ("##hive-progress step=4 total=12 name=carddialog": name, log and wait are the rest of the line), or null. */
+/** A step line ("##cw-progress step=4 total=12 name=carddialog": name, log and wait are the rest of the line), or null. */
 export function stepLine(line: string): StepLine | null {
-  const m = /^##(?:cw|hive)-progress(?:[ \t]+(.*?))?[ \t]*\r?\n?$/.exec(line)
+  const m = /^##cw-progress(?:[ \t]+(.*?))?[ \t]*\r?\n?$/.exec(line)
   if (!m) return null
   const u: StepLine = {}
   let rest = m[1] ?? ''
@@ -236,13 +232,13 @@ export function stepLine(line: string): StepLine | null {
 
 /**
  * Passes output through, taking out step lines. A line is held back only while it may still turn out to be one
- * (it starts like "##hive-progress" and hasn't ended); any other partial line goes out at once, so prompts and
+ * (it starts like "##cw-progress" and hasn't ended); any other partial line goes out at once, so prompts and
  * progress bars without a newline still show.
  */
 export class StepFilter {
   private held: Buffer = Buffer.alloc(0)
   private atLineStart = true
-  private readonly prefixes = [Buffer.from(STEP_PREFIX), Buffer.from(LEGACY_STEP_PREFIX)]
+  private readonly prefixes = [Buffer.from(STEP_PREFIX)]
   constructor(
     private readonly write: (b: Buffer) => void,
     private readonly onStep: (u: StepLine) => void

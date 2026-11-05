@@ -1404,8 +1404,8 @@
     "description": "The MCP sidebar: a button. Keep .json and .zip as they are."
   },
   "assistant.sidebar.serverNameRule": {
-    "defaultMessage": "Use letters, numbers, \"-\" and \"_\". \"combwork\" and \"hive\" are reserved.",
-    "description": "New MCP Server: a name that can't be used. Keep combwork and hive as they are (the built-in server's name and its old one, HI-2463)."
+    "defaultMessage": "Use letters, numbers, \"-\" and \"_\". \"combwork\" is reserved.",
+    "description": "New MCP Server: a name that can't be used. Keep combwork as it is (the built-in server's name)."
   },
   "assistant.sidebar.sharedNotes": {
     "defaultMessage": "Shared Notes",

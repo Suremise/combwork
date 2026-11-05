@@ -38,10 +38,10 @@ describe("the merge's commit message (G19)", () => {
     expect(branchMessage(['Combwork-Card: RE-229'], card.title)).toBe(card.title)
   })
 
-  it("HI-2588: no message Combwork makes has a Hive- trailer, a branch's commit from before 1.1 carrying one included", () => {
+  it("HI-2588, HI-2594: Combwork writes no Hive- trailer, and reads none: a branch's commit from before 1.1 keeps its words, as any other line", () => {
     // Historical data on purpose: the trailer Hive wrote before 1.1.
-    expect(branchMessage(['Fix it\n\nHive-Card: RE-229\nHive-Revision: abc\nCo-Authored-By: Someone <x@y>'], card.title)).toBe('Fix it\n\nCo-Authored-By: Someone <x@y>')
-    expect(mergeMessage('branch', { card, revision: 'abc', messages: ['Fix it\n\nHive-Card: RE-229'] })).toBe('Fix it')
+    expect(branchMessage(['Fix it\n\nHive-Card: RE-229\nHive-Revision: abc\nCo-Authored-By: Someone <x@y>'], card.title)).toBe('Fix it\n\nHive-Card: RE-229\nHive-Revision: abc\nCo-Authored-By: Someone <x@y>')
+    expect(mergeMessage('branch', { card, revision: 'abc', messages: ['Fix it\n\nHive-Card: RE-229'] })).toBe('Fix it\n\nHive-Card: RE-229')
     const made = [mergeMessage('hive', { card, revision: 'abc', updated: 'def', reviewers: 'a-1', messages: [] }), updateMessage('hive', 'main', 'RE-229', 'abc')]
     for (const m of made) {
       expect(m).toMatch(/^Combwork-Card: RE-229$/m)
@@ -109,14 +109,15 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     expect(parents(e)).toBe(2)
   })
 
-  it("HI-2588: the branch's own, squash, a commit from before 1.1 with Hive-Card: the new commit carries no Hive- line, the branch's commit keeps it", async () => {
+  it("HI-2594: the branch's own, squash, a commit from before 1.1 with Hive-Card: its words carried as they are, read as nothing, and the branch's commit keeps them", async () => {
     const e = merging({ style: 'squash', commitMessage: 'branch' })
     // Historical data on purpose: a branch commit with the trailer Hive wrote before 1.1.
     const c = await approved(e, 'Old trailer', [[`Fix it\n\nHive-Card: OLD-1`, 'fix.txt']])
     const branchCommit = e.wf.state(c).latest!.revision!
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
-    expect(body(e)).toBe('Fix it')
-    expect(body(e)).not.toMatch(/^(Hive|Combwork)-/m)
+    expect(e.wf.state(c).stage).toBe('done')
+    expect(body(e)).toBe('Fix it\n\nHive-Card: OLD-1')
+    expect(body(e)).not.toMatch(/^Combwork-/m)
     expect(body(e, branchCommit)).toBe('Fix it\n\nHive-Card: OLD-1')
   })
 

@@ -555,7 +555,7 @@ const steps = {
     try { gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8') } catch { /* below */ }
     check('4.workspace-files', "The workspace's .gitignore is Combwork's, for combwork.db, keeping the names upgrade's record out", /\(added by Combwork, #1017\)/.test(gitignore.split(/\r?\n/)[0]) && /^combwork\.db\r?$/m.test(gitignore) && /^combwork-names\.json\r?$/m.test(gitignore) && !/^hive\.db/m.test(gitignore), gitignore.slice(0, 600))
     check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes('.hive-copy') && readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))?.hash === 'h', JSON.stringify(res.facts.names.copy))
-    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === 1, JSON.stringify(res.facts.names.combwork))
+    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === 2, JSON.stringify(res.facts.names.combwork))
     const oldNames = [...res.facts.names.combwork.filter((n) => /^hive/i.test(n)), ...res.facts.names.logs.filter((n) => /^hive/i.test(n))]
     check('4.no-old-names', "No file under Hive's names left in the workspace's .combwork or the profile's logs", oldNames.length === 0, JSON.stringify(oldNames))
     if (!FROM_RC) {

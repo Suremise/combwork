@@ -353,7 +353,7 @@ async function tellAssistants(c: UnexpectedClose, r: ResumeReport | null, still:
     const count = c.agents.filter((a) => a.workspace.toLowerCase() === ws).length
     await journalFactAt(ws, { summary: closeFact(c.lastSeen, count), summaryText: closeFactText(c.lastSeen, count), importance: 2, tags: ['incident', 'unexpected-close'] })
     // A session host's own config is in its .combwork folder: none, the workspace has no Assistant to tell.
-    if (!existsSync(join(dataFolder(home, 'assistant'), 'project.json'))) continue
+    if (!existsSync(join(dataFolder(home), 'project.json'))) continue
     // Its workspace may be open in no window now (#1395): left on a lease, for its next open, not admitted for this.
     // Stored for its next start: the Default's words until stored text is said when read (5b, 6b).
     await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: inDefaultDialect(() => assistantLine(c, r, still)) }).catch((e) => log.warn('telling the Assistant Combwork closed unexpectedly', e))

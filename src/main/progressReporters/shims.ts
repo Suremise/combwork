@@ -1,4 +1,4 @@
-// The cw-progress command (and its hive-progress alias) on every session's PATH: a .cmd (cmd, PowerShell) and an extensionless sh script (Git
+// The cw-progress command on every session's PATH: a .cmd (cmd, PowerShell) and an extensionless sh script (Git
 // Bash) in Combwork's bin folder, each starting cw-progress.js with Hive's own executable as Node. Timings for its
 // estimates are kept beside them, in Hive's data (never in the user's project).
 import { mkdir, readFile, writeFile } from 'original-fs/promises'
@@ -16,13 +16,10 @@ export interface ShimPaths {
 /**
  * The shims' contents. ELECTRON_RUN_AS_NODE makes Combwork's executable run the script as Node; the caller's own value
  * (usually none) is kept in CW_PROGRESS_RUN_AS_NODE, and the wrapper gives the command that one back
- * (wrapper.ts commandEnv), so an Electron app it runs starts as an app.
- *
- * cw-progress is the command agents are told of (HI-2463). hive-progress is the same shim under its name from before,
- * a shell alias only (HR1, HI-2463 s13): instructions written then (this repository's own, until HI-2490) keep
- * working. It runs the same wrapper with the same environment, and agents are never told of it.
+ * (wrapper.ts commandEnv), so an Electron app it runs starts as an app. The names before 1.1 aren't made (HI-2594):
+ * the names upgrade removes them from the folder (nameUpgradeProfile.ts).
  */
-export function shimFiles(p: ShimPaths): Record<'cw-progress.cmd' | 'cw-progress' | 'hive-progress.cmd' | 'hive-progress', string> {
+export function shimFiles(p: ShimPaths): Record<'cw-progress.cmd' | 'cw-progress', string> {
   const slash = (s: string): string => s.replace(/\\/g, '/')
   const sq = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
   const cmd = [
@@ -36,7 +33,7 @@ export function shimFiles(p: ShimPaths): Record<'cw-progress.cmd' | 'cw-progress
     ''
   ].join('\r\n')
   const sh = ['#!/bin/sh', `CW_PROGRESS_RUN_AS_NODE="\${ELECTRON_RUN_AS_NODE-}" ELECTRON_RUN_AS_NODE=1 CW_PROGRESS_DATA=${sq(slash(p.data))} exec ${sq(slash(p.exec))} ${sq(slash(p.script))} "$@"`, ''].join('\n')
-  return { 'cw-progress.cmd': cmd, 'cw-progress': sh, 'hive-progress.cmd': cmd, 'hive-progress': sh }
+  return { 'cw-progress.cmd': cmd, 'cw-progress': sh }
 }
 
 /** Writes the shims into `dir` (only what changed). Resolves to `dir`, or null when they couldn't be written. */

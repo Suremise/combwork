@@ -12,7 +12,7 @@ const log = createLogger('skills')
 
 /**
  * Hive's skill copies in the folders agents work in (#1431, SPEC §16.10.7, §16.15 C row 15). Codex and Copilot read
- * Hive's skills from copies in `<folder>/.agents/skills/hive-*` (providers/common.ts syncAgentsSkills), which outlive
+ * Hive's skills from copies in `<folder>/.agents/skills/cw-*` (providers/common.ts syncAgentsSkills), which outlive
  * the session, so a CLI run on its own there still sees them; Claude Code's launch plugin leaves nothing behind. Hive
  * records each copy it makes (`skill_copies` in combwork.db) and removes its own, unchanged ones (removeHiveCopies) once no
  * session of Hive's works in the folder, as Settings → Advanced's switch says: when the last session there ends, at

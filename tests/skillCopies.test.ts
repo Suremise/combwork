@@ -121,24 +121,20 @@ describe('safe clean-up (#1431)', () => {
     expect(book.rows.size).toBe(0)
   })
 
-  it('a copy from before HI-2463 (hive-<skill>) is retired as the cw- one is written when unchanged; an edited one stays', async () => {
-    const w = world('deploy', 'notes')
+  it('a folder under the old prefix (hive-<skill>) is never read or touched by delivery or clean-up: the names upgrade retires the old copies (HI-2594)', async () => {
+    const w = world('deploy')
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
-    // As a build before the rename left them: the same copies, marked and recorded, under the old prefix.
-    const old = (s: string) => join(w.slot, '.agents', 'skills', `hive-${s}`)
-    for (const s of ['deploy', 'notes']) renameSync(w.copy(w.slot, s), old(s))
-    writeFileSync(join(old('notes'), 'SKILL.md'), '# notes, my edit')
+    // As a build before the rename left one: the same copy, marked, under the old prefix.
+    const old = join(w.slot, '.agents', 'skills', 'hive-deploy')
+    renameSync(w.copy(w.slot, 'deploy'), old)
     const out = await sync(w.slot, w.project, w.sources, book)
-    // The unchanged one is gone, the edited one stays; each skill is delivered under the new name, and recorded there.
-    expect(existsSync(old('deploy'))).toBe(false)
-    expect(readFileSync(join(old('notes'), 'SKILL.md'), 'utf8')).toBe('# notes, my edit')
-    for (const s of ['deploy', 'notes']) expect(readFileSync(join(w.copy(w.slot, s), 'SKILL.md'), 'utf8'), s).toBe(`# ${s}`)
+    expect(readFileSync(join(old, 'SKILL.md'), 'utf8')).toBe('# deploy')
+    expect(readFileSync(join(w.copy(w.slot, 'deploy'), 'SKILL.md'), 'utf8')).toBe('# deploy')
     expect(out.deploy.revision).toBe(await contentHash(w.copy(w.slot, 'deploy')))
-    expect([...book.rows.values()].map((r) => r.skill).sort()).toEqual(['deploy', 'notes'])
-    // A clean-up finds the old prefix too: only Combwork's own, unchanged copies go, and the edited one stays.
-    expect((await removeHiveCopies(w.slot, w.project, book, () => false)).sort()).toEqual(['deploy', 'notes'])
-    expect(readFileSync(join(old('notes'), 'SKILL.md'), 'utf8')).toBe('# notes, my edit')
+    expect(await removeHiveCopies(w.slot, w.project, book, () => false)).toEqual(['deploy'])
+    expect(existsSync(w.copy(w.slot, 'deploy'))).toBe(false)
+    expect(readFileSync(join(old, 'SKILL.md'), 'utf8')).toBe('# deploy')
   })
 
   it("records it can't read keep every copy; a record whose copy has gone is dropped", async () => {

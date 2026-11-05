@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'original-fs/promises'
+import { lstat, mkdir, readdir, readFile, rm, rmdir } from 'original-fs/promises'
 import { join } from 'path'
 import { writeTextAtomic } from './fsutil'
 
@@ -97,9 +97,60 @@ export const ifAbsent = <T>(value: T) => (e: NodeJS.ErrnoException): T | Promise
 
 const mcpFiles = async (dir: string): Promise<string[]> => (await readdir(join(dir, 'mcp')).catch(ifAbsent([] as string[]))).filter((f) => f.endsWith('.json')).map((f) => join(dir, 'mcp', f))
 
-/** Rewrites them (the names upgrade's `files` step). `readme`: the README Combwork writes now. */
-export async function upgradeWorkspaceFiles(dir: string, readme: string): Promise<void> {
+/** Tests only: a stat that fails for some paths, in place of lstat (an access error on the board's file, HR1's round 2). */
+export const stubTestHooks: { stat?: (path: string) => Promise<unknown> } = {}
+
+/** Where the board keeps cards an older version saved, for the user to review (boardStore.ts SET_ASIDE, #1044). */
+export const SET_ASIDE_DIR = 'tasks.set-aside'
+
+/**
+ * The stub 0.9 to 1.0 left in a board's old cards' folder for older versions (#1017: `tasks/` with `board.json` and a
+ * `README.txt`), at the upgrade (HI-2594, HR1's round 1: under the move's lock, after the other processes' refusal, as
+ * every step is). No version writes one since 1.1, and nothing reads `tasks/` after this: the cards an older Hive saved
+ * there (`<n>.json`) are set aside, intact, in `tasks.set-aside` as the board did at each open before (one whose very
+ * content is there already isn't kept twice; another of a taken name is kept beside it under a name of its own), each
+ * copied before it leaves the stub, then the stub's own two files go and the folder with them once empty. Only a stub:
+ * a folder without the README, or a workspace with no board yet (0.8's cards, which the board imports), is left as it
+ * is. Says how many cards it set aside, for the board's notice. Whether a file is there is asked so that only ENOENT
+ * (or ENOTDIR) is absent: one that can't be looked at fails the step (HR1's round 2), as a listing that can't be read does.
+ */
+export async function moveOldStub(dir: string, o: { stat?: (path: string) => Promise<unknown> } = {}): Promise<number> {
+  const stat = o.stat ?? stubTestHooks.stat ?? lstat
+  const there = (p: string): Promise<boolean> => stat(p).then(() => true, (e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' || e?.code === 'ENOTDIR' ? false : Promise.reject(e)))
+  const stub = join(dir, 'tasks')
+  const names = await readdir(stub).catch(ifAbsent(null))
+  if (!names || !names.includes('README.txt') || !(await there(join(dir, 'combwork.db')))) return 0
+  const cards = names.filter((f) => /^\d+\.json$/.test(f))
+  let found = 0
+  if (cards.length) {
+    const aside = join(dir, SET_ASIDE_DIR)
+    await mkdir(aside, { recursive: true })
+    const kept = new Set<string>()
+    for (const f of await readdir(aside)) kept.add(await readFile(join(aside, f), 'utf8'))
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    for (const f of cards) {
+      const text = await readFile(join(stub, f), 'utf8')
+      if (!kept.has(text)) {
+        const to = (await there(join(aside, f))) ? `${f.slice(0, -5)}.${stamp}-${found}.json` : f
+        await writeTextAtomic(join(aside, to), text)
+        kept.add(text)
+        found++
+      }
+      await rm(join(stub, f))
+    }
+  }
+  for (const f of ['board.json', 'README.txt']) await rm(join(stub, f), { force: true })
+  if (!(await readdir(stub)).length) await rmdir(stub)
+  return found
+}
+
+/**
+ * Rewrites them (the names upgrade's `files` step), and retires the board's stub for older versions (moveOldStub).
+ * `readme`: the README Combwork writes now. Says how many cards the stub held that were set aside.
+ */
+export async function upgradeWorkspaceFiles(dir: string, readme: string): Promise<number> {
   await rewrite(join(dir, '.gitignore'), upgradedGitignore)
   await rewrite(join(dir, 'README.md'), (t) => upgradedReadme(t, readme))
   for (const f of await mcpFiles(dir)) await rewrite(f, upgradedMcpDefinition)
+  return moveOldStub(dir)
 }

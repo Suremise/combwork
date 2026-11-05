@@ -350,7 +350,7 @@
   "assistant.sidebar.saveFirst": "Enregistre ou abandonne d’abord tes modifications de la note {name}",
   "assistant.sidebar.saveFirstDetail": "Elle a des modifications non enregistrées, qui seraient sinon enregistrées sous son ancien nom.",
   "assistant.sidebar.serverFromFile": "Ajouter un serveur MCP depuis un fichier (.json ou .zip)…",
-  "assistant.sidebar.serverNameRule": "Utilise des lettres, des chiffres, « - » et « _ ». « combwork » et « hive » sont réservés.",
+  "assistant.sidebar.serverNameRule": "Utilise des lettres, des chiffres, « - » et « _ ». « combwork » est réservé.",
   "assistant.sidebar.sharedNotes": "Notes partagées",
   "assistant.sidebar.skillFromFile": "Ajouter une compétence depuis un fichier (.md ou .zip)…",
   "assistant.sidebar.skills": "Compétences",
