@@ -11,7 +11,7 @@ import { attributeFolder } from '../src/main/workflow/reconcile'
 import { compile, loadRuleset } from '../src/shared/workflow/compile'
 import { agentActor } from '../src/shared/workflow/facts'
 import { allOff, contradictions, preset, reviewerModeOf, takesOption, type WorkflowOptions } from '../src/shared/workflow/options'
-import { designReviewer, openDesign, poolAssignments, preferredReviewer, reviewsInProgress, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
+import { designReviewer, heldOnUser, openDesign, poolAssignments, preferredReviewer, reviewingNow, reviewsInProgress, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
 import type { LaneRecord } from '../src/shared/lanes'
 import type { AgentDef } from '../src/shared/types'
 
@@ -841,6 +841,93 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
     const b = e.wf.createCard({ title: 'No reviewer' })
     moved(await e.wf.start(b.key, B1))
     refusedBy(await e.wf.loopStep(b.key, B1, 'design', 'The plan', { waitMinutes: 30, reviewer: async () => null }), 'loop.noReviewer')
+  })
+})
+
+describe("a reviewer whose card waits on its own question to the user is free for the pool's other cards (HI-2559)", { timeout: 60_000 }, () => {
+  const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
+  const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
+
+  it("the choice: a held card's reviewer is free for others, and the held card is given to nobody else", () => {
+    expect(poolAssignments([card(1, 'a', { reviewing: 'R1', held: true }), card(2, 'b', { builders: ['B2'] })], [agent('R1'), agent('R2')])).toEqual([{ card: 2, submission: 1, reviewer: 'R1' }])
+    // Not held: R1 is busy with card 1, so card 2 waits for another.
+    expect(poolAssignments([card(1, 'a', { reviewing: 'R1' }), card(2, 'b', { builders: ['B2'] })], [agent('R1')])).toEqual([])
+  })
+
+  it("held only by an open request its reviewer asked: not another asker's, an asker-less one, or none", () => {
+    expect(heldOnUser([{ asker: 'R1' }], 'R1')).toBe(true)
+    expect(heldOnUser([{ asker: 'B1' }, {}], 'R1')).toBe(false)
+    expect(heldOnUser([], 'R1')).toBe(false)
+    expect(heldOnUser([{ asker: 'R1' }], null)).toBe(false)
+    expect(heldOnUser([{ asker: 'user' }], 'user')).toBe(false)
+  })
+
+  /** One pooled reviewer R1, two pool lanes: A (B1's) in Review, R1 reviewing it; B (B2's) started. */
+  async function twoLanes() {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    const agents = AGENTS.filter((x) => x.id !== 'R2')
+    const a = e.wf.createCard({ title: 'Held A' })
+    const b = e.wf.createCard({ title: 'Waiting B' })
+    lane(e, 'LA', [a.id], 'B1', null)
+    lane(e, 'LB', [b.id], 'B2', null)
+    await submitted(e, a, B1)
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    moved(await e.wf.startReview(a.key, R1))
+    moved(await e.wf.start(b.key, B2))
+    const design = async () => {
+      const posted = await e.wf.loopStep(b.key, B2, 'design', 'The plan', { waitMinutes: 30, reviewer: async () => designReviewer(e.store.facts(b.id), () => true) })
+      moved(posted)
+      return (posted as { data?: Record<string, unknown> }).data?.design as string
+    }
+    const designsOf = () => e.store.facts(b.id).filter((f) => f.kind === 'ReviewerAssigned' && (f.data as { design?: boolean }).design).map((f) => (f.data as { reviewer: string }).reviewer)
+    const toldR1 = (re: RegExp) => state.deliveries.filter((d) => d.agentId === 'R1' && re.test(d.body))
+    return { e, a, b, agents, design, designsOf, toldR1 }
+  }
+
+  it("A held on R1's open question: B's design, then B's submission, go to R1, each told once; A stays R1's throughout", async () => {
+    const { e, a, b, agents, design, designsOf, toldR1 } = await twoLanes()
+    const asked = await e.wf.askTheUser(a.key, R1, { kind: 'decide', text: 'Do you accept the bounded "not reproduced" conclusion?' })
+    moved(asked)
+    const id = await design()
+    await pass(e, agents)
+    await pass(e, agents)
+    expect(designsOf()).toEqual(['R1'])
+    expect(toldR1(new RegExp(`posted a design for a check \\(${id}\\)`))).toHaveLength(1)
+    moved(await e.wf.loopStep(b.key, R1, 'ok', 'Fine', { waitMinutes: 30, design: id, reviewer: async () => designReviewer(e.store.facts(b.id), () => true) }))
+    commit(e.project, { [`${b.id}.txt`]: 'built\n' }, 'Built', { trailer: b.key })
+    await attributeFolder(e.wf)
+    moved(await e.wf.submit(b.key, B2, { summary: 'Built' }))
+    await pass(e, agents)
+    await pass(e, agents)
+    expect(assignedTo(e, b.id)).toEqual(['R1', 'R1'])
+    expect(toldR1(new RegExp(`^#${b.id}\\b.*is in Review: you review it from the pool`))).toHaveLength(1)
+    // A's question is still open, and A is still R1's: never released or given again.
+    expect(e.wf.state(e.store.card(a.id)).requests.map((r) => r.asker)).toEqual(['R1'])
+    expect(reviewingNow(e.store.facts(a.id), () => true)?.reviewing).toBe('R1')
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    expect(e.store.facts(a.id).some((f) => f.kind === 'ReviewerReleased')).toBe(false)
+    expect(toldR1(new RegExp(`^#${a.id}\\b`)).filter((d) => d.state !== 'cancelled')).toHaveLength(1)
+  })
+
+  it("controls: a question the builder asked on A, or R1's question answered, leaves R1 busy with A, and B's design waits", async () => {
+    const { e, a, agents, design, designsOf } = await twoLanes()
+    // R1's own question, answered: no longer open, so it holds nothing.
+    moved(await e.wf.askTheUser(a.key, R1, { kind: 'decide', text: "The reviewer's question" }))
+    for (const r of e.wf.state(e.store.card(a.id)).requests) moved(await e.wf.answer(a.key, r.request, 'answered', { note: 'Yes' }))
+    expect(e.wf.state(e.store.card(a.id)).requests).toEqual([])
+    // The builder's question on A, still open: not R1's, so it holds nothing either.
+    moved(await e.wf.askTheUser(a.key, B1, { kind: 'decide', text: "The builder's question" }))
+    await design()
+    await pass(e, agents)
+    expect(designsOf()).toEqual([])
+    expect(state.deliveries.filter((d) => d.agentId === 'R1' && /posted a design/.test(d.body))).toEqual([])
+    // R1 asks again, still open: held, so the waiting design goes to it.
+    moved(await e.wf.askTheUser(a.key, R1, { kind: 'decide', text: "The reviewer's question, again" }))
+    await pass(e, agents)
+    expect(designsOf()).toEqual(['R1'])
   })
 })
 
