@@ -41,7 +41,7 @@ import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
 import { classify, finishMove, moveFolders, type MoveOptions, type MoveOutcome } from './combworkMove'
-import { NAMES_DONE_FILE } from './nameUpgrade'
+import { NAMES_DONE_FILE, projectNamesDone } from './nameUpgrade'
 import { NAMES_IGNORE } from './nameUpgradeFiles'
 import { movedPathOf } from '../shared/hiveFolderMove'
 
@@ -1414,6 +1414,12 @@ export class WorkspaceService {
         if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
       })()
     ])
+    // Its own names upgrade (HI-2587, HR2's round 1), by its own record: a project that came into an upgraded workspace
+    // with a `.combwork` of an RC's (its skill copies' old markers, git's old comments and refs), or a new one, once.
+    if (this.path && !this.isAssistantHome(projectPath) && !(await projectNamesDone(projectPath))) {
+      const moved = await moveFolders(this.path, { only: projectPath })
+      if (moved.late) await this.finishFolderMove()
+    }
     if (!this.isAssistantHome(projectPath) && existsSync(join(h, 'project.json'))) this.markSetUp(projectPath, gen, ticket)
   }
 

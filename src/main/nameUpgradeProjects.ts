@@ -6,6 +6,7 @@ import { COPY_MARKER, writeTextAtomic } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { gitDirOf, vcsOf } from './hiveVcs'
+import { ifAbsent } from './nameUpgradeFiles'
 
 /**
  * The names upgrade's steps in a project and the folders its agents work in (HI-2587, nameUpgrade.ts), each looking at
@@ -84,7 +85,7 @@ export function upgradedExclude(text: string): string | null {
 /** The copies' folders in `<folder>/.agents/skills` that still hold the old marker and not the new one. */
 async function oldMarkers(folder: string): Promise<string[]> {
   const skills = join(folder, '.agents', 'skills')
-  const names = await readdir(skills).catch(() => [] as string[])
+  const names = await readdir(skills).catch(ifAbsent([] as string[]))
   return names.map((n) => join(skills, n)).filter((d) => existsSync(join(d, OLD_COPY_MARKER)) && !existsSync(join(d, COPY_MARKER)))
 }
 
@@ -103,7 +104,7 @@ export async function upgradeProject(host: string | null, folders: readonly stri
   for (const f of host ? [host, ...folders] : folders) for (const d of await oldMarkers(f)) await rename(join(d, OLD_COPY_MARKER), join(d, COPY_MARKER)).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? undefined : Promise.reject(e)))
   if (!host) return
   const ex = await excludeFile(host)
-  const text = ex ? await readFile(ex, 'utf8').catch(() => null) : null
+  const text = ex ? await readFile(ex, 'utf8').catch(ifAbsent(null)) : null
   const now = text === null ? null : upgradedExclude(text)
   if (ex && now !== null) await writeTextAtomic(ex, now)
   const found = vcsOf(host)

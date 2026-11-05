@@ -80,28 +80,22 @@ export function upgradedMcpDefinition(text: string): string | null {
   return text.split('${HIVE_MCP_DIR}').join('${CW_MCP_DIR}').split(OLD_CATALOG_URL).join(CATALOG_URL)
 }
 
-/** Whether a file's text needs `f`; read, not changed. */
-async function needs(file: string, f: (t: string) => string | null): Promise<boolean> {
-  const t = await readFile(file, 'utf8').catch(() => null)
-  return t !== null && f(t) !== null
-}
-
-/** Rewrites a file when `f` changes it. Gone or unreadable: nothing to do. */
+/** Rewrites a file when `f` changes it. Gone: nothing to do; unreadable: the step fails. */
 async function rewrite(file: string, f: (t: string) => string | null): Promise<void> {
-  const t = await readFile(file, 'utf8').catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? null : Promise.reject(e)))
+  const t = await readFile(file, 'utf8').catch(ifAbsent(null))
   if (t === null) return
   const now = f(t)
   if (now !== null) await writeTextAtomic(file, now)
 }
 
-const mcpFiles = async (dir: string): Promise<string[]> => (await readdir(join(dir, 'mcp')).catch(() => [] as string[])).filter((f) => f.endsWith('.json')).map((f) => join(dir, 'mcp', f))
+/**
+ * A step's way with a file or folder that isn't there (HI-2587, HR2's round 1): `value` for ENOENT only, every other
+ * error thrown, so a folder that can't be read fails the step (and the upgrade isn't recorded done) rather than reading
+ * as empty.
+ */
+export const ifAbsent = <T>(value: T) => (e: NodeJS.ErrnoException): T | Promise<never> => (e?.code === 'ENOENT' ? value : Promise.reject(e))
 
-/** Whether a workspace's `.combwork` has a file of these still in Hive's words. */
-export async function workspaceFilesNeeded(dir: string, readme: string): Promise<boolean> {
-  if ((await needs(join(dir, '.gitignore'), upgradedGitignore)) || (await needs(join(dir, 'README.md'), (t) => upgradedReadme(t, readme)))) return true
-  for (const f of await mcpFiles(dir)) if (await needs(f, upgradedMcpDefinition)) return true
-  return false
-}
+const mcpFiles = async (dir: string): Promise<string[]> => (await readdir(join(dir, 'mcp')).catch(ifAbsent([] as string[]))).filter((f) => f.endsWith('.json')).map((f) => join(dir, 'mcp', f))
 
 /** Rewrites them (the names upgrade's `files` step). `readme`: the README Combwork writes now. */
 export async function upgradeWorkspaceFiles(dir: string, readme: string): Promise<void> {

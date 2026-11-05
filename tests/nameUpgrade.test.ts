@@ -17,7 +17,7 @@ vi.mock('../src/main/events', async (orig) => ({ ...(await orig<object>()), toas
 const base = tempDir('nameupgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { MOVE_LOCK_FILE, finishMove, moveFolders } = await import('../src/main/combworkMove')
-const { NAMES_DONE_FILE } = await import('../src/main/nameUpgrade')
+const { NAMES_DONE_FILE, projectNamesDone } = await import('../src/main/nameUpgrade')
 const { boardMoveTestHooks } = await import('../src/main/boardFileMove')
 const { WORKSPACE_README, BOARD_GITIGNORE } = await import('../src/main/workspace')
 
@@ -156,6 +156,47 @@ describe('the names upgrade at the open', () => {
     chmodSync(def, 0o644)
     await open(w.ws)
     expectUpgraded(w)
+  })
+
+  it("a folder a step can't list fails the step, nothing recorded; once it can be, the next open finishes (HR2's round 1)", async () => {
+    const w = workspace('rc2')
+    // Not a folder where the step lists one: an error other than its absence.
+    const skills = join(w.alpha, '.agents', 'skills')
+    const { renameSync, rmSync } = await import('fs')
+    renameSync(skills, `${skills}.kept`)
+    writeFileSync(skills, 'not a folder')
+    await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the projects' skill copies, git exclude lines and refs/)
+    expect(existsSync(join(w.ws, '.combwork', NAMES_DONE_FILE))).toBe(false)
+    rmSync(skills)
+    renameSync(`${skills}.kept`, skills)
+    await open(w.ws)
+    expectUpgraded(w)
+  })
+
+  it("a project that comes into an upgraded workspace with an RC's .combwork gets its own steps by its own record, with no lock (HR2's round 1)", async () => {
+    const w = workspace('rc2')
+    await open(w.ws)
+    expectUpgraded(w)
+    expect(existsSync(join(w.alpha, '.combwork', NAMES_DONE_FILE))).toBe(true)
+    // Copied in from an RC's workspace: its .combwork, an old marker, Hive's exclude comment, an old ref.
+    const beta = join(w.ws, 'beta')
+    write(join(beta, '.combwork', 'project.json'), '{}')
+    git(w.ws, 'init', '-q', beta)
+    write(join(beta, '.git', 'info', 'exclude'), OLD_EXCLUDE)
+    write(join(beta, '.agents', 'skills', 'cw-handover', '.hive-copy'), '{"source":"s","hash":"b1"}')
+    write(join(beta, 'b.txt'), 'b')
+    git(beta, 'add', 'b.txt')
+    git(beta, 'commit', '-q', '-m', 'b')
+    git(beta, 'update-ref', 'refs/hive/cards/BE-1/1', 'HEAD')
+    const lock = join(w.ws, MOVE_LOCK_FILE)
+    const before = readFileSync(lock)
+    expect(await projectNamesDone(beta)).toBe(false)
+    await moveFolders(w.ws, { only: beta })
+    expect(existsSync(join(beta, '.agents', 'skills', 'cw-handover', '.combwork-copy'))).toBe(true)
+    expect(readFileSync(join(beta, '.git', 'info', 'exclude'), 'utf8')).not.toMatch(/Hive/)
+    expect(git(beta, 'for-each-ref', '--format=%(refname)', 'refs/hive', 'refs/cw').trim()).toBe('refs/cw/cards/BE-1/1')
+    expect(await projectNamesDone(beta)).toBe(true)
+    expect(readFileSync(lock).equals(before)).toBe(true)
   })
 
   it("a new workspace's first open writes nothing; once made, its record is there and its .gitignore keeps it out", async () => {

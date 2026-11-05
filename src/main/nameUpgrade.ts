@@ -45,21 +45,34 @@ const M = {
   } satisfies Record<WorkspaceStep, Msg<string>>
 }
 
-const doneFile = (ws: string): string => join(ws, HIVE_DIR, NAMES_DONE_FILE)
+/**
+ * The record, in a host's `.combwork`: the workspace's once every step has worked; a project's once its own steps have
+ * (HR2's round 1: a project that comes into an upgraded workspace later, its folder `.combwork` already, gets its steps
+ * by its own record, whatever the workspace's says). Both are this machine's: the workspace's is in its .gitignore, a
+ * project's `.combwork` is out of git whole.
+ */
+const recordOf = (host: string): string => join(host, HIVE_DIR, NAMES_DONE_FILE)
 
-async function done(ws: string): Promise<boolean> {
+async function recorded(host: string): Promise<boolean> {
   try {
-    return (JSON.parse(await readFile(doneFile(ws), 'utf8')) as { version?: unknown }).version === NAMES_VERSION
+    return (JSON.parse(await readFile(recordOf(host), 'utf8')) as { version?: unknown }).version === NAMES_VERSION
   } catch {
     return false
   }
 }
 
+const record = async (host: string): Promise<void> => {
+  if (existsSync(join(host, HIVE_DIR))) await writeTextAtomic(recordOf(host), JSON.stringify({ version: NAMES_VERSION, at: new Date().toISOString() }) + '\n')
+}
+
+/** Whether a project's own steps have run (its record): looked at as a project comes into an open workspace. */
+export const projectNamesDone = (host: string): Promise<boolean> => recorded(host)
+
 /** Whether a workspace may still have anything under an old name: looked at cheaply, on every open. */
 export async function workspaceNeeds(ws: string): Promise<boolean> {
   const dir = join(ws, HIVE_DIR)
   if (!existsSync(dir)) return false
-  return (await boardFileNeeded(dir)) || !(await done(ws))
+  return (await boardFileNeeded(dir)) || !(await recorded(ws))
 }
 
 export interface UpgradeOptions {
@@ -77,7 +90,13 @@ export interface UpgradeOptions {
 /** The steps (under the move's lock, nothing of the workspace open): each throws a HiveError naming it when it can't. */
 export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<void> {
   const dir = join(ws, HIVE_DIR)
-  if (o.only) return step('projects', o.stop, () => upgradeProject(o.only!, []))
+  if (o.only) {
+    const only = o.only
+    return step('projects', o.stop, async () => {
+      await upgradeProject(only, [])
+      await record(only)
+    })
+  }
   if (!existsSync(dir)) return
   await step('board', o.stop, () => moveBoardFile(dir, o.checkpoint))
   await step('files', o.stop, async () => upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README))
@@ -88,12 +107,13 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
     for (const p of o.projects) {
       o.stop()
       await upgradeProject(p, [])
+      await record(p)
     }
     o.stop()
     await upgradeProject(null, recorded)
   })
   o.stop()
-  await writeTextAtomic(doneFile(ws), JSON.stringify({ version: NAMES_VERSION, at: new Date().toISOString() }) + '\n')
+  await record(ws)
   log.info(`The names upgrade is done for this workspace (${NAMES_DONE_FILE})`)
 }
 

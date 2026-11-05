@@ -5,6 +5,7 @@ import { msg, tr } from '../shared/i18n'
 import { toast } from './events'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
+import { ifAbsent } from './nameUpgradeFiles'
 
 /**
  * The board's file renamed `hive.db` → `combwork.db` (HI-2587, its design HI-2587/s15, s20, s23, s26), with its copies in
@@ -59,7 +60,7 @@ export async function boardFileNeeded(dir: string): Promise<boolean> {
 }
 
 async function oldBackups(dir: string): Promise<string[]> {
-  const names = await readdir(join(dir, 'backups')).catch(() => [] as string[])
+  const names = await readdir(join(dir, 'backups')).catch(ifAbsent([] as string[]))
   return names.filter((n) => OLD_BACKUP.test(n) && n.endsWith('.db'))
 }
 
