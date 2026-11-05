@@ -586,6 +586,39 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
     }
   })
 
+  // HI-2542: a project.json written after set up found none (a project copied in, its folder seen first; the accounts
+  // suite's epsilon) is kept with its agents, never replaced by the default.
+  it("a project.json written while a project is set up isn't replaced by the default", async () => {
+    const wsPath = join(base, 'ws-config-in-setup')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const copied = join(wsPath, 'copied')
+      mkdirSync(copied)
+      const theirs = JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] })
+      // After set up found no project.json, before it writes the default: the project's own arrives then.
+      let held = 0
+      configTestHooks.beforeDefaultConfig = async (p) => {
+        if (p.toLowerCase() !== copied.toLowerCase()) return
+        held++
+        writeFileSync(join(copied, '.combwork', 'project.json'), theirs)
+        writeFileSync(join(copied, '.combwork', 'project.json.bak'), theirs)
+      }
+      await w.ensureProject(copied)
+      expect(held).toBe(1)
+      expect(projectJson(copied)).toEqual(JSON.parse(theirs))
+      expect(JSON.parse(readFileSync(join(copied, '.combwork', 'project.json.bak'), 'utf8'))).toEqual(JSON.parse(theirs))
+      expect(readdirSync(join(copied, '.combwork')).filter((n) => n.endsWith('.tmp'))).toEqual([])
+      // Its agent is there to change, as agents:update found it gone before.
+      expect((await w.updateAgent(copied, 'a-one', { name: 'Uno' })).name).toBe('Uno')
+    } finally {
+      delete configTestHooks.beforeDefaultConfig
+      await disposeWorkspaceService(w)
+    }
+  })
+
   /**
    * A workspace whose folder listings the test sets (`folders`), with every read of `gone`'s project.json held until
    * `release` (HR3's probe for HI-1668 round 1): the order reads list and settle in is the test's.

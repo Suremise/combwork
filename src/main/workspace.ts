@@ -164,7 +164,7 @@ export interface ProjectSeen {
 }
 
 /** For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. */
-export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void> } = {}
+export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void>; beforeDefaultConfig?: (projectPath: string) => Promise<void> } = {}
 
 /**
  * Whether an agent may be given a connection now (HI-2107; accounts.ts sets it): it exists and isn't being removed. Asked
@@ -1349,7 +1349,10 @@ export class WorkspaceService {
         // Its platform is recorded as it is made, from what detection finds (SPEC §16.3.5): never switched silently after.
         // Made only if none is there by then (HI-2542): one written meanwhile (copied in with the folder, a refresh the
         // folder's appearing began reading it) is kept, never replaced by the default.
-        if (!existsSync(join(h, 'project.json'))) await createKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }), { existing: true })
+        if (!existsSync(join(h, 'project.json'))) {
+          await configTestHooks.beforeDefaultConfig?.(projectPath)
+          await createKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }), { existing: true })
+        }
         // 0.1's launch folder for Agent 1; every agent now has launch-<id>.
         if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
       })()
