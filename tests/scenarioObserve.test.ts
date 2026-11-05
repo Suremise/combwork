@@ -187,7 +187,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
     const ran = observe(rollout(call('c2', ps), shell('exec-2', 'pwsh -File scripts/cards.ps1', 'HTTP 200 … Scoped card for alpha\nHTTP 403 only for your own project'), output('c2', '')))
     const ctx = { read: (f: string) => (f === 'scripts/cards.ps1' ? 'Get-Content $env:CW_API_TOKEN_FILE' : null) }
     expect(check('raw-api', 'it ran, and listed its own card', ran, ctx)).toBe(true)
-    expect(check('raw-api', "it didn't get beta's card, and Hive refused it", ran, ctx)).toBe(true)
+    expect(check('raw-api', "it didn't get beta's card, and Combwork refused it", ran, ctx)).toBe(true)
     // Written in the script, never run (the rollout records the script's other call, not this one): not a run, whatever it printed.
     const never = `if (false) ${ps}; text(await tools.mcp__combwork__cw_inbox({})); text("HTTP 200 Scoped card for alpha HTTP 403 only for your own project")`
     const notRun = observe(rollout(call('c2', never), mcp('exec-3', 'cw_inbox', {}, 'Nothing new.'), output('c2', 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project')))
@@ -213,7 +213,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
       const o = observeItems(seen)
       expect(o.tools, what).toEqual([])
       expect(check('raw-api', 'it ran, and listed its own card', o, ctx), what).toBe(false)
-      expect(check('raw-api', "it didn't get beta's card, and Hive refused it", o, ctx), what).toBe(false)
+      expect(check('raw-api', "it didn't get beta's card, and Combwork refused it", o, ctx), what).toBe(false)
       expect(check('card-detail', "its reply had the card's acceptance line", o, { cards: { q: 1 } }), what).toBe(false)
       expect(helpers.testRunsIn(o.tools.flatMap(helpers.commandsOf)), what).toEqual([])
       expect(o.skillsRead, what).toEqual([])
@@ -690,7 +690,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
   })
 
   describe("assistant-new-lane: cw_lane start, Coder left to Combwork's start as the reply says", () => {
-    const LEFT = "left Coder to Hive's start as the reply said (no prompt where Hive gives it the card; a new conversation where it said to tell it)"
+    const LEFT = "left Coder to Combwork's start as the reply said (no prompt where Combwork gives it the card; a new conversation where it said to tell it)"
     const STARTED = "started Coder's lane with cw_lane start, which worked: its card, rounds 3, wait 60 minutes"
     const byHive = "Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it."
     const tellIt = 'Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: tell it about the lane.'
@@ -730,7 +730,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
 
   it('card-loop-merge-decision: each question it asked closed by the decision once, and the answer told to it once; missing or duplicate fails', () => {
     const CLOSED = 'the decision closed each question it asked, once'
-    const TOLD = 'Hive told it of the answer, once on each card it asked on'
+    const TOLD = 'Combwork told it of the answer, once on each card it asked on'
     const ASKED = 'asked the user on a lane card (cw_cannot_within_rules or cw_ask_user: open under For you), and ended its turn'
     const answeredAt = Date.parse('2026-10-31T12:00:00.000Z')
     const decided = { at: '2026-10-31T12:00:00.100Z', by: 'You', what: 'Recorded a decision: "The maintainer allowed the lane\'s commit…"' }
@@ -813,7 +813,7 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
   }
 
   it("card-loop-two-cards: the passed card finished by a merge report Combwork took passes; its builder's own move or verdict doesn't", () => {
-    const FIN = "finished neither card by a move of its own (the passed one only by a merge report Hive took, its project's finish)"
+    const FIN = "finished neither card by a move of its own (the passed one only by a merge report Combwork took, its project's finish)"
     const two = (hiveCalls: unknown[], pColumn: string) => run('card-loop-two-cards', { hiveCalls, cards: { p: { number: 1, key: 'AL-1', column: pColumn, history: [] }, f: { number: 2, key: 'AL-2', column: 'review', history: [] } } }, { cards: { p: 1, f: 2 }, read: () => '' })[FIN]
     expect(two([call('cw_report_merge', { card: 'AL-1' }), call('cw_submit', { card: 'AL-2', summary: 'Fixed.' })], 'done')).toBe(true)
     expect(two([call('cw_submit', { card: 'AL-2', summary: 'Fixed.' })], 'passed')).toBe(true)
@@ -1069,7 +1069,7 @@ describe('the HI-2260 check fixes', () => {
 
 describe('the HI-2265 check fix', () => {
   const byName = (id: string, o: object, c: object) => Object.fromEntries(SCENARIOS.find((s) => s.id === id)!.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
-  const TOLD = 'Hive told it once'
+  const TOLD = 'Combwork told it once'
   const o = (history: { by: string; what: string }[], wakeLines: string[]) => ({ hiveCalls: [], tools: [], skillsRead: [], wakeLines, cards: { a: { number: 1, key: 'AL-1', column: 'done', history: [{ at: '2026-11-01T00:00:00Z', by: 'You', what: 'Recorded a decision: "Use "Welcome back!" as the greeting."' }, ...history.map((h) => ({ at: '2026-11-01T00:00:05Z', ...h }))] } }, facts: { a: [] }, allCards: [{ number: 1, key: 'AL-1' }] })
   const c = { cards: { a: 1 }, read: () => 'Welcome back!\n' }
   const watchWake = '1 new:\nm1 · Hive · AL-1: [CW] AL-1 is in Doing (a new decision from the user: read its decisions). Your card watch has ended: carry on.'
@@ -1691,7 +1691,7 @@ describe('the fixtures fail when nothing was done', () => {
   it('raw-api: a script that only names the token, never run, passes nothing about running or scope', () => {
     const ctx = { read: (f: string) => (f === 'scripts/cards.ps1' ? '# CW_API_TOKEN_FILE\n# no HTTP call' : null) }
     const checks = scenario('raw-api').expect({ ...base, skillsRead: ['use-cw-api'] }, ctx)
-    expect(failed(checks)).toEqual(expect.arrayContaining(['it ran, and listed its own card', "it didn't get beta's card, and Hive refused it"]))
+    expect(failed(checks)).toEqual(expect.arrayContaining(['it ran, and listed its own card', "it didn't get beta's card, and Combwork refused it"]))
     // A run that printed the token fails too.
     expect(failed(scenario('raw-api').expect({ ...base, tokenLeak: true }, ctx))).toContain('no token was printed or said')
   })

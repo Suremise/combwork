@@ -1,5 +1,5 @@
-// Measures what sessions are actually given about Hive, from real launches (with the fake CLIs, so it costs nothing):
-// for each provider and role (project agent, the Assistant at each control level), a short catalog (Hive's own skills)
+// Measures what sessions are actually given about Combwork, from real launches (with the fake CLIs, so it costs nothing):
+// for each provider and role (project agent, the Assistant at each control level), a short catalog (Combwork's own skills)
 // and a long one (40 more skills of the user's), a new session and a resumed one. Counted from the launch itself:
 // - instructions: the hive MCP server's (initialize, with the launch's own environment), and for Codex the developer
 //   instructions on its command line; for the Assistant on Claude Code, its appended system prompt file;

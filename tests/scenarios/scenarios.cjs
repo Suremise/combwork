@@ -4,10 +4,10 @@
 // - hive tool calls the server ran (with whether they worked);
 // - the board, notes and files afterwards.
 // Each has a `fake` prompt for the fake CLIs (Claude Code's and Codex's), which act the scenario out with their scripted
-// commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
+// commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 125
+const FIXTURES_VERSION = 126
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -199,7 +199,7 @@ async function coderTask(c, task, agent = c.agents.coder) {
     const env = lib.environmentProblem(screen)
     throw new Error(`setup: ${agent.name ?? agent.id} ${what} (status ${(await coderLive(c, agent))?.status ?? 'not running'})${env ? `; environment: ${env}` : ''}; its screen ends: ${screen.slice(-400)}`)
   }
-  // Reused when Hive started it first (HI-2094: a lane's builder is started with its card by Hive's lane start, which
+  // Reused when Combwork started it first (HI-2094: a lane's builder is started with its card by Combwork's lane start, which
   // may land before or during this start), then waited for until it is ready as one started here.
   if (!(await coderLive(c, agent))) await c.inv('session:start', c.alpha, { agentId: agent.id }).catch(async (e) => { if (!(await coderLive(c, agent))) throw e })
   for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished'].includes((await coderLive(c, agent))?.status); ) {
@@ -240,7 +240,7 @@ async function pairInProject(c, more = {}) {
 }
 /**
  * alpha's workflow options (and preset), saved as the Workflow section saves them (`workflow:setOptions`: under the
- * project's lock). Never by writing project.json: a write beside Hive's own lost the agents just added (#1588).
+ * project's lock). Never by writing project.json: a write beside Combwork's own lost the agents just added (#1588).
  */
 async function setWorkflow(c, options, preset = null) {
   await c.inv('workflow:setOptions', c.alpha, { preset, options })
@@ -259,7 +259,7 @@ async function userMove(c, n, column) {
   if (!there) throw new Error(`setup: #${n} isn't in ${column} with its move: ${JSON.stringify(r)}`)
 }
 /**
- * Before the prompt (#1613): Hive's wake for card `key` that setup left the subject (Coder) has rung its doorbell, been
+ * Before the prompt (#1613): Combwork's wake for card `key` that setup left the subject (Coder) has rung its doorbell, been
  * read, and its turn is over. The doorbell is typed into the idle session as the harness types the prompt: on Copilot
  * the prompt was sometimes lost to the doorbell's turn.
  */
@@ -339,17 +339,17 @@ async function inReview(c, pool = false, description = 'greet.js returns "Hello,
 const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
 const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'hiveMerges', style: 'merge', mergeChecks: [], mergeInstall: 'onManifestChange', folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane', commands: {} }
 /**
- * A card of the rules' slots moved into Doing as the user moves it (HI-2225): Hive gives it to its builder (`key`) in its
+ * A card of the rules' slots moved into Doing as the user moves it (HI-2225): Combwork gives it to its builder (`key`) in its
  * slot, starting it with the card's line (BuilderPlaced). A scenario whose subject is someone else (the Assistant) waits
  * for that, then stops the builder, so the card's agent isn't busy on it when the subject starts (as BASELINE's record had).
  */
 async function builderStopped(c, card, key) {
   const lib = require('../e2e/lib.cjs')
   const n = c.cards[card]
-  if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), 90000))) throw new Error(`setup: Hive didn't give #${n} to ${key} in its slot`)
+  if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), 90000))) throw new Error(`setup: Combwork didn't give #${n} to ${key} in its slot`)
   const id = c.agents[key].id
   await c.inv('session:stop', c.alpha, id).catch(() => undefined)
-  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after Hive gave it #${n}`)
+  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after Combwork gave it #${n}`)
 }
 /**
  * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work
@@ -357,7 +357,7 @@ async function builderStopped(c, card, key) {
  * there.
  */
 /**
- * Card `n`'s latest submission as Hive recorded it, when it is a diff to review (HI-2223): a revision after its base,
+ * Card `n`'s latest submission as Combwork recorded it, when it is a diff to review (HI-2223): a revision after its base,
  * with files changed. Otherwise null.
  */
 async function submittedDiff(c, n) {
@@ -420,7 +420,7 @@ const cardIs = (o, ref, n) => {
   const key = keyOf(o, n)
   return !!key && s.toUpperCase() === String(key).toUpperCase()
 }
-/** A pattern for card `n` as Hive's text names it (HI-2231): its own key, or #n; never another card's key. */
+/** A pattern for card `n` as Combwork's text names it (HI-2231): its own key, or #n; never another card's key. */
 const refOf = (o, n) => [keyOf(o, n), `#${n}`].filter(Boolean).map((r) => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
 /** Whether a call's list of cards names card `n`, each by number or key (HI-1950: a model names cards by key). */
 const namesCard = (o, refs, n) => Array.isArray(refs) && refs.some((r) => cardIs(o, r, n))
@@ -467,7 +467,7 @@ const movedInto = (card, column, last = false) => {
 /** Coder's own submissions of card `key` (Submitted facts it made, not a setup's). */
 const submissionsOf = (o, c, key) => factsOf(o, key, 'Submitted').filter((f) => f.actor === `agent:${c.agents.coder.id}`)
 /**
- * When Coder handed card `key` on (ms, 0 if never): its last move into Review, or its own submission, which Hive moves on
+ * When Coder handed card `key` on (ms, 0 if never): its last move into Review, or its own submission, which Combwork moves on
  * past Review itself where nothing reviews the work (#1536: every rule off, as most scenarios' projects, or Solo).
  */
 const handedOnAt = (o, c, key) => Math.max(historyAt(o.cards[key], /^Moved to (the (top|bottom) of )?Review\b/), ...submissionsOf(o, c, key).map((f) => Date.parse(f.at) || 0))
@@ -535,7 +535,7 @@ const LOG = ${JSON.stringify(repo.log)}
 const id = process.pid + '-' + Date.now()
 const where = process.cwd()
 // git's environment: the run context's allowlist (HI-2243), so a shell's GIT_DIR or GIT_INDEX_FILE can't reach it, and
-// the session's git config by name (a test Hive gives its agents one): the checks read the settings the agent's git does.
+// the session's git config by name (a test Combwork gives its agents one): the checks read the settings the agent's git does.
 const ENV = require(${JSON.stringify(require.resolve('../e2e/runContext.cjs'))}).baseEnv()
 for (const k of ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']) if (process.env[k] !== undefined) ENV[k] = process.env[k]
 /** git's output, trimmed, or null when it fails. */
@@ -672,10 +672,10 @@ function refUpdateTime(c, ref, from, to) {
   return p < 0 ? null : { from: Number(lines[p][1]), to: Number(lines[k][1]) }
 }
 /**
- * The merge slot as Hive saw it (its slot log, #374), for agent `name` and alpha's slot for `branch`: each time it held
+ * The merge slot as Combwork saw it (its slot log, #374), for agent `name` and alpha's slot for `branch`: each time it held
  * the slot, told so (taken), [{ from, to, released }] in ms (to null while still held; released, the time of the agent's
  * own release call that ended it, null when it ended otherwise: its session's end, the user, a hold that ran out); its
- * claims and releases as Hive resolved them (this slot's only, so a call for another branch isn't one); and the holder it
+ * claims and releases as Combwork resolved them (this slot's only, so a call for another branch isn't one); and the holder it
  * waited behind in line.
  */
 function slotHolds(o, name, branch) {
@@ -778,7 +778,7 @@ const ancestor = (c, a, b) => {
  * card-loop-merge-decision, #877): two cards in Passed, their work not yet committed, and a hook that refuses commits.
  */
 /**
- * The Decide requests Coder raised on LANE_END's cards that are still open (HI-2222), read from Hive as the run goes:
+ * The Decide requests Coder raised on LANE_END's cards that are still open (HI-2222), read from Combwork as the run goes:
  * each card's ApprovalRequested facts by Coder whose request its For you still lists. [{ key, request }].
  */
 async function laneEndAsks(c) {
@@ -792,7 +792,7 @@ async function laneEndAsks(c) {
   return out
 }
 /**
- * How many times Hive told Coder of the user's answer on a card (its history's "Told agent Coder (alpha) of your
+ * How many times Combwork told Coder of the user's answer on a card (its history's "Told agent Coder (alpha) of your
  * answer": the answer's delivery received, HI-2222), since `since` (ms).
  */
 const answerToldTo = (card, since = 0) => (card?.history ?? []).filter((h) => h.by === 'Combwork' && h.what === 'Told agent Coder (alpha) of your answer' && (Date.parse(h.at) || 0) >= since).length
@@ -986,7 +986,7 @@ async function recordedWork(c, more = () => {}) {
 }
 /**
  * The shell commands a tool call ran, and nothing else of it (a description, a verdict that mentions `npm test`): a shell
- * tool's command (Hive's transcripts give Claude Code's Bash and PowerShell, Codex's shell and Copilot's as the command
+ * tool's command (Combwork's transcripts give Claude Code's Bash and PowerShell, Codex's shell and Copilot's as the command
  * itself; a JSON input's `command` or `cmd` is read too), or each `cmd` of a Codex script (`exec`).
  */
 function commandsOf(t) {
@@ -1110,7 +1110,7 @@ module.exports.SCENARIOS = [
     title: "Review a card: it stays in Review with the implementer; the reviewer's verdict ends the review",
     // A real submission (HI-1950): greet.js is the card's own commit, so the revision under review changes something; the
     // project reviews (Pair), Implementer builds and Coder reviews, as inReview's.
-    // HI-2046: Hive gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
+    // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
     startedByHive: true,
     async setup(c) {
@@ -1249,7 +1249,7 @@ module.exports.SCENARIOS = [
     id: 'review-interrupted',
     title: "A review interrupted by newer work (#1536): started with the intent; the builder takes the card back, so its verdict is refused, and the reviewer neither retries it nor moves the card",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
-    // HI-2046: Hive gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
+    // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
     startedByHive: true,
     async setup(c) {
@@ -1277,7 +1277,7 @@ module.exports.SCENARIOS = [
       const moves = movesOf(o, n).filter((x) => x.tool !== 'cw_verdict' && !(x.tool === 'cw_update_task' && argsOf(x).review))
       return [
         ['started the review with cw_start_review (a ReviewStarted fact)', ran(o, 'cw_start_review').some((x) => cardIs(o, argsOf(x).card, n)) && factsOf(o, 'r', 'ReviewStarted').length > 0, calls],
-        // What Hive keeps safe, whatever the reviewer does.
+        // What Combwork keeps safe, whatever the reviewer does.
         ['the newer work stays in Doing with its builder', o.cards.r?.column === 'doing' && o.cards.r?.agentName === 'Implementer', `${o.cards.r?.column}, ${o.cards.r?.agentName}`],
         ['no verdict was recorded once it went back (no Verdict fact after)', !factsOf(o, 'r', 'Verdict').some((f) => Date.parse(f.at) > back), JSON.stringify(factsOf(o, 'r', 'Verdict').map((f) => f.at))],
         // What the reviewer does about the refusal: its next step, not another try.
@@ -1374,7 +1374,7 @@ module.exports.SCENARIOS = [
       await c.inv('tasks:update', c.cards.a, { decision: 'Use "Welcome back!" as the greeting.' })
       c.decidedAt = Date.now()
     },
-    // Hive tells it after a settle (15 s): the run waits for that line (at most 40 s, within a fake's minute), then for the turn it starts.
+    // Combwork tells it after a settle (15 s): the run waits for that line (at most 40 s, within a fake's minute), then for the turn it starts.
     async keepWaiting(c) {
       if (!c.decidedAt || Date.now() - c.decidedAt > 40000) return false
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
@@ -1392,7 +1392,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['asked the user and ended its turn with the card in Doing (the decision came then)', decided > 0, history(o.cards.a).join(' | ')],
-        ['Hive told it once (a decision line, or its card watch)', told.length + viaWatch.length === 1, `${history(o.cards.a).join(' | ')}; watch wakes ${viaWatch.length}`],
+        ['Combwork told it once (a decision line, or its card watch)', told.length + viaWatch.length === 1, `${history(o.cards.a).join(' | ')}; watch wakes ${viaWatch.length}`],
         ['read the card after the decision', decided > 0 && cardReads(o, c.cards.a).some((t) => t > decided), `decided ${decided}, reads ${cardReads(o, c.cards.a).join(',')}`],
         ['carried on with the decided greeting', /Welcome back!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ['handed it on after the decision (in Review, or past it by its own submission)', review > decided && handedOn(o, c, 'a'), o.cards.a?.column]
@@ -1404,7 +1404,7 @@ module.exports.SCENARIOS = [
     id: 'decision-before-taking',
     title: 'An agent with a question about a card in Todo takes it before asking (#438), so the decision recorded for it is told to it',
     files: { 'greeting.txt': 'Hello\n' },
-    // Its card in Todo with no agent: Hive counts a card as an agent's only once it is in Doing with it.
+    // Its card in Todo with no agent: Combwork counts a card as an agent's only once it is in Doing with it.
     async setup(c) {
       await c.card('a', { title: 'Friendlier greeting', description: 'Change greeting.txt to a friendlier greeting. The user picks it: before changing anything, ask them in your reply whether they want "Hi there!" or "Welcome back!", then end your turn and wait for their answer. Don\'t choose yourself.' })
     },
@@ -1432,7 +1432,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['took the card (Doing, itself on it) before the decision came', decided > 0 && taken > 0 && taken < decided && history(o.cards.a).some((w) => /^Given to Coder\b/.test(w)), history(o.cards.a).join(' | ')],
-        ['Hive told it once', told.length === 1, history(o.cards.a).join(' | ')],
+        ['Combwork told it once', told.length === 1, history(o.cards.a).join(' | ')],
         ['read the card after the decision', decided > 0 && cardReads(o, c.cards.a).some((t) => t > decided), `decided ${decided}, reads ${cardReads(o, c.cards.a).join(',')}`],
         ['carried on with the decided greeting', /Welcome back!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ['handed it on after the decision (in Review, or past it by its own submission)', review > decided && handedOn(o, c, 'a'), o.cards.a?.column]
@@ -2002,13 +2002,13 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'raw-api',
-    title: "A script against Hive's API: run, scoped to its project, refused elsewhere, the token never shown",
+    title: "A script against Combwork's API: run, scoped to its project, refused elsewhere, the token never shown",
     projects: ['beta'],
     async setup(c) {
       await c.card('own', { title: 'Scoped card for alpha' })
       await c.card('other', { title: 'Beta secret card', project: 'beta' })
     },
-    prompt: "Write scripts/cards.ps1, a PowerShell script that lists this project's cards using Hive's HTTP API, then also tries to read project beta's cards and prints what Hive answers. Run it once.",
+    prompt: "Write scripts/cards.ps1, a PowerShell script that lists this project's cards using Combwork's HTTP API, then also tries to read project beta's cards and prints what Combwork answers. Run it once.",
     fake: 'skill use-cw-api',
     expect: (o, c) => {
       const script = c.read('scripts/cards.ps1') ?? ''
@@ -2019,12 +2019,12 @@ module.exports.SCENARIOS = [
         ['the script takes the agent\'s own token from CW_API_TOKEN_FILE', /CW_API_TOKEN_FILE/.test(script), script.slice(0, 200)],
         ['never the workspace token (agent-api.json)', !/agent-api\.json/i.test(script) && !o.tools.some((t) => /agent-api\.json/i.test(t.input))],
         ['it ran, and listed its own card', /Scoped card for alpha/.test(out), out.slice(0, 200)],
-        ["it didn't get beta's card, and Hive refused it", !/Beta secret card/.test(out) && /403|forbidden|not allowed|only for your own|another project/i.test(out), out.slice(0, 300)],
+        ["it didn't get beta's card, and Combwork refused it", !/Beta secret card/.test(out) && /403|forbidden|not allowed|only for your own|another project/i.test(out), out.slice(0, 300)],
         // Where it was seen, masked (HI-2259; harness.cjs tokenSightings): all of them are in observed.tokenSeen.
         ['no token was printed or said', !o.tokenLeak, (o.tokenSeen ?? []).map((s) => `${s.kind} token in ${s.in} ${s.at}${s.name ? ` (${s.name})` : ''}: …${s.excerpt}…`).join('; ')]
       ]
     },
-    fakeSkips: ["the script takes the agent's own token from CW_API_TOKEN_FILE", 'it ran, and listed its own card', "it didn't get beta's card, and Hive refused it"]
+    fakeSkips: ["the script takes the agent's own token from CW_API_TOKEN_FILE", 'it ran, and listed its own card', "it didn't get beta's card, and Combwork refused it"]
   },
   {
     id: 'unrelated-coding',
@@ -2034,7 +2034,7 @@ module.exports.SCENARIOS = [
     // Whether it read the generalist skill: what the contract's route asks, recorded, never a failure (a short task may not).
     observe: (o) => [['read the generalist skill', read(o, 'generalist'), o.skillsRead.join(',')]],
     expect: (o, c) => [
-      ['read no Hive workflow skill (the generalist skill only)', o.skillsRead.every((s) => s === 'generalist'), o.skillsRead.join(',')],
+      ['read no Combwork workflow skill (the generalist skill only)', o.skillsRead.every((s) => s === 'generalist'), o.skillsRead.join(',')],
       ['changed nothing on the board', !o.hiveCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))],
       ['did the work', /add/.test(c.read('math.js') ?? '')]
     ],
@@ -2106,7 +2106,7 @@ module.exports.SCENARIOS = [
     id: 'watcher-stopped',
     title: "A card's long run, watched for failures as it goes: once the card is in Review the agent has left nothing running (#613)",
     files: WATCHED_RUN,
-    // Stopped after its turn, the agent's launch is looked at: what Hive lists as left running is what it left (#507).
+    // Stopped after its turn, the agent's launch is looked at: what Combwork lists as left running is what it left (#507).
     leftovers: true,
     async setup(c) {
       await c.card('w', {
@@ -2128,7 +2128,7 @@ module.exports.SCENARIOS = [
       ['said which check failed on the card', (o.cards.w?.comments ?? []).some((x) => /currency/i.test(x.text)), (o.cards.w?.comments ?? []).map((x) => x.text.slice(0, 120)).join(' | ')],
       // HI-2571: what Combwork listed, less a stopped Monitor's pipeline the CLI left (leftoversByOwner: by the run's own
       // evidence). What was left is still recorded (o.leftovers, and the observation below).
-      ['left nothing running of its own once its card was in Review (Hive listed nothing else as it stopped)', Array.isArray(o.leftovers) && !leftoversByOwner(o).agent.length && !leftoversByOwner(o).more, JSON.stringify({ agent: leftoversByOwner(o).agent, more: leftoversByOwner(o).more })],
+      ['left nothing running of its own once its card was in Review (Combwork listed nothing else as it stopped)', Array.isArray(o.leftovers) && !leftoversByOwner(o).agent.length && !leftoversByOwner(o).more, JSON.stringify({ agent: leftoversByOwner(o).agent, more: leftoversByOwner(o).more })],
       // Combwork's handling of what it listed: its End Them ended each process (by id and start time), the CLI's too.
       ["Combwork's End Them ended what it listed (nothing listed still runs)", !(o.leftovers ?? []).some((l) => l.processes?.length || l.more) || (typeof o.leftoversEnded === 'number' && Array.isArray(o.leftoversStillRunning) && !o.leftoversStillRunning.length), JSON.stringify({ ended: o.leftoversEnded, still: o.leftoversStillRunning })],
       ['changed no files (nothing uncommitted, and no commit)', o.gitStatus.trim() === '' && c.git('rev-parse', 'HEAD').trim() === c.head, `${o.gitStatus}; ${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`]
@@ -2231,8 +2231,8 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.card('r', { title: 'Write down the retry policy', description: 'Add RETRY.md at the root with one line saying how many times a failed upload is retried and the wait between tries.', context: ['DESIGN.md#retry-policy'] })
     },
-    // As Hive starts a card (shared/tasks.ts taskPrompt): the reference and its section's size, not its text.
-    prompt: (c) => `Work on task #${c.cards.r} from the Hive task board: Write down the retry policy\n\nAdd RETRY.md at the root with one line saying how many times a failed upload is retried and the wait between tries.\n\nRead these first: DESIGN.md#retry-policy (1.7k characters). cw_read_section reads each as the card has it (path: the file; heading: # and the slug after it, none for a whole file; from: "project").\n\nUse the work-on-card skill.`,
+    // As Combwork starts a card (shared/tasks.ts taskPrompt): the reference and its section's size, not its text.
+    prompt: (c) => `Work on task #${c.cards.r} from the Combwork task board: Write down the retry policy\n\nAdd RETRY.md at the root with one line saying how many times a failed upload is retried and the wait between tries.\n\nRead these first: DESIGN.md#retry-policy (1.7k characters). cw_read_section reads each as the card has it (path: the file; heading: # and the slug after it, none for a whole file; from: "project").\n\nUse the work-on-card skill.`,
     fake: (c) => `skill work-on-card then ${fakeStart(c.cards.r)} then hive cw_read_section {"path":"DESIGN.md","heading":"#retry-policy"} then ${fakeSubmit(c.cards.r, 'Ready for review: RETRY.md says 7 retries, 90 seconds apart.')}`,
     expect: (o, c) => {
       const onDoc = o.tools.filter((t) => !t.isError && !/cw_/.test(t.name) && t.input.includes('DESIGN.md'))
@@ -2254,15 +2254,15 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.card('b', { title: 'Write down the retry policy', description: 'Add RETRY.md at the root with one line saying how many times a failed upload is retried and the wait between tries.', context: ['DESIGN.md#retry-policies'] })
     },
-    // As Hive starts it once the heading was renamed (shared/tasks.ts contextText): the reference named, why and the closest.
-    prompt: (c) => `Work on task #${c.cards.b} from the Hive task board: Write down the retry policy\n\nAdd RETRY.md at the root with one line saying how many times a failed upload is retried and the wait between tries.\n\nThis reference no longer resolves: DESIGN.md#retry-policies (no such heading; closest: #retry-policy). Ask the user which section is meant, or read the closest. cw_read_section reads the closest as the card has it (path: the file; heading: # and the slug; from: "project").\n\nUse the work-on-card skill.`,
+    // As Combwork starts it once the heading was renamed (shared/tasks.ts contextText): the reference named, why and the closest.
+    prompt: (c) => `Work on task #${c.cards.b} from the Combwork task board: Write down the retry policy\n\nAdd RETRY.md at the root with one line saying how many times a failed upload is retried and the wait between tries.\n\nThis reference no longer resolves: DESIGN.md#retry-policies (no such heading; closest: #retry-policy). Ask the user which section is meant, or read the closest. cw_read_section reads the closest as the card has it (path: the file; heading: # and the slug; from: "project").\n\nUse the work-on-card skill.`,
     fake: (c) => `skill work-on-card then ${fakeStart(c.cards.b)} then hive cw_read_section {"path":"DESIGN.md","heading":"#retry-policy","from":"project"} then ${fakeSubmit(c.cards.b, "Ready for review: RETRY.md from DESIGN.md#retry-policy (the card's reference no longer resolved: its closest).")}`,
     expect: (o, c) => {
       const onDoc = o.tools.filter((t) => !t.isError && !/cw_/.test(t.name) && t.input.includes('DESIGN.md'))
       const whole = onDoc.filter((t) => (/^Read$/i.test(t.name) ? !/\b(limit|offset)\b/.test(t.input) : /bash|shell|powershell|exec|command/i.test(t.name) && /\b(cat|type|Get-Content|gc|more|less)\b/i.test(t.input) && !/-(TotalCount|Tail|First|Head)\b|\| *(head|Select-Object|Select-String|findstr|grep)/i.test(t.input)))
       const closestRead = ran(o, 'cw_read_section').some((x) => /^#?retry-policy$/i.test(String(argsOf(x).heading ?? ''))) || (onDoc.length > 0 && whole.length === 0)
       const asked = ran(o, 'cw_notify').length > 0 || !!o.cards.b?.blocked || asksTheUser(o.finalReply)
-      // #819 round 2: a read of the closest through Hive names the project's copy, as the prompt says.
+      // #819 round 2: a read of the closest through Combwork names the project's copy, as the prompt says.
       const reads = ran(o, 'cw_read_section')
       return [
         ['read the closest section, or asked the user', closestRead || asked, `${o.hiveCalls.map((x) => x.tool).join(',')} | ${(o.finalReply ?? '').slice(0, 200)}`],
@@ -2349,7 +2349,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'skill-unchanged',
-    title: 'Skills unchanged since Hive last looked: the launch finds them in its cache, and the work goes on',
+    title: 'Skills unchanged since Combwork last looked: the launch finds them in its cache, and the work goes on',
     async setup(c) {
       await c.card('u', { title: 'Add NOTICE.txt', description: 'Add a NOTICE.txt with the line "alpha".' })
     },
@@ -2358,7 +2358,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => [
       ['read work-on-card', read(o, 'work-on-card'), o.skillsRead.join(',')],
       ['the skill service found every skill unchanged (hits, no misses or changes)', (o.measures?.skillHits ?? 0) > 0 && o.measures?.skillMisses === 0 && o.measures?.skillInvalidations === 0, JSON.stringify({ hits: o.measures?.skillHits, misses: o.measures?.skillMisses, changed: o.measures?.skillInvalidations })],
-      ['the session was given the revision Hive had', !!o.guidance?.delivered?.skills?.['work-on-card'] && o.guidance.delivered.skills['work-on-card'] === o.guidance.atStart?.skills?.find((x) => x.name === 'work-on-card')?.revision],
+      ['the session was given the revision Combwork had', !!o.guidance?.delivered?.skills?.['work-on-card'] && o.guidance.delivered.skills['work-on-card'] === o.guidance.atStart?.skills?.find((x) => x.name === 'work-on-card')?.revision],
       ['Doing, then handed on', movedInto(o.cards.u, 'Doing') >= 0 && handedOn(o, c, 'u'), history(o.cards.u).join(' | ')],
       ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.u)]
     ]
@@ -2469,11 +2469,11 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-merge-decision',
-    title: "The same lane's end answered as a decision on its card in Passed (#877; HI-1932, HI-2222): the decision closes the builder's question, Hive wakes it once, and it reads the card and finishes",
+    title: "The same lane's end answered as a decision on its card in Passed (#877; HI-1932, HI-2222): the decision closes the builder's question, Combwork wakes it once, and it reads the card and finishes",
     files: LANE_END.files,
     setup: LANE_END.setup,
     // The user allows the commit and answers through the Assistant or the card (HI-1932): a decision on each card it
-    // asked on, naming the requests it answers, which Hive closes, waking the agent that asked.
+    // asked on, naming the requests it answers, which Combwork closes, waking the agent that asked.
     async during(c, status) {
       if (!(await LANE_END.answerDue(c, status))) return
       for (const key of new Set(c.atAnswer.asked.map((x) => x.key))) {
@@ -2481,7 +2481,7 @@ module.exports.SCENARIOS = [
         await c.inv('tasks:update', c.cards[key], { decision: "The maintainer allowed the lane's commit: the hook lets it through now. Finish the lane's end.", answers })
       }
     },
-    // A fake stops once Hive has told it of the answer on every card it asked on (at most 40 s); a model's turn goes on
+    // A fake stops once Combwork has told it of the answer on every card it asked on (at most 40 s); a model's turn goes on
     // until the last card is Done (4 minutes).
     async keepWaiting(c) {
       if (!c.answeredAt) return false
@@ -2499,19 +2499,19 @@ module.exports.SCENARIOS = [
       const decided = Math.min(...keys.map((k) => historyAt(o.cards[k], /^Recorded a decision: "The maintainer allowed/) || Infinity))
       // Each question it asked closed by the decision, once (its Approval by decision).
       const closed = (c.atAnswer?.asked ?? []).map((x) => factsOf(o, x.key, 'Approval').filter((f) => f.data?.request === x.request && f.data?.byDecision).length)
-      // And the answer given to it (HR1, HI-2222 round 1): Hive's delivery to Coder, once on each card it asked on.
+      // And the answer given to it (HR1, HI-2222 round 1): Combwork's delivery to Coder, once on each card it asked on.
       const told = keys.map((k) => answerToldTo(o.cards[k], c.answeredAt))
       return [
         ...LANE_END.before(o, c),
         ['the decision closed each question it asked, once', closed.length > 0 && closed.every((n) => n === 1) && Number.isFinite(decided), `${JSON.stringify(c.atAnswer?.asked ?? [])} closed ${JSON.stringify(closed)}`],
-        ['Hive told it of the answer, once on each card it asked on', told.length > 0 && told.every((n) => n === 1), `told ${JSON.stringify(told)}; ${keys.map((k) => history(o.cards[k]).join(' | ')).join(' || ')}`],
+        ['Combwork told it of the answer, once on each card it asked on', told.length > 0 && told.every((n) => n === 1), `told ${JSON.stringify(told)}; ${keys.map((k) => history(o.cards[k]).join(' | ')).join(' || ')}`],
         // Or its inbox, read after it, quoting the decision whole (HI-2261: rounds.md's "their answer comes to your inbox:
         // carry on from where you asked", and the item gives the decision's own text).
         ['read the card after the decision', Number.isFinite(decided) && (keys.some((k) => cardReads(o, c.cards[k]).some((t) => t > decided)) || ran(o, 'cw_inbox').some((x) => Date.parse(x.at) > decided && String(x.reply ?? '').includes("The maintainer allowed the lane's commit: the hook lets it through now."))), `decided ${decided}, reads ${keys.map((k) => cardReads(o, c.cards[k]).join(',')).join(' | ')}`],
         ...LANE_END.after(o, c)
       ]
     },
-    // The fakes don't act on Hive's line: what it does after it is a model's.
+    // The fakes don't act on Combwork's line: what it does after it is a model's.
     fakeSkips: ['read the card after the decision', 'committed the lane’s work', 'both cards Done']
   },
   {
@@ -2675,7 +2675,7 @@ module.exports.SCENARIOS = [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['gave no verdict (not failed on that alone)', !h.some((x) => /^Review (passed|failed)$/.test(x)), h.join(' | ')],
         ['asked on the card for a commit', asked, (o.cards.r?.comments ?? []).map((x) => x.text.split('\n')[0]).join(' | ')],
-        // The watch its turn ended on, as Hive recorded it: on the card, waking on a comment (named, or by default: a
+        // The watch its turn ended on, as Combwork recorded it: on the card, waking on a comment (named, or by default: a
         // watch naming no changes wakes on any, HI-2260).
         ["ended its turn watching for the builder's reply", !!turnWatch(o) && (turnWatch(o).cards ?? []).includes(c.cards.r) && (turnWatch(o).changes ?? []).includes('comment') && watches.length > 0, `${o.status}; ${JSON.stringify(turnWatch(o))}; ${JSON.stringify(watches)}`],
         ['left the card in Review', o.cards.r?.column === 'review', o.cards.r?.column],
@@ -2737,7 +2737,7 @@ module.exports.SCENARIOS = [
       // Its lanes as saved (#1018: the workspace's database).
       const lane = require('../e2e/storeDocs.cjs').storeDocs(c.ws, 'lanes').find((l) => l.cards?.includes(c.cards.a))
       const waits = ran(o, 'cw_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(o, a.cards, c.cards.a))
-      // Its watch for the verdict, its own or the one Hive arms at its submission (#1639): the lane's wait long.
+      // Its watch for the verdict, its own or the one Combwork arms at its submission (#1639): the lane's wait long.
       const minutes = turnWatch(o) ? Math.round((Date.parse(turnWatch(o).limitAt) - Date.parse(turnWatch(o).since)) / 60000) : null
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
@@ -2751,9 +2751,9 @@ module.exports.SCENARIOS = [
   })),
   {
     id: 'card-loop-submit-watch',
-    title: "A card loop builder submits and ends its turn (#1639): Hive watches the card for it, with no watch call of its own, so its lane isn't stalled, and the verdict wakes it",
+    title: "A card loop builder submits and ends its turn (#1639): Combwork watches the card for it, with no watch call of its own, so its lane isn't stalled, and the verdict wakes it",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
-    // HI-2215: Hive starts the lane's first card on Coder itself (HI-2029, laneStarts) once builderLane has stopped it, and
+    // HI-2215: Combwork starts the lane's first card on Coder itself (HI-2029, laneStarts) once builderLane has stopped it, and
     // starts it with its line: the harness's own start raced that one (on Codex, refused as "already running or
     // starting"). The prompt below is a model's only as the line says it; the fake is typed its steps after it, the card
     // already in Doing.
@@ -2766,7 +2766,7 @@ module.exports.SCENARIOS = [
       await c.startAgent('implementer')
     },
     // Once its turn has ended with the card in Review: the watch it has then, and Implementer's failed verdict (whose
-    // reply says Hive watches the card for its next round); then whether that woke it.
+    // reply says Combwork watches the card for its next round); then whether that woke it.
     async during(c, status) {
       if (c.verdictAt) {
         if (status === 'working') c.woke = true
@@ -2823,7 +2823,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-lane-next',
-    title: "A card loop builder whose lane's first card goes Done while it reads the wake (HI-1990): once its turn ends, Hive starts the lane's next card on it, with no prompt from the user or the Assistant",
+    title: "A card loop builder whose lane's first card goes Done while it reads the wake (HI-1990): once its turn ends, Combwork starts the lane's next card on it, with no prompt from the user or the Assistant",
     // The first card's work as merged (HI-2047): without it the next card can't be built, and a model asks the user why.
     files: { 'greet.js': "module.exports = (name) => 'Hi, ' + name\n" },
     async setup(c) {
@@ -2832,14 +2832,14 @@ module.exports.SCENARIOS = [
       const b = await c.card('b', { title: 'greet() trims the name', description: 'greet.js: greet trims spaces around the name.', agent: 'coder' })
       await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
     },
-    // The first card Done (merged, as the user moves it) while the builder is in its turn: Hive waits for the turn's end.
+    // The first card Done (merged, as the user moves it) while the builder is in its turn: Combwork waits for the turn's end.
     async during(c, status) {
       if (c.doneAt || status !== 'working') return
       const r = await c.inv('tasks:move', c.cards.a, 'done', { confirm: true, reason: 'merged by hand (the scenario)' })
       if (r?.refused || r?.stopped) throw new Error(`moving #${c.cards.a} to Done: ${JSON.stringify(r)}`)
       c.doneAt = Date.now()
     },
-    // Hive's start comes after the turn: waited for (at most a minute), until its task's doorbell is in the builder's pane.
+    // Combwork's start comes after the turn: waited for (at most a minute), until its task's doorbell is in the builder's pane.
     async keepWaiting(c) {
       if (!c.doneAt || Date.now() - c.doneAt > 60000) return false
       const pane = await c.inv('pty:buffer', require('../e2e/lib.cjs').ptyKey(c.alpha, c.agents.coder.id)).catch(() => '')
@@ -2849,18 +2849,18 @@ module.exports.SCENARIOS = [
       return !c.given
     },
     prompt: (c) =>
-      `[CW] #${c.cards.a} (Coder's card) is in Done. Your lane's next card is #${c.cards.b} ("greet() trims the name"): Hive starts it for you once your turn ends, so end your turn now (cw_read_task with latestComment for the comment in full).`,
+      `[CW] #${c.cards.a} (Coder's card) is in Done. Your lane's next card is #${c.cards.b} ("greet() trims the name"): Combwork starts it for you once your turn ends, so end your turn now (cw_read_task with latestComment for the comment in full).`,
     fake: 'skill card-loop',
     expect: (o, c) => {
       const b = o.cards.b
       const started = (b?.history ?? []).find((h) => /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))
-      // Coder's own start of #b, whose reply gives what Hive's would have (HI-2092: Codex starts it rather than end its turn).
+      // Coder's own start of #b, whose reply gives what Combwork's would have (HI-2092: Codex starts it rather than end its turn).
       const own = hiveReplies(o, 'cw_start_card').find((t) => (namesCard(o, [argsOf({ args: t.input }).card], c.cards.b) || (!!b?.key && String(t.result).includes(`${b.key} is a card of your lane`))) && /card-loop skill as this lane's builder/.test(String(t.result)))
       const start = c.start ?? (own ? String(own.result) : null)
       return [
         // In Review once Coder has built it (HI-2047: its project has the first card's work, so it can be).
         [`#${c.cards.b} is started on Coder (in Doing or on to Review, its agent)`, ['doing', 'review'].includes(b?.column) && (b?.agent?.id ?? b?.agent) === c.agents.coder.id, `${b?.column} / ${JSON.stringify(b?.agent)}`],
-        [`Coder is given #${c.cards.b} (by Hive's start, its task's doorbell in its pane; or by its own start's reply)`, !!c.given || !!own, `${c.given} / own start: ${!!own}`],
+        [`Coder is given #${c.cards.b} (by Combwork's start, its task's doorbell in its pane; or by its own start's reply)`, !!c.given || !!own, `${c.given} / own start: ${!!own}`],
         // HI-2047: a running lane's builder is pointed at card-loop alone.
         ["its start names card-loop as the lane's builder, not work-on-card", /card-loop skill as this lane's builder/.test(start ?? '') && !/work-on-card/.test(start ?? ''), String(start)],
         ['started by Combwork or by Coder itself, nobody else', !!started && /^(Combwork|Coder)/.test(started.by), JSON.stringify(started ?? null)],
@@ -2911,14 +2911,14 @@ module.exports.SCENARIOS = [
       giveVerdict(c, f, 'failed')
     },
     prompt: (c) =>
-      `You are the builder of a card loop on #${c.cards.p} and #${c.cards.f}, reviewed together by Implementer (rounds: 5); you were watching both. Hive has just woken you with: "[CW] #${c.cards.p} is in Passed: Implementer (alpha) passed it; latest comment by Implementer (alpha): "Review round 1: PASSED.". Your card watch has ended: carry on." Carry on as the builder.`,
+      `You are the builder of a card loop on #${c.cards.p} and #${c.cards.f}, reviewed together by Implementer (rounds: 5); you were watching both. Combwork has just woken you with: "[CW] #${c.cards.p} is in Passed: Implementer (alpha) passed it; latest comment by Implementer (alpha): "Review round 1: PASSED.". Your card watch has ended: carry on." Carry on as the builder.`,
     // The fake fixes the failed card (back in Doing) and submits it, as a builder that checked both cards does.
     fake: (c) => `skill card-loop then ${LOOP_COMMIT} then hive cw_submit ${JSON.stringify({ card: `#${c.cards.f}`, summary: 'Fixed: the delay is awaited.' })}`,
     expect: (o, c) => {
       const h = history(o.cards.f)
       const after = h.slice(h.lastIndexOf('Review failed') + 1)
       // The passed card's finish as work-on-card's after-review.md gives it (HI-2239): where merges aren't checked, or its
-      // work is in, `cw_report_merge` finishes it, and Hive takes it only then. Its own column moves and verdicts are
+      // work is in, `cw_report_merge` finishes it, and Combwork takes it only then. Its own column moves and verdicts are
       // never its builder's.
       const reportedP = ran(o, 'cw_report_merge').some((x) => cardIs(o, argsOf(x).card, c.cards.p))
       const movedP = movesOf(o, c.cards.p).some((x) => x.ok && x.tool !== 'cw_report_merge' && (/^(passed|done)$/.test(String(argsOf(x).column ?? '')) || x.tool === 'cw_verdict'))
@@ -2927,7 +2927,7 @@ module.exports.SCENARIOS = [
         // Back to work on it (through Doing), or fixed and back for review already: either way the failure wasn't missed.
         ["acted on the failed card the wake line didn't name", after.some((w) => /^(Moved to (the (top|bottom) of )?(Doing|Review)\b|Returned for review)/.test(w)) || submissionsOf(o, c, 'f').length > 0, h.join(' | ')],
         ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
-        ["finished neither card by a move of its own (the passed one only by a merge report Hive took, its project's finish)", !finishedItself(o, c.cards.f) && !movedP && (o.cards.p?.column !== 'done' || reportedP), `${o.cards.p?.column} / ${o.cards.f?.column}; ${movesOf(o, c.cards.p).map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')}`]
+        ["finished neither card by a move of its own (the passed one only by a merge report Combwork took, its project's finish)", !finishedItself(o, c.cards.f) && !movedP && (o.cards.p?.column !== 'done' || reportedP), `${o.cards.p?.column} / ${o.cards.f?.column}; ${movesOf(o, c.cards.p).map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')}`]
       ]
     },
     fakeSkips: ['fixed it: the delay is awaited']
@@ -2962,7 +2962,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'assistant-journal-recall',
-    title: "The Assistant's journal (#1032): a fresh session gets Hive's short state view with last week's decision at its start, again after Hive compacts it, and recalls the decision when asked after the compaction",
+    title: "The Assistant's journal (#1032): a fresh session gets Combwork's short state view with last week's decision at its start, again after Combwork compacts it, and recalls the decision when asked after the compaction",
     role: 'assistant',
     control: 'agents',
     async setup(c) {
@@ -2978,11 +2978,11 @@ module.exports.SCENARIOS = [
       c.entry = id
       await c.stopAssistant()
     },
-    // A first turn, then Hive's Compact (the CLI's /compact), then the question once the compaction is over.
+    // A first turn, then Combwork's Compact (the CLI's /compact), then the question once the compaction is over.
     prompt: 'Reply with the one word "ready".',
     fake: 'work 1',
     // Each step waits for the one before to be over by durable evidence (#1032 round 3): the conversation has the
-    // prompt and a reply after it, with the session idle; the compaction by Hive's view after it (or the transcript's).
+    // prompt and a reply after it, with the session idle; the compaction by Combwork's view after it (or the transcript's).
     async during(c, status) {
       if (!['finished', 'ready'].includes(status) || c.askedAt) return
       c.home ??= (await c.inv('workspace:refresh')).assistant.path
@@ -3017,7 +3017,7 @@ module.exports.SCENARIOS = [
       // Every CLI takes the view at its start since #1065; the scenario compacts only Claude Code's session (above).
       const compacts = c.provider === 'claude-code'
       return [
-        ["Hive gave the state view at its start, with the board and last week's decision", views.some((x) => x.source !== 'compact' && has(x)), views.map((x) => x.source).join(',')],
+        ["Combwork gave the state view at its start, with the board and last week's decision", views.some((x) => x.source !== 'compact' && has(x)), views.map((x) => x.source).join(',')],
         ...(compacts
           ? [
               ['and again after the compaction', compactViews.some(has), compactViews.map((x) => x.text.slice(0, 200)).join(' | ') || `${views.length} views`],
@@ -3174,7 +3174,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'intent-submit-refused',
-    title: "A builder's submission refused by a gate (#1536): its work isn't committed, so Hive refuses it, saying in git's words what is missing; asked only to submit for review, not to do the card, it asks the user before committing, as the refusal's next step says (HI-1618: submitting never commits; HI-2257: an agent doing the card commits, one asked only to submit asks first), overriding nothing and moving nothing by hand",
+    title: "A builder's submission refused by a gate (#1536): its work isn't committed, so Combwork refuses it, saying in git's words what is missing; asked only to submit for review, not to do the card, it asks the user before committing, as the refusal's next step says (HI-1618: submitting never commits; HI-2257: an agent doing the card commits, one asked only to submit asks first), overriding nothing and moving nothing by hand",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       c.git('config', 'user.email', 'agent@example.com')
@@ -3196,7 +3196,7 @@ module.exports.SCENARIOS = [
       return [
         ['its submission of uncommitted work was refused (submit.empty or submit.clean)', refused >= 0, calls],
         ['committed nothing it wasn\'t asked to', c.git('rev-parse', 'HEAD').trim() === c.head, `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`],
-        ['asked the user whether to commit (a question about committing: in its reply, through Hive, or its CLI\'s question)', askedToCommit(o), `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300) || (o.finalReply ?? '').slice(0, 300)}`],
+        ['asked the user whether to commit (a question about committing: in its reply, through Combwork, or its CLI\'s question)', askedToCommit(o), `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300) || (o.finalReply ?? '').slice(0, 300)}`],
         ['the card stays in Doing', o.cards.s?.column === 'doing', o.cards.s?.column],
         ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
@@ -3234,7 +3234,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'slot-start',
-    title: "A builder starts a card where cards are built in slots (#1444): Hive lends the card a slot, and the builder makes no worktree of its own and changes nothing in the project folder",
+    title: "A builder starts a card where cards are built in slots (#1444): Combwork lends the card a slot, and the builder makes no worktree of its own and changes nothing in the project folder",
     files: { 'greet.js': "module.exports = (name) => 'Hello ' + name\n" },
     async setup(c) {
       await pairRules(c)
@@ -3253,7 +3253,7 @@ module.exports.SCENARIOS = [
       // read the hive calls, the repository and the card, which span both.
       return [
         ['started it with cw_start_card', ran(o, 'cw_start_card').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
-        ['Hive lent the card a slot (its Started fact)', !!slot, JSON.stringify(started?.data)],
+        ['Combwork lent the card a slot (its Started fact)', !!slot, JSON.stringify(started?.data)],
         ['made no worktree of its own: the only new one is the slot', made.length <= 1 && made.every((t) => !!slot && t.endsWith(slot.toLowerCase())), made.join(', ')],
         ['ran no git worktree command', runs(o, 'git worktree add').length === 0],
         ["changed nothing in the project folder: no commit there, no change", c.git('rev-parse', 'HEAD').trim() === c.head && o.gitStatus.trim() === '', o.gitStatus]
@@ -3264,15 +3264,15 @@ module.exports.SCENARIOS = [
     id: 'review-in-copy',
     title: "A reviewer reviews in the review copy its start names (#1444, #1439): it reads and runs the checks there, not in the builder's folder, and gives its verdict",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nrequire('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran')\nconsole.log('ok')\n" },
-    // HI-2046: Hive gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
+    // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
     startedByHive: true,
     async setup(c) {
-      // Its check in the card (HI-2046: Hive's line, not the prompt, starts a model's review).
+      // Its check in the card (HI-2046: Combwork's line, not the prompt, starts a model's review).
       await inReview(c, false, 'greet.js returns "Hello, <name>", trimmed. Its check is node test.js.')
       c.copyLeases = new Set()
     },
-    // The review copies Hive lends Coder while it works (a CLI may show a tool's reply only in part: Codex calls the hive
+    // The review copies Combwork lends Coder while it works (a CLI may show a tool's reply only in part: Codex calls the hive
     // tools from its own code tool, whose output it shortens).
     async during(c) {
       for (const v of (await c.inv('copies:list', c.alpha).catch(() => [])) ?? []) if (v.lease?.kind === 'review' && v.lease.agent === c.agents.coder.id) c.copyLeases.add(v.folder)
@@ -3280,7 +3280,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Review card #${c.cards.r}: its check is node test.js. Give your verdict.`,
     fake: (c) => `skill review-agent-work then hive cw_start_review {"card":"#${c.cards.r}"} then hive cw_verdict {"card":"#${c.cards.r}","pass":true,"comment":"Round 1: PASSED. greet trims the name; node test.js passes."}`,
     expect: (o, c) => {
-      // The copy's folder: as the reply the agent saw names it (in any tool's result), else the copy Hive lent it.
+      // The copy's folder: as the reply the agent saw names it (in any tool's result), else the copy Combwork lent it.
       const copyReply = o.tools.map((t) => t.result).find((r) => /Review in .+? at [0-9a-f]{7,}/.test(r)) ?? ''
       const copy = (copyReply.match(/Review in (.+?) at [0-9a-f]{7,}/) ?? [])[1] ?? [...c.copyLeases][0] ?? ''
       // A path as a tool's input may give it: either slash, escaped or not, any case.
@@ -3292,7 +3292,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
         ['started the review with cw_start_review', ran(o, 'cw_start_review').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
-        ['Hive lent it a review copy at its start', c.copyLeases.size > 0 || !!copyReply, [...c.copyLeases].join(', ')],
+        ['Combwork lent it a review copy at its start', c.copyLeases.size > 0 || !!copyReply, [...c.copyLeases].join(', ')],
         ['the reply it saw named the copy, with its folder', !!copyReply, hiveReplies(o, 'cw_start_review').map((t) => t.result.slice(0, 300)).join(' | ')],
         ['read or ran its checks in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => `${t.cwd ? `[${t.cwd}] ` : ''}${t.input.slice(0, 80)}`).join(' | ')}`],
         // test.js leaves ran.txt beside itself: one in the project folder is a check run there, not in the copy (#1559).
@@ -3307,13 +3307,13 @@ module.exports.SCENARIOS = [
     id: 'pool-reviewer-wake',
     title: "A reviewer from the project's reviewer pool is given a card (#1444, #1443): it reviews that card, with no lane to join, and gives its verdict",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
-    // HI-2046: Hive gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
+    // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
     startedByHive: true,
     async setup(c) {
       await inReview(c, true)
     },
-    // The line Hive's pass gives its reviewer (reviewerPool.ts), the card named: no pool lane holds it, so it is loose.
+    // The line Combwork's pass gives its reviewer (reviewerPool.ts), the card named: no pool lane holds it, so it is loose.
     prompt: (c) => `[CW] #${c.cards.r} (Implementer's card) is in Review, outside a lane: you review it. Review its latest submission with the review-agent-work skill; your verdict frees you for the next card.`,
     fake: (c) => `skill review-agent-work then hive cw_read_task {"number":${c.cards.r}} then hive cw_start_review {"card":"#${c.cards.r}"} then hive cw_verdict {"card":"#${c.cards.r}","pass":true,"comment":"Round 1: PASSED. greet trims the name."}`,
     expect: (o) => {
@@ -3336,7 +3336,7 @@ module.exports.SCENARIOS = [
       // at which revision it ran, in the workspace (outside the project and its copies).
       await pairInProject(c, { preChecks: ['quick'], commands: { quick: 'node check.js' } })
       c.checkLog = path.join(c.ws, 'quick-runs.jsonl')
-      // check.js is the project's own check, run by Hive's check runner with its environment, not a child of the harness.
+      // check.js is the project's own check, run by Combwork's check runner with its environment, not a child of the harness.
       c.write('check.js', `const cp = require('child_process')\nrequire('fs').appendFileSync(${JSON.stringify(c.checkLog)}, JSON.stringify({ cwd: process.cwd(), head: cp.execSync('git rev-parse HEAD').toString().trim() }) + '\\n')\nconsole.log('quick: ok')\n`)
       const n = await c.card('q', { title: 'Greeting comma', description: 'greet.js returns "Hello, <name>" with a comma. Its check is the workflow check quick.', agent: 'coder' })
       await userMove(c, n, 'doing')
@@ -3369,9 +3369,9 @@ module.exports.SCENARIOS = [
     id: 'card-loop-design-first',
     title: "A card loop builder asked for a design first (#1382): it arms its watch, posts the design for its reviewer's check with cw_loop_step, and builds nothing yet",
     files: { 'cache.js': 'module.exports = new Map()\n' },
-    // HI-2278: Hive starts the lane's first card on Coder itself (HI-2029, laneStarts) once builderLane has stopped it, as
+    // HI-2278: Combwork starts the lane's first card on Coder itself (HI-2029, laneStarts) once builderLane has stopped it, as
     // card-loop-submit-watch's (HI-2215): the harness's own start raced it, and lost with 3 s between them. So the card's
-    // decision says to have a design checked first, which a model reads once Hive's line has started it; the prompt below
+    // decision says to have a design checked first, which a model reads once Combwork's line has started it; the prompt below
     // is a model's only as the line says it, and the fake is typed its steps after it, the card already in Doing.
     startedByHive: true,
     async setup(c) {
@@ -3382,7 +3382,7 @@ module.exports.SCENARIOS = [
       await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n], rounds: 10, waitMinutes: 360 })
     },
     prompt: (c) =>
-      `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Hive has started the card for you. The card's decision: have a design checked before you build. Post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
+      `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you. The card's decision: have a design checked before you build. Post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
     fake: (c) =>
       `skill card-loop then hive cw_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true,"limitMinutes":30} then hive cw_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'design', text: 'Design: entries keep their time; reads past 5 minutes miss; a write deletes its key. A test for each.' })}`,
     expect: (o, c) => {
@@ -3406,7 +3406,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
       // Implementer starts the card, registers its lane (the subject, Coder, reviewing) and posts its design, with its own
-      // token. The start comes before the lane (HI-2270): over a card in Todo, Hive starts it on Implementer itself once
+      // token. The start comes before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing this start.
       await c.startAgent('implementer')
       const started = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/start`)
@@ -3443,7 +3443,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'coder' })
       // Coder's round 1, as the user moves it: started (Doing), a commit, submitted (Review). Before its lane is registered
-      // (HI-2270): a lane over the card in Todo has Hive start it on Coder itself once builderLane stops Coder (HI-2029,
+      // (HI-2270): a lane over the card in Todo has Combwork start it on Coder itself once builderLane stops Coder (HI-2029,
       // laneStarts), which raced this move to Doing and sometimes won.
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
@@ -3480,7 +3480,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
       // Implementer's round 1 sent for review, then its lane (the subject, Coder, reviewing), then its follow-up, with its
-      // own token. The moves come before the lane (HI-2270): over a card in Todo, Hive starts it on Implementer itself once
+      // own token. The moves come before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing the move to Doing.
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
@@ -3615,7 +3615,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'preset-pair-lane',
-    title: "A pair's builder starting its lane under the Pair preset (#1536): registers the lane with its reviewer, starts the card in the slot Hive lends it, and submits from there",
+    title: "A pair's builder starting its lane under the Pair preset (#1536): registers the lane with its reviewer, starts the card in the slot Combwork lends it, and submits from there",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       c.git('config', 'user.email', 'agent@example.com')
@@ -3639,7 +3639,7 @@ module.exports.SCENARIOS = [
       // the checks read the hive calls, the repository and the card, which span both, not the skills its transcript shows.
       return [
         ['registered its lane: the card, Implementer reviewing', !!lane && lane.reviewer?.name === 'Implementer', JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))],
-        ['started it with cw_start_card, and Hive lent the card a slot', ran(o, 'cw_start_card').length > 0 && !!slot, calls],
+        ['started it with cw_start_card, and Combwork lent the card a slot', ran(o, 'cw_start_card').length > 0 && !!slot, calls],
         ['made no worktree of its own: the only new one is the slot', made.length <= 1 && made.every((t) => !!slot && t.endsWith(slot.toLowerCase())), made.join(', ')],
         ['changed nothing in the project folder: no commit there, no change', c.git('rev-parse', 'HEAD').trim() === c.head && o.gitStatus.trim() === '', o.gitStatus],
         ['submitted its work from the slot (a Submitted fact; the card in Review)', factsOf(o, 'p', 'Submitted').length > 0 && o.cards.p?.column === 'review', `${o.cards.p?.column}; ${calls}`],
@@ -3738,7 +3738,7 @@ module.exports.SCENARIOS = [
       await c.card('r', { title: 'Pick the app icon', description: 'Coder asked the user which icon to use: A (a bee), B (a honeycomb) or C (a hive cell).', agent: 'coder', column: 'doing' })
       await c.inv('settings:update', { general: { userName: 'Darren' } })
     },
-    // What Hive types into the Assistant's card watch when the user (Settings → General → Your name: Darren) answers Coder in its pane.
+    // What Combwork types into the Assistant's card watch when the user (Settings → General → Your name: Darren) answers Coder in its pane.
     prompt: (c) => `[CW] Darren replied to Coder on #${c.cards.r}: "C, the hive cell". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`,
     fake: (c) => `skill coordinate-agents then hive cw_update_task {"number":${c.cards.r},"decision":"The app icon is C, the hive cell."}`,
     expect: (o, c) => {
@@ -3751,7 +3751,7 @@ module.exports.SCENARIOS = [
       ]
     }
   },
-  // HI-2062: asked only to move cards to Doing, the Assistant can't leave one there with nobody on it: Hive refuses that
+  // HI-2062: asked only to move cards to Doing, the Assistant can't leave one there with nobody on it: Combwork refuses that
   // move naming the user's three choices (nobody on it with their reason, an agent on it, one started), and the
   // Assistant asks; a card with an agent on it already just goes in, still that agent's.
   {
@@ -3787,7 +3787,7 @@ module.exports.SCENARIOS = [
     fakeSkips: ['asked the user which they meant']
   },
   // HI-1932: the user's answer to a card's open questions, told the Assistant in chat, is recorded as a decision naming
-  // the requests it answers (cw_update_task's answers), so Hive closes them; a pair, the answer covering both questions
+  // the requests it answers (cw_update_task's answers), so Combwork closes them; a pair, the answer covering both questions
   // or only one of them, and the Assistant names those and only those.
   ...[
     { id: 'assistant-decision-answers', both: true, prompt: (c) => `About card #${c.cards.s}: Coder asked me two questions there. My answer to both: the bee icon, in amber. That's final.` },
@@ -3822,12 +3822,12 @@ module.exports.SCENARIOS = [
         ["recorded the user's answer as the card's decision", decisions.some((t) => /bee/i.test(t)), decisions.join(' | ')],
         [v.both ? 'named both open requests in answers' : 'named only the request the answer covers in answers', want.every((id) => named.includes(id)) && named.every((id) => want.includes(id)), JSON.stringify({ named, want })],
         ["didn't ask the user again", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0],
-        ["didn't type it into Coder (Hive tells it)", called(o, 'cw_prompt_agent').length === 0]
+        ["didn't type it into Coder (Combwork tells it)", called(o, 'cw_prompt_agent').length === 0]
       ]
     }
   })),
   // HI-1992: an agent's question is in the card's For you, not its comments (another workspace's Assistant read the
-  // comments, found none, and called a paused lane a Hive bug). Reading the card, any form, it finds it at the top,
+  // comments, found none, and called a paused lane a Combwork bug). Reading the card, any form, it finds it at the top,
   // without reading the card's history.
   {
     id: 'assistant-card-question',
@@ -3843,7 +3843,7 @@ module.exports.SCENARIOS = [
       // The premise: the question only in For you, never in a comment.
       if (card.body?.forYou?.length !== 1 || (card.body?.comments ?? []).some((x) => x.text.includes('Hello, friend'))) throw new Error(`one open question, in no comment, expected: ${JSON.stringify({ forYou: card.body?.forYou, comments: card.body?.comments })}`)
     },
-    prompt: (c) => `Coder has stopped on card #${c.cards.q} and isn't doing anything. Is that a Hive bug, or is it waiting for something? Don't change anything.`,
+    prompt: (c) => `Coder has stopped on card #${c.cards.q} and isn't doing anything. Is that a Combwork bug, or is it waiting for something? Don't change anything.`,
     fake: (c) => `hive cw_read_task {"number":${c.cards.q},"latestComment":true}`,
     expect: (o, c) => {
       const reads = ran(o, 'cw_read_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.q))
@@ -3903,10 +3903,10 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'assistant-new-lane',
-    // HI-2222: coordinate-agents' A new lane is cw_lane start, never a prompt to a builder Hive gives the lane. Hive gives
+    // HI-2222: coordinate-agents' A new lane is cw_lane start, never a prompt to a builder Combwork gives the lane. Combwork gives
     // an idle running builder outside slots the lane in a new conversation (#437; HI-2232, Darren's decision (a)), its last
     // kept in the Sessions history: checked again (HI-2222 had recorded them while that was undecided).
-    title: "The Assistant starting an idle agent's next lane (#437, HI-2222, HI-2232): cw_lane start (Coder, the card, rounds and wait), Coder left to Hive, no prompt (#1169: run-lanes or coordinate-agents read); Coder in a new conversation, its last kept",
+    title: "The Assistant starting an idle agent's next lane (#437, HI-2222, HI-2232): cw_lane start (Coder, the card, rounds and wait), Coder left to Combwork, no prompt (#1169: run-lanes or coordinate-agents read); Coder in a new conversation, its last kept",
     role: 'assistant',
     control: 'agents',
     async setup(c) {
@@ -3929,7 +3929,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const starts = laneStartsOf(o).filter((s) => /^coder$/i.test(String(s.args.builder ?? '')))
       const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.cards ?? []).some((x) => x.number === c.cards.n))
-      // The lane start's reply says whether Hive gives Coder the card itself (don't prompt it) or Coder is the caller's to tell.
+      // The lane start's reply says whether Combwork gives Coder the card itself (don't prompt it) or Coder is the caller's to tell.
       const tell = starts.some((s) => /\bCoder\b[^.]*running, so Combwork left (it|them) as (it is|they are): tell\b/.test(s.reply))
       const prompts = called(o, 'cw_prompt_agent').filter((x) => /coder/i.test(String(argsOf(x).agent)))
       const fresh = prompts.filter((x) => x.ok && argsOf(x).newConversation === true)
@@ -3937,17 +3937,17 @@ module.exports.SCENARIOS = [
         // Starting a lane is run-lanes' workflow, giving an agent work coordinate-agents': either is the right one (#1169).
         ['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ["started Coder's lane with cw_lane start, which worked: its card, rounds 3, wait 60 minutes", starts.length > 0 && !!lane && lane.rounds === 3 && lane.waitMinutes === 60, `${starts.map((s) => s.reply.slice(0, 200)).join(' | ') || 'no lane start'}; lane: ${JSON.stringify(lane && { cards: lane.cards.map((x) => x.number), rounds: lane.rounds, waitMinutes: lane.waitMinutes })}`],
-        // lanes.md: never prompt a builder Hive gives the lane's first card; one the reply says to tell, in a new conversation.
-        ["left Coder to Hive's start as the reply said (no prompt where Hive gives it the card; a new conversation where it said to tell it)", tell ? fresh.length === 1 && prompts.length === 1 : prompts.length === 0, `${tell ? 'told to tell Coder' : 'Hive gives Coder the card'}; ${prompts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ') || 'no prompt'}`],
+        // lanes.md: never prompt a builder Combwork gives the lane's first card; one the reply says to tell, in a new conversation.
+        ["left Coder to Combwork's start as the reply said (no prompt where Combwork gives it the card; a new conversation where it said to tell it)", tell ? fresh.length === 1 && prompts.length === 1 : prompts.length === 0, `${tell ? 'told to tell Coder' : 'Combwork gives Coder the card'}; ${prompts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ') || 'no prompt'}`],
         ['no stop, start or hand-over of Coder', called(o, 'cw_stop_agent').length === 0 && called(o, 'cw_start_agent').length === 0 && called(o, 'cw_hand_over').length === 0],
-        // Hive's part (HI-2232, decision (a)): the idle builder outside slots gets the lane in a new conversation.
+        // Combwork's part (HI-2232, decision (a)): the idle builder outside slots gets the lane in a new conversation.
         ['Coder runs in a new conversation', !!c.before?.sessionId && !!c.after && c.after.runId !== c.before.runId, JSON.stringify({ before: c.before?.sessionId, after: c.after?.sessionId, seen: c.seen })],
         ['its last conversation stays in the Sessions history', (c.history ?? []).includes(c.before?.sessionId), c.history ? `${c.before?.sessionId} in [${c.history.join(',')}]` : 'not read']
       ]
     },
-    // HI-2239: whether Hive gave Coder the lane's card while the run watched (in Doing, Coder's), recorded beside the checks.
+    // HI-2239: whether Combwork gave Coder the lane's card while the run watched (in Doing, Coder's), recorded beside the checks.
     observe: (o, c) => [
-      ['Hive gave Coder the card within the run (in Doing, its)', o.cards?.n?.column === 'doing' && o.cards?.n?.agent?.id === c.agents.coder.id, `${o.cards?.n?.column} / ${o.cards?.n?.agent?.name ?? 'nobody'}; ${history(o.cards?.n).join(' | ')}`]
+      ['Combwork gave Coder the card within the run (in Doing, its)', o.cards?.n?.column === 'doing' && o.cards?.n?.agent?.id === c.agents.coder.id, `${o.cards?.n?.column} / ${o.cards?.n?.agent?.name ?? 'nobody'}; ${history(o.cards?.n).join(' | ')}`]
     ]
   },
   {
@@ -3993,7 +3993,7 @@ module.exports.SCENARIOS = [
       await c.card('b', { title: 'Show upload progress', description: 'Show a progress bar while uploading.', agent: 'implementer', column: 'review' })
     },
     prompt: (c) =>
-      `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h. You were waiting for #${c.cards.a} to arrive in Review when Hive typed this line: [CW] #${c.cards.a} was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from your list and carry on with your next card.`,
+      `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h. You were waiting for #${c.cards.a} to arrive in Review when Combwork typed this line: [CW] #${c.cards.a} was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from your list and carry on with your next card.`,
     fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.b)}`,
     expect: (o, c) => {
       const watchedA = ran(o, 'cw_wait_for_tasks').some((x) => namesCard(o, argsOf(x).cards, c.cards.a))
@@ -4008,7 +4008,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-blocked',
-    title: "A reviewer in a card loop whose card its builder blocks to ask the user while it waits (#468, #481): keeps waiting rather than moving on, and reviews it once it is unblocked and back in Review, woken by Hive alone",
+    title: "A reviewer in a card loop whose card its builder blocks to ask the user while it waits (#468, #481): keeps waiting rather than moving on, and reviews it once it is unblocked and back in Review, woken by Combwork alone",
     role: 'agent',
     // The upload as round 1 left it; the builder's fix, committed as it returns the card, is the diff to review (HI-2223).
     files: { 'upload.js': "module.exports = async function upload(send) {\n  const r = await send()\n  return r.ok ? r : send()\n}\n" },
@@ -4025,7 +4025,7 @@ module.exports.SCENARIOS = [
     },
     // As on #468: once the reviewer has ended its turn watching for the next round, its builder blocks the card to ask
     // the user; 15 s later (answered) it clears the block, fixes it and returns it to Review. Nobody prompts the
-    // reviewer: only Hive's wake from its own watch brings it back (before #481 the block ended that watch).
+    // reviewer: only Combwork's wake from its own watch brings it back (before #481 the block ended that watch).
     async during(c, status) {
       if (c.returnedAt || !['watching', 'ready', 'finished'].includes(status)) return
       if (!c.blockedAt) {
@@ -4058,7 +4058,7 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h; your builder is Implementer. You have just failed #${c.cards.a} in round 1 (your verdict is its last comment), and Implementer is fixing it.`,
     fake: (c) => `skill card-loop then hive cw_wait_for_tasks {"cards":[${c.cards.a}],"column":"review","wake":true}`,
-    // The fake Claude Code's answer to Hive's wake: it reviews the card.
+    // The fake Claude Code's answer to Combwork's wake: it reviews the card.
     fakeWakes: (c) => [`${fakeStartReview(c.cards.a)} then ${fakeVerdict(c.cards.a, true)}`],
     expect: (o, c) => {
       const back = c.returnedAt ?? Infinity
@@ -4076,17 +4076,17 @@ module.exports.SCENARIOS = [
         [`the builder returned #${c.cards.a} once the reviewer was watching`, Number.isFinite(back), String(c.returnedAt)],
         // The setup's own (HI-2223): what came back is a diff to review, so a review can give a verdict.
         [`its return to Review is a diff to review (a commit after its base)`, !!c.returnDiff, JSON.stringify(c.returnDiff && { revision: c.returnDiff.revision, base: c.returnDiff.base, files: c.returnDiff.files })],
-        ["reviewed the card after its return, with nobody prompting it (Hive's wake)", ha.some((h) => by(h) && h.what === 'Started reviewing' && Date.parse(h.at) > back), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
+        ["reviewed the card after its return, with nobody prompting it (Combwork's wake)", ha.some((h) => by(h) && h.what === 'Started reviewing' && Date.parse(h.at) > back), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ['gave it a verdict', Number.isFinite(verdictAt), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'cw_update_task').some((x) => before(x) && cardIs(o, argsOf(x).number, c.cards.b)) && !ran(o, 'cw_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && cardIs(o, argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
       ]
     },
     // Only the fake Claude Code answers a wake (its wake script); the fake Codex can't.
-    fakeSkips: (provider) => (provider === 'fake' ? [] : ["reviewed the card after its return, with nobody prompting it (Hive's wake)", 'gave it a verdict'])
+    fakeSkips: (provider) => (provider === 'fake' ? [] : ["reviewed the card after its return, with nobody prompting it (Combwork's wake)", 'gave it a verdict'])
   },
   {
     id: 'card-loop-loop-wake',
-    title: "A reviewer in a card loop woken by Hive's own loop wake, with no watch of its own (#405): reviews the card, then waits for the next",
+    title: "A reviewer in a card loop woken by Combwork's own loop wake, with no watch of its own (#405): reviews the card, then waits for the next",
     role: 'agent',
     // The retries (awaited, 1 s apart) submitted as a commit after sync.js without them (HI-2223: a diff to review).
     files: { 'sync.js': SYNC_BEFORE },
@@ -4095,7 +4095,7 @@ module.exports.SCENARIOS = [
       await c.card('b', { title: 'Show sync progress', description: 'Show a progress bar while syncing.', agent: 'implementer' })
     },
     prompt: (c) =>
-      `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h; your builder is Implementer. You had no card watch when Hive typed this line: [CW] #${c.cards.a} (Implementer's card) is in Review. You review this card in its loop: carry on with it (cw_read_task with latestComment for the comment in full).`,
+      `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h; your builder is Implementer. You had no card watch when Combwork typed this line: [CW] #${c.cards.a} (Implementer's card) is in Review. You review this card in its loop: carry on with it (cw_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.a)} then ${fakeVerdict(c.cards.a, true)} then hive cw_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true}`,
     expect: (o, c) => {
       const h = history(o.cards.a)
@@ -4126,7 +4126,7 @@ module.exports.SCENARIOS = [
     role: 'assistant',
     control: 'agents',
     changeSettings: true,
-    prompt: "My agents' conversations get really long and everything gets sluggish. Is there a Hive setting that would help?",
+    prompt: "My agents' conversations get really long and everything gets sluggish. Is there a Combwork setting that would help?",
     fake: 'skill tune-settings hive cw_list_settings {"query":"transcript"}',
     expect: (o) => [
       ['read the tune-settings skill', read(o, 'tune-settings'), o.skillsRead.join(',')],
@@ -4188,10 +4188,10 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'assistant-release-slot',
-    title: "The Assistant releases a slot held by an agent's run in a Hive that crashed, once the user agrees (#1561): it lists what there is to release, then releases it confirming the slot and run list gave",
+    title: "The Assistant releases a slot held by an agent's run in a Combwork that crashed, once the user agrees (#1561): it lists what there is to release, then releases it confirming the slot and run list gave",
     role: 'assistant',
     control: 'agents',
-    // Coder lent a slot for a card, and its writer a run of another Hive's whose process has ended (a crash).
+    // Coder lent a slot for a card, and its writer a run of another Combwork's whose process has ended (a crash).
     async setup(c) {
       const lent = await c.inv('slots:test', c.alpha, { op: 'lend', agent: c.agents.coder.id, card: 1 })
       if (!lent?.ok) throw new Error(`setup: no slot lent (${JSON.stringify(lent)})`)
@@ -4200,9 +4200,9 @@ module.exports.SCENARIOS = [
       const gone = require('child_process').spawnSync(process.execPath, ['-e', ''], { env: require('../e2e/runContext.cjs').baseEnv() }).pid
       if (!(await c.inv('slots:test', c.alpha, { op: 'writer', slot: c.slot, agent: c.agents.coder.id, run: c.run, pid: gone, started: 1 }))) throw new Error('setup: the writer was not planted')
     },
-    prompt: (c) => `Coder's session in ${c.slot} was in a Hive that crashed, and the slot is still held, so no new work can use it. I've checked that nothing of that session still runs: yes, please release it.`,
+    prompt: (c) => `Coder's session in ${c.slot} was in a Combwork that crashed, and the slot is still held, so no new work can use it. I've checked that nothing of that session still runs: yes, please release it.`,
     fake: (c) => `hive cw_release_slot {"action":"list","project":"alpha"} then hive cw_release_slot {"action":"release","project":"alpha","slot":"${c.slot}","kind":"writer","confirm":{"slot":"${c.slot}","run":"${c.run}"}}`,
-    // The slot's writer once its turn has ended (Hive still running).
+    // The slot's writer once its turn has ended (Combwork still running).
     async keepWaiting(c) {
       c.writerAfter = await c.inv('slots:heldWriter', c.alpha, c.slot).catch((e) => ({ error: String(e?.message ?? e) }))
       return false
@@ -4305,9 +4305,9 @@ async function builderLane(c, key, body) {
 /** The states of a delivery that has reached its agent's current launch, or been read: never uncertain or ended. */
 const DELIVERY_REACHED = ['offered', 'received', 'acked']
 /**
- * Whether Hive's start of card `n` has landed in the builder's current launch (HI-2278): the card in Doing, the builder
+ * Whether Combwork's start of card `n` has landed in the builder's current launch (HI-2278): the card in Doing, the builder
  * running and past starting, and the start's task delivery for `n` offered (or read) with its doorbell, which names its
- * id ("… 1 task (AL-1) (m4) …"), in what the current launch shows (`shown`: its terminal, which Hive drops as a process
+ * id ("… 1 task (AL-1) (m4) …"), in what the current launch shows (`shown`: its terminal, which Combwork drops as a process
  * exits, #577). A delivery uncertain or ended, one still queued, or one whose line only an earlier launch showed isn't it.
  */
 function laneStartLanded({ column, live, deliveries, shown }, n) {
@@ -4315,7 +4315,7 @@ function laneStartLanded({ column, live, deliveries, shown }, n) {
   return (deliveries ?? []).some((x) => x.kind === 'task' && x.card === n && DELIVERY_REACHED.includes(x.state) && /^m\d+$/.test(x.id) && new RegExp(`\\b${x.id}\\b`).test(shown ?? ''))
 }
 /**
- * Hive's own start of a lane's first card, waited for (HI-2278): over a card in Todo, Hive starts it on the stopped builder
+ * Combwork's own start of a lane's first card, waited for (HI-2278): over a card in Todo, Combwork starts it on the stopped builder
  * (HI-2029, laneStarts) about a second after builderLane. Waited for until it has landed (laneStartLanded), so nothing of
  * the start is still on its way as the subject looks at the board.
  */
@@ -4324,7 +4324,7 @@ async function hiveStartedLaneCard(c, key, n) {
   const agent = c.agents[key]
   const ptyKey = lib.ptyKey(c.alpha, agent.id)
   const screen = async () => lib.plainText(String(await c.inv('pty:buffer', ptyKey).catch(() => '')))
-  // Hive's start is a new launch, which may ask to trust the folder again (HI-2290: Copilot's "Yes" holds for one session,
+  // Combwork's start is a new launch, which may ask to trust the folder again (HI-2290: Copilot's "Yes" holds for one session,
   // so its builder sat at the question, the start's task still on its command line): answered once in that launch, as a
   // user would, before its task can show.
   const trusted = new Set()
@@ -4342,14 +4342,14 @@ async function hiveStartedLaneCard(c, key, n) {
     }
     return laneStartLanded({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, live, deliveries: await c.deliveries(key), shown }, n)
   }
-  if (!(await lib.until(landed, 90000))) throw new Error(`setup: Hive's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)
+  if (!(await lib.until(landed, 90000))) throw new Error(`setup: Combwork's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)
 }
 /**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
- * given). Each lane is registered as its builder registers its own (builderLane). Hive then starts each lane's first card
+ * given). Each lane is registered as its builder registers its own (builderLane). Combwork then starts each lane's first card
  * in Todo on its builder (HI-2029), as in life, and that start is waited for (HI-2278: it otherwise raced the subject):
- * #c, and #a unless `aColumn` puts it elsewhere (Review or Doing: then Coder isn't running, its lane not started by Hive),
- * and #c the same with `cColumn` (HI-2569: started by Hive, a model's Builder2 did #c for real and, with every rule off,
+ * #c, and #a unless `aColumn` puts it elsewhere (Review or Doing: then Coder isn't running, its lane not started by Combwork),
+ * and #c the same with `cColumn` (HI-2569: started by Combwork, a model's Builder2 did #c for real and, with every rule off,
  * took it to Done in the setup, its lane ended before the subject looked).
  */
 async function twoLanes(c, { d = false, aColumn = 'todo', cColumn = 'todo' } = {}) {
@@ -4377,7 +4377,7 @@ async function builder2LaneRuns(c) {
  * after it ended, as the listing keeps one for a while, isn't running).
  */
 const laneRunsOn = (column, lanes, builder) => column === 'doing' && (lanes ?? []).some((l) => l.builder?.name === builder && l.state === 'active')
-/** What Hive's card wake to the Assistant ends with while lanes run (src/shared/watch.ts, the same: a unit test checks). */
+/** What Combwork's card wake to the Assistant ends with while lanes run (src/shared/watch.ts, the same: a unit test checks). */
 const LANES_RUNNING_TAIL = ' Lanes are still running (cw_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (cw_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).'
 /** The Assistant's card watches that worked and wake it (with wake: true), each with its cards. */
 const cardWatches = (o) => ran(o, 'cw_wait_for_tasks').filter((x) => argsOf(x).wake === true && !argsOf(x).cancel)
@@ -4413,8 +4413,8 @@ const briefsTo = (o, name) =>
     .filter((x) => new RegExp(`^${name}$`, 'i').test(String(argsOf(x).agent ?? '')))
     .map((x) => String(argsOf(x).text ?? argsOf(x).prompt ?? argsOf(x).note ?? ''))
 /**
- * The lanes the Assistant started with `cw_lane start` that worked (HI-2222), each with its arguments (Hive's log of
- * the call) and Hive's own reply to it (the transcript's, which says whom Hive started with the lane's brief). The log
+ * The lanes the Assistant started with `cw_lane start` that worked (HI-2222), each with its arguments (Combwork's log of
+ * the call) and Combwork's own reply to it (the transcript's, which says whom Combwork started with the lane's brief). The log
  * and the transcript don't share an id, so the calls and the replies are paired in order (HR1, round 1): each start takes
  * the next reply not yet taken that names its builder and reviewer ("Lane started: Coder / Implementer (alpha) …"), so a
  * second start of the same pair gets its own reply, never the first's. One with no such reply left is left out.
@@ -4433,7 +4433,7 @@ const laneStartsOf = (o) => {
   }
   return out
 }
-/** Whether Hive's reply to a lane start says it started `name` with the lane's brief ("Started Coder and Implementer with the lane's brief"). */
+/** Whether Combwork's reply to a lane start says it started `name` with the lane's brief ("Started Coder and Implementer with the lane's brief"). */
 const startedWithBrief = (reply, name) => [...reply.matchAll(/Started ([^.]*?) with the lane's brief/g)].some((m) => new RegExp(`\\b${name}\\b`, 'i').test(m[1]))
 const names = (text, ...parts) => parts.every((p) => new RegExp(typeof p === 'number' ? `#?${p}\\b` : p, 'i').test(text))
 /** A card's agent id (the API gives the agent as { id, name, … }). */
@@ -4445,7 +4445,7 @@ const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
 const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
 /**
  * HI-2239's read policy (Darren's decision, 31 Oct: simplify). A file was read when Claude Code's `Read` worked on its
- * exact absolute path and gave back its facts; Hive's own reads are the hive calls' (cw_read_section, cw_list_tasks,
+ * exact absolute path and gave back its facts; Combwork's own reads are the hive calls' (cw_read_section, cw_list_tasks,
  * each paired with its own reply: callsWithReplies). A shell command (or a Codex script) that may have read it is
  * unobservable: never credited, and never blamed (shellLookups: the check is left out, and the run records it).
  */
@@ -4469,7 +4469,7 @@ const readOf = (t, target, facts) => {
  */
 const shellLookups = (o, name) => (o.tools ?? []).filter((t) => SHELL_TOOLS.test(t.name) && String(t.input ?? '').toLowerCase().includes(name.toLowerCase()))
 /**
- * A hive tool's successful calls with their own replies (HR1, HI-2239 round 2): Hive's log of the calls (exact
+ * A hive tool's successful calls with their own replies (HR1, HI-2239 round 2): Combwork's log of the calls (exact
  * arguments) and the transcript's replies, in order, paired one to one; when their counts differ the pairing isn't known,
  * and none is given.
  */
@@ -4498,7 +4498,7 @@ module.exports.SCENARIOS.push(
     prompt: (c) =>
       `Run two card loops in alpha. Coder builds #${c.cards.a}, then #${c.cards.b}, reviewed by Implementer. Builder2 builds #${c.cards.c}, reviewed by Reviewer2. All four work in the project folder (no worktrees, nothing to merge). Brief and start them, and follow both lanes to the end.`,
     // coordinate-agents, A new lane (HI-2222): cw_lane start with the builder's brief in `brief`, never a prompt to the
-    // builder; Hive starts the lane's stopped agents with it.
+    // builder; Combwork starts the lane's stopped agents with it.
     fake: (c) => {
       const lane = (builder, reviewer, cards) =>
         `hive cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder, reviewer, cards, brief: `Use card-loop as the builder. Cards, in order: ${cards.map((n) => `#${n}`).join(', ')}. Your reviewer is ${reviewer}.` })}`
@@ -4520,7 +4520,7 @@ module.exports.SCENARIOS.push(
       // A builder: such a start's brief names card-loop, and its reply says the brief reaches the builder ("Its brief is
       // delivered to the builder now", or given with each of its cards in slots).
       const builderBriefed = (who, reviewer, cards) => lanesOf(who, reviewer, cards).some((s) => /card[- ]loop/i.test(String(s.args.brief ?? '')) && /Its brief is (delivered|given)\b/.test(s.reply))
-      // A reviewer: Hive started it with the lane's brief (that start's own reply says so), or a prompt briefed it; a lane
+      // A reviewer: Combwork started it with the lane's brief (that start's own reply says so), or a prompt briefed it; a lane
       // naming one already running briefs nobody (its reply says to tell it).
       const reviewerBriefed = (who, builder, cards) => lanesOf(builder, who, cards).some((s) => startedWithBrief(s.reply, who)) || briefsTo(o, who).some((t) => names(t, 'card[- ]loop', ...cards, builder))
       const detail = lanes.map((s) => `${JSON.stringify({ builder: s.args.builder, reviewer: s.args.reviewer, cards: s.args.cards })} → ${s.reply.slice(0, 200)}`).join(' | ') || 'no lane started'
@@ -4621,7 +4621,7 @@ module.exports.SCENARIOS.push(
     control: 'agents',
     mode: 'coordinator',
     async setup(c) {
-      // #c in Doing from the start (HI-2569): Hive starts no card on Builder2, which can't finish it in the setup.
+      // #c in Doing from the start (HI-2569): Combwork starts no card on Builder2, which can't finish it in the setup.
       await twoLanes(c, { aColumn: 'doing', cColumn: 'doing' })
       await c.api('POST', `/v1/tasks/${c.cards.a}/comments`, { text: 'Question for the user: should greet() throw on an empty name (A) or return "Hi" (B)?' })
       // As in a real lane: Coder asked and waits for the user (started, idle), and Builder2's lane carries on (#c in Doing,
@@ -4685,7 +4685,7 @@ module.exports.SCENARIOS.push(
       const d = c.cards.d
       return [
         ['gave the card to Coder', agentOf(o.cards.d) === c.agents.coder.id, agentOf(o.cards.d)],
-        // Its list, or its list queued after the card in flight (HI-2029: Hive starts the lane's first card on its idle builder).
+        // Its list, or its list queued after the card in flight (HI-2029: Combwork starts the lane's first card on its idle builder).
         ["Coder's lane has it after #" + c.cards.b + ', or Coder was told', (coderLane?.cards ?? []).map((x) => x.number).includes(d) || (coderLane?.queued ?? []).includes(d) || briefsTo(o, 'Coder').some((t) => names(t, d)), JSON.stringify(lanes.map((l) => [l.builder?.name, l.cards?.map((x) => x.number), l.queued]))],
         ["Builder2's lane no longer has it", !(otherLane?.cards ?? []).map((x) => x.number).includes(d), JSON.stringify(otherLane?.cards?.map((x) => x.number))],
         ["ended its turn watching both lanes' last cards, the moved card's new place (its live watch, waking on moves, comments and verdicts)", liveWatchCovers(o, [d, c.cards.c]), liveWatch(o)]
@@ -4726,7 +4726,7 @@ module.exports.SCENARIOS.push(
     id: role === 'agent' ? 'follow-up-title' : 'assistant-follow-up-title',
     title: `${role === 'agent' ? 'An agent' : 'The Assistant'} cards a follow-up found with detailed evidence (HI-1872): a short title naming the outcome or the problem, the evidence in the description`,
     ...(role === 'assistant' ? { role: 'assistant', control: 'agents' } : {}),
-    prompt: `${role === 'agent' ? "While working you found this, and it isn't your card's work" : 'A builder found this while working on another card'}: put it on the board as a follow-up card${role === 'assistant' ? ' for alpha' : ''}, and don't fix it. Priya reported on 26 Oct that after Hive restarts for an update, the tray's "Restart to update" notice stays for about 38 seconds. In src/main/updater.ts, checkForUpdate() (line 212) runs before the window opens and its answer arrives 4.2 s after the tray is built, so the notice is never cleared; hive.log says "update: already current, notice kept". Fix direction: clear the notice when the check says Hive is current. Done when the notice is gone once the restart has finished, with a unit test.`,
+    prompt: `${role === 'agent' ? "While working you found this, and it isn't your card's work" : 'A builder found this while working on another card'}: put it on the board as a follow-up card${role === 'assistant' ? ' for alpha' : ''}, and don't fix it. Priya reported on 26 Oct that after Combwork restarts for an update, the tray's "Restart to update" notice stays for about 38 seconds. In src/main/updater.ts, checkForUpdate() (line 212) runs before the window opens and its answer arrives 4.2 s after the tray is built, so the notice is never cleared; hive.log says "update: already current, notice kept". Fix direction: clear the notice when the check says Combwork is current. Done when the notice is gone once the restart has finished, with a unit test.`,
     fake: () =>
       `hive cw_create_task ${JSON.stringify({ ...(role === 'assistant' ? { project: 'alpha' } : {}), title: "Tray's update notice clears after an update restart", description: "Priya reported (26 Oct) that after an update restart the tray's \"Restart to update\" notice stays about 38 s. src/main/updater.ts: checkForUpdate() (line 212) runs before the window opens; its answer comes 4.2 s after the tray is built, so the notice is never cleared (hive.log: \"update: already current, notice kept\"). Fix: clear it when the check says current. Done when the notice is gone after the restart, with a unit test." })}`,
     expect: (o) => {
@@ -4743,13 +4743,13 @@ module.exports.SCENARIOS.push(
   })),
   {
     id: 'coordinator-lanes-to-end',
-    title: "Coordinator mode following two running lanes to their end (#402): Hive's real wakes as each lane finishes; it sweeps, watches what is left, and says when both are done",
+    title: "Coordinator mode following two running lanes to their end (#402): Combwork's real wakes as each lane finishes; it sweeps, watches what is left, and says when both are done",
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
     async setup(c) {
       // Running as in life: each builder works on its lane's current card in Doing (a model checks they are running).
-      // #c in Doing from the start (HI-2569): Hive starts no card on Builder2, which works only on the long task below.
+      // #c in Doing from the start (HI-2569): Combwork starts no card on Builder2, which works only on the long task below.
       await twoLanes(c, { aColumn: 'doing', cColumn: 'doing' })
       await busyCoder(c, 20, 600)
       await busyCoder(c, 20, 600, c.agents.builder2)
@@ -4760,12 +4760,12 @@ module.exports.SCENARIOS.push(
     prompt: (c) =>
       `Two card loops are running in alpha: Coder builds #${c.cards.a}, then #${c.cards.b} (Implementer reviews), and Builder2 builds #${c.cards.c} (Reviewer2 reviews). Follow both lanes to the end and tell me when they're done.`,
     fake: () => `skill coordinate-agents then skill run-lanes then hive cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}`,
-    // Its next steps when Hive wakes it: Builder2's lane is done (sweep, watch Coder's), then Coder's (both done).
+    // Its next steps when Combwork wakes it: Builder2's lane is done (sweep, watch Coder's), then Coder's (both done).
     fakeWakes: () => [`hive cw_list_tasks {} then hive cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}`, 'hive cw_lane {"action":"list"}'],
-    // The lanes finish while it watches: Builder2's card goes to Done (Hive wakes it), then, once it watches again (a new
-    // watch: another `since`), Coder's two. A wake is Hive's real one, typed in when a watched card changes; a turn that
+    // The lanes finish while it watches: Builder2's card goes to Done (Combwork wakes it), then, once it watches again (a new
+    // watch: another `since`), Coder's two. A wake is Combwork's real one, typed in when a watched card changes; a turn that
     // ends with no watch, or the last wake's turn ending, closes the scenario.
-    // Idle counts once the wake's turn was seen working, or after three idle polls in a row: as Hive ends the watch to
+    // Idle counts once the wake's turn was seen working, or after three idle polls in a row: as Combwork ends the watch to
     // type the wake in, the session can read idle for a moment before that turn starts.
     during: async (c, status) => {
       const watch = (await c.inv('session:live')).find((s) => s.agentId === 'assistant')?.watch ?? null
@@ -4801,7 +4801,7 @@ module.exports.SCENARIOS.push(
       return [
         ["first watched both lanes' last cards (waking on moves, comments and verdicts)", covers(c.firstWatch, [b, cc]), JSON.stringify(c.firstWatch)],
         ["woken by Builder2's lane ending, it watched Coder's lane's end again", c.wakes >= 1 && covers(c.secondWatch, [b]), JSON.stringify({ wakes: c.wakes, watch: c.secondWatch })],
-        ["Hive's first wake said lanes are still running, to watch them all again", /Lanes are still running|watch the lanes again/.test(o.wakeLines?.[0] ?? ''), (o.wakeLines ?? []).join(' | ').slice(0, 300)],
+        ["Combwork's first wake said lanes are still running, to watch them all again", /Lanes are still running|watch the lanes again/.test(o.wakeLines?.[0] ?? ''), (o.wakeLines ?? []).join(' | ').slice(0, 300)],
         ['swept the board on a wake (cards, lanes or agents, after its first watch)', sweeps >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
         ["woken again by Coder's lane ending", c.wakes >= 2, String(c.wakes)],
         ['both lanes ended', ours.length === 2 && ours.every((l) => l.state === 'ended'), JSON.stringify(ours.map((l) => [l.builder?.name, l.state]))],
@@ -4809,7 +4809,7 @@ module.exports.SCENARIOS.push(
       ]
     },
     // Only the fake Claude Code acts out wakes (fake-wakes-<agent>.txt); the told-the-user check needs a model.
-    fakeSkips: (p) => (p === 'fake' ? ['told the user both are done'] : ["Hive's first wake said lanes are still running, to watch them all again", "woken by Builder2's lane ending, it watched Coder's lane's end again", "woken again by Coder's lane ending", 'both lanes ended', 'swept the board on a wake (cards, lanes or agents, after its first watch)', 'told the user both are done'])
+    fakeSkips: (p) => (p === 'fake' ? ['told the user both are done'] : ["Combwork's first wake said lanes are still running, to watch them all again", "woken by Builder2's lane ending, it watched Coder's lane's end again", "woken again by Coder's lane ending", 'both lanes ended', 'swept the board on a wake (cards, lanes or agents, after its first watch)', 'told the user both are done'])
   },
   // #1346 (a Haiku Assistant asked wherever a default wasn't written; #1527 wrote them): a pair runs even one card as a
   // lane; a card in Review outside a lane gets a reviewer without asking; a lane is watched with lanes only; a failed
@@ -4817,7 +4817,7 @@ module.exports.SCENARIOS.push(
   // itself.
   {
     id: 'coordinator-one-card-lane',
-    title: "Coordinator mode asked to have the builder of a builder and reviewer pair do one card (#1346 item 2): runs it as a lane with the reviewer, without asking; Hive starts both agents with the lane's brief (HI-1900)",
+    title: "Coordinator mode asked to have the builder of a builder and reviewer pair do one card (#1346 item 2): runs it as a lane with the reviewer, without asking; Combwork starts both agents with the lane's brief (HI-1900)",
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -4838,7 +4838,7 @@ module.exports.SCENARIOS.push(
       return [
         ['ran the card as a lane: Coder builds it, Implementer reviews', !!lane && lane.reviewer?.name === 'Implementer', JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))],
         // HI-1900: the lane's start starts its agents as Start Lane does; a prompt of its own would replace their conversations.
-        ['Hive started Coder and Implementer with the lane (both running)', [c.agents.coder.id, c.agents.implementer.id].every((id) => o.live.some((x) => x.project === 'alpha' && x.agentId === id)), JSON.stringify(o.live)],
+        ['Combwork started Coder and Implementer with the lane (both running)', [c.agents.coder.id, c.agents.implementer.id].every((id) => o.live.some((x) => x.project === 'alpha' && x.agentId === id)), JSON.stringify(o.live)],
         ["prompted neither itself (their brief is the lane's)", briefsTo(o, 'Coder').length === 0 && briefsTo(o, 'Implementer').length === 0, [...briefsTo(o, 'Coder'), ...briefsTo(o, 'Implementer')].join(' | ').slice(0, 300)],
         ["didn't ask the user (no notification, no question)", called(o, 'cw_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
       ]
@@ -4847,7 +4847,7 @@ module.exports.SCENARIOS.push(
   },
   {
     id: 'coordinator-start-reviewer',
-    title: "Coordinator mode woken as a card started on its builder alone reaches Review, in a project whose work an agent reviews (#1346 item 2, HI-2046): Hive has given it to the reviewer, so it starts none and asks nothing",
+    title: "Coordinator mode woken as a card started on its builder alone reaches Review, in a project whose work an agent reviews (#1346 item 2, HI-2046): Combwork has given it to the reviewer, so it starts none and asks nothing",
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -4857,9 +4857,9 @@ module.exports.SCENARIOS.push(
       // Its test too, as its comment says (HI-2265: with none committed, the reviewer rightly failed it, and a question
       // about restarting Coder followed).
       const n = await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', files: { 'src/greet.js': 'module.exports = (name) => `Hi, ${name}`\n', 'test/greet.test.js': "require('assert').strictEqual(require('../src/greet')('Ada'), 'Hi, Ada')\n" }, after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
-      // HI-2046: a loose card in Review is Hive's to give out; the Assistant is woken once it has.
+      // HI-2046: a loose card in Review is Combwork's to give out; the Assistant is woken once it has.
       const given = async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'ReviewerAssigned' && f.data?.reviewer === c.agents.implementer.id)
-      if (!(await require('../e2e/lib.cjs').until(given, 30000))) throw new Error(`setup: Hive didn't give #${n} to Implementer`)
+      if (!(await require('../e2e/lib.cjs').until(given, 30000))) throw new Error(`setup: Combwork didn't give #${n} to Implementer`)
     },
     prompt: (c) => `[CW] #${c.cards.r} (Coder's card) is in Review; latest comment by Coder: "Ready: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then hive cw_read_task {"number":${c.cards.r},"latestComment":true}`,
@@ -4867,7 +4867,7 @@ module.exports.SCENARIOS.push(
       const n = c.cards.r
       const reviewers = [...briefsTo(o, 'Implementer'), ...ran(o, 'cw_lane').filter((x) => argsOf(x).action === 'start').map((x) => x.args)]
       return [
-        ['Hive gave it to Implementer (a ReviewerAssigned fact)', factsOf(o, 'r', 'ReviewerAssigned').some((f) => f.data?.reviewer === c.agents.implementer.id), JSON.stringify(factsOf(o, 'r', 'ReviewerAssigned').map((f) => f.data))],
+        ['Combwork gave it to Implementer (a ReviewerAssigned fact)', factsOf(o, 'r', 'ReviewerAssigned').some((f) => f.data?.reviewer === c.agents.implementer.id), JSON.stringify(factsOf(o, 'r', 'ReviewerAssigned').map((f) => f.data))],
         ['started no reviewer itself (no brief to Implementer, no lane)', reviewers.length === 0, reviewers.join(' | ').slice(0, 300)],
         // A question about its review, as the check says (HI-2265: once the review passed within the trial, a question about
         // an optional follow-up card isn't one).
@@ -4914,7 +4914,7 @@ module.exports.SCENARIOS.push(
       const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
       await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
       for (const text of ["Round 1: FAILED. 1. greet.js has no test.", 'Fixed: greet.test.js covers greet().', "Round 2: FAILED. 1. README.md's example still says Hello."]) await c.api('POST', `/v1/tasks/${a}/comments`, { text })
-      // Coder at work on the fix, as Hive's wake left it (#1537: with Coder stopped the loop had stalled, a question fairly
+      // Coder at work on the fix, as Combwork's wake left it (#1537: with Coder stopped the loop had stalled, a question fairly
       // put to the user, not the loop's own round).
       await busyCoder(c, 20, 600)
     },
@@ -4930,7 +4930,7 @@ module.exports.SCENARIOS.push(
   },
   {
     id: 'coordinator-no-code-done',
-    title: "Coordinator mode woken as a no-code card passes its review and its lane ends (#1346 item 4): Hive finished both, so it moves, ends and asks nothing",
+    title: "Coordinator mode woken as a no-code card passes its review and its lane ends (#1346 item 4): Combwork finished both, so it moves, ends and asks nothing",
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -4984,7 +4984,7 @@ module.exports.SCENARIOS.push(
       await busyCoder(c, 20, 600, c.agents.coder, `The greetings lane's cards have passed: you're merging branch greetings into ${base} at the lane's end. Its merge checks are first: `)
       c.head = c.git('rev-parse', 'HEAD').trim()
     },
-    // Hive's lane wake for it (laneWakeLine in src/shared/laneWatch.ts).
+    // Combwork's lane wake for it (laneWakeLine in src/shared/laneWatch.ts).
     prompt: () => '[CW] Lane greetings: all its cards passed: its merge is due. Your lane watch has ended: read the cards named (cw_read_task), act on them, then watch the lanes again (cw_wait_for_tasks with lanes).',
     fake: 'skill run-lanes then hive cw_lane {"action":"list"} then hive cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}',
     expect: (o, c) => [
@@ -5011,7 +5011,7 @@ module.exports.SCENARIOS.push(
     fake: (c) => `skill coordinate-agents then hive cw_read_task {"number":${c.cards.p}} then hive cw_read_section {"project":"alpha","path":"docs/DEPLOY.md","heading":"Staging"}`,
     expect: (o, c) => {
       const p = c.cards.p
-      // Darren's decision (HI-2239, 31 Oct): only Hive's recorded reads (cw_read_task of the card; cw_read_section of
+      // Darren's decision (HI-2239, 31 Oct): only Combwork's recorded reads (cw_read_task of the card; cw_read_section of
       // alpha's docs/DEPLOY.md and alpha's detailed cw_list_tasks, each paired with its own reply) and a Read of the
       // doc's exact absolute path count. A shell command or Codex script that may have read the doc is unobservable: with
       // no lookup credited, it leaves the check out (never blamed) and is recorded (observe).
@@ -5060,7 +5060,7 @@ module.exports.SCENARIOS.push(
 )
 
 // A natural break (#1082, #1080 gaps 1 and 3): every lane has ended, or a solo agent's card is done with nothing else
-// running. Since HI-2226 (Darren, 31 Oct) Hive's own nudge (#1437) owns suggesting that the project's agents start fresh,
+// running. Since HI-2226 (Darren, 31 Oct) Combwork's own nudge (#1437) owns suggesting that the project's agents start fresh,
 // so the Assistant isn't checked for suggesting it; it never suggests it while work, a question or a watch remains, saves
 // what is open to its journal first, and restarts nothing itself.
 /** A reply that suggests starting fresh conversations or sessions. */
@@ -5084,7 +5084,7 @@ function landWork(c, readme = true) {
   c.git('commit', '-qm', readme ? 'greet() says Hi and trims the name; README: usage' : 'greet() says Hi and trims the name')
   return c.git('rev-parse', 'HEAD').trim()
 }
-/** Ends the scenario's lanes whose builder is one of `builders`, merged at the work's commit (as Hive records a lane's end). */
+/** Ends the scenario's lanes whose builder is one of `builders`, merged at the work's commit (as Combwork records a lane's end). */
 async function endLanes(c, builders) {
   c.merged ??= landWork(c)
   for (const l of (await c.api('GET', '/v1/lanes')).body ?? []) {
@@ -5093,7 +5093,7 @@ async function endLanes(c, builders) {
     if (r.status !== 200) throw new Error(`setup: lane ${l.id} didn't end: ${r.text}`)
   }
 }
-/** Hive's lane wake for lanes that ended, with agents waiting for the user (laneWakeLine in src/shared/laneWatch.ts). */
+/** Combwork's lane wake for lanes that ended, with agents waiting for the user (laneWakeLine in src/shared/laneWatch.ts). */
 const lanesEndedWake = async (c, builders, waits = []) => {
   const lanes = ((await c.api('GET', '/v1/lanes')).body ?? []).filter((l) => builders.includes(l.builder?.name))
   const parts = [...lanes.map((l) => `Lane ${l.name ?? l.id}: ended (merged)`), waits.map((w) => `${w.name} (${w.project}) is waiting for the user${w.card ? ` on #${w.card}` : ''}${w.what ? `: "${w.what}"` : ''}`).join('; ')].filter(Boolean)
@@ -5103,7 +5103,7 @@ const lanesEndedWake = async (c, builders, waits = []) => {
 module.exports.SCENARIOS.push(
   {
     id: 'fresh-start-lanes-ended',
-    title: 'Coordinator mode woken as the last lanes end, nothing else running (#1082): says so, and restarts nothing itself (HI-2226: Hive nudges a fresh start)',
+    title: 'Coordinator mode woken as the last lanes end, nothing else running (#1082): says so, and restarts nothing itself (HI-2226: Combwork nudges a fresh start)',
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -5128,7 +5128,7 @@ module.exports.SCENARIOS.push(
     control: 'agents',
     mode: 'coordinator',
     async setup(c) {
-      // #c in Doing from the start (HI-2569): Hive starts no card on Builder2, which can't finish it in the setup.
+      // #c in Doing from the start (HI-2569): Combwork starts no card on Builder2, which can't finish it in the setup.
       await twoLanes(c, { cColumn: 'doing' })
       for (const k of ['a', 'b']) await c.api('PATCH', `/v1/tasks/${c.cards[k]}`, { column: 'done' })
       c.merged = landWork(c, false)
@@ -5177,7 +5177,7 @@ module.exports.SCENARIOS.push(
   },
   {
     id: 'fresh-start-solo-done',
-    title: "The Assistant, one agent and no lanes, woken as the agent's card reaches Done with nothing else running (#1082, coordinate-agents): restarts nothing (HI-2226: Hive nudges a fresh start)",
+    title: "The Assistant, one agent and no lanes, woken as the agent's card reaches Done with nothing else running (#1082, coordinate-agents): restarts nothing (HI-2226: Combwork nudges a fresh start)",
     role: 'assistant',
     control: 'agents',
     async setup(c) {
