@@ -4,7 +4,7 @@ import { join, resolve } from 'path'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-// #847 (E10c): sessions in the window's language, English for agents. Errors are HiveErrors (English message, the
+// #847 (E10c): sessions in the window's language, English for agents. Errors are CombworkErrors (English message, the
 // window's text through IPC); Combwork's own statuses are text beside the English statusMessage (statusText), as is the
 // merge slot's note (mergeSlotText) and Combwork's sign-in message (signIn.messageText); notices are formatted twice: the
 // user's title and the Agent API stream's English one.
@@ -19,8 +19,8 @@ const { COMPACTING_TEXT, runtimeLabel, shownMergeSlot, shownStatusMessage } = aw
 const { finishedApiTitle } = await import('../../src/shared/bursts')
 const { waitingNote, holdingNote } = await import('../../src/shared/mergeSlot')
 const { applyStep, hookStep, SAFEGUARD_IDLE_MESSAGE, SAFEGUARD_IDLE_TEXT } = await import('../../src/main/hookStatus')
-const { HiveError, shownError } = await import('../../src/main/combworkError')
-const { onHiveEvent } = await import('../../src/main/events')
+const { CombworkError, shownError } = await import('../../src/main/combworkError')
+const { onCombworkEvent } = await import('../../src/main/events')
 const { apiEventFor } = await import('../../src/main/apiEvents')
 const { noteUntracked, trackingProblem } = await import('../../src/main/agentProcesses')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')
@@ -131,9 +131,9 @@ describe('errors: English for agents, the window gets its language', () => {
   it('a refused action, from the session manager', async () => {
     setLanguage('de', GERMAN, 'de-DE')
     const e = await run(() => sessions.soleAgent(empty)).catch((x: unknown) => x)
-    expect(e).toBeInstanceOf(HiveError)
+    expect(e).toBeInstanceOf(CombworkError)
     expect((e as Error).message).toBe('This project has no agents yet. Add one first.')
-    expect((e as InstanceType<typeof HiveError>).kind).toBe('conflict')
+    expect((e as InstanceType<typeof CombworkError>).kind).toBe('conflict')
     expect(shownError(e)).toBe('Dieses Projekt hat noch keine Agenten. Füge zuerst einen hinzu.')
     const none = await run(() => sessions.compact(alpha, undefined, 'a1')).catch((x: unknown) => x)
     expect((none as Error).message).toBe('No session is running for this agent.')
@@ -210,7 +210,7 @@ describe('notices: the user in their language, the Agent API in English', () => 
   const seen: { type: string; notice?: { title: string; body: string }; toast?: { title: string; message?: string } }[] = []
   let off: () => void
   beforeAll(() => {
-    off = onHiveEvent((e) => void seen.push(e as never))
+    off = onCombworkEvent((e) => void seen.push(e as never))
   })
   afterAll(() => off())
 

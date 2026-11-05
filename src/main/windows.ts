@@ -1,5 +1,5 @@
 import type { BrowserWindow, WebContents } from 'electron'
-import type { HiveEvent, QuitChoice, QuitScope, QuitSession } from '../shared/types'
+import type { CombworkEvent, QuitChoice, QuitScope, QuitSession } from '../shared/types'
 import { setEventRouter } from './events'
 import { samePlace } from './fsutil'
 import { forgetWindowViews } from './transcriptReads'
@@ -15,7 +15,7 @@ import { contextWorkspace, setWorkspaceFallback, workspaceFor, type WorkspaceSer
 /** The window buttons' height: the title bar's (34 px) less its bottom border, which would otherwise stop short of them. */
 export const TITLE_BAR_OVERLAY = 33
 
-export interface HiveWindow {
+export interface CombworkWindow {
   win: BrowserWindow
   ws: WorkspaceService
   /** Files with unsaved edits in this window (reported by its page). */
@@ -29,17 +29,17 @@ export interface HiveWindow {
   showing: string | null
 }
 
-const entries = new Map<number, HiveWindow>()
+const entries = new Map<number, CombworkWindow>()
 
-export function registerWindow(win: BrowserWindow, ws: WorkspaceService): HiveWindow {
-  const e: HiveWindow = { win, ws, unsaved: [], focusedAt: Date.now(), question: null, closing: false, showing: null }
+export function registerWindow(win: BrowserWindow, ws: WorkspaceService): CombworkWindow {
+  const e: CombworkWindow = { win, ws, unsaved: [], focusedAt: Date.now(), question: null, closing: false, showing: null }
   entries.set(win.webContents.id, e)
   ws.window = win
   win.on('focus', () => (e.focusedAt = Date.now()))
   return e
 }
 
-export function unregisterWindow(e: HiveWindow): void {
+export function unregisterWindow(e: CombworkWindow): void {
   for (const [k, v] of entries) {
     if (v !== e) continue
     entries.delete(k)
@@ -51,40 +51,40 @@ export function unregisterWindow(e: HiveWindow): void {
 }
 
 /** Every window, in the order they were opened. */
-export function hiveWindows(): HiveWindow[] {
+export function combworkWindows(): CombworkWindow[] {
   return [...entries.values()].filter((e) => !e.win.isDestroyed())
 }
 
-export function windowOf(sender: WebContents): HiveWindow | null {
+export function windowOf(sender: WebContents): CombworkWindow | null {
   return entries.get(sender.id) ?? null
 }
 
 /** The window used when nothing says which: the one focused last. */
-export function lastFocused(): HiveWindow | null {
-  return hiveWindows().sort((a, b) => b.focusedAt - a.focusedAt)[0] ?? null
+export function lastFocused(): CombworkWindow | null {
+  return combworkWindows().sort((a, b) => b.focusedAt - a.focusedAt)[0] ?? null
 }
 
 /** The window showing a workspace folder, if one is. */
-export function windowShowing(path: string): HiveWindow | null {
+export function windowShowing(path: string): CombworkWindow | null {
   // By real paths: the folder by another name (an 8.3 short name, a junction) is the same workspace (#455).
-  return hiveWindows().find((e) => !!e.ws.path && samePlace(e.ws.path, path)) ?? null
+  return combworkWindows().find((e) => !!e.ws.path && samePlace(e.ws.path, path)) ?? null
 }
 
 /** The window showing the workspace a project (or worktree) path belongs to. */
-export function windowForPath(p: string): HiveWindow | null {
+export function windowForPath(p: string): CombworkWindow | null {
   const ws = workspaceFor(p)
-  return ws ? (hiveWindows().find((e) => e.ws === ws) ?? null) : null
+  return ws ? (combworkWindows().find((e) => e.ws === ws) ?? null) : null
 }
 
-const wins = (list: (HiveWindow | null)[]): BrowserWindow[] => list.filter((e): e is HiveWindow => !!e && !e.win.isDestroyed()).map((e) => e.win)
+const wins = (list: (CombworkWindow | null)[]): BrowserWindow[] => list.filter((e): e is CombworkWindow => !!e && !e.win.isDestroyed()).map((e) => e.win)
 
-function inContext(): HiveWindow | null {
+function inContext(): CombworkWindow | null {
   const ws = contextWorkspace()
-  return ws ? (hiveWindows().find((e) => e.ws === ws) ?? null) : null
+  return ws ? (combworkWindows().find((e) => e.ws === ws) ?? null) : null
 }
 
-function forEvent(e: HiveEvent): BrowserWindow[] {
-  const all = hiveWindows()
+function forEvent(e: CombworkEvent): BrowserWindow[] {
+  const all = combworkWindows()
   switch (e.type) {
     case 'session-status':
       return wins([windowForPath(e.state.projectPath)])
@@ -134,7 +134,7 @@ function forPty(key: string): BrowserWindow[] {
   // session:<project path>#<agent id>: the window showing that project. Other terminals (Provider Setup's
   // tasks) go to every window; only the one that started the task shows it.
   const m = /^session:(.+)#[^#]+$/.exec(key)
-  return m ? wins([windowForPath(m[1])]) : wins(hiveWindows())
+  return m ? wins([windowForPath(m[1])]) : wins(combworkWindows())
 }
 
 setEventRouter({ forEvent, forPty })

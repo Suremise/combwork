@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
 }
 
 async function start() {
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   app.on('window', (p) => p.on('pageerror', (e) => check('no page errors', false, e.message)))
   return app
@@ -168,8 +168,8 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   await lib.until(() => (JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {})[wsA.toLowerCase()] === true, 5000)
   const saved = JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {}
   check("config.json remembers A's pin only", saved[wsA.toLowerCase()] === true && !(wsB.toLowerCase() in saved), JSON.stringify(saved))
-  const inHive = [wsA, wsB].some((ws) => fs.readdirSync(path.join(ws, '.combwork'), { recursive: true }).some((f) => /alwaysOnTop/.test(fs.statSync(path.join(ws, '.combwork', String(f))).isFile() ? fs.readFileSync(path.join(ws, '.combwork', String(f)), 'utf8') : '')))
-  check("…and no workspace's .combwork does", !inHive)
+  const inCombwork = [wsA, wsB].some((ws) => fs.readdirSync(path.join(ws, '.combwork'), { recursive: true }).some((f) => /alwaysOnTop/.test(fs.statSync(path.join(ws, '.combwork', String(f))).isFile() ? fs.readFileSync(path.join(ws, '.combwork', String(f)), 'utf8') : '')))
+  check("…and no workspace's .combwork does", !inCombwork)
 
   // --- The welcome page is off; the workspace's pin comes back with it.
   await inv1('workspace:close')

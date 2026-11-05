@@ -38,7 +38,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47898), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47898), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -53,15 +53,15 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
     return v
   }
   const live = async (proj, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === id)
-  const textAt = (key, text) => page.evaluate(([k, t]) => window.__hiveTerminalTextAt(k, t), [key, text])
+  const textAt = (key, text) => page.evaluate(([k, t]) => window.__cwTerminalTextAt(k, t), [key, text])
   // Where `text` is drawn once the turn of `prompt` has ended on screen (its "Done:" line with the input drawn below it),
   // read in one go in the window, so the position is the one drawn with that end: the fake Claude Code's screen changes
   // as a turn ends (its working lines go), which can move the lines under the mouse.
   const drawnAt = async (k, text, prompt) => {
     const at = await until(() => page.evaluate(([termKey, t, done]) => {
-      const drawn = window.__hiveTerminalLines(termKey) ?? []
+      const drawn = window.__cwTerminalLines(termKey) ?? []
       const end = drawn.findIndex((l) => l.includes(done))
-      return end >= 0 && drawn.slice(end + 1).some((l) => l.includes('? for shortcuts')) ? window.__hiveTerminalTextAt(termKey, t) : null
+      return end >= 0 && drawn.slice(end + 1).some((l) => l.includes('? for shortcuts')) ? window.__cwTerminalTextAt(termKey, t) : null
     }, [k, text, `Done: ${prompt}`]), 15000)
     check(`"${text}" is drawn, its turn's end below it`, !!at)
     return at ?? { x: 0, y: 0 }

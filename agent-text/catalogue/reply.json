@@ -224,7 +224,7 @@
     "note": "A journal entry that digests others."
   },
   "reply.journal.head": {
-    "text": "#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byHive, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}",
+    "text": "#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byCombwork, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}",
     "note": "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed."
   },
   "reply.journal.links": {

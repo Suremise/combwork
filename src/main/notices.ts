@@ -1,7 +1,7 @@
 import { englishText, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { asksYou } from '../shared/inbox'
-import { emit, onHiveEvent } from './events'
+import { emit, onCombworkEvent } from './events'
 import { resolveAsks } from './notify'
 
 const CLOSED = msg({ id: 'main.quit.closed', defaultMessage: 'Combwork has closed', description: 'A notice after Combwork quit without asking, its sessions stopped.' })
@@ -24,7 +24,7 @@ const ENDED = msg({ id: 'main.notify.sessionEnded', defaultMessage: 'Its session
 export function startNoticeResolver(): () => void {
   const asking = new Set<string>()
   const key = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
-  return onHiveEvent((e) => {
+  return onCombworkEvent((e) => {
     if (e.type === 'session-status') {
       const k = key(e.state.projectPath, e.state.agentId)
       if (asksYou(e.state)) asking.add(k)

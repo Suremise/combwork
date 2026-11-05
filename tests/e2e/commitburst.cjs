@@ -26,9 +26,9 @@ const check = (name, ok, extra = '') => {
     const errors = []
     h.page.on('pageerror', (e) => errors.push(e.message))
     await lib.appReady(h.page)
-    const largest = () => h.page.evaluate(() => window.__hiveCommitBurst?.().max ?? null)
-    const longest = () => h.page.evaluate(() => window.__hiveCommitBurst?.().chain ?? null)
-    check("a test copy's window watches React's commits", await h.page.evaluate(() => window.combwork.commitWatch === true && typeof window.__hiveCommitBurst === 'function'))
+    const largest = () => h.page.evaluate(() => window.__cwCommitBurst?.().max ?? null)
+    const longest = () => h.page.evaluate(() => window.__cwCommitBurst?.().chain ?? null)
+    check("a test copy's window watches React's commits", await h.page.evaluate(() => window.combwork.commitWatch === true && typeof window.__cwCommitBurst === 'function'))
     // Opening the window is calibration data for step 2 (HI-1759), not judged here: only that it was counted.
     const opening = await largest()
     console.log(`INFO opening the window: ${opening} commits at most within 250 ms`)
@@ -52,7 +52,7 @@ const check = (name, ok, extra = '') => {
     check('typing makes commits: one at least per key', typedBurst > 0, String(typedBurst))
     check('…but no chain: each key starts a new one, well under the limit', typedChain < LIMIT / 2, String(typedChain))
     // The fixture: a loop of 80 commits, one per useEffect, all within the window.
-    await h.page.evaluate((n) => window.__hiveTestCommitLoop(n), 80)
+    await h.page.evaluate((n) => window.__cwTestCommitLoop(n), 80)
     const after = await largest()
     check('a deliberate loop (a setState per commit in a useEffect) is caught: its burst reaches the candidate threshold', after >= LIMIT, String(after))
     check('…and lib.cjs has it from the console', !!(await lib.until(() => lib.commitBursts() >= after, HUNG_MS, 100)), `${lib.commitBursts()} of ${after}`)

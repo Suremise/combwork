@@ -1,16 +1,16 @@
 import { join } from 'path'
 import { readFileSync } from 'original-fs'
 import { app } from 'electron'
-import { emit, onHiveEvent, toast } from './events'
+import { emit, onCombworkEvent, toast } from './events'
 import { resolveOffer } from './notify'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { JobHost, MAX_LISTED, MAX_WORKING_IN, type HostFailure, type JobList } from './processSupervisor'
 import { brokersOnly, brokersWorkingIn, folderInside, mayBeBroker, parseWorkingIn, SYSTEM_BROKERS } from './systemBrokers'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
 import type { ActivityProcess } from '../shared/activity'
-import type { HiveEvent } from '../shared/types'
+import type { CombworkEvent } from '../shared/types'
 import { maskText } from '../shared/redact'
 import { englishText, shownText, withValues, type TextPart } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
@@ -263,9 +263,9 @@ export async function trackLaunch(launch: Launch, pid: number, cancelled?: Abort
  * This Hive's identity as its slot writers name it, "pid:started" (HI-2055: agentFolders gives it), for the keeper's
  * receipts: a receipt frees only a writer of the Hive that started its helper.
  */
-let hiveIdentity: (() => Promise<string>) | null = null
-export function setHiveIdentity(fn: (() => Promise<string>) | null): void {
-  hiveIdentity = fn
+let combworkIdentity: (() => Promise<string>) | null = null
+export function setCombworkIdentity(fn: (() => Promise<string>) | null): void {
+  combworkIdentity = fn
 }
 
 /** Where the keepers write their runs' states (HI-2055): Hive's profile. */
@@ -284,7 +284,7 @@ async function keeperHelper(): Promise<{ instance: number; helper: string } | nu
   const instance = host.instance
   if (instance === null) return null
   if (keeperOf?.instance === instance) return keeperOf
-  const who = await hiveIdentity?.().catch(() => null)
+  const who = await combworkIdentity?.().catch(() => null)
   if (!who || !/^\d+:\d+$/.test(who)) return null
   const r = await host.request('keeper', who, Buffer.from(keeperDir(), 'utf8').toString('base64url'))
   if (typeof r !== 'string' || !HELPER_ID.test(r) || host.instance !== instance) return null
@@ -956,7 +956,7 @@ export async function settleLeftovers(projectPath: string, agentId: string, how:
   emit({ type: 'agent-leftovers', leftovers: leftoversOf(mine[0].projectPath, agentId) })
   if (failed) {
     log.warn(`could not end ${failed} process(es) ${userText(name)} left running`)
-    throw hiveError(msg({ id: 'session.leftovers.notEnded', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Combwork end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}", description: "Ending the processes an agent left running failed. {n} is how many are still running; the ⋯ menu on the agent's pane lists them with End and Keep." }), { n: failed })
+    throw combworkError(msg({ id: 'session.leftovers.notEnded', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Combwork end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}", description: "Ending the processes an agent left running failed. {n} is how many are still running; the ⋯ menu on the agent's pane lists them with End and Keep." }), { n: failed })
   }
   return done
 }
@@ -1045,7 +1045,7 @@ export async function settleOffer(offer: string, how: 'end' | 'keep'): Promise<v
       const l = left.get(r.run)
       if (!l) return done(tr(LO.changed))
       const now = await listedNow(l)
-      if (!now) throw hiveError(LO.unchecked, undefined, { kind: 'conflict' })
+      if (!now) throw combworkError(LO.unchecked, undefined, { kind: 'conflict' })
       const seen = shownOf({ runId: r.run, processes: now.processes, more: now.more })
       if (seen.more !== r.more || seen.ids.join(',') !== r.ids.join(',')) return done(tr(LO.changed))
     }
@@ -1056,7 +1056,7 @@ export async function settleOffer(offer: string, how: 'end' | 'keep'): Promise<v
     // What the notice showed and the user authorised, frozen when it was made: never widened from the kept list, which a
     // poll may have changed during the awaits above (HR2's round 2).
     const shown = o.runs.flatMap((r) => r.frozen)
-    if (!(await endProcessesExactly(shown))) throw hiveError(LO.notEnded, { n: shown.length }, { kind: 'conflict' })
+    if (!(await endProcessesExactly(shown))) throw combworkError(LO.notEnded, { n: shown.length }, { kind: 'conflict' })
     // Each launch looked at again: one now empty is settled as ended; one with something started since stays listed.
     let left_ = 0
     for (const r of o.runs) {
@@ -1102,10 +1102,10 @@ let watchingOffers = false
 function watchLeftoverOffers(): void {
   if (watchingOffers) return
   watchingOffers = true
-  onHiveEvent(reconcileLeftoverOffers)
+  onCombworkEvent(reconcileLeftoverOffers)
 }
 
-function reconcileLeftoverOffers(e: HiveEvent): void {
+function reconcileLeftoverOffers(e: CombworkEvent): void {
   if (e.type !== 'agent-leftovers' || !offersShown.size) return
   const k = agentKey(e.leftovers.projectPath, e.leftovers.agentId)
   for (const [offer, o] of offersShown) {

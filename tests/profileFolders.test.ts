@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 
 const accounts = vi.hoisted(() => ({ list: [] as { id: string; name: string; kind?: string }[] }))
 const toasts = vi.hoisted(() => [] as { level: string; title: string; message?: string }[])
-vi.mock('../src/main/accounts', () => ({ hiveAccounts: () => accounts.list, isServer: (a: { kind?: string } | undefined) => a?.kind === 'server', checkAccount: async () => null }))
+vi.mock('../src/main/accounts', () => ({ combworkAccounts: () => accounts.list, isServer: (a: { kind?: string } | undefined) => a?.kind === 'server', checkAccount: async () => null }))
 vi.mock('../src/main/events', () => ({ toast: (level: string, title: string, message?: string) => void toasts.push({ level, title, message }) }))
 const { checkSignInsAfterMove, MOVE_RECORD } = await import('../src/main/profileNotices')
 

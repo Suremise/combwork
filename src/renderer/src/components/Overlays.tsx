@@ -332,7 +332,7 @@ export function CommandPalette() {
   const keys = useStore((s) => s.projectKeys)
   const moved = useStore((s) => s.movedCardNames)
   // The user's commands (HI-1954): each one runs by hand from here, as from Settings.
-  const hiveCommands = useStore((s) => s.settings?.commands?.list ?? NO_COMMANDS)
+  const combworkCommands = useStore((s) => s.settings?.commands?.list ?? NO_COMMANDS)
   const wsCommands = useStore((s) => s.workspace?.config.commands?.list ?? NO_COMMANDS)
   // Toggles' states as one string, so their rows' checkmarks follow live changes (pinning the window
   // while the palette is open) without rebuilding the item list; a string keeps the selector stable.
@@ -379,7 +379,7 @@ export function CommandPalette() {
             checked: undefined as (() => boolean) | undefined
           }))
       : []
-    const runItems = mode === 'projects' ? [] : [...wsCommands.map((c) => ({ c, scope: 'workspace' as const })), ...hiveCommands.map((c) => ({ c, scope: 'combwork' as const }))].map(({ c, scope }) => ({
+    const runItems = mode === 'projects' ? [] : [...wsCommands.map((c) => ({ c, scope: 'workspace' as const })), ...combworkCommands.map((c) => ({ c, scope: 'combwork' as const }))].map(({ c, scope }) => ({
       id: `run:${scope}:${c.id}`,
       command: undefined as string | undefined,
       label: tr(msg({ id: 'shell.palette.runCommand', defaultMessage: 'Run Command: {name}', description: "One of the user's own commands in the command palette (Settings → Commands, HI-1954): choosing it runs it now. {name} is the command's name." }), { name: c.name }),
@@ -394,7 +394,7 @@ export function CommandPalette() {
       .slice(0, 60)
     // `open`: commands' availability (when()) is read again each time the palette opens; `shownLanguage`: their labels.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved, hiveCommands, wsCommands])
+  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved, combworkCommands, wsCommands])
 
   useEffect(() => {
     listRef.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' })

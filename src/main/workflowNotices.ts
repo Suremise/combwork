@@ -9,14 +9,14 @@ import type { TaskColumn } from '../shared/types'
 import { workflowLine } from '../shared/workflow/texts'
 import { boardRead, boardReadOnly, boardRevision, boardWrite, boardWriteOp } from './boardStore'
 import { coalesced } from './coalesce'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { listLanes } from './lanes'
 import { createLogger } from './logger'
 import { wakesOn } from './loopWakes'
 import { sessions } from './sessions'
 import { HISTORY } from '../shared/taskHistory'
 import type { StoredText } from '../shared/types'
-import { allTasks, commentAsHive, getTask, noteOnCard } from './tasks'
+import { allTasks, commentAsCombwork, getTask, noteOnCard } from './tasks'
 import { lanesNowIn } from './watches'
 import { onAction, type ActionHandler } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
@@ -109,7 +109,7 @@ async function commentFromAction(a: ActionRow, ws: WorkspaceService): Promise<vo
   // the worker records the action failed, never done without its comment; one stopped by its workspace closing waits
   // for the next run there, which writes it (or finds it written: its id is the action's).
   if (noticeTestHooks.commentFails) throw new Error('the board refused the change (a test)') // i18n-ignore: a test's error, logged
-  await commentAsHive(a.card, shown ? { text, shown } : text, ws, undefined, `action-${a.id}`)
+  await commentAsCombwork(a.card, shown ? { text, shown } : text, ws, undefined, `action-${a.id}`)
 }
 
 /** How much of an agent's question a request's notice shows (its first sentence or two). */
@@ -335,7 +335,7 @@ export function initWorkflowNotices(): void {
   onAction('laneNotice', laneNoticeFromAction, 'repeatable')
   // The comment, its id the action's, is the record that it was made: a run again finds it and writes nothing.
   onAction('comment', commentFromAction, 'delivered')
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type !== 'tasks-changed' && e.type !== 'lanes-changed') return
     const ws = openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())
     if (ws) checkSoon(ws)

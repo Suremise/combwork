@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   const claudeHome = lib.ownClaudeHome('cliquit')
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47795), CODEX_HOME: lib.CODEX_HOME, ...claudeHome.env })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47795), CODEX_HOME: lib.CODEX_HOME, ...claudeHome.env })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -50,14 +50,14 @@ const check = (name, ok, extra = '') => {
       if (c.provider === 'claude-code') await lib.acceptClaudeTrust(inv, proj, agent.id)
       const ready = await lib.until(async () => (await live(agent.id))?.status === 'ready', HUNG_MS, 300)
       check(`${c.name} starts and is at its prompt`, !!ready, lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-400))
-      // Its hive tools connected: Combwork types nothing into a CLI before then (sessions.hiveToolsSettled).
-      await lib.until(() => lib.hiveToolsConnected(userData, agent.id), HUNG_MS, 300)
+      // Its hive tools connected: Combwork types nothing into a CLI before then (sessions.combworkToolsSettled).
+      await lib.until(() => lib.combworkToolsConnected(userData, agent.id), HUNG_MS, 300)
       const version = (await live(agent.id))?.cliVersion ?? null
-      const since = Math.max(0, lib.hiveLogLines(userData).length - 1) // the last element is the empty one after the final newline
+      const since = Math.max(0, lib.combworkLogLines(userData).length - 1) // the last element is the empty one after the final newline
       const r = await inv('slots:test', proj, { op: 'quit', agent: agent.id })
       check(`${c.name}: its exit command is typed`, r === 'sent', JSON.stringify(r))
       const gone = await lib.until(async () => !(await live(agent.id)), HUNG_MS, 300)
-      const after = lib.hiveLogLines(userData).slice(since)
+      const after = lib.combworkLogLines(userData).slice(since)
       const mine = after.filter((l) => l.includes(`#${agent.id}`) || l.includes(`⁨${agent.id}⁩`))
       check(`${c.name}: ${c.line} was typed`, after.some((l) => l.includes(`typed ${c.line} (a test asked)`)), after.join('\n'))
       check(`${c.name} exits by itself (code 0)${version ? `, ${version}` : ''}`, !!gone && mine.some((l) => l.includes('[pty] exit') && /: 0⁩?$/.test(l.trim())), mine.join('\n'))

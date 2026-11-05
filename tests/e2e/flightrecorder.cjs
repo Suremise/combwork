@@ -69,7 +69,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47837), ...claudeEnv, CODEX_HOME: codexHome, CW_TEST_SILENT_MS: String(SILENT_MS), CW_TEST_FLIGHT_AFTER_MS: '500' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47837), ...claudeEnv, CODEX_HOME: codexHome, CW_TEST_SILENT_MS: String(SILENT_MS), CW_TEST_FLIGHT_AFTER_MS: '500' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -90,7 +90,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     const capturedToasts = async () => (await toasts()).filter((t) => t.title.startsWith('Captured '))
     const toastFor = (title) => lib.until(async () => (await toasts()).find((t) => t.title === title) ?? null, HUNG_MS)
     const setAdvanced = (id, value) => inv('advanced:set', id, value)
-    const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
+    const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
 
     // Two agents in alpha (so Combwork names one "alpha · Claude"), one in beta ("beta").
     const claude = await lib.addAgent(inv, alpha, { name: 'Claude' })
@@ -111,7 +111,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     check('off: Combwork noted the safeguard stop', !!(await stops(1)))
     check('off: no capture is saved', captures().length === 0, JSON.stringify(captures().map((c) => c.name)))
     check('off: no "Captured" notice', (await capturedToasts()).length === 0, JSON.stringify(await capturedToasts()))
-    check('off: the recorder noted nothing', !/flight recorder: /.test(hiveLog()))
+    check('off: the recorder noted nothing', !/flight recorder: /.test(combworkLog()))
 
     // --- 2. Safeguard on: a capture of the turn, redacted, and its notice.
     await setAdvanced('cw.recorder.safeguard', true)

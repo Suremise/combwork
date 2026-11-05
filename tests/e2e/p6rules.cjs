@@ -33,7 +33,7 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
   const nada = path.join(fx.ws, 'nada')
   fs.mkdirSync(path.join(nada, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(nada, 'notes.txt'), 'notes\n')
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

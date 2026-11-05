@@ -13,9 +13,9 @@ import { LOG_FILE, logsDir } from './logger'
 import { provider } from './providers'
 import { providerService } from './providerService'
 import { gitTool } from './gitTool'
-import { hiveWindows } from './windows'
+import { combworkWindows } from './windows'
 import { GUIDANCE_REVISION } from './guidance'
-import { hiveSkills } from './skills'
+import { combworkSkills } from './skills'
 import { inWorkspace } from './workspace'
 import { trackingLost, trackingProblem } from './agentProcesses'
 import { diagnosticRecording } from '../shared/consoleFixtures.mts'
@@ -78,7 +78,7 @@ export function toolListLine(label: string, rows: ToolListRow[]): string {
 }
 
 /** The tool list lines of each open workspace (its metrics' last 24 hours; one that can't be read says so). */
-function toolListLines(windows: ReturnType<typeof hiveWindows>): string[] {
+function toolListLines(windows: ReturnType<typeof combworkWindows>): string[] {
   // Numbered as the skills' lines number them: the windows with a workspace open.
   return windows.filter((w) => !!w.ws.path).map((w, i) => {
     const label = `Workspace ${i + 1}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
@@ -101,7 +101,7 @@ const yesNo = (v: boolean | null | undefined): string => (v === true ? 'yes' : v
  */
 export async function diagnostics(opts: { recording?: boolean } = {}): Promise<string> {
   const s = config.settings
-  const windows = hiveWindows()
+  const windows = combworkWindows()
   const workspaces = windows.map((w) => w.ws.info()).filter((w) => !!w)
   const projects = workspaces.flatMap((w) => w.projects)
   const agents = projects.flatMap((p) => p.agents)
@@ -130,7 +130,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
   const skillLines: string[] = []
   for (const w of windows) {
     if (!w.ws.path) continue
-    const list = await inWorkspace(w.ws, () => hiveSkills(true)).catch(() => [])
+    const list = await inWorkspace(w.ws, () => combworkSkills(true)).catch(() => [])
     const mark = (x: (typeof list)[number]): string => `${x.name} ${x.bundled}${x.updateAvailable ? ' (update available)' : ''}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     skillLines.push(`- Workspace ${skillLines.length + 1}: ${list.filter((x) => x.bundled).map(mark).join(', ') || 'no bundled skills'}; ${list.filter((x) => !x.bundled).length} of its own`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
   }

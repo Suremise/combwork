@@ -2,7 +2,7 @@ import { isAbsolute, join } from 'path'
 import { open, stat } from 'original-fs/promises'
 import { SETTINGS_FILE_LIMIT, SETTINGS_READ_CHUNK, settingsArgValue } from './autoCompact'
 import { msg } from '../../../shared/i18n/msg'
-import { errorText, hiveError } from '../../combworkError'
+import { errorText, combworkError } from '../../combworkError'
 
 /**
  * A `--settings` in the user's own arguments (#330). Claude Code reads only the last `--settings` it is given (checked
@@ -11,7 +11,7 @@ import { errorText, hiveError } from '../../combworkError'
  */
 
 /**
- * Why a launch is refused (#842): thrown as HiveErrors, so the window reads them in its language and the Agent API (an
+ * Why a launch is refused (#842): thrown as CombworkErrors, so the window reads them in its language and the Agent API (an
  * agent or the Assistant starting one) in English.
  */
 const M = {
@@ -47,7 +47,7 @@ export async function userSettings(args: readonly string[], cwd: string): Promis
   const v = settingsArgValue(args)
   if (v === null) return null
   // `--settings` at the end, `--settings=` or an empty value: a mistake to fix, not "no settings" (#361).
-  if (!v) throw hiveError(M.noValue)
+  if (!v) throw combworkError(M.noValue)
   // Claude Code takes a value that parses as JSON as inline settings, and anything else as a file's path.
   let json: unknown
   let inline = false
@@ -66,21 +66,21 @@ export async function userSettings(args: readonly string[], cwd: string): Promis
     try {
       text = await readSettingsFile(file)
     } catch (e) {
-      throw hiveError(M.unreadable, { file: v, why: (e as NodeJS.ErrnoException).code === 'ENOENT' ? M.noFile : errorText(e) }, { cause: e })
+      throw combworkError(M.unreadable, { file: v, why: (e as NodeJS.ErrnoException).code === 'ENOENT' ? M.noFile : errorText(e) }, { cause: e })
     }
     try {
       json = JSON.parse(text.replace(/^﻿/, ''))
     } catch (e) {
-      throw hiveError(M.notJson, { file: v, why: (e as Error).message }, { cause: e })
+      throw combworkError(M.notJson, { file: v, why: (e as Error).message }, { cause: e })
     }
   }
-  if (!json || typeof json !== 'object' || Array.isArray(json)) throw hiveError(M.notObject, what)
+  if (!json || typeof json !== 'object' || Array.isArray(json)) throw combworkError(M.notObject, what)
   // It would turn off Hive's hooks and status line with the user's (Claude Code 2.1.292): Hive can't keep both. Refused,
   // not launched without them (#1285, Darren's decision: no hooks-free mode): the hooks are how Hive knows the agent.
-  if ((json as Record<string, unknown>).disableAllHooks === true) throw hiveError(M.hooksOff, what)
+  if ((json as Record<string, unknown>).disableAllHooks === true) throw combworkError(M.hooksOff, what)
   // A list's entries are added to (mergeLaunchSettings); anything else in its place blocks Hive's hooks (2.1.292).
   for (const key of HOOK_ALLOWLISTS) {
-    if (key in json && !Array.isArray((json as Record<string, unknown>)[key])) throw hiveError(M.notList, { ...what, key })
+    if (key in json && !Array.isArray((json as Record<string, unknown>)[key])) throw combworkError(M.notList, { ...what, key })
   }
   return json as Record<string, unknown>
 }
@@ -93,12 +93,12 @@ export async function userSettings(args: readonly string[], cwd: string): Promis
  */
 async function readSettingsFile(file: string): Promise<string> {
   const st = await stat(file)
-  if (!st.isFile()) throw hiveError(M.notAFile)
-  const over = (): Error => hiveError(M.tooLarge)
+  if (!st.isFile()) throw combworkError(M.notAFile)
+  const over = (): Error => combworkError(M.tooLarge)
   if (st.size > SETTINGS_FILE_LIMIT) throw over()
   const fh = await open(file, 'r')
   try {
-    if (!(await fh.stat()).isFile()) throw hiveError(M.notAFile)
+    if (!(await fh.stat()).isFile()) throw combworkError(M.notAFile)
     const chunks: Buffer[] = []
     let n = 0
     for (;;) {
@@ -119,7 +119,7 @@ async function readSettingsFile(file: string): Promise<string> {
 const HOOK_ALLOWLISTS = ['allowedHttpHookUrls', 'httpHookAllowedEnvVars'] as const
 
 /** What Hive's own hooks need from the settings: the URL its HTTP hooks post to and the variable their header reads. */
-export interface HiveHookNeeds {
+export interface CombworkHookNeeds {
   url: string
   envVar: string
 }
@@ -131,7 +131,7 @@ export interface HiveHookNeeds {
  * the highest file that sets one, and without it blocks Hive's hooks (`allowedHttpHookUrls`) or sends them without
  * the token (`httpHookAllowedEnvVars`); checked with 2.1.292. Managed settings, above this file, still apply.
  */
-export function mergeLaunchSettings(hive: { hooks: Record<string, unknown[]>; statusLine: unknown }, user: Record<string, unknown> | null, needs: HiveHookNeeds): Record<string, unknown> {
+export function mergeLaunchSettings(hive: { hooks: Record<string, unknown[]>; statusLine: unknown }, user: Record<string, unknown> | null, needs: CombworkHookNeeds): Record<string, unknown> {
   if (!user) return { ...hive }
   const theirs = user.hooks && typeof user.hooks === 'object' && !Array.isArray(user.hooks) ? (user.hooks as Record<string, unknown>) : {}
   const hooks: Record<string, unknown[]> = { ...hive.hooks }
@@ -178,7 +178,7 @@ export function ownStatusLine(scopes: readonly { json: unknown }[]): StatusLine 
  * comment at its end, several lines) can reach past the group: Claude Code runs status lines with bash (Git Bash on
  * Windows), where that holds for any command that runs alone.
  */
-export function hiveStatusLine(forward: (echo: boolean) => string, own: StatusLine | null): StatusLine {
+export function combworkStatusLine(forward: (echo: boolean) => string, own: StatusLine | null): StatusLine {
   if (!own) return { type: 'command', command: forward(false), padding: 0 }
   return { ...own, command: `${forward(true)} | (\n${own.command}\n)` }
 }

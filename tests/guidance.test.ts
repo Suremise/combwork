@@ -6,7 +6,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { controlRules, hiveInstructions, journalRule, withLatestHandover } from '../src/shared/combworkGuidance'
+import { controlRules, combworkInstructions, journalRule, withLatestHandover } from '../src/shared/combworkGuidance'
 import { taskPrompt } from '../src/shared/tasks'
 import { ASSISTANT_ONLY_TOOLS, assistantTools } from '../src/shared/assistantTools'
 import { parseSkillFrontmatter, skillFor } from '../src/main/skills'
@@ -44,8 +44,8 @@ const skillsNamed = (text: string): string[] => [...text.matchAll(/\b([a-z]+(?:-
 const toolsNamed = (text: string): string[] => [...new Set([...text.matchAll(/\bcw_[a-z_]+/g)].map((m) => m[0]))]
 
 describe('the session contract', () => {
-  const agent = hiveInstructions('web')
-  const assistant = hiveInstructions('', 'assistant')
+  const agent = combworkInstructions('web')
+  const assistant = combworkInstructions('', 'assistant')
 
   it('routes to skills that exist and reach that role', () => {
     /** The catalog's hyphenated names a text mentions (plain words like "handover" are too common to count). */
@@ -63,12 +63,12 @@ describe('the session contract', () => {
     const named = (text: string): string[] => [...catalog.keys()].filter((n) => n.includes('-') && new RegExp(`\\b${n}\\b`).test(text))
     const all = named(agent)
     for (const off of all) {
-      const without = hiveInstructions('web', 'agent', true, new Set([off]))
+      const without = combworkInstructions('web', 'agent', true, new Set([off]))
       expect(named(without), off).toEqual(all.filter((n) => n !== off))
       // The board rules stay whatever is switched off.
       expect(without, off).toMatch(/Board rules \(Combwork's, whatever a skill says, or if it is missing\)/)
     }
-    expect(named(hiveInstructions('web', 'agent', true, new Set(all)))).toEqual([])
+    expect(named(combworkInstructions('web', 'agent', true, new Set(all)))).toEqual([])
   })
 
   it('keeps the board boundaries a session needs when its skills are missing', () => {
@@ -97,7 +97,7 @@ describe('the session contract', () => {
   // cw.workflow.enforce: the contract names the intents and leaves each case to Combwork's reply or refusal. Every session
   // gets the same contract, so each line reads right for a solo user with the rules off as for a Git team with them on.
   it('stays conditional where the gates are: no round count, no review or merge stated as the rule', () => {
-    for (const text of [agent, hiveInstructions('web', 'agent', false)]) {
+    for (const text of [agent, combworkInstructions('web', 'agent', false)]) {
       // cw.workflow.enforce off: no round limit, no one card at a time, lane edits at once.
       expect(text).not.toMatch(/\b\d+ rounds?\b|\bround limit\b|\bone (?:card )?at a time\b/i)
       // Review off or by the user: a card can finish on submit, with no reviewer.
@@ -136,8 +136,8 @@ describe('the session contract', () => {
   })
 
   it("adds the journal's rule and scope while the journal is on, and nothing while it is off (#1032)", () => {
-    expect(hiveInstructions('', 'assistant', true, undefined, null)).toBe(assistant)
-    const on = hiveInstructions('', 'assistant', true, undefined, ['decision', 'plan'])
+    expect(combworkInstructions('', 'assistant', true, undefined, null)).toBe(assistant)
+    const on = combworkInstructions('', 'assistant', true, undefined, ['decision', 'plan'])
     // HI-2048 (K12): its skills line leaves out handover while the journal is on; the rest is as it was.
     const skillsOff = assistant.split('\n').find((l) => l.startsWith("Combwork's skills cover"))!
     expect(skillsOff).toMatch(/, handover, pick-up and workspace-note\.$/)
@@ -154,8 +154,8 @@ describe('the session contract', () => {
     expect(rule).not.toMatch(/isn't needed/)
     expect(catalog.get('journal')?.text).toMatch(/asked for one, say so in a line/)
     // An agent's contract has no such line: it only gains the rule.
-    const agentContract = hiveInstructions('web')
-    expect(hiveInstructions('web', 'agent', true, undefined, ['decision']).startsWith(agentContract)).toBe(true)
+    const agentContract = combworkInstructions('web')
+    expect(combworkInstructions('web', 'agent', true, undefined, ['decision']).startsWith(agentContract)).toBe(true)
     expect(catalog.get('journal')?.audience).toBe('assistant')
     for (const t of toolsNamed(rule)) expect(assistantTools('projects', false, true), t).toContain(t)
     expect(journalRule(['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment']).length).toBeLessThan(600)
@@ -175,7 +175,7 @@ describe('one owner per rule', () => {
   const NOT_YET: Record<string, string[]> = {}
   const descriptions = TOOL_DESCRIPTIONS.join('\n')
   const places = (role: 'agent' | 'assistant'): [string, string][] => [
-    ['contract', role === 'agent' ? hiveInstructions('web') : [hiveInstructions('', 'assistant'), controlRules('projects', true), journalRule(['decision'])].join('\n')],
+    ['contract', role === 'agent' ? combworkInstructions('web') : [combworkInstructions('', 'assistant'), controlRules('projects', true), journalRule(['decision'])].join('\n')],
     ...[...catalog].filter(([, s]) => skillFor(s.audience, role)).map(([name, s]): [string, string] => [name, s.text]),
     ['tool descriptions', descriptions]
   ]
@@ -284,7 +284,7 @@ describe('the bundled skills', () => {
       expect(d).not.toMatch(own)
       expect(d).not.toMatch(builders)
     }
-    for (const text of [hiveInstructions('web'), hiveInstructions('', 'assistant')]) expect(text).not.toMatch(own)
+    for (const text of [combworkInstructions('web'), combworkInstructions('', 'assistant')]) expect(text).not.toMatch(own)
   })
 
   it('link only to files inside their own folder', () => {
@@ -702,7 +702,7 @@ describe('workspace-note: where each kind of note goes', () => {
       ['About this machine or person', `the shared note \`${WORKSPACE_NOTES_PATH}\``]
     ]) expect(skill.text, kind).toMatch(new RegExp(`\\| ${kind}[^\\n]*\\| ${where.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
     expect(skill.text).toMatch(/Only the user and the Assistant write it/)
-    for (const text of [hiveInstructions('web'), hiveInstructions('', 'assistant')]) expect(text).not.toMatch(/Workspace notes/)
+    for (const text of [combworkInstructions('web'), combworkInstructions('', 'assistant')]) expect(text).not.toMatch(/Workspace notes/)
   })
 })
 

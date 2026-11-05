@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_LOOP_GRACE_MS: '3000', CW_TEST_WAKE_TAKE_MS: '2000' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_LOOP_GRACE_MS: '3000', CW_TEST_WAKE_TAKE_MS: '2000' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -72,7 +72,7 @@ const check = (name, ok, extra = '') => {
     const l = await live(id)
     const state = l ? `${l.status}${l.notWatching ? `, not watching ${JSON.stringify(l.notWatching)}` : ''}` : 'no session'
     const term = lib.plainText(await inv('pty:buffer', lib.ptyKey(alpha, id)).catch(() => '')).trim().slice(-600)
-    return `${state}; terminal: ${term || '(empty)'}; combwork.log: ${hiveLog().split(/\r?\n/).filter(Boolean).slice(-25).join(' | ')}`
+    return `${state}; terminal: ${term || '(empty)'}; combwork.log: ${combworkLog().split(/\r?\n/).filter(Boolean).slice(-25).join(' | ')}`
   }
   /** Starts an agent: whether it is ready for a line, a failed check saying why when it isn't (#539). */
   const start = async (id, name) => {
@@ -108,7 +108,7 @@ const check = (name, ok, extra = '') => {
   const rawStalled = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.stalled ?? null
   const stalledOf = async (n) => lib.unkey(await rawStalled(n))
   const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
-  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
+  const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
 
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
@@ -127,7 +127,7 @@ const check = (name, ok, extra = '') => {
   dropEnters('Reviewer', 1)
   await inv('tasks:update', c1, { column: 'review' })
   check('its wake is taken after Enter is pressed again', !!(await until(async () => wakes('Reviewer').length === 1, 20000)), JSON.stringify(wakes('Reviewer')))
-  check('…Combwork says it pressed Enter again', /wasn't taken: pressed Enter again/.test(hiveLog()))
+  check('…Combwork says it pressed Enter again', /wasn't taken: pressed Enter again/.test(combworkLog()))
   check('…and the reviewer works, then watches again', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)))
   await lib.sleep(4500) // on purpose: longer than the grace, to see no flag comes
   check('a reviewer that keeps watching is never flagged', !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, String(await stalledOf(c1)))
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   const reason = `Reviewer hasn't taken the wake Combwork typed for #${c1}: it waits in its prompt.`
   check('a wake never taken: after the grace, the card is stalled, saying who and why', !!(await until(async () => (await stalledOf(c1)) === reason, 30000)), String(await stalledOf(c1)))
   check('…naming the card by key alone (#1219, HI-1661)', lib.KEYED.test(String(await rawStalled(c1))), String(await rawStalled(c1)))
-  check('…the line was never sent, and Combwork says so', !!(await until(async () => /still wasn't taken/.test(hiveLog()), 8000)) && wakes('Reviewer').length === 1)
+  check('…the line was never sent, and Combwork says so', !!(await until(async () => /still wasn't taken/.test(combworkLog()), 8000)) && wakes('Reviewer').length === 1)
   check('…the reviewer shows idle, with the card it left', ['ready', 'finished'].includes((await live(reviewer.id))?.status) && JSON.stringify((await live(reviewer.id))?.notWatching) === JSON.stringify([c1]), JSON.stringify(await live(reviewer.id)))
   await page.getByRole('button', { name: 'Task Board' }).click()
   const tile = page.locator(`.task-card[data-task="${c1}"]`)
@@ -246,8 +246,8 @@ const check = (name, ok, extra = '') => {
   }
   const builderSession = (await live(builder.id))?.sessionId
   const launch = launches().find((l) => l.sessionId === builderSession && l.opts['--mcp-config'])
-  const hiveServer = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-  const builderToken = hiveServer ? JSON.parse(fs.readFileSync(hiveServer.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+  const combworkServer = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+  const builderToken = combworkServer ? JSON.parse(fs.readFileSync(combworkServer.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   const reviewing = builderToken ? await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${solo}`)}/start-review`, { method: 'POST', headers: { Authorization: `Bearer ${builderToken}`, 'Content-Type': 'application/json' }, body: '{}' }) : null
   check('Builder starts reviewing it', reviewing?.status === 200, String(reviewing?.status))
   await inv('tasks:update', solo, { column: 'doing' })

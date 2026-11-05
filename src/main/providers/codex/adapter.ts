@@ -17,7 +17,7 @@ import { CW_TOOLS, TOOLS_SERVER } from '../../../shared/assistantTools'
 import { config } from '../../config'
 import { isFile, placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
-import { hiveError } from '../../combworkError'
+import { combworkError } from '../../combworkError'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
@@ -37,7 +37,7 @@ import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
 import { codexListedHooks } from '../../hookListing'
 import type { HookListing, HookRow } from '../../../shared/hooks'
-import { withoutHiveAuth } from '../../../shared/hooks'
+import { withoutCombworkAuth } from '../../../shared/hooks'
 
 const log = createLogger('codex')
 /** Rollouts stat'd at once while listing a folder's sessions (HI-1681). */
@@ -396,7 +396,7 @@ function appServerAnswer(executable: string, args: string[], cwd: string, method
  * per-tool `tools.<tool>.approval_mode`); none with the switch off (#1281). Hive's server is always on (`enabled`): a
  * native server of that name merges into Hive's table key by key, and could turn it off.
  */
-function hiveTable(name: string, hive: HiveServerOptions): Record<string, unknown> {
+function combworkTable(name: string, hive: CombworkServerOptions): Record<string, unknown> {
   if (name !== TOOLS_SERVER) return {}
   if (!hive.preApprove) return { enabled: true }
   if (hive.trusted) return { enabled: true, tools: Object.fromEntries(hive.trusted.map((t) => [t, { approval_mode: 'approve' }])) }
@@ -404,14 +404,14 @@ function hiveTable(name: string, hive: HiveServerOptions): Record<string, unknow
 }
 
 /** How Hive's own server is given to this launch: its tools pre-approved (all, or the Assistant's `trusted`), or not. */
-export interface HiveServerOptions {
+export interface CombworkServerOptions {
   preApprove: boolean
   trusted?: readonly string[]
 }
 
 /** An MCP server definition (Claude Code's JSON format) as a Codex mcp_servers table; null if it can't be passed safely. */
-export function codexMcpServer(name: string, def: McpServerDef, hive: HiveServerOptions = { preApprove: true }): { table: Record<string, unknown> | null; warning?: string } {
-  const approval = (n: string): Record<string, unknown> => hiveTable(n, hive)
+export function codexMcpServer(name: string, def: McpServerDef, hive: CombworkServerOptions = { preApprove: true }): { table: Record<string, unknown> | null; warning?: string } {
+  const approval = (n: string): Record<string, unknown> => combworkTable(n, hive)
   const ref = (v: unknown): string | null => {
     const m = typeof v === 'string' ? /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$|^\$([A-Za-z_][A-Za-z0-9_]*)$/.exec(v.trim()) : null
     return m ? (m[1] ?? m[2]) : null
@@ -455,8 +455,8 @@ export function codexMcpServer(name: string, def: McpServerDef, hive: HiveServer
 /** A native hive server's keys for an HTTP server, which can't be taken out of Hive's stdio one (Codex refuses the mix). */
 const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_headers', 'http_headers_helper', 'auth', 'oauth', 'oauth_resource', 'scopes', 'experimental_environment']
 
-/** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeHive). */
-const NATIVE_HIVE = msg({
+/** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeCombwork). */
+const NATIVE_CW = msg({
   id: 'providers.codex.nativeCombwork',
   defaultMessage: 'Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.',
   description: "Why a Codex agent didn't start: the user's own Codex config has an MCP server named combwork. {file} is that config file's path. combwork is the name of Combwork's MCP server (HI-2463): keep it."
@@ -467,16 +467,16 @@ const NATIVE_HIVE = msg({
  * Codex merges Hive's `-c mcp_servers.hive={…}` into it key by key (0.163.0, probed: a whole table, an empty value or
  * another transport can't take a key out), so Hive's table gives every key the native one sets Hive's value, and Hive's
  * server wins whatever the isolation switch says:
- * - its tools: all of them shown (`enabled_tools`, `disabled_tools`; `enabled` is always set, hiveTable);
+ * - its tools: all of them shown (`enabled_tools`, `disabled_tools`; `enabled` is always set, combworkTable);
  * - their approval: the server default and each native per-tool mode as this launch approves them (`approved`: every
  *   tool, the Assistant's trusted ones, or none), "auto" (Codex's own policy) for the rest;
  * - how it starts: the session's folder for its `cwd`, Hive's startup timeout (`codex.mcp.startupTimeoutSeconds`, Codex's
  *   own default), not `required`, and the native
  *   `env` and `env_vars` emptied (an environment variable Hive doesn't set is set empty: Codex can't remove one).
  * An HTTP one (`url` and its kin, HTTP_KEYS) can't be taken out of a stdio server: the launch is refused with what to do
- * (NATIVE_HIVE; Codex itself would refuse to start).
+ * (NATIVE_CW; Codex itself would refuse to start).
  */
-export function outrankNativeHive(files: string[], table: Record<string, unknown>, approved: 'all' | readonly string[], cwd: string): Record<string, unknown> {
+export function outrankNativeCombwork(files: string[], table: Record<string, unknown>, approved: 'all' | readonly string[], cwd: string): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   const mode = (tool: string): string => (approved === 'all' || approved.includes(tool) ? 'approve' : 'auto')
   for (const file of files) {
@@ -487,7 +487,7 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
     const http = Object.keys(n).filter((k) => HTTP_KEYS.includes(k))
     if (http.length) {
       log.warn(`Codex has an HTTP MCP server named ${TOOLS_SERVER} in ${userText(file)} (${http.join(', ')}): Codex agents can't start beside Combwork's own.`)
-      throw hiveError(NATIVE_HIVE, { file })
+      throw combworkError(NATIVE_CW, { file })
     }
     if ('enabled_tools' in n) out.enabled_tools = [...CW_TOOLS]
     if ('disabled_tools' in n) out.disabled_tools = []
@@ -971,12 +971,12 @@ export class CodexAdapter implements ProviderAdapter {
     if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
     const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
-    const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveCombworkTools'), trusted: ctx.trustedHiveTools }
+    const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveCombworkTools'), trusted: ctx.trustedCombworkTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
       const { table, warning } = codexMcpServer(name, def, hive)
       if (warning) log.warn(warning)
       if (!table) continue
-      if (name === TOOLS_SERVER) Object.assign(table, outrankNativeHive(files, table, hive.preApprove ? (hive.trusted ?? 'all') : [], ctx.cwd))
+      if (name === TOOLS_SERVER) Object.assign(table, outrankNativeCombwork(files, table, hive.preApprove ? (hive.trusted ?? 'all') : [], ctx.cwd))
       args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
     }
     // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code; with the
@@ -1016,7 +1016,7 @@ export class CodexAdapter implements ProviderAdapter {
     this.configByRun.delete(ctx.runId)
     const command = hookCommand(ctx.hookUrl, ctx.hookAuthFile)
     const secrets = [ctx.hookAuthFile, ctx.env.CW_HOOK_TOKEN ?? '']
-    const hive: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'combwork', type: 'command', command: withoutHiveAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
+    const hive: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'combwork', type: 'command', command: withoutCombworkAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
     const listing: HookListing = { basis: 'cli', rows: hive, notes: [] }
     return {
       listing,
@@ -1029,7 +1029,7 @@ export class CodexAdapter implements ProviderAdapter {
         // Hive's as passed while Codex trusts them; else as Codex has them, or unknown where it doesn't list them (a later
         // -c of the user's own for that event replaced Hive's).
         const rows = hive.map((r): HookRow => {
-          const trust = got.hiveTrust.get(r.event) ?? 'unknown'
+          const trust = got.combworkTrust.get(r.event) ?? 'unknown'
           return { ...r, status: trust === 'trusted' ? 'passed' : trust }
         })
         return { basis: 'cli', rows: [...rows, ...got.rows], notes: got.more ? [{ kind: 'more', source: 'other', count: got.more }] : [] }
@@ -1403,7 +1403,7 @@ export class CodexAdapter implements ProviderAdapter {
   }
 
   skillRoots(home = codexHome()): SkillRoots {
-    return { machine: [join(home, 'skills')], plugins: null, local: [AGENTS_SKILLS], hiveCopyPrefix: 'cw-' }
+    return { machine: [join(home, 'skills')], plugins: null, local: [AGENTS_SKILLS], combworkCopyPrefix: 'cw-' }
   }
 
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {

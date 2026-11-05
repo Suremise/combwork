@@ -12,7 +12,7 @@
 // workspace's lifetime: once it closes or its window opens another, the run stops and its watch goes.
 
 import { boardReadOnly } from '../boardStore'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { createLogger } from '../logger'
 import { observer, type Disposable, type ObserveEvent } from '../platform/observe'
 import { openWorkspaces, WorkspaceService } from '../workspace'
@@ -231,7 +231,7 @@ let lastFocus = 0
 /** Starts following the open workspaces' projects for reconciliation (Hive starting). */
 export function startReconciling(): void {
   if (stop) return
-  const off = onHiveEvent((e) => {
+  const off = onCombworkEvent((e) => {
     if (e.type === 'workspace-changed') follow()
     else if (e.type === 'window-state' && e.focused && Date.now() - lastFocus > FOCUS_MS) {
       lastFocus = Date.now()

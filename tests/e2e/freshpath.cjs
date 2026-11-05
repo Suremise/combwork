@@ -30,7 +30,7 @@ const check = (name, ok, extra = '') => {
 
 /** The run context's PATH for a test copy without the folders that hold a Codex (node stays, for the launcher). */
 function pathWithoutCodex() {
-  const env = lib.hiveEnv({ CW_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   return (env[key] ?? '')
     .split(path.delimiter)
@@ -92,8 +92,8 @@ function pathWithoutCodex() {
   const shows = await lib.until(async () => (await setup.innerText()).includes(`Codex ${VERSION}`), 10000)
   check('Provider Setup shows it found, via PATH', !!shows && (await setup.innerText()).includes('found via PATH'), (await setup.innerText()).slice(0, 300))
   await page.screenshot({ path: path.join(lib.WORK, 'freshpath-setup.png') })
-  const hivePath = await app.evaluate(() => process.env.PATH ?? process.env.Path ?? '')
-  check("Combwork's own PATH has the folder, after its own folders", hivePath.toLowerCase().endsWith(bin.toLowerCase()) && hivePath.toLowerCase().startsWith(hidden.split(path.delimiter)[0].toLowerCase()), hivePath.slice(-200))
+  const combworkPath = await app.evaluate(() => process.env.PATH ?? process.env.Path ?? '')
+  check("Combwork's own PATH has the folder, after its own folders", combworkPath.toLowerCase().endsWith(bin.toLowerCase()) && combworkPath.toLowerCase().startsWith(hidden.split(path.delimiter)[0].toLowerCase()), combworkPath.slice(-200))
   await setup.locator('button', { hasText: 'Close' }).click()
 
   // --- A new agent uses it, with the new PATH.

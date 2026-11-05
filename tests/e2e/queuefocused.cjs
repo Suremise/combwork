@@ -58,7 +58,7 @@ function tools() {
   q.prepare(fx)
   const cmd = tools()
   steerFocused({ pick: [{ test: 'tests/a.test.ts', needs: ['unit'] }, { test: 'board', needs: ['fake'] }] })
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { mergeChecks: [], focusedTests: true, commands: { 'focused.pick': cmd.pick, 'focused.run': cmd.run } }) })

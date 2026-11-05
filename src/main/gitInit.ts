@@ -11,8 +11,8 @@ import { samePlace } from './fsutil'
 import { git, type GitResult } from './git'
 import { gitSaid, oneAtATime, parseIdentity } from './gitRepo'
 import { gitTool } from './gitTool'
-import { HiveError, errorText, hiveError } from './combworkError'
-import { ensureHiveExcluded, otherVcsOf, vcsOf } from './combworkVcs'
+import { CombworkError, errorText, combworkError } from './combworkError'
+import { ensureCombworkExcluded, otherVcsOf, vcsOf } from './combworkVcs'
 import { createLogger, userText } from './logger'
 import { excludeCopies } from './providers/common'
 import { workspace, workspaceOf } from './workspace'
@@ -63,7 +63,7 @@ export async function initCheck(projectPath: string): Promise<GitInitCheck> {
   projectPath = workspace.assertProject(projectPath)
   const base = { identity: {}, hasGitignore: existsSync(join(projectPath, '.gitignore')), empty: await isEmpty(projectPath) }
   // Refused: its English for the log and the error initRepo throws (#881), its text for the window.
-  // window: the Git init dialog's check (it shows refusedText); a refusal is thrown as a HiveError of refusedText
+  // window: the Git init dialog's check (it shows refusedText); a refusal is thrown as a CombworkError of refusedText
   const refuse = (text: Text): GitInitCheck => ({ ...base, refused: englishText(text), refusedText: text })
   const problem = gitProblemData(gitTool())
   if (problem) return refuse(withValues(msg({ id: 'main.gitInit.noGit', defaultMessage: '{problem}: Provider Setup says how to fix it.', description: "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Provider Setup is a view's name." }), { problem }))
@@ -89,26 +89,26 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
   if (!isGitignoreChoice(choice)) throw new Error(`There's no starter .gitignore ${String(choice)}.`) // i18n-ignore: a programming error, the dialog offers only these
   const name = typeof opts.name === 'string' ? opts.name.trim() : ''
   const email = typeof opts.email === 'string' ? opts.email.trim() : ''
-  // Refusals are HiveErrors (#881): their English in the log, the window's language in the dialog.
+  // Refusals are CombworkErrors (#881): their English in the log, the window's language in the dialog.
   const problem = identityProblemData(name, email)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     // Checked again here: the folder may have changed since the dialog asked.
     const check = await initCheck(projectPath)
     // agent-text: initCheck
-    if (check.refusedText) throw new HiveError(check.refusedText)
-    if (check.parentRepo && opts.nested !== true) throw hiveError(msg({ id: 'main.gitInit.nested', defaultMessage: 'This folder is inside the git repository in {root}. Confirm that you want a repository of its own inside it.', description: "Why a folder wasn't made a git repository yet: it is inside another one, {root}, and the user didn't confirm a repository of its own." }), { root: check.parentRepo })
+    if (check.refusedText) throw new CombworkError(check.refusedText)
+    if (check.parentRepo && opts.nested !== true) throw combworkError(msg({ id: 'main.gitInit.nested', defaultMessage: 'This folder is inside the git repository in {root}. Confirm that you want a repository of its own inside it.', description: "Why a folder wasn't made a git repository yet: it is inside another one, {root}, and the user didn't confirm a repository of its own." }), { root: check.parentRepo })
     // With conditional includes, only the new repository knows its identity: checked once it exists, below.
-    if (!check.conditionalIdentity && !check.identity.name && !name) throw hiveError(msg({ id: 'main.gitInit.noName', defaultMessage: 'Git has no name to make the first commit as: enter one.', description: 'Why a folder was not made a git repository: no name to commit as is set, and the user entered none.' }))
-    if (!check.conditionalIdentity && !check.identity.email && !email) throw hiveError(msg({ id: 'main.gitInit.noEmail', defaultMessage: 'Git has no email to make the first commit as: enter one.', description: 'Why a folder was not made a git repository: no email address to commit as is set, and the user entered none.' }))
+    if (!check.conditionalIdentity && !check.identity.name && !name) throw combworkError(msg({ id: 'main.gitInit.noName', defaultMessage: 'Git has no name to make the first commit as: enter one.', description: 'Why a folder was not made a git repository: no name to commit as is set, and the user entered none.' }))
+    if (!check.conditionalIdentity && !check.identity.email && !email) throw combworkError(msg({ id: 'main.gitInit.noEmail', defaultMessage: 'Git has no email to make the first commit as: enter one.', description: 'Why a folder was not made a git repository: no email address to commit as is set, and the user entered none.' }))
 
     // Each step that worked, so a failure says plainly where it stopped (there's no undo): clauses, the first
     // capitalised where they start a sentence.
     const done: Text[] = []
     // At most four (initialise, identity, .gitignore, commit), joined as the language joins a list.
     const steps = (): Text => capitalised(listOf(done))
-    const stop = (what: Text, why: TextPart): HiveError =>
-      new HiveError(
+    const stop = (what: Text, why: TextPart): CombworkError =>
+      new CombworkError(
         done.length
           ? withValues(msg({ id: 'main.gitInit.stoppedAfter', defaultMessage: '{done}, but {what}: {why}', description: "Why making a git repository stopped part way. {done} lists the steps that worked (main.gitInit.step.*), {what} what failed (main.gitInit.failed.*), {why} why (git's message, or what to do)." }), { done: steps(), what, why })
           : withValues(msg({ id: 'main.gitInit.stopped', defaultMessage: '{what}: {why}', description: 'Why making a git repository failed at its first step. {what} is what failed (main.gitInit.failed.*, which starts with a small letter in English), {why} why.' }), { what, why })
@@ -122,9 +122,9 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
     }
 
     // Before anything is staged: .combwork is never in the first commit, whatever the folder's .gitignore says.
-    let ex: Awaited<ReturnType<typeof ensureHiveExcluded>>
+    let ex: Awaited<ReturnType<typeof ensureCombworkExcluded>>
     try {
-      ex = await ensureHiveExcluded(projectPath)
+      ex = await ensureCombworkExcluded(projectPath)
     } catch (e) {
       throw stop(msg({ id: 'main.gitInit.failed.exclude', defaultMessage: "couldn't keep .combwork out of git", description: "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork is a folder's name." }), errorText(e))
     }

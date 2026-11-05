@@ -143,7 +143,7 @@ async function duringDetection(env) {
   fs.mkdirSync(path.join(fakeUser, 'codex-home'), { recursive: true })
   // Held long enough to act while it is pending, and let go by itself: the suite waits for its end, never a time.
   // Launched as providerdetect does, not with lib.launch (which waits for detection to finish).
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData2, ...env, CODEX_HOME: path.join(fakeUser, 'codex-home'), CW_TEST_SLOW_DETECT: 'codex=20000', CW_TEST_CLI_HOME_CONNECTION: '0' }) })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData2, ...env, CODEX_HOME: path.join(fakeUser, 'codex-home'), CW_TEST_SLOW_DETECT: 'codex=20000', CW_TEST_CLI_HOME_CONNECTION: '0' }) })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.until(() => page.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), HUNG_MS)

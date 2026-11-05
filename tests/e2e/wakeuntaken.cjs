@@ -39,7 +39,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // How long a wake has to be taken (10 s in Combwork): set in Combwork's main process for each part (takeWindow, below).
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -59,7 +59,7 @@ const check = (name, ok, extra = '') => {
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
   }
   const wakes = () => wakeRecords().map((w) => w.text)
-  const hiveLog = () => {
+  const combworkLog = () => {
     const f = path.join(userData, 'logs', 'combwork.log')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
   }
@@ -92,7 +92,7 @@ const check = (name, ok, extra = '') => {
   check('it watches the card', !!(await watch()))
   await inv('tasks:comment', card, 'First change')
   check('the wake is taken', !!(await until(async () => wakes().length === 1, HUNG_MS)))
-  check('…and the log says so, with how soon', !!(await until(async () => /The wake typed into ⁨?[\w-]+⁩? was taken after \d+ ms/.test(hiveLog()), HUNG_MS)), hiveLog().split('\n').filter((l) => /wake typed/.test(l)).join(' | '))
+  check('…and the log says so, with how soon', !!(await until(async () => /The wake typed into ⁨?[\w-]+⁩? was taken after \d+ ms/.test(combworkLog()), HUNG_MS)), combworkLog().split('\n').filter((l) => /wake typed/.test(l)).join(' | '))
   await until(() => idle(agent.id), HUNG_MS)
 
   // Its CLI drops the wake's Enter and Combwork's Enter again (not reading its input). A short window, so the two Enters
@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
   // Combwork's two Enters were pressed before it marked the agent, but the CLI may not have read them yet (#664, under load).
   const drops = () => fs.readFileSync(path.join(claudeHome, 'fake-drop-enters-Watcher.txt'), 'utf8').trim()
   check('Combwork pressed Enter twice, never a third time (the CLI dropped both)', !!(await until(async () => drops() === '0', HUNG_MS)) && wakes().length === 1, JSON.stringify({ left: drops(), wakes: wakes().length }))
-  check('the log says: Enter again, still not taken', /wasn't taken: pressed Enter again/.test(hiveLog()) && /still wasn't taken/.test(hiveLog()))
+  check('the log says: Enter again, still not taken', /wasn't taken: pressed Enter again/.test(combworkLog()) && /still wasn't taken/.test(combworkLog()))
   check('its pane says so', !!(await until(async () => (await page.locator('.pane-status', { hasText: "A line Combwork typed wasn't taken" }).count()) >= 1, HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'wakeuntaken-marked.png') })
   const toldOf = () => notices().filter((n) => /hasn't taken a line Combwork typed/.test(JSON.stringify(n)))

@@ -25,7 +25,7 @@ const git = (cwd, args) => lib.git(cwd, ['-c', 'user.email=t@t', '-c', 'user.nam
 
 ;(async () => {
   q.prepare(fx)
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

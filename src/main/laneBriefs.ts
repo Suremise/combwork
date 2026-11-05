@@ -12,7 +12,7 @@ import { join } from 'path'
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import type { LaneRecord } from '../shared/lanes'
 import { cancelDeliveries, createDelivery, deliveriesOf, registerSource, type DeliverySource } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { mutateLanes, onLanesWritten, rawLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -149,7 +149,7 @@ export function startLaneBriefs(): void {
     for (const ws of openWorkspaces()) void settleLaneBriefs(ws)
   }
   const offLanes = onLanesWritten(all)
-  const offOpen = onHiveEvent((e) => {
+  const offOpen = onCombworkEvent((e) => {
     if (e.type === 'workspace-changed') all()
   })
   stop = () => {

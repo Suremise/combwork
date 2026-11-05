@@ -12,7 +12,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { as09 } from './boardDb'
 import { TEMPLATE_VERSION } from '../src/shared/templates'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 
 const base = tempDir('hive-upgrade-templates-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -84,7 +84,7 @@ async function workspace09(): Promise<{ ws: string; wsTemplates: string; pTempla
 function notices(w: WS): { title: string; message: string }[] {
   const seen: { title: string; message: string }[] = []
   const emit = w.emit.bind(w)
-  w.emit = ((e: HiveEvent) => {
+  w.emit = ((e: CombworkEvent) => {
     if (e.type === 'toast') seen.push({ title: e.toast.title, message: e.toast.message ?? '' })
     return emit(e)
   }) as typeof w.emit

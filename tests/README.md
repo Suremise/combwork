@@ -44,7 +44,7 @@ where no one else's Store PowerShell runs (a Windows Sandbox, or a machine of yo
 
 Tests never assume they're alone on the machine or inherit their shell.
 - What a run uses of its own comes from the run context (`e2e/runContext.cjs`, `lanes.mjs`, `build.mjs`): environments
-  from an allowlist (`lib.hiveEnv()` for a test Combwork, `lib.childEnv()` for the combwork MCP server or `cw-progress`), a
+  from an allowlist (`lib.combworkEnv()` for a test Combwork, `lib.childEnv()` for the combwork MCP server or `cw-progress`), a
   lane's ports and folders, the CLI test homes, and the dev build under a lock per worktree.
 - Never build a child's environment from `process.env`. Give every child the runners, `lib.cjs` or the harness start
   themselves an `env` (`runContext.baseEnv()` for git and the build), so a shell's `GIT_DIR` or `NODE_OPTIONS` can't

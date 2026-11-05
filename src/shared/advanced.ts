@@ -348,7 +348,7 @@ export const RAW_CARD_START = 'cw.prompt.rawCardStart'
  */
 export const ASSISTANT_OTHER_MCP = 'cw.assistant.otherMcpServers'
 
-/** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
+/** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's combworkGuidance and the hive MCP server. */
 export const CW_GUIDANCE = 'cw.guidance'
 
 /** Hive delivers the Workspace notes note at each launch (#1433, #873): main's workspaceNotes.ts. */
@@ -2885,7 +2885,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   // Only the workspace's MCP servers (#1281, #966 rows 4–6). Off, the CLI's own load beside them, and the workspace's
   // (Hive's hive among them) still win over the CLI's own of the same name: each CLI checked (Claude Code 2.1.305,
-  // Copilot 1.0.100 natively; Codex by Hive's table, outrankNativeHive).
+  // Copilot 1.0.100 natively; Codex by Hive's table, outrankNativeCombwork).
   {
     id: overrideId('claude-code', 'mcpIsolation'),
     group: 'claude-code',

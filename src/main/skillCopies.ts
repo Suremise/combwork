@@ -4,7 +4,7 @@ import { samePath } from '../shared/movePaths'
 import { advanced } from './advanced'
 import { boardRead, boardReadOnly, boardWrite, boardWriteOp, onBoardUpgraded } from './boardStore'
 import { createLogger, userText } from './logger'
-import { removeHiveCopies } from './providers/common'
+import { removeCombworkCopies } from './providers/common'
 import type { SkillCopyBook, SkillCopyRecord } from './providers/types'
 import { WorkspaceService, workspaceFor } from './workspace'
 
@@ -14,7 +14,7 @@ const log = createLogger('skills')
  * Hive's skill copies in the folders agents work in (#1431, SPEC §16.10.7, §16.15 C row 15). Codex and Copilot read
  * Hive's skills from copies in `<folder>/.agents/skills/cw-*` (providers/common.ts syncAgentsSkills), which outlive
  * the session, so a CLI run on its own there still sees them; Claude Code's launch plugin leaves nothing behind. Hive
- * records each copy it makes (`skill_copies` in combwork.db) and removes its own, unchanged ones (removeHiveCopies) once no
+ * records each copy it makes (`skill_copies` in combwork.db) and removes its own, unchanged ones (removeCombworkCopies) once no
  * session of Hive's works in the folder, as Settings → Advanced's switch says: when the last session there ends, at
  * start for folders whose sessions are gone, and when a lease ends or a slot goes (removeCopiesIn, for #1438 and #1429).
  */
@@ -73,7 +73,7 @@ export async function removeCopiesIn(projectPath: string, folder: string, opts: 
   // The Assistant works in the workspace folder, never a slot: its copies there are kept as a project folder's are.
   if (!ws || (!opts.always && !removesIn(folder, ws.isAssistantHome(projectPath) ? folder : projectPath))) return []
   try {
-    const removed = await removeHiveCopies(folder, projectPath, copyBook(ws), () => busyIn(folder))
+    const removed = await removeCombworkCopies(folder, projectPath, copyBook(ws), () => busyIn(folder))
     if (removed.length) log.info(`Removed Combwork's skill copies from ${userText(folder)}${opts.why ? ` (${opts.why})` : ''}: ${removed.join(', ')}`)
     return removed
   } catch (e) {

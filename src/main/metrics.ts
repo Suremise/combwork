@@ -9,7 +9,7 @@ import { readTable, saveTable } from './storeTables'
 import { dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { englishText } from '../shared/advanced'
 import { msg } from '../shared/i18n'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import type { WorkspaceService } from './workspace'
 import { CW_TOOLS } from '../shared/assistantTools'
 import { PROVIDERS } from '../shared/providers'
@@ -1156,9 +1156,9 @@ export function queryMetrics(w: WorkspaceService, q: MetricsQuery): Omit<Metrics
   const now = clock.now()
   const to = q.to ? Date.parse(q.to) : now
   const from = q.from ? Date.parse(q.from) : to - DAY
-  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) throw hiveError(msg({ id: 'service.metrics.badRange', defaultMessage: 'from and to must be ISO times, from before to', description: 'An error reading metrics: the range asked for is not two times in order. from and to are the parameters\' names: keep them, and ISO.' }), undefined, { kind: 'invalid' })
-  if (q.role !== undefined && !QUERY_ROLES.has(q.role)) throw hiveError(msg({ id: 'service.metrics.badRole', defaultMessage: 'role must be agent, assistant, api or viewer', description: "An error reading metrics: the role filter isn't one of its values. Keep role, agent, assistant, api and viewer as they are (a parameter and its values)." }), undefined, { kind: 'invalid' })
-  if (q.provider !== undefined && (typeof q.provider !== 'string' || q.provider.length > 64)) throw hiveError(msg({ id: 'service.metrics.badProvider', defaultMessage: 'provider must be a provider id', description: "An error reading metrics: the provider filter isn't a provider's id. Keep provider as it is (a parameter's name)." }), undefined, { kind: 'invalid' })
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) throw combworkError(msg({ id: 'service.metrics.badRange', defaultMessage: 'from and to must be ISO times, from before to', description: 'An error reading metrics: the range asked for is not two times in order. from and to are the parameters\' names: keep them, and ISO.' }), undefined, { kind: 'invalid' })
+  if (q.role !== undefined && !QUERY_ROLES.has(q.role)) throw combworkError(msg({ id: 'service.metrics.badRole', defaultMessage: 'role must be agent, assistant, api or viewer', description: "An error reading metrics: the role filter isn't one of its values. Keep role, agent, assistant, api and viewer as they are (a parameter and its values)." }), undefined, { kind: 'invalid' })
+  if (q.provider !== undefined && (typeof q.provider !== 'string' || q.provider.length > 64)) throw combworkError(msg({ id: 'service.metrics.badProvider', defaultMessage: 'provider must be a provider id', description: "An error reading metrics: the provider filter isn't a provider's id. Keep provider as it is (a parameter's name)." }), undefined, { kind: 'invalid' })
   const h = metricsHandle(w)
   if (h) {
     h.store.touch(now)

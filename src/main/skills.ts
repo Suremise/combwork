@@ -10,7 +10,7 @@ import { bundledDir, bundledIds, bundledStatus, restoreBundled } from './bundled
 import { copyDir, COPY_MARKER, isDir, isFile, readDirBounded } from './fsutil'
 import { englishText, withValues, type Text, type TextValues } from '../shared/advanced'
 import { msg, type Msg } from '../shared/i18n'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { createLogger } from './logger'
 import { headerOf, SKILL_HEAD_MAX } from './revisions'
 import { workspace, workspaceOf } from './workspace'
@@ -249,7 +249,7 @@ export function bundledSkillsDir(): string {
  * The workspace's Hive skills. `withMissing` adds the bundled skills the workspace doesn't have (for the Skills
  * view); `role` keeps only those for project agents or the Assistant (SKILL.md's metadata.audience).
  */
-export async function hiveSkills(withMissing = false, role?: 'agent' | 'assistant'): Promise<SkillInfo[]> {
+export async function combworkSkills(withMissing = false, role?: 'agent' | 'assistant'): Promise<SkillInfo[]> {
   if (!workspace.path) return []
   const out: SkillInfo[] = []
   let entries: Dirent[] = []
@@ -324,15 +324,15 @@ export async function skillFiles(dir: string, lim = SKILL_FILES_LIMITS): Promise
  */
 export async function listedSkillFiles(dir: string, projectPath?: string): Promise<{ files: string[]; truncated: boolean }> {
   const want = resolve(String(dir)).toLowerCase()
-  const listed = [...(await hiveSkills(true)), ...(projectPath ? await listSkills(projectPath) : [])]
-  if (!listed.some((s) => resolve(s.path).toLowerCase() === want)) throw hiveError(msg({ id: 'content.skill.notListed', defaultMessage: "That folder isn't a skill Combwork lists.", description: "An error listing a skill's files for its page: the folder asked for isn't one of the skills Combwork shows (the workspace's skills or a project's)." }), undefined, { kind: 'forbidden' })
+  const listed = [...(await combworkSkills(true)), ...(projectPath ? await listSkills(projectPath) : [])]
+  if (!listed.some((s) => resolve(s.path).toLowerCase() === want)) throw combworkError(msg({ id: 'content.skill.notListed', defaultMessage: "That folder isn't a skill Combwork lists.", description: "An error listing a skill's files for its page: the folder asked for isn't one of the skills Combwork shows (the workspace's skills or a project's)." }), undefined, { kind: 'forbidden' })
   return skillFiles(dir)
 }
 
 /** The folder a provider's project skills are created in (e.g. <project>/.claude/skills): the first it loads them from. */
 function localDir(projectPath: string, id: ProviderId): string {
   const rel = provider(id).skillRoots().local[0]
-  if (!rel) throw hiveError(msg({ id: 'content.skill.noLocalFolder', defaultMessage: '{cli} has no project skills folder.', description: "An error adding a project's own skill for a coding agent CLI ({cli}: \"Codex\") that reads no skills from a project's folder." }), { cli: provider(id).descriptor.name })
+  if (!rel) throw combworkError(msg({ id: 'content.skill.noLocalFolder', defaultMessage: '{cli} has no project skills folder.', description: "An error adding a project's own skill for a coding agent CLI ({cli}: \"Codex\") that reads no skills from a project's folder." }), { cli: provider(id).descriptor.name })
   return join(projectPath, rel)
 }
 
@@ -362,7 +362,7 @@ export async function localSkills(projectPath: string): Promise<SkillInfo[]> {
 export async function listSkills(projectPath?: string): Promise<SkillInfo[]> {
   // The asking workspace's: the project's, else the current work's (HI-1755: its connections' skills only).
   const ws = projectPath ? workspaceOf(projectPath) : workspace
-  const out = [...(await hiveSkills()), ...(await machineSkills(ws.path ? ws.config : null))]
+  const out = [...(await combworkSkills()), ...(await machineSkills(ws.path ? ws.config : null))]
   if (projectPath) out.push(...(await localSkills(projectPath)))
   return out
 }
@@ -376,7 +376,7 @@ export function validSkillName(name: string): boolean {
 }
 
 function assertName(name: string): void {
-  if (!validSkillName(name)) throw hiveError(M.badName, undefined, { kind: 'invalid' })
+  if (!validSkillName(name)) throw combworkError(M.badName, undefined, { kind: 'invalid' })
 }
 
 function targetDir(target: SkillTarget): string {
@@ -387,9 +387,9 @@ function targetDir(target: SkillTarget): string {
 /** Writes one skill (a map of relative paths to contents) into each target; fails before writing if any target has it already. */
 async function writeSkill(name: string, files: Map<string, Uint8Array | string>, targets: SkillTarget[]): Promise<SkillInfo> {
   assertName(name)
-  if (!targets.length) throw hiveError(msg({ id: 'content.skill.noTarget', defaultMessage: 'No place to add the skill to.', description: 'An error adding a skill with no place chosen for it (the workspace, or a project for a coding agent).' }), undefined, { kind: 'invalid' })
+  if (!targets.length) throw combworkError(msg({ id: 'content.skill.noTarget', defaultMessage: 'No place to add the skill to.', description: 'An error adding a skill with no place chosen for it (the workspace, or a project for a coding agent).' }), undefined, { kind: 'invalid' })
   const dirs = targets.map((t) => join(targetDir(t), name))
-  const exists = (d: string): Error => hiveError(msg({ id: 'content.skill.exists', defaultMessage: 'A skill named "{name}" already exists in {folder}', description: 'An error adding a skill: the skills folder {folder} (relative to the workspace) already has one called {name}.' }), { name, folder: relative(workspace.path ?? '', dirname(d)) || dirname(d) }, { kind: 'conflict' })
+  const exists = (d: string): Error => combworkError(msg({ id: 'content.skill.exists', defaultMessage: 'A skill named "{name}" already exists in {folder}', description: 'An error adding a skill: the skills folder {folder} (relative to the workspace) already has one called {name}.' }), { name, folder: relative(workspace.path ?? '', dirname(d)) || dirname(d) }, { kind: 'conflict' })
   for (const d of dirs) if (existsSync(d)) throw exists(d)
   // Each folder is claimed (created, never reused) before anything is written: two adds at once can't share one.
   // If anything fails, the folders claimed so far go again, so a retry isn't blocked by a half-written skill.
@@ -440,26 +440,26 @@ export function skillFromZip(data: Uint8Array): { files: Map<string, Uint8Array>
   const entries = unzipSync(data, {
     filter: (f) => {
       total += f.originalSize
-      if (total > ZIP_MAX_BYTES) throw hiveError(msg({ id: 'content.skill.zipTooLarge', defaultMessage: 'The .zip is too large for a skill (over {mb} MB unpacked).', description: 'An error adding a skill from a .zip: its files take more than {mb} MB unpacked.' }), { mb: ZIP_MAX_BYTES / 1024 / 1024 })
+      if (total > ZIP_MAX_BYTES) throw combworkError(msg({ id: 'content.skill.zipTooLarge', defaultMessage: 'The .zip is too large for a skill (over {mb} MB unpacked).', description: 'An error adding a skill from a .zip: its files take more than {mb} MB unpacked.' }), { mb: ZIP_MAX_BYTES / 1024 / 1024 })
       return true
     }
   })
   const names = Object.keys(entries).filter((n) => !n.endsWith('/') && !/(^|\/)(__MACOSX|\.DS_Store)(\/|$)/.test(n))
-  if (names.length > ZIP_MAX_FILES) throw hiveError(msg({ id: 'content.skill.zipTooMany', defaultMessage: 'The .zip has too many files for a skill (over {max}).', description: 'An error adding a skill from a .zip: it has more than {max} files.' }), { max: ZIP_MAX_FILES })
+  if (names.length > ZIP_MAX_FILES) throw combworkError(msg({ id: 'content.skill.zipTooMany', defaultMessage: 'The .zip has too many files for a skill (over {max}).', description: 'An error adding a skill from a .zip: it has more than {max} files.' }), { max: ZIP_MAX_FILES })
   const norm = (n: string): string => n.replace(/\\/g, '/')
   let prefix = ''
   let folder: string | null = null
   if (!names.some((n) => norm(n) === 'SKILL.md')) {
     const tops = new Set(names.map((n) => norm(n).split('/')[0]))
     const top = tops.size === 1 ? [...tops][0] : null
-    if (!top || !names.some((n) => norm(n) === `${top}/SKILL.md`)) throw hiveError(msg({ id: 'content.skill.zipNoSkill', defaultMessage: 'No SKILL.md found. A skill .zip has SKILL.md at its top level, or inside one folder.', description: 'An error adding a skill from a .zip that has no SKILL.md where Combwork looks. Keep SKILL.md as it is: it is a file name.' }))
+    if (!top || !names.some((n) => norm(n) === `${top}/SKILL.md`)) throw combworkError(msg({ id: 'content.skill.zipNoSkill', defaultMessage: 'No SKILL.md found. A skill .zip has SKILL.md at its top level, or inside one folder.', description: 'An error adding a skill from a .zip that has no SKILL.md where Combwork looks. Keep SKILL.md as it is: it is a file name.' }))
     prefix = `${top}/`
     folder = top
   }
   const files = new Map<string, Uint8Array>()
   for (const n of names) {
     const rel = norm(n).slice(prefix.length)
-    if (!rel || rel.split('/').some((p) => p === '..' || p === '') || /^[a-z]:|^\//i.test(rel)) throw hiveError(msg({ id: 'content.skill.zipUnsafe', defaultMessage: 'The .zip has a file with an unsafe path: {path}', description: "An error adding a skill from a .zip: a file's path ({path}) would land outside the skill's folder." }), { path: n })
+    if (!rel || rel.split('/').some((p) => p === '..' || p === '') || /^[a-z]:|^\//i.test(rel)) throw combworkError(msg({ id: 'content.skill.zipUnsafe', defaultMessage: 'The .zip has a file with an unsafe path: {path}', description: "An error adding a skill from a .zip: a file's path ({path}) would land outside the skill's folder." }), { path: n })
     files.set(rel, entries[n])
   }
   return { files, folder }
@@ -490,7 +490,7 @@ export async function addSkillFromFile(file: string, name: string, targets: Skil
   } else if (ext === '.md' || ext === '.markdown') {
     files = new Map([['SKILL.md', skillText(await readFile(file, 'utf8'), name)]])
   } else {
-    throw hiveError(msg({ id: 'content.skill.chooseFile', defaultMessage: 'Choose a .md file or a .zip.', description: 'An error adding a skill from a file that is neither Markdown (.md) nor a .zip.' }), undefined, { kind: 'invalid' })
+    throw combworkError(msg({ id: 'content.skill.chooseFile', defaultMessage: 'Choose a .md file or a .zip.', description: 'An error adding a skill from a file that is neither Markdown (.md) nor a .zip.' }), undefined, { kind: 'invalid' })
   }
   return writeSkill(name, files, targets)
 }
@@ -510,14 +510,14 @@ async function deletableSkill(dir: string): Promise<boolean> {
 
 /** Moves a Hive or local skill folder to the Recycle Bin. */
 export async function deleteSkill(dir: string): Promise<void> {
-  if (!(await deletableSkill(dir)) || !existsSync(join(dir, 'SKILL.md'))) throw hiveError(msg({ id: 'content.skill.cantDelete', defaultMessage: "Only Combwork skills and a project's local skills can be deleted in Combwork.", description: "An error deleting a skill Combwork doesn't manage (a CLI's own, from the user's profile or a plugin)." }), undefined, { kind: 'forbidden' })
-  if (existsSync(join(dir, OWN_COPY_MARKER))) throw hiveError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Combwork's copy of a workspace skill (Combwork puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
+  if (!(await deletableSkill(dir)) || !existsSync(join(dir, 'SKILL.md'))) throw combworkError(msg({ id: 'content.skill.cantDelete', defaultMessage: "Only Combwork skills and a project's local skills can be deleted in Combwork.", description: "An error deleting a skill Combwork doesn't manage (a CLI's own, from the user's profile or a plugin)." }), undefined, { kind: 'forbidden' })
+  if (existsSync(join(dir, OWN_COPY_MARKER))) throw combworkError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Combwork's copy of a workspace skill (Combwork puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
   await trash(dir)
 }
 
 /** Puts back a bundled skill as this version of Hive ships it: the workspace copy (edited) goes to the Recycle Bin. */
 export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
-  if (!(await bundledIds('skills')).includes(name)) throw hiveError(msg({ id: 'content.skill.notBundled', defaultMessage: '"{name}" isn\'t one of Combwork\'s bundled skills.', description: 'An error restoring a skill Combwork ships: Combwork ships no skill called {name}.' }), { name }, { kind: 'notFound' })
+  if (!(await bundledIds('skills')).includes(name)) throw combworkError(msg({ id: 'content.skill.notBundled', defaultMessage: '"{name}" isn\'t one of Combwork\'s bundled skills.', description: 'An error restoring a skill Combwork ships: Combwork ships no skill called {name}.' }), { name }, { kind: 'notFound' })
   const dest = join(workspace.skillsDir, name)
   if (existsSync(dest)) await trash(dest)
   await restoreBundled('skills', name)
@@ -528,10 +528,10 @@ export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
 /** Deploys a Local or Machine skill into the workspace so Hive can manage it. */
 export async function copySkillToWorkspace(skillPath: string): Promise<SkillInfo> {
   const name = basename(skillPath)
-  if (!validSkillName(name)) throw hiveError(msg({ id: 'content.skill.cantCopyName', defaultMessage: '"{name}" can\'t be a Combwork skill name: use letters, numbers, "-" and "_" (rename the folder first).', description: "An error copying a skill into the workspace: its folder's name {name} can't be a Combwork skill's name." }), { name }, { kind: 'invalid' })
+  if (!validSkillName(name)) throw combworkError(msg({ id: 'content.skill.cantCopyName', defaultMessage: '"{name}" can\'t be a Combwork skill name: use letters, numbers, "-" and "_" (rename the folder first).', description: "An error copying a skill into the workspace: its folder's name {name} can't be a Combwork skill's name." }), { name }, { kind: 'invalid' })
   const dest = join(workspace.skillsDir, name)
-  if (existsSync(dest)) throw hiveError(msg({ id: 'content.skill.copyExists', defaultMessage: 'The workspace already has a skill named "{name}"', description: 'An error copying a skill into the workspace: it has one called {name} already.' }), { name }, { kind: 'conflict' })
-  if (!(await isFile(join(skillPath, 'SKILL.md')))) throw hiveError(msg({ id: 'content.skill.notSkill', defaultMessage: 'Not a skill folder (no SKILL.md)', description: 'An error copying a skill into the workspace: its folder has no SKILL.md (a file name: keep it).' }))
+  if (existsSync(dest)) throw combworkError(msg({ id: 'content.skill.copyExists', defaultMessage: 'The workspace already has a skill named "{name}"', description: 'An error copying a skill into the workspace: it has one called {name} already.' }), { name }, { kind: 'conflict' })
+  if (!(await isFile(join(skillPath, 'SKILL.md')))) throw combworkError(msg({ id: 'content.skill.notSkill', defaultMessage: 'Not a skill folder (no SKILL.md)', description: 'An error copying a skill into the workspace: its folder has no SKILL.md (a file name: keep it).' }))
   await copyDir(skillPath, dest)
   const s = (await readSkill(dest, 'combwork'))!
   s.name = name

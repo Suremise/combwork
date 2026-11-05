@@ -44,15 +44,15 @@ const check = (name, ok, extra = '') => {
     const hostSelector = `.terminal-host[data-pty=${JSON.stringify(key)}]`
     const pane = page.locator(hostSelector)
     check('its terminal draws with the DOM renderer', !!(await lib.until(async () => (await pane.locator('.xterm-rows > div').count()) > 0, HUNG_MS)))
-    const print = (data) => page.evaluate(([k, d]) => window.__hiveTerminalOutput(k, d), [key, data])
-    const state = () => page.evaluate((k) => window.__hiveTerminalState(k), key)
-    const selection = () => page.evaluate((k) => window.__hiveTerminalSelection(k), key)
+    const print = (data) => page.evaluate(([k, d]) => window.__cwTerminalOutput(k, d), [key, data])
+    const state = () => page.evaluate((k) => window.__cwTerminalState(k), key)
+    const selection = () => page.evaluate((k) => window.__cwTerminalSelection(k), key)
     const selectionDrawn = () => pane.locator('.xterm-selection > div').count()
 
     // A word selected (double-click), as a user would before looking elsewhere.
     // Again while it isn't: the pane's fit settling (a change of height) clears a selection, and the CLI's redraw for its
     // new size the word itself.
-    const wordAt = () => page.evaluate(([k, w]) => window.__hiveTerminalTextAt(k, w), [key, WORD])
+    const wordAt = () => page.evaluate(([k, w]) => window.__cwTerminalTextAt(k, w), [key, WORD])
     const selected = await lib.until(async () => {
       if ((await selection()) === WORD && (await selectionDrawn()) > 0) return true
       // On a row of its own: the rest of the row erased (HI-1979: printed at the cursor in Claude Code's input box, the
@@ -90,7 +90,7 @@ const check = (name, ok, extra = '') => {
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     // As drawn (the DOM renderer's rows) is what its buffer holds: the lines printed while hidden, drawn once shown.
     const drawn = () => pane.evaluate((h) => [...h.querySelectorAll('.xterm-rows > div')].map((r) => r.textContent.replace(/\u00a0/g, ' ').trimEnd()))
-    const held = async () => ((await page.evaluate((k) => window.__hiveTerminalLines(k), key)) ?? []).map((l) => l.trimEnd())
+    const held = async () => ((await page.evaluate((k) => window.__cwTerminalLines(k), key)) ?? []).map((l) => l.trimEnd())
     const same = await lib.until(async () => {
       const [d, h] = [await drawn(), await held()]
       return d.length > 0 && d.join('\n') === h.join('\n') && d.includes(lines.at(-1))
@@ -102,7 +102,7 @@ const check = (name, ok, extra = '') => {
     const asItStands = async () => {
       if ((await selection()) === '') return (await selectionDrawn()) === 0
       if ((await selectionDrawn()) > 0) return true
-      await page.evaluate((k) => window.__hiveTerminalScrollLines(k, -3), key)
+      await page.evaluate((k) => window.__cwTerminalScrollLines(k, -3), key)
       return false
     }
     check('its selection is drawn as it stands', !!(await lib.until(asItStands, HUNG_MS, 200)), JSON.stringify({ selection: await selection(), drawn: await selectionDrawn(), state: await state() }))

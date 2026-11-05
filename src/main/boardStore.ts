@@ -23,7 +23,7 @@ import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { placeKey, realPath, withFileLock } from './fsutil'
 import { trash } from './trash'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { assertAdmitted, assertPlaceAdmitted, isAdmitted, isRefusal } from './openingFence'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
@@ -671,7 +671,7 @@ function boardOf(path: string, transient = false): Board {
   }
   if (!transient) assertAdmitted(join(path, CW_DIR, DB_FILE))
   const failed = failures.get(key)?.error
-  if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
+  if (failed) throw combworkError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
     const b = openBoard(path, false)
     b.transient = transient
@@ -680,7 +680,7 @@ function boardOf(path: string, transient = false): Board {
     const err = e instanceof Error ? e : new Error(String(e))
     failures.set(key, { error: err, place: placeKey(path) })
     log.error(`opening the board of ${userText(path)}${isIoError(e) ? ` (SQLite code ${(e as { errcode?: number }).errcode})` : ''}`, e)
-    throw hiveError(M.unavailable, { error: err.message }, { kind: 'conflict' })
+    throw combworkError(M.unavailable, { error: err.message }, { kind: 'conflict' })
   }
 }
 
@@ -721,7 +721,7 @@ function openBoard(path: string, upgrade: boolean): Board {
       backupDir: join(path, CW_DIR, BACKUPS),
       approve: (p) => upgrade || upgradeAnswer(p) === 'yes',
       beforeGroup: () => {
-        if (othersPresent(hive, presenceId()).length) throw new OtherHiveError()
+        if (othersPresent(hive, presenceId()).length) throw new OtherCombworkError()
       },
       whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
       checkpointer: checkpointWhenIdle,
@@ -783,7 +783,7 @@ const FAMILY = DB_FILE.replace(/\.db$/, '')
 const RESTORE_FAMILY = `${FAMILY}-before-restore`
 
 /** Another profile's Hive has the workspace open, by its presence marker (a 1.0 Hive; a 0.9 one shows by SQLite's lock). */
-class OtherHiveError extends Error {
+class OtherCombworkError extends Error {
   constructor() {
     super('another Combwork has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.inUse
   }
@@ -958,7 +958,7 @@ const lostChange = (cause?: unknown): Error =>
 
 /** The workspace folder, or the error a board change gives without one. */
 function pathOf(ws: WorkspaceService): string {
-  if (!ws.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+  if (!ws.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
   return ws.path
 }
 
@@ -987,17 +987,17 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
   return withFileLock(boardLock(path), async () => {
     // `alive`: the caller's workspace, as it was when it asked, is still open (a background run's, #1215 round 1): a
     // change that waited for the lock while it closed or switched is refused, and the board isn't opened again for it.
-    if (opts.alive && !opts.alive()) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+    if (opts.alive && !opts.alive()) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     const b = boardOf(path)
-    if (b.db.newer !== null) throw hiveError(M.newer, undefined, { kind: 'conflict' })
-    if (b.db.pending) throw hiveError(M.upgradeFirst, undefined, { kind: 'conflict' })
+    if (b.db.newer !== null) throw combworkError(M.newer, undefined, { kind: 'conflict' })
+    if (b.db.pending) throw combworkError(M.upgradeFirst, undefined, { kind: 'conflict' })
     const state: WriteState = { key, open: true, changed: false, after: [], undone: [], lost: null }
     const db = b.db.writer
     let committed = false
     timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
     try {
       const out = await writing.run(state, fn)
-      if (!boards.has(key)) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+      if (!boards.has(key)) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
       // Undone part way, whatever the change made of the error meanwhile (a batch skips a card that fails): it fails whole.
       if (state.lost) throw state.lost
       if (!db.isTransaction) throw lostChange()
@@ -1964,14 +1964,14 @@ export function boardWaits(ws: WorkspaceService): boolean {
 
 /** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without combwork.db (an agent's start). */
 export function assertUpgraded(workspacePath: string): void {
-  if (upgradeWaiting(workspacePath)) throw hiveError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
+  if (upgradeWaiting(workspacePath)) throw combworkError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
 }
 
 /** A copy's time as its name has it (`2026-10-20T14-06-21-256Z`), as ISO. */
 const isoOf = (at: string): string => at.replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, 'T$1:$2:$3.$4Z')
 
 /** The user's errors for another Hive on the file (SQLite's lock or a fresh presence marker). */
-const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof OtherHiveError
+const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof OtherCombworkError
 
 const upgradedListeners = new Set<(ws: WorkspaceService) => void>()
 /**
@@ -2014,11 +2014,11 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
       if (inUse(e)) {
         log.info(`the board of ${userText(path)} wasn't upgraded: another Combwork has it open`)
         boardOf(path)
-        throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+        throw combworkError(M.inUse, undefined, { kind: 'conflict' })
       }
       log.error(`upgrading the board of ${userText(path)}`, e)
       boardOf(path)
-      throw hiveError(M.unavailable, { error: e instanceof Error ? e.message : String(e) }, { kind: 'conflict' })
+      throw combworkError(M.unavailable, { error: e instanceof Error ? e.message : String(e) }, { kind: 'conflict' })
     }
     // A 0.9 board's copy is the one kept for good; a 1.0 board taking a later step of the group gets an ordinary one.
     const kept = from09 ? copy09(path) : undefined
@@ -2054,18 +2054,18 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     const version = schemaVersion(boardOf(path).db.reader)
     const kept = copy09(path)
     // The file itself, not only its name: a 0.9 board, which a 0.9 Hive can change again.
-    if (!kept || !(fileSchemaVersion(kept.file) < FIRST_10)) throw hiveError(M.noBackup, undefined, { kind: 'conflict' })
+    if (!kept || !(fileSchemaVersion(kept.file) < FIRST_10)) throw combworkError(M.noBackup, undefined, { kind: 'conflict' })
     // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
-    if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
-    if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+    if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
+    if (othersPresent(hive, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
     // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691), awaited
     // before the close, so nothing opens it again between the close and the copy.
     await checkpointsReleased(file)
     // As they are after that wait: still a window's (#1395, HR6's round 3: closed meanwhile, nothing is changed), and no
     // agent or other Hive on it.
     assertAdmitted(file)
-    if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
-    if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+    if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
+    if (othersPresent(hive, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
     closeBoard(path)
     let saved: string
     try {
@@ -2073,14 +2073,14 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     } catch (e) {
       failures.delete(keyOf(path))
       boardOf(path)
-      if (e instanceof DbInUseError) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+      if (e instanceof DbInUseError) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
       throw e
     }
     // Closed by its only connection, SQLite has folded its log back in and removed it: what is left of one is another
     // process's, which opened the file meanwhile.
     if (existsSync(`${file}-wal`)) {
       boardOf(path)
-      throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+      throw combworkError(M.inUse, undefined, { kind: 'conflict' })
     }
     const next = `${file}.restoring`
     copyFileSync(kept.file, next)

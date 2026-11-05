@@ -4,7 +4,7 @@ import { tasksWillWake } from '../shared/providers'
 import { pendingStep } from '../shared/tasks'
 import type { LiveSessionState, TaskCard } from '../shared/types'
 import { agentReadsInbox } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { loopReviewerOf, poolCard } from './loopReviewer'
@@ -317,7 +317,7 @@ export function initLoopCheck(): void {
       void coalesced(`loop-check:${keyOf(loop.projectPath, loop.agentId)}`, () => recheck(loop).catch((err) => log.warn('checking a card loop', err)))
     }
   }
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'session-status') statusChanged(e.state)
     else if (e.type === 'tasks-changed' || e.type === 'lanes-changed' || e.type === 'team-pause-changed') recheckAll(e.workspacePath)
     // What reaches it may have changed (HI-1693): its hive tools (the Agent API, the built-in hive server), or its

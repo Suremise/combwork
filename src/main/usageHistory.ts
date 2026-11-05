@@ -11,7 +11,7 @@ import type { UsageSummary } from '../shared/usageLedger'
 import { advanced } from './advanced'
 import { resolvedValues } from './advancedValues'
 import { config } from './config'
-import { emit, onHiveEvent } from './events'
+import { emit, onCombworkEvent } from './events'
 import { createLogger, userText } from './logger'
 import { recordProvider, sessions, type ListContext } from './sessions'
 import { boardHolds, cardHolds, type CardHolds } from './tasks'
@@ -147,7 +147,7 @@ class UsageHistory {
     this.timer = setInterval(() => this.tick(), TICK_MS)
     this.timer.unref?.()
     const status = new Map<string, string>()
-    onHiveEvent((e) => {
+    onCombworkEvent((e) => {
       // The board changed: its holds are read again, and running sessions' cards shared out again if they changed.
       if (e.type === 'tasks-changed') {
         const c = this.cards.get(wsKey(e.workspacePath))

@@ -136,7 +136,7 @@ CW_PROGRESS=0 turns reporting off.`,
   revisionChanged: agentMsg({ id: 'progress.uncounted.revisionChanged', text: "not counted as check {check}: the card's declared files changed while it ran. Run it again.", note: '#1654: a card on the None platform (#1233).' }),
   changeReflog: agentMsg({ id: 'progress.change.reflog', text: 'a commit or checkout', note: "What a write log's :reflog mark records, in the list of what changed while a check ran." }),
   changeEdit: agentMsg({ id: 'progress.change.edit', text: "an agent's edit", note: "What a write log's :edit mark records, in the list of what changed while a check ran." }),
-  checkOutsideHive: agentMsg({
+  checkOutsideCombwork: agentMsg({
     id: 'progress.check.outsideCombwork',
     text: "--check runs the project's command for {check}, which only Combwork knows: run it in a session Combwork started, with reporting on.",
     note: '#1220.'
@@ -716,7 +716,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   const replyMs = io.resolveTimeoutMs ?? replyTimeoutMs(io.env)
   // A check's command is the project's (#1220), which only Hive knows.
   if (parsed.check !== undefined && !target) {
-    io.stderr.write(`cw-progress: ${say(A.checkOutsideHive, { check: parsed.check })}\n`)
+    io.stderr.write(`cw-progress: ${say(A.checkOutsideCombwork, { check: parsed.check })}\n`)
     return 2
   }
   // What the run is for, checked before anything runs: a revision that isn't checked out, an unknown card or a check

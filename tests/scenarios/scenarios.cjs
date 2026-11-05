@@ -869,7 +869,7 @@ const SYNC_BEFORE = `module.exports = async function sync(run) {
 }
 `
 /** The Combwork tool calls in the transcript (mcp__combwork__x, combwork.x, Combwork's "combwork · x"), with their replies. */
-const hiveReplies = (o, tool) => o.tools.filter((t) => new RegExp(`(^|__|\\.|\\s)${tool}$`).test(t.name) && !t.isError)
+const combworkReplies = (o, tool) => o.tools.filter((t) => new RegExp(`(^|__|\\.|\\s)${tool}$`).test(t.name) && !t.isError)
 
 /** Three Todo cards with long descriptions, each with a phrase only its description has (one title with Unicode and quotes). */
 const TODO = [
@@ -881,7 +881,7 @@ async function todoCards(c) {
   for (const t of TODO) await c.card(t.key, { title: t.title, description: `Some background first.\n\n${'Context that only the full card has. '.repeat(8)}\n\nAcceptance: ${t.phrase}.` })
 }
 /** Every hive reply of these tools, as one text. */
-const replies = (o, ...tools) => tools.flatMap((t) => hiveReplies(o, t).map((x) => x.result)).join('\n')
+const replies = (o, ...tools) => tools.flatMap((t) => combworkReplies(o, t).map((x) => x.result)).join('\n')
 /** A small, harmless edit to a skill, inside the measured window (scenario beforeLaunch). */
 const editSkill = (c, name) => require('fs').appendFileSync(require('path').join(c.skillsDir, name, 'SKILL.md'), '\n<!-- edited for the skill-changed scenario -->\n')
 
@@ -1062,7 +1062,7 @@ const sentMessage = (c) => {
 }
 /** The delivery of the second message the Assistant left (`c.sent2`), as sentMessage. */
 const secondMessage = (c) => sentMessage({ sent: c.sent2, got: c.got })
-const contractWas = (o, on) => o.measures?.coreChars === require('../../src/shared/combworkGuidance.ts').hiveInstructions('alpha', 'agent', on).length
+const contractWas = (o, on) => o.measures?.coreChars === require('../../src/shared/combworkGuidance.ts').combworkInstructions('alpha', 'agent', on).length
 
 module.exports.FIXTURES_VERSION = FIXTURES_VERSION
 /**
@@ -1112,7 +1112,7 @@ module.exports.SCENARIOS = [
     // project reviews (Pair), Implementer builds and Coder reviews, as inReview's.
     // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       await pairInProject(c)
       await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
@@ -1251,7 +1251,7 @@ module.exports.SCENARIOS = [
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       // Implementer's submission in Review, Coder its reviewer (inReview: a reviewed project, its work committed).
       await inReview(c)
@@ -2217,7 +2217,7 @@ module.exports.SCENARIOS = [
     fake: (c) => `cw cw_read_task {"number":"AL-${c.cards.q}","detail":true}`,
     expect: (o, c) => [
       ['read the card with cw_read_task', ran(o, 'cw_read_task').some((x) => cardIs(o, argsOf(x).number, c.cards.q)), o.hiveCalls.map((x) => x.tool).join(',')],
-      ["its reply had the card's acceptance line", hiveReplies(o, 'cw_read_task').some((t) => t.result.includes('ACCEPT-ZEBRA-42')), hiveReplies(o, 'cw_read_task').map((t) => t.result.slice(0, 120)).join(' | ')],
+      ["its reply had the card's acceptance line", combworkReplies(o, 'cw_read_task').some((t) => t.result.includes('ACCEPT-ZEBRA-42')), combworkReplies(o, 'cw_read_task').map((t) => t.result.slice(0, 120)).join(' | ')],
       ['quoted it', /ACCEPT-ZEBRA-42/.test(o.finalReply), o.finalReply.slice(0, 200)],
       ['read it once (no repeated identical calls)', (o.measures?.repeatedCalls ?? 0) === 0, String(o.measures?.repeatedCalls)],
       ['the card is unchanged', o.cards.q?.column === 'todo' && !ran(o, 'cw_update_task').length && !movesOf(o, c.cards.q).length, o.cards.q?.column]
@@ -2757,7 +2757,7 @@ module.exports.SCENARIOS = [
     // starts it with its line: the harness's own start raced that one (on Codex, refused as "already running or
     // starting"). The prompt below is a model's only as the line says it; the fake is typed its steps after it, the card
     // already in Doing.
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Make the greeting say Hi', description: CARD_LOOP_GREETING, agent: 'coder' })
@@ -2855,7 +2855,7 @@ module.exports.SCENARIOS = [
       const b = o.cards.b
       const started = (b?.history ?? []).find((h) => /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))
       // Coder's own start of #b, whose reply gives what Combwork's would have (HI-2092: Codex starts it rather than end its turn).
-      const own = hiveReplies(o, 'cw_start_card').find((t) => (namesCard(o, [argsOf({ args: t.input }).card], c.cards.b) || (!!b?.key && String(t.result).includes(`${b.key} is a card of your lane`))) && /card-loop skill as this lane's builder/.test(String(t.result)))
+      const own = combworkReplies(o, 'cw_start_card').find((t) => (namesCard(o, [argsOf({ args: t.input }).card], c.cards.b) || (!!b?.key && String(t.result).includes(`${b.key} is a card of your lane`))) && /card-loop skill as this lane's builder/.test(String(t.result)))
       const start = c.start ?? (own ? String(own.result) : null)
       return [
         // In Review once Coder has built it (HI-2047: its project has the first card's work, so it can be).
@@ -3266,7 +3266,7 @@ module.exports.SCENARIOS = [
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nrequire('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran')\nconsole.log('ok')\n" },
     // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       // Its check in the card (HI-2046: Combwork's line, not the prompt, starts a model's review).
       await inReview(c, false, 'greet.js returns "Hello, <name>", trimmed. Its check is node test.js.')
@@ -3293,7 +3293,7 @@ module.exports.SCENARIOS = [
         ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
         ['started the review with cw_start_review', ran(o, 'cw_start_review').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['Combwork lent it a review copy at its start', c.copyLeases.size > 0 || !!copyReply, [...c.copyLeases].join(', ')],
-        ['the reply it saw named the copy, with its folder', !!copyReply, hiveReplies(o, 'cw_start_review').map((t) => t.result.slice(0, 300)).join(' | ')],
+        ['the reply it saw named the copy, with its folder', !!copyReply, combworkReplies(o, 'cw_start_review').map((t) => t.result.slice(0, 300)).join(' | ')],
         ['read or ran its checks in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => `${t.cwd ? `[${t.cwd}] ` : ''}${t.input.slice(0, 80)}`).join(' | ')}`],
         // test.js leaves ran.txt beside itself: one in the project folder is a check run there, not in the copy (#1559).
         ['ran no command in the project folder (no ran.txt there)', !require('fs').existsSync(require('path').join(c.ws, 'alpha', 'ran.txt'))],
@@ -3309,7 +3309,7 @@ module.exports.SCENARIOS = [
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     // HI-2046: Combwork gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
     // is a model's only as the line says it; the fakes are typed their steps after it).
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       await inReview(c, true)
     },
@@ -3373,7 +3373,7 @@ module.exports.SCENARIOS = [
     // card-loop-submit-watch's (HI-2215): the harness's own start raced it, and lost with 3 s between them. So the card's
     // decision says to have a design checked first, which a model reads once Combwork's line has started it; the prompt below
     // is a model's only as the line says it, and the fake is typed its steps after it, the card already in Doing.
-    startedByHive: true,
+    startedByCombwork: true,
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
@@ -3849,7 +3849,7 @@ module.exports.SCENARIOS = [
       const reads = ran(o, 'cw_read_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.q))
       return [
         ['read the card (cw_read_task)', reads.length > 0, o.hiveCalls.map((x) => x.tool).join(',')],
-        ["its reply had Coder's question", hiveReplies(o, 'cw_read_task').some((t) => t.result.includes('Hello, friend')), hiveReplies(o, 'cw_read_task').map((t) => t.result.slice(0, 160)).join(' | ')],
+        ["its reply had Coder's question", combworkReplies(o, 'cw_read_task').some((t) => t.result.includes('Hello, friend')), combworkReplies(o, 'cw_read_task').map((t) => t.result.slice(0, 160)).join(' | ')],
         ["didn't read the card's history for it", !reads.some((x) => argsOf(x).history === true), reads.map((x) => x.args).join(' | ')],
         ['said Coder waits for the user to answer which greeting', /Hello, friend|Hi there|which greeting|greeting/i.test(o.finalReply) && /(wait|answer|question|ask)/i.test(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
         ['changed nothing', !ran(o, 'cw_update_task').length && !movesOf(o, c.cards.q).length && o.cards.q?.column === 'doing', o.cards.q?.column]
@@ -4319,7 +4319,7 @@ function laneStartLanded({ column, live, deliveries, shown }, n) {
  * (HI-2029, laneStarts) about a second after builderLane. Waited for until it has landed (laneStartLanded), so nothing of
  * the start is still on its way as the subject looks at the board.
  */
-async function hiveStartedLaneCard(c, key, n) {
+async function combworkStartedLaneCard(c, key, n) {
   const lib = require('../e2e/lib.cjs')
   const agent = c.agents[key]
   const ptyKey = lib.ptyKey(c.alpha, agent.id)
@@ -4360,7 +4360,7 @@ async function twoLanes(c, { d = false, aColumn = 'todo', cColumn = 'todo' } = {
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
   for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
     await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
-    if ((key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')) await hiveStartedLaneCard(c, key, cards[0])
+    if ((key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')) await combworkStartedLaneCard(c, key, cards[0])
   }
 }
 /**
@@ -4420,7 +4420,7 @@ const briefsTo = (o, name) =>
  * second start of the same pair gets its own reply, never the first's. One with no such reply left is left out.
  */
 const laneStartsOf = (o) => {
-  const laneReplies = hiveReplies(o, 'cw_lane').map((t) => String(t.result ?? ''))
+  const laneReplies = combworkReplies(o, 'cw_lane').map((t) => String(t.result ?? ''))
   let next = 0
   const out = []
   for (const args of ran(o, 'cw_lane').map((x) => argsOf(x))) {
@@ -4475,7 +4475,7 @@ const shellLookups = (o, name) => (o.tools ?? []).filter((t) => SHELL_TOOLS.test
  */
 const callsWithReplies = (o, tool) => {
   const calls = ran(o, tool)
-  const own = hiveReplies(o, tool)
+  const own = combworkReplies(o, tool)
   return calls.length === own.length ? calls.map((x, i) => ({ args: argsOf(x), reply: String(own[i].result ?? '') })) : []
 }
 module.exports.SCENARIOS.push(

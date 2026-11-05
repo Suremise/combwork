@@ -6,13 +6,13 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, ProjectConfig } from '../src/shared/types'
+import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { PLATFORMS, revisionShort } from '../src/shared/platform/descriptors'
 import { detect, projectPlatform } from '../src/main/platform/registry'
 import { git, gitTestHooks } from '../src/main/git'
 import { checkGit } from '../src/main/gitTool'
 import { excludeCopies } from '../src/main/providers/common'
-import { onHiveEvent } from '../src/main/events'
+import { onCombworkEvent } from '../src/main/events'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-platform-')
@@ -102,7 +102,7 @@ describe("a project's platform", () => {
 describe('in ProjectInfo', () => {
   let ws: string
   let w: ReturnType<typeof createWorkspaceService>
-  const events: HiveEvent[] = []
+  const events: CombworkEvent[] = []
   let off: () => void = () => undefined
   /**
    * A project Combwork sets up (its project.json made by ensureProject, as adding one does): as the workspace opens with it,
@@ -125,7 +125,7 @@ describe('in ProjectInfo', () => {
   beforeEach(async () => {
     ws = tempDir('hive-platform-ws-')
     events.length = 0
-    off = onHiveEvent((e) => events.push(e))
+    off = onCombworkEvent((e) => events.push(e))
     w = createWorkspaceService()
     await w.open(ws)
   })

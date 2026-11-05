@@ -1,6 +1,6 @@
 // Generated from locales/en/settings.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'settings.accounts.accountSettings': undefined
   'settings.accounts.accountSettingsTitle': { name: string | number }
   'settings.accounts.addAccount': undefined

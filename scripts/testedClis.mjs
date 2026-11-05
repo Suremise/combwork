@@ -15,7 +15,7 @@ export const MANIFEST = 'resources/tested-clis.json'
  * The manifest with what a run record shows (`current` kept for a CLI it can't vouch for): a CLI's entry is replaced
  * only when the record is valid, every real suite of that CLI ran and passed (none failed or skipped), and every one
  * of them says which of that CLI its Hive selected (the record's per-suite `clis`, from Hive's own detection), all the
- * same version. A suite marked `noHive` in suites.mjs runs the CLI without Hive, so it names none: it must pass, and
+ * same version. A suite marked `noCombwork` in suites.mjs runs the CLI without Hive, so it names none: it must pass, and
  * isn't asked which. `updated` lists the provider ids replaced; `problems` says why each other one wasn't.
  */
 export function manifestFromRecord(record, suites, current = {}) {
@@ -24,18 +24,18 @@ export function manifestFromRecord(record, suites, current = {}) {
 
 /**
  * What one record shows of one CLI (`need`, a key of CLI_PROVIDERS): its version when every real suite of it ran and
- * passed, each naming the same version (noHive suites only passing), or why not, and whether any of them ran at all.
+ * passed, each naming the same version (noCombwork suites only passing), or why not, and whether any of them ran at all.
  */
 function cliInRecord(record, suites, need) {
   const { id, name } = CLI_PROVIDERS[need]
   const real = suites.filter((s) => (s.needs ?? []).includes(need)).map((s) => s.name)
-  const noHive = new Set(suites.filter((s) => s.noHive).map((s) => s.name))
+  const noCombwork = new Set(suites.filter((s) => s.noCombwork).map((s) => s.name))
   const result = (n) => record.results.find((r) => r.name === n)
   const missing = real.filter((n) => !result(n))
   const notPassed = real.filter((n) => result(n) && (!result(n).ok || result(n).skipped))
   // What each suite's Hive selected of this CLI.
   const versionsOf = (n) => [...new Set((result(n)?.clis ?? []).filter((c) => c?.provider === id && typeof c.version === 'string').map((c) => c.version))]
-  const unsaid = real.filter((n) => !noHive.has(n) && result(n) && !versionsOf(n).length)
+  const unsaid = real.filter((n) => !noCombwork.has(n) && result(n) && !versionsOf(n).length)
   // Every version its suites' Hive selected, whatever they did (#1105 round 1: a partial or failed record's version
   // still counts against another record's).
   const versions = [...new Set(real.flatMap(versionsOf))].sort()

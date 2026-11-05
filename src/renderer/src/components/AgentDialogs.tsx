@@ -727,7 +727,7 @@ export function HandOverDialog() {
   // Who carries on: the agent itself (self), the chosen one (other), or one not chosen yet (none).
   const who = self ? 'self' : chosen ? 'other' : 'none'
   const names = { from: from.name, other: chosen?.name ?? '', who }
-  const hiveTools = settings?.agentApi.provideCombworkMcp !== false
+  const combworkTools = settings?.agentApi.provideCombworkMcp !== false
 
   const go = (): void => {
     if (!chosen) return
@@ -746,7 +746,7 @@ export function HandOverDialog() {
           <button className="btn subtle" onClick={close}>
             {tr(CANCEL)}
           </button>
-          <button className="btn primary" disabled={!chosen || !hiveTools} onClick={go}>
+          <button className="btn primary" disabled={!chosen || !combworkTools} onClick={go}>
             <Icon name="arrow-swap" /> {tr(msg({ id: 'agents.handOver.go', defaultMessage: 'Hand Over', description: "The Continue with… dialog's button: hands the work to the chosen agent." }))}
           </button>
         </>
@@ -755,7 +755,7 @@ export function HandOverDialog() {
       <p style={{ marginTop: 0 }}>
         {tr(msg({ id: 'agents.handOver.intro', defaultMessage: "Another agent picks up the work from a handover. It can use a different provider: the conversation itself stays with {agent}; the handover carries the goal, what's done and the next steps. Or {agent} carries on itself in a new conversation, which keeps a long one from slowing things down.", description: 'At the top of the Continue with… dialog ({agent}: the agent whose work is handed over). A handover is a note an agent writes for the next one.' }), { agent: from.name })}
       </p>
-      {!hiveTools && (
+      {!combworkTools && (
         <div className="banner warn">
           <Icon name="warning" /> {tr(msg({ id: 'agents.handOver.needsTools', defaultMessage: 'This needs Combwork\'s tools in sessions. Turn on "Provide Combwork tools to sessions" in Settings → Agent API.', description: "The Continue with… dialog when sessions don't get Combwork's tools: the setting to turn on (its name in quotes, and where: use their translated names)." }))}
         </div>

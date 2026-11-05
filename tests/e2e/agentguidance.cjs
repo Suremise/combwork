@@ -114,7 +114,7 @@ function packagesRequired(entry) {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -130,7 +130,7 @@ function packagesRequired(entry) {
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
     /** A launch's hive server: started, ready, its --mcp-config read while it runs (it holds the server's environment). */
-    const hiveServer = async () => {
+    const combworkServer = async () => {
       const before = launches().length
       await inv('session:start', alpha, { agentId: def.id })
       await lib.until(async () => launches().length > before && (await live())?.status === 'ready', HUNG_MS)
@@ -142,7 +142,7 @@ function packagesRequired(entry) {
     }
 
     // ---- On (the default): the guidance as the server's instructions.
-    const on = await hiveServer()
+    const on = await combworkServer()
     check('the launch has the hive server', !!on?.command, JSON.stringify(on))
     const withGuidance = await initialize(on)
     check("on: the hive server answers with Combwork's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /cw_inbox|Combwork/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
@@ -181,7 +181,7 @@ function packagesRequired(entry) {
 
     // ---- Off: the same server, its tools still there, no instructions.
     await inv('advanced:set', GUIDANCE, false)
-    const off = await hiveServer()
+    const off = await combworkServer()
     check('off: the launch still has the hive server (Combwork\'s tools)', !!off?.command && off.env?.CW_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
     const without = await initialize(off)
     check('…which answers with no instructions', !!without && !('instructions' in without), JSON.stringify(without).slice(0, 300))

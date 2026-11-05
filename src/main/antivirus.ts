@@ -187,7 +187,7 @@ async function missingOf(paths: string[]): Promise<string[]> {
 }
 
 /** Whether the workspace holds Hive's own repository (someone developing Hive). */
-async function holdsHive(w: WorkspaceService): Promise<boolean> {
+async function holdsCombwork(w: WorkspaceService): Promise<boolean> {
   for (const p of await w.listProjectPaths().catch(() => [] as string[])) {
     try {
       const pkg = JSON.parse(await readFile(join(p, 'package.json'), 'utf8')) as { name?: unknown; productName?: unknown }
@@ -226,7 +226,7 @@ export async function workspaceFolders(w: WorkspaceService): Promise<{ path: str
   const trees = worktreesRoot(root)
   const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
   const tests = join(local, 'combwork-test')
-  const wantTests = testsEligible({ packaged: app.isPackaged, holdsHive: app.isPackaged ? await holdsHive(w) : false }) && (await exists(tests))
+  const wantTests = testsEligible({ packaged: app.isPackaged, holdsCombwork: app.isPackaged ? await holdsCombwork(w) : false }) && (await exists(tests))
   return folderPlan(
     {
       root: rootReal,

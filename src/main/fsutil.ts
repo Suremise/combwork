@@ -6,7 +6,7 @@ import { readdir } from 'original-fs/promises'
 import { join } from 'path'
 import { msg } from '../shared/i18n'
 import { withValues } from '../shared/advanced'
-import { HiveError } from './combworkError'
+import { CombworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { timedStep } from './stallWork'
 import { placeKey, realPath, relativeInside } from './places'
@@ -201,7 +201,7 @@ function unsettled<T>(path: string, bak: string | null, fallback: T): T {
  * A kept file still being saved by something else, read for a change (#1600): its value can't be known yet, so the change
  * isn't made. `retryWhileSaving` runs the change again a few times first.
  */
-export class KeptFileBusy extends HiveError {
+export class KeptFileBusy extends CombworkError {
   constructor(path: string) {
     super(withValues(msg({ id: 'service.fsutil.keptBusy', defaultMessage: '{file} is being saved by something else: nothing was changed. Try again in a moment.', description: "An error: one of Combwork's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Combwork's change to it wasn't made." }), { file: path }), { kind: 'conflict' })
   }
@@ -211,7 +211,7 @@ export class KeptFileBusy extends HiveError {
  * A kept file that is there but can't be read (HI-2414: locked by another program, access refused, a disk error), even
  * after the pauses: its value isn't known, so a change to it isn't made, and nothing is written over it or its .bak.
  */
-export class KeptFileUnreadable extends HiveError {
+export class KeptFileUnreadable extends CombworkError {
   constructor(path: string) {
     super(withValues(msg({ id: 'service.fsutil.keptUnreadable', defaultMessage: "{file} couldn't be read: nothing was changed. Try again in a moment.", description: "An error: one of Combwork's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Combwork's change to it wasn't made and the file was left as it is." }), { file: path }), { kind: 'conflict' })
   }
@@ -1045,7 +1045,7 @@ let swapCounter = 0
 export class SwapAbandoned extends Error {}
 
 /** A swap whose copy couldn't be made (its source gone, unreadable or changing): nothing was replaced. `cause` is why. Restore (Skills, modes) shows it in the window's language (#850). */
-export class CopyFailed extends HiveError {}
+export class CopyFailed extends CombworkError {}
 
 /**
  * Why a skill's source couldn't be copied, without its path (the user's): gone, a file in it gone, not allowed, or

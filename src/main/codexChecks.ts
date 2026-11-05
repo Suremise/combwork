@@ -63,7 +63,7 @@ let stopped = false
 
 /** A home's key: a connection's folder by its id (its name in the accounts folder), else the folder itself. */
 const keyOf = (home: string | undefined): string => (home ? basename(home).toLowerCase() : '~')
-const nameFor = (key: string): string => `HiveCheck-${key.replace(/[^a-z0-9-]/gi, '_')}-${randomBytes(6).toString('hex')}`
+const nameFor = (key: string): string => `CombworkCheck-${key.replace(/[^a-z0-9-]/gi, '_')}-${randomBytes(6).toString('hex')}`
 
 /** Whether a connection's folder is held: a check of it under way, or one not confirmed ended (HI-1757). */
 export function codexCheckHeld(home: string): boolean {

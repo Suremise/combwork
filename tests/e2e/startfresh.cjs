@@ -53,11 +53,11 @@ const check = (name, ok, extra = '') => {
       // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), home, null, text, { live: () => live(id) })
     }
-    const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
+    const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
     /** The nudges Combwork told, by what ended (its log line names it). */
-    const nudges = () => [...hiveLog().matchAll(/Suggested a fresh start in .*?\((.+?)\)/g)].map((m) => m[1])
+    const nudges = () => [...combworkLog().matchAll(/Suggested a fresh start in .*?\((.+?)\)/g)].map((m) => m[1])
     /** The decisions not to suggest one, by what ended and why. */
-    const notNudged = () => [...hiveLog().matchAll(/No fresh-start suggestion in .*?\((.+?)\): (.+)/g)].map((m) => `${m[1]}: ${m[2].trim()}`)
+    const notNudged = () => [...combworkLog().matchAll(/No fresh-start suggestion in .*?\((.+?)\): (.+)/g)].map((m) => `${m[1]}: ${m[2].trim()}`)
     const banner = page.locator('.popups .popup', { hasText: 'A good moment to start fresh' })
     /** Closes the fresh-start banners shown (one at a time, each seen gone). */
     const closeBanners = async () => {

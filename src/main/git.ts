@@ -8,7 +8,7 @@ import type { GitDiff, GitStatus } from '../shared/types'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
@@ -374,7 +374,7 @@ export const tooLargeDiff = (path: string, bytes: number): GitDiff => ({ path, o
 
 /** Why a git command failed, for an error the window shows: git missing, else git's own first line. `command` is the git command, as it is. */
 export function failure(command: string, r: GitResult): Error {
-  return hiveError(M.failed, { command, why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(M.exitCode, { code: r.code })) })
+  return combworkError(M.failed, { command, why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(M.exitCode, { code: r.code })) })
 }
 
 /** The commit where HEAD left base, or null if there is none (git's exit 1). Throws when git can't say (#346). */
@@ -471,7 +471,7 @@ export function isBinary(buf: Buffer): boolean {
 
 export async function gitDiff(projectPath: string, file: string, base?: string): Promise<GitDiff> {
   const abs = resolve(projectPath, file)
-  if (!abs.toLowerCase().startsWith(resolve(projectPath).toLowerCase() + sep)) throw hiveError(M.outside)
+  if (!abs.toLowerCase().startsWith(resolve(projectPath).toLowerCase() + sep)) throw combworkError(M.outside)
   const ref = (base && (await mergeBase(projectPath, base))) || 'HEAD'
   const head = await git(projectPath, ['show', `${ref}:${file.replace(/\\/g, '/')}`], MAX_DIFF_BYTES * 2)
   const original = head.ok ? head.buf : Buffer.alloc(0)
@@ -482,7 +482,7 @@ export async function gitDiff(projectPath: string, file: string, base?: string):
     if (s.isSymbolicLink()) modified = Buffer.from(await readlink(abs), 'utf8')
     else {
       // Nor a file reached through a linked folder that leads outside.
-      if (!insideReal(abs, [projectPath])) throw Object.assign(hiveError(M.outside), { outside: true })
+      if (!insideReal(abs, [projectPath])) throw Object.assign(combworkError(M.outside), { outside: true })
       if (s.size > MAX_DIFF_BYTES) return tooLargeDiff(file, s.size)
       modified = await readFile(abs)
     }

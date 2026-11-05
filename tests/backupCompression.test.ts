@@ -196,7 +196,7 @@ describe('compressed transcript backups', () => {
       config.settings.sessions.backupRetention = '30'
       const gone = await session({ days: 40, inCli: true })
       write(backup(gone, true) + '.gz', '')
-      const hiveOnly = await session({ days: 400 })
+      const combworkOnly = await session({ days: 400 })
       const recent = await session({ days: 10, inCli: true })
       const live = await session({ days: 40, inCli: true })
       running(live)
@@ -208,7 +208,7 @@ describe('compressed transcript backups', () => {
       expect(existsSync(cliFile(gone))).toBe(true)
       const u = await run(() => sessions.usage(p, gone))
       expect(u && u.outputTokens).toBe(2000)
-      for (const kept of [hiveOnly, recent, live]) expect(existsSync(backup(kept)), kept).toBe(true)
+      for (const kept of [combworkOnly, recent, live]) expect(existsSync(backup(kept)), kept).toBe(true)
     })
 
     // What decides it can change while it waits: before the session is reserved (the first look at the CLI), and while

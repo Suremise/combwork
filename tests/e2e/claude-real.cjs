@@ -34,7 +34,7 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, wtRoot]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(proj, { 'README.md': '# Demo\n' })
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47925), ...lib.ownClaudeHome('claude-real').env })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47925), ...lib.ownClaudeHome('claude-real').env })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

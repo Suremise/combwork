@@ -57,7 +57,7 @@ const server = http.createServer(async (req, res) => {
 })
 
 async function launch(profile, extraEnv = {}) {
-  const env = lib.hiveEnv({ CW_USER_DATA: path.join(scratch, profile), CW_UPDATE_CACHE: cacheName, ...extraEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: path.join(scratch, profile), CW_UPDATE_CACHE: cacheName, ...extraEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
@@ -235,7 +235,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('#1647: downloaded, an agent running', await waitFor(async () => (await inv('update:state')).status === 'ready' && (await inv('session:live')).length === 1, HUNG_MS))
   // HI-2425: the notice's Restart and Update, then Cancel in the quit dialog: its entry keeps the button and never says
   // Installing.
-  const readyRow = () => page.evaluate(() => window.__hiveBell?.().find((t) => t.title === 'Combwork 9.1.1 is ready') ?? null)
+  const readyRow = () => page.evaluate(() => window.__cwBell?.().find((t) => t.title === 'Combwork 9.1.1 is ready') ?? null)
   check('HI-2425: the ready notice is in the bell, with Restart and Update', !!(await lib.until(async () => (await readyRow())?.actions.includes('Restart and Update'), HUNG_MS)))
   await inv('update:install', '9.1.1')
   check('HI-2425: Restart and Update asks first (an agent is running)', await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1, HUNG_MS))

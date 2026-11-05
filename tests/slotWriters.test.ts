@@ -100,7 +100,7 @@ const { SlotPool, SlotStore, fileSlotConn } = await import('../src/main/slots')
 const { goneWriterCleared, goneWriterSettles, goneWriterStill, heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
 const { releasableSlots, releaseSlot, SlotReleaseRefused } = await import('../src/main/slotRelease')
 const { settleRunForTests } = await import('../src/main/agentProcesses')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { sessions } = await import('../src/main/sessions')
 const { config } = await import('../src/main/config')
 const { providerService } = await import('../src/main/providerService')
@@ -711,7 +711,7 @@ describe("a gone Combwork's writer settled by itself after a restart (HI-1886)",
     it('"live" with only Windows Sandbox\'s idle broker: held at the sweep and at its own start, told once that releasing is safe; with anything else, held and not told', async () => {
       hostOn(false)
       const toasts: { title: string; message?: string; actions?: { command: string; args?: unknown[] }[] }[] = []
-      const off = onHiveEvent((e) => {
+      const off = onCombworkEvent((e) => {
         if (e.type === 'toast') toasts.push(e.toast)
       })
       try {

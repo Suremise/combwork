@@ -123,7 +123,7 @@ const never = (): Promise<never> => new Promise<never>(() => undefined)
 
 /** Another Combwork's pool on the board: its own holder (its pid), gone once its pid is in `dead`. */
 const dead = new Set<number>()
-function hivePool(pid: number, renamer: Renamer): Pool {
+function combworkPool(pid: number, renamer: Renamer): Pool {
   const me = { pid, started: 1 }
   return new SlotPool({
     store: new SlotStore(fileSlotConn(boardFile(wsPath)), projectId),
@@ -301,8 +301,8 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
       const r = realRenamer()
       return { ...r, move: async (a, b, t) => (await g.wait(), r.move(a, b, t)) }
     }
-    const a = hivePool(91001, gated(gA)).rename(n4)
-    const b = hivePool(91002, gated(gB)).rename(n5)
+    const a = combworkPool(91001, gated(gA)).rename(n4)
+    const b = combworkPool(91002, gated(gB)).rename(n5)
     // Both reserved, and waiting at git's move: their destinations differ.
     await Promise.all([gA.reached, gB.reached])
     const iA = intentOf(n4)!
@@ -327,11 +327,11 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     const name = await free('c1')
     const atCopy = gate()
     const r = realRenamer()
-    const renaming = hivePool(95001, { ...r, copy: async (a, b, w) => (await atCopy.wait(), r.copy(a, b, w)) }).rename(name)
+    const renaming = combworkPool(95001, { ...r, copy: async (a, b, w) => (await atCopy.wait(), r.copy(a, b, w)) }).rename(name)
     await atCopy.reached
     const intent = intentOf(name)!
     // Another Combwork lends a new slot while the rename copies (its destination not on disk yet): made and set up for real.
-    const lending = hivePool(95002, realRenamer())
+    const lending = combworkPool(95002, realRenamer())
     const lent = await lending.lend({ card: 9901, agent: 'c2' }, { install: false })
     expect(lent.ok).toBe(true)
     const made = lent.ok ? lent.slot : null
@@ -355,20 +355,20 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     const name = await free('b6')
     const after = gate()
     // Combwork A stops right after git's move: its follow never goes on.
-    void hivePool(92001, { ...realRenamer(), follow: async () => (await after.wait(), never()) }).rename(name)
+    void combworkPool(92001, { ...realRenamer(), follow: async () => (await after.wait(), never()) }).rename(name)
     await after.reached
     const intent = intentOf(name)!
     expect(await listed()).toContain(intent.to.toLowerCase())
     // A is alive: B's pass and refresh leave its operation and intent alone.
-    const hiveB = hivePool(92002, realRenamer())
-    await settleRenames(hiveB)
-    await hiveB.refresh()
+    const combworkB = combworkPool(92002, realRenamer())
+    await settleRenames(combworkB)
+    await combworkB.refresh()
     expect(intentOf(name)).toEqual(intent)
     expect(store.slot(name)?.op?.pid).toBe(92001)
     expect(await cwdOf('s-b6')).toBe(wt('hb6').toLowerCase())
     // A is gone: B takes its operation over and finishes the rename from where git lists it.
     dead.add(92001)
-    await settleRenames(hiveB)
+    await settleRenames(combworkB)
     expect(store.slot(name)).toBeNull()
     expect(store.slot(intent.toName)).toMatchObject({ op: null, state: 'ready' })
     expect(store.slot(intent.toName)?.folder.toLowerCase()).toBe(intent.to.toLowerCase())
@@ -379,11 +379,11 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
   it("cut short before git's move: its Combwork gone, given up, the slot as it was", async () => {
     const name = await free('b8')
     const before = gate()
-    void hivePool(93001, { ...realRenamer(), move: async () => (await before.wait(), never()) }).rename(name)
+    void combworkPool(93001, { ...realRenamer(), move: async () => (await before.wait(), never()) }).rename(name)
     await before.reached
     expect(intentOf(name)).not.toBeNull()
     dead.add(93001)
-    await settleRenames(hivePool(93002, realRenamer()))
+    await settleRenames(combworkPool(93002, realRenamer()))
     expect(store.slot(name)).toMatchObject({ state: 'ready', op: null })
     expect(store.slot(name)?.folder.toLowerCase()).toBe(wt('hb8').toLowerCase())
     expect(await listed()).toContain(wt('hb8').toLowerCase())
@@ -395,7 +395,7 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     const r = realRenamer()
     const crashed = gate()
     // Combwork A: another worktree arrives at the destination, git moves this one inside it, and A stops before its check.
-    void hivePool(96001, {
+    void combworkPool(96001, {
       ...r,
       move: async (from, to) => {
         mkdirSync(join(to, '..'), { recursive: true })
@@ -409,7 +409,7 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     const intent = intentOf(name)!
     expect(await r.where(intent.from, intent.to, intent.tree)).toBe('elsewhere')
     dead.add(96001)
-    await settleRenames(hivePool(96002, realRenamer()))
+    await settleRenames(combworkPool(96002, realRenamer()))
     // This worktree back where it was, its slot free again; the other at the destination, untouched.
     expect(await r.where(intent.from, intent.to, intent.tree)).toBe('from')
     expect(store.slot(name)).toMatchObject({ state: 'ready', op: null })
@@ -423,7 +423,7 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     const name = await free('b9')
     const r = realRenamer()
     let backFails = true
-    const hive = hivePool(94001, { ...r, follow: async () => Promise.reject(new Error('the sessions could not follow (test)')), back: async (a, b, t) => (backFails ? false : r.back(a, b, t)) })
+    const hive = combworkPool(94001, { ...r, follow: async () => Promise.reject(new Error('the sessions could not follow (test)')), back: async (a, b, t) => (backFails ? false : r.back(a, b, t)) })
     expect(await hive.rename(name)).toBeNull()
     expect(intentOf(name)).not.toBeNull()
     expect(store.slot(name)?.op).not.toBeNull()

@@ -5,7 +5,7 @@ import { readFileSync } from 'original-fs'
 import { join } from 'path'
 import { ADVANCED_DEFS, LEGACY_ADVANCED, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
-import { HiveError, hiveError } from './combworkError'
+import { CombworkError, combworkError } from './combworkError'
 import type { AppSettings, ProviderId } from '../shared/types'
 import type { SettingsPatch } from '../shared/api'
 import { emit } from './events'
@@ -255,8 +255,8 @@ export class AdvancedStore {
   /** Sets an override now: only inside transact (or set), in a change's turn. */
   async setNow(id: string, raw: unknown): Promise<void> {
     const def = advancedDef(id)
-    if (!def) throw hiveError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Combwork has none with the id {id}.' }), { id }, { kind: 'notFound' })
-    if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixFirst', defaultMessage: '{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.', description: "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
+    if (!def) throw combworkError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Combwork has none with the id {id}.' }), { id }, { kind: 'notFound' })
+    if (this.fileError) throw combworkError(msg({ id: 'service.advanced.fixFirst', defaultMessage: '{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.', description: "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
     const values = { ...this.values }
     const madeFor = { ...this.madeFor }
     if (raw === null || raw === undefined) {
@@ -265,7 +265,7 @@ export class AdvancedStore {
     } else {
       const checked = checkAdvanced(def, raw)
       // agent-text: checkAdvanced
-      if ('error' in checked) throw new HiveError(checked.errorText, { kind: 'invalid' })
+      if ('error' in checked) throw new CombworkError(checked.errorText, { kind: 'invalid' })
       if (JSON.stringify(checked.value) === JSON.stringify(def.default)) {
         // The default itself is no override.
         delete values[id]
@@ -284,7 +284,7 @@ export class AdvancedStore {
       const def = advancedDef(id)
       if (!def || !cliFacing(def) || this.values[id] === undefined) return
       // agent-text: fileText
-      if (this.fileError) throw new HiveError(this.fileText(), { kind: 'conflict' })
+      if (this.fileError) throw new CombworkError(this.fileText(), { kind: 'conflict' })
       await this.write(this.values, { ...this.madeFor, [id]: { version: this.cli[def.group as ProviderId] ?? null, value: this.values[id] } })
     })
   }
@@ -309,7 +309,7 @@ export class AdvancedStore {
 
   resetAll(): Promise<void> {
     return this.serial(async () => {
-      if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixOrDelete', defaultMessage: '{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).', description: "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
+      if (this.fileError) throw combworkError(msg({ id: 'service.advanced.fixOrDelete', defaultMessage: '{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).', description: "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
       await this.write(Object.fromEntries(Object.entries(this.values).filter(([id]) => !advancedDef(id))), {})
     })
   }
@@ -322,7 +322,7 @@ export class AdvancedStore {
     } catch (e) {
       if ((e as Error).message === 'CONFLICT') {
         await this.reload()
-        throw hiveError(msg({ id: 'service.advanced.changedOutside', defaultMessage: 'advanced.json was changed outside Combwork meanwhile: Settings shows it now. Try again.', description: "An error changing an advanced setting: advanced.json (a file name: keep it) was edited elsewhere meanwhile, so the change wasn't written." }), undefined, { kind: 'conflict', cause: e })
+        throw combworkError(msg({ id: 'service.advanced.changedOutside', defaultMessage: 'advanced.json was changed outside Combwork meanwhile: Settings shows it now. Try again.', description: "An error changing an advanced setting: advanced.json (a file name: keep it) was edited elsewhere meanwhile, so the change wasn't written." }), undefined, { kind: 'conflict', cause: e })
       }
       throw e
     }

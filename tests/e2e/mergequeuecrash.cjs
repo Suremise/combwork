@@ -35,7 +35,7 @@ const main = () => q.head(fx, 'main')
   let crew = null
   /** A run of Combwork with these seams, the crew (made in the first, rejoined after) ready. */
   async function start(env = {}) {
-    const h = await q.startHive(fx, { port: PORT, env, keepOptions: !!crew })
+    const h = await q.startCombwork(fx, { port: PORT, env, keepOptions: !!crew })
     if (!crew) {
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options() })
       await h.inv('advanced:set', 'cw.queue.checkedOutTarget', 'auto')

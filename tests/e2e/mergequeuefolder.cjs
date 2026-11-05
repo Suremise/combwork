@@ -36,7 +36,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
 ;(async () => {
   q.prepare(fx)
-  let h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   let reviewer = null
   let builder = null
   try {
@@ -131,7 +131,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
   // The race is a test seam of unpackaged builds: a packaged one (CW_EXE, the Sandbox checks) skips it, saying so.
   if (process.env.CW_EXE) console.log('NOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with CW_EXE')
   else try {
-    h = await q.startHive(fx, { port: PORT, env: { CW_TEST_QUEUE_RACE: 'beforeRef' }, keepOptions: true })
+    h = await q.startCombwork(fx, { port: PORT, env: { CW_TEST_QUEUE_RACE: 'beforeRef' }, keepOptions: true })
     const r = await q.rejoin(fx, h, reviewer)
     const atRace = main()
     q.steer(fx, 'pass')

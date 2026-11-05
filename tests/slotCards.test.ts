@@ -186,20 +186,20 @@ vi.mock('../src/main/sessions', async (orig) => {
     liveStates: () => state.sessionsIn.map((cwd) => ({ cwd, agentId: 'b9', agentName: 'B9', status: 'working' })),
     // The pause after the user typed in its builder's pane, while it holds (HI-2191): when it ends.
     userQuietAt: () => state.quietAt,
-    hiveToolsWaiting: () => false,
+    combworkToolsWaiting: () => false,
     agentNow: () => (state.live ? { status: 'ready', pending: false, backgroundTasks: 0 } : null),
     // No run writes in a slot here (HI-1762's takeover of the slot an agent's own run still writes in finds none).
     runNow: () => null,
-    hiveMcp: () => null,
+    combworkMcp: () => null,
     start: async (_p: string, o: { prompt?: string; resumeId?: string }) => {
       const name = `${o.resumeId ? `resume ${o.resumeId}` : 'start'}${o.prompt ? ' with the card' : ''}`
       const how = state.starts.shift()
       state.calls.push(how ? `${name} (${how})` : name)
       if (how === 'fails') throw new Error("its conversation couldn't resume (test)")
       if (how === 'busy') {
-        const { HiveError } = await vi.importActual<typeof import('../src/main/combworkError')>('../src/main/combworkError')
+        const { CombworkError } = await vi.importActual<typeof import('../src/main/combworkError')>('../src/main/combworkError')
         const text = 'slot-a still has another session in it (test)'
-        throw new HiveError({ shown: text, agent: text }, { kind: 'conflict' })
+        throw new CombworkError({ shown: text, agent: text }, { kind: 'conflict' })
       }
       if (how === 'lost') {
         // Another start of it (the restart queue, Resume All) won: it runs there now, and this one is refused.

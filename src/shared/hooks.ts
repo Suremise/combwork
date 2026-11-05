@@ -127,7 +127,7 @@ export function clip(text: string, max: number): { text: string; truncated: bool
  * A command or URL with Hive's authentication material left out: a bearer token, the run id in Hive's hook URL and the
  * path of the launch's auth file (`secrets`: values to hide wherever they appear).
  */
-export function withoutHiveAuth(text: string, secrets: readonly string[] = []): string {
+export function withoutCombworkAuth(text: string, secrets: readonly string[] = []): string {
   let out = text
   // A path in either slash form (curl is given the auth file's path with forward slashes).
   for (const s of secrets) if (s && s.length >= 4) for (const form of new Set([s, s.replace(/\\/g, '/')])) out = out.split(form).join('…')

@@ -25,7 +25,7 @@ import { dialectModelProblem } from '../../shared/models'
 const log = createLogger('dialects')
 
 /** A workspace's dialects folder. */
-export const dialectsDir = (hiveDir: string): string => join(hiveDir, 'dialects')
+export const dialectsDir = (combworkDir: string): string => join(combworkDir, 'dialects')
 
 /** A folder: a provider's id, or `api`. */
 const FOLDER = /^[a-z0-9][a-z0-9-]*$/

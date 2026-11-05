@@ -12,12 +12,12 @@
 
 import { basename } from 'path'
 import { cancelDeliveries } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { journalFact } from './journalService'
 import { refresh as refreshLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { projectOfCard, settleSlotCards } from './slotCards'
-import { commentAsHive } from './tasks'
+import { commentAsCombwork } from './tasks'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 import { onAction } from './workflow/actionWorker'
 import { finishAccepts } from './workflow/finish'
@@ -89,7 +89,7 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
     const key = card.key
     for (const dep of wf.store.cards()) {
       if (!dep.blockedBy.includes(n) || dep.stage === 'done' || wf.store.isArchived(dep.id)) continue
-      await commentAsHive(dep.id, storedText(HISTORY.startsWithout, { card: key, reason: f.reason ?? '' }), ws, (c) => c.column !== 'done' && current(), dependentNoteId(key, finish))
+      await commentAsCombwork(dep.id, storedText(HISTORY.startsWithout, { card: key, reason: f.reason ?? '' }), ws, (c) => c.column !== 'done' && current(), dependentNoteId(key, finish))
     }
   })
   // The lane first: it ends as its last card is Done, never later for its slot (its next card waits on the slot itself,
@@ -139,7 +139,7 @@ export function startFinishPath(): void {
     'repeatable'
   )
   const seen = new WeakSet<AbortSignal>()
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type !== 'workspace-changed') return
     for (const ws of openWorkspaces()) {
       if (!ws.path || seen.has(ws.lifetime)) continue

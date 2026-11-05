@@ -1,6 +1,6 @@
 // Generated from locales/en/mcp.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'mcp.add.busy': undefined
   'mcp.add.button': undefined
   'mcp.add.message': undefined

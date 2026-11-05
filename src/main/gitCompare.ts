@@ -4,7 +4,7 @@ import { resolve as resolvePath } from 'path'
 import { msg } from '../shared/i18n'
 import { failure as commandFailed, git, isBinary, MAX_DIFF_BYTES, tooLargeDiff } from './git'
 import { gitProblem } from './gitTool'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
 
@@ -73,10 +73,10 @@ export async function compareLines(root: string, workTarget: string | null, slot
 /** A listed branch's tip, read through its whole name; refused when there's no such branch (deleted or renamed since the list). */
 async function branchTip(root: string, name: string): Promise<string> {
   const listed = (await localBranches(root)).some((b) => b.name === name)
-  if (!listed) throw hiveError(M.noBranch, { branch: name })
+  if (!listed) throw combworkError(M.noBranch, { branch: name })
   const r = await git(root, ['rev-parse', '--verify', '-q', `refs/heads/${name}^{commit}`])
   if (r.ok) return r.out.trim()
-  if (r.code === 1) throw hiveError(M.noBranch, { branch: name })
+  if (r.code === 1) throw combworkError(M.noBranch, { branch: name })
   throw commandFailed('git rev-parse', r) // i18n-ignore: a git command, as it is
 }
 

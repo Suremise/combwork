@@ -4,7 +4,7 @@
 // A fake Claude Code agent's terminal is given chunks of new glyphs (CJK ideographs in 24-bit colours, the cursor
 // hidden, as Claude Code hides it) until the atlas has merged several times; after each chunk, once the screen has
 // settled, it shows the same as a full redraw of the same buffer. The merges are counted by the dev build's
-// __hiveAtlasMerges, so a run that merged nothing fails rather than passing for nothing.
+// __cwAtlasMerges, so a run that merged nothing fails rather than passing for nothing.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47924), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47924), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -67,9 +67,9 @@ const check = (name, ok, extra = '') => {
     )
     check('its terminal is shown', !!marked)
     const screen = page.locator('#atlasmerge-screen')
-    check('it draws with WebGL', !!(await lib.until(() => page.evaluate(() => window.__hiveWebglCount() === 1 && typeof window.__hiveAtlasMerges?.() === 'number'), HUNG_MS)))
-    const merged = () => page.evaluate(() => window.__hiveAtlasMerges())
-    const out = (d) => page.evaluate(([k, x]) => window.__hiveTerminalOutput(k, x), [key, d])
+    check('it draws with WebGL', !!(await lib.until(() => page.evaluate(() => window.__cwWebglCount() === 1 && typeof window.__cwAtlasMerges?.() === 'number'), HUNG_MS)))
+    const merged = () => page.evaluate(() => window.__cwAtlasMerges())
+    const out = (d) => page.evaluate(([k, x]) => window.__cwTerminalOutput(k, x), [key, d])
     /** The screen once two shots in a row are the same (what a write or a redraw set off has been drawn). */
     const settled = async () => {
       let last = await screen.screenshot()
@@ -100,8 +100,8 @@ const check = (name, ok, extra = '') => {
       const shown = await settled()
       // A full redraw of the same buffer: scrolling up a line and back draws every row again.
       await page.evaluate((k) => {
-        window.__hiveTerminalScrollLines(k, -1)
-        window.__hiveTerminalScrollLines(k, 1)
+        window.__cwTerminalScrollLines(k, -1)
+        window.__cwTerminalScrollLines(k, 1)
       }, key)
       const redrawn = await settled()
       if (!shown || !redrawn) unsettled++

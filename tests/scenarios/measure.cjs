@@ -19,7 +19,7 @@ const bytes = (s) => Buffer.byteLength(s ?? '', 'utf8')
 const HUNG_MS = 30000
 
 /** The hive MCP server's instructions and tools, started as the launch starts it. */
-function hiveServer(env) {
+function combworkServer(env) {
   return new Promise((resolve, reject) => {
     const p = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ ...env, ELECTRON_RUN_AS_NODE: '1' }) })
     let buf = ''
@@ -120,7 +120,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
         const measureClaude = async (role, resumed) => {
           const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1)
           const session = !resumed ? 'new' : launch.opts['--resume'] === resumed ? 'resumed' : 'resume NOT confirmed'
-          const server = await hiveServer(JSON.parse(mcpConfigs.get(launch.opts['--mcp-config']) ?? fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env)
+          const server = await combworkServer(JSON.parse(mcpConfigs.get(launch.opts['--mcp-config']) ?? fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env)
           const appended = launch.opts['--append-system-prompt-file'] ? fs.readFileSync(launch.opts['--append-system-prompt-file'], 'utf8') : ''
           const skills = skillMetadata(path.join(launch.opts['--plugin-dir'], 'skills'))
           rows.push({ provider: 'claude-code', role, catalog, session, instructions: bytes(server.instructions) + bytes(appended), tools: bytes(server.tools), skills: bytes(skills.text), skillCount: skills.count })
@@ -133,7 +133,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
           // The hive server's environment from its -c mcp_servers.combwork table.
           const table = arg('mcp_servers.combwork=')
           const env = Object.fromEntries([...table.matchAll(/(CW_\w+|ELECTRON_RUN_AS_NODE)="((?:[^"\\]|\\.)*)"/g)].map((m) => [m[1], JSON.parse(`"${m[2]}"`)]))
-          const server = await hiveServer(env)
+          const server = await combworkServer(env)
           const skills = skillMetadata(path.join(cwd, '.agents', 'skills'))
           // Codex doesn't show MCP instructions to the model: the developer instructions carry the same text.
           rows.push({ provider: 'codex', role, catalog, session, instructions: bytes(developer), tools: bytes(server.tools), skills: bytes(skills.text), skillCount: skills.count })

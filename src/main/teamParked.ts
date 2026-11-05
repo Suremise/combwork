@@ -8,7 +8,7 @@ import type { LiveSessionState } from '../shared/types'
 import { heldSlots } from './agentFolders'
 import { endTreesExactly, leftoversOf } from './agentProcesses'
 import { startNow } from './agentStarts'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { orphansOf } from './orphanProcesses'
 import { progress } from './progressService'
 import { sessions } from './sessions'
@@ -166,7 +166,7 @@ function orphanProcess(projectPath: string, agentId: string, pid: number, create
  * workspaces open. Counted as each happens; a scan whose count moved meanwhile isn't the state now.
  */
 let changes = 0
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type === 'session-status' || e.type === 'session-exit' || e.type === 'agent-start' || e.type === 'progress-changed' || e.type === 'team-pause-changed' || e.type === 'workspace-changed') changes++
 })
 

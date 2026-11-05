@@ -39,7 +39,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.assistant = { ...cfg.settings.assistant, typingPause: 600, enterEndsPause: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -362,7 +362,7 @@ const check = (name, ok, extra = '') => {
   check('project agents get the board tools', ['cw_list_tasks', 'cw_read_task', 'cw_create_task', 'cw_update_task', 'cw_reorder_tasks'].every((t) => asAgent.includes(t)), asAgent.join(','))
   check('Control agents: agent tools, no project creation', asAgents.includes('cw_prompt_agent') && asAgents.includes('cw_stop_agent') && asAgents.includes('cw_hand_over') && asAgents.includes('cw_start_task') && !asAgents.includes('cw_create_project'))
   check('Look and advise: reading tools only', asLook.includes('cw_agent_activity') && asLook.includes('cw_wait_for_agents') && asLook.includes('cw_list_tasks') && !asLook.includes('cw_add_agent') && !asLook.includes('cw_start_task'))
-  // Its lane tool says only list works there (#500); trusted at every level (sessions' trustedHiveTools, unit-tested).
+  // Its lane tool says only list works there (#500); trusted at every level (sessions' trustedCombworkTools, unit-tested).
   const laneTool = (envExtra) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ CW_API_URL: API, ...envExtra }), timeout: 10000 }).toString().split('\n')[0]).result.tools.find((t) => t.name === 'cw_lane')
   check('Look and advise: cw_lane says only list works', /only list works/.test(laneTool({ CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'look' })?.description ?? '') && !/only list works/.test(laneTool({ CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'agents' })?.description ?? ''))
 
@@ -373,37 +373,37 @@ const check = (name, ok, extra = '') => {
   const holdNextWrite = () =>
     app.evaluate((_, target) => {
       const f = process.mainModule.require('original-fs/promises')
-      const original = global.__hiveTestRename ?? (global.__hiveTestRename = f.rename)
-      global.__hiveTestGate = { entered: false }
+      const original = global.__cwTestRename ?? (global.__cwTestRename = f.rename)
+      global.__cwTestGate = { entered: false }
       f.rename = async (...args) => {
-        if (!global.__hiveTestGate.entered && String(args[1]).toLowerCase() === target.toLowerCase()) {
-          global.__hiveTestGate.entered = true
-          await new Promise((resolve) => (global.__hiveTestGate.release = resolve))
+        if (!global.__cwTestGate.entered && String(args[1]).toLowerCase() === target.toLowerCase()) {
+          global.__cwTestGate.entered = true
+          await new Promise((resolve) => (global.__cwTestGate.release = resolve))
           f.rename = original
         }
         return original(...args)
       }
     }, projectFile)
-  const held = () => lib.until(() => app.evaluate(() => global.__hiveTestGate.entered), HUNG_MS)
-  const release = () => app.evaluate(() => global.__hiveTestGate.release())
+  const held = () => lib.until(() => app.evaluate(() => global.__cwTestGate.entered), HUNG_MS)
+  const release = () => app.evaluate(() => global.__cwTestGate.release())
   // A change queued for the lock: withFileLock (fsutil.ts) sets the file's key (its path in lower case) to the queue's
   // promise in the same step as the call, so a promise set to that key while the user's write holds it is a change queued
   // behind it, past its checks before the lock (assistantsettings says more). Counted only while it waits, then put back.
   const watchLockQueue = () =>
     app.evaluate((_, lockKey) => {
-      const set = (global.__hiveTestMapSet ??= Map.prototype.set)
-      global.__hiveTestQueued = 0
+      const set = (global.__cwTestMapSet ??= Map.prototype.set)
+      global.__cwTestQueued = 0
       // eslint-disable-next-line eslint/no-extend-native -- in the test copy only, and put back once the change is queued
       Map.prototype.set = function (k, v) {
-        if (k === lockKey && typeof v?.then === 'function') global.__hiveTestQueued++
+        if (k === lockKey && typeof v?.then === 'function') global.__cwTestQueued++
         return set.call(this, k, v)
       }
     }, projectFile.toLowerCase())
   const queuedForLock = async () => {
-    const queued = !!(await lib.until(() => app.evaluate(() => global.__hiveTestQueued > 0), 30000))
+    const queued = !!(await lib.until(() => app.evaluate(() => global.__cwTestQueued > 0), 30000))
     await app.evaluate(() => {
       // eslint-disable-next-line eslint/no-extend-native -- putting Map's own set back
-      Map.prototype.set = global.__hiveTestMapSet
+      Map.prototype.set = global.__cwTestMapSet
     })
     return queued
   }

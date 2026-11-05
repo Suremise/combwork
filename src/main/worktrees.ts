@@ -15,7 +15,7 @@ import { gitProblemData, gitProblemText } from '../shared/gitTool'
 import { copyDir, isDir, placeKey, samePlace } from './fsutil'
 import { branchOfRef, git, gitReading } from './git'
 import { gitTool } from './gitTool'
-import { errorText, hiveError, shownError } from './combworkError'
+import { errorText, combworkError, shownError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { unwatchedWhile } from './platform/observe'
 import { CW_DIR } from '../shared/defaults'
@@ -24,7 +24,7 @@ const log = createLogger('worktrees')
 
 /**
  * What git and worktrees say (#848, E10d of #677). Errors thrown here reach the window (IPC) and agents (the Agent API's
- * add agent) alike: HiveErrors, English for agents and in the window's language for the window. A reason or a merge's
+ * add agent) alike: CombworkErrors, English for agents and in the window's language for the window. A reason or a merge's
  * error returned as data is the window's alone (a removal, a check, a merge): formatted with tr() when it is made. Git's
  * own words stay as git said them, in either.
  */
@@ -52,7 +52,7 @@ export const GIT_FAILED = M.gitFailed
 const gitWhy = (err: string, command: string): TextPart => gitProblemData(gitTool()) ?? (err.split(/\r?\n/)[0] || { m: M.gitFailed, values: { command } })
 
 /** Git's own message when it gave one, as it came; else Hive's words that `command` failed. */
-const gitError = (err: string, command: string): Error => (err ? new Error(err) : hiveError(M.gitFailed, { command }))
+const gitError = (err: string, command: string): Error => (err ? new Error(err) : combworkError(M.gitFailed, { command }))
 
 /** Where Hive creates worktrees: next to the workspace, so the project's own tools don't scan them and they aren't taken for projects. */
 export function worktreesRoot(workspacePath: string): string {
@@ -66,7 +66,7 @@ export function worktreesRoot(workspacePath: string): string {
  */
 export async function checkedOutBranch(cwd: string): Promise<string | null> {
   const r = await git(cwd, ['rev-parse', '--symbolic-full-name', 'HEAD'])
-  if (!r.ok) throw hiveError(M.readBranch, { folder: cwd, why: gitWhy(r.err, 'git rev-parse') }) // i18n-ignore: a git command, as it is
+  if (!r.ok) throw combworkError(M.readBranch, { folder: cwd, why: gitWhy(r.err, 'git rev-parse') }) // i18n-ignore: a git command, as it is
   const b = r.out.trim()
   return b.startsWith('refs/heads/') ? b.slice('refs/heads/'.length) : null
 }
@@ -86,7 +86,7 @@ export async function localBranches(cwd: string): Promise<string[]> {
  */
 async function localBranchesStrict(cwd: string): Promise<string[]> {
   const r = await git(cwd, ['for-each-ref', '--format=%(refname)', 'refs/heads'])
-  if (!r.ok) throw hiveError(M.listBranches, { why: gitWhy(r.err, 'for-each-ref') })
+  if (!r.ok) throw combworkError(M.listBranches, { why: gitWhy(r.err, 'for-each-ref') })
   return r.out.split(/\r?\n/).map((l) => branchOfRef(l)).filter((b): b is string => !!b)
 }
 
@@ -181,7 +181,7 @@ export class RepoReads {
 export async function uniqueBranch(cwd: string, wanted: string, taken: ReadonlySet<string> = new Set(), reads?: RepoReads): Promise<string> {
   const existing = [...new Set([...(await (reads ? reads.branchesStrict().catch(() => []) : localBranches(cwd))), ...taken].map((b) => b.toLowerCase()))]
   const parent = existing.find((b) => wanted.toLowerCase().startsWith(`${b}/`))
-  if (parent) throw hiveError(M.branchInWay, { branch: wanted, parent })
+  if (parent) throw combworkError(M.branchInWay, { branch: wanted, parent })
   const free = (b: string): boolean => !existing.some((e) => e === b.toLowerCase() || e.startsWith(`${b.toLowerCase()}/`))
   if (free(wanted)) return wanted
   for (let i = 2; ; i++) if (free(`${wanted}-${i}`)) return `${wanted}-${i}`
@@ -198,7 +198,7 @@ export async function createWorktree(projectPath: string, dest: string, branch: 
   const check = await git(projectPath, ['check-ref-format', '--branch', branch])
   if (!check.ok) {
     const problem = check.missing ? gitProblemData(gitTool()) : null
-    throw problem ? hiveError(M.gitProblem, { problem }) : hiveError(M.badBranchName, { branch })
+    throw problem ? combworkError(M.gitProblem, { problem }) : combworkError(M.badBranchName, { branch })
   }
   await mkdir(dirname(dest), { recursive: true })
   const r = await git(projectPath, ['worktree', 'add', '-b', branch, dest, base])
@@ -215,7 +215,7 @@ export async function removeWorktree(projectPath: string, wt: WorktreeRef, delet
   }
   if (deleteBranch) {
     const b = await git(projectPath, ['branch', '-D', wt.branch])
-    if (!b.ok && !/not found/i.test(b.err)) throw b.err ? new Error(b.err) : hiveError(M.deleteBranch, { branch: wt.branch })
+    if (!b.ok && !/not found/i.test(b.err)) throw b.err ? new Error(b.err) : combworkError(M.deleteBranch, { branch: wt.branch })
   }
   log.info(`Removed worktree ${userText(wt.path)}${deleteBranch ? ` and branch ${userText(wt.branch)}` : ''}`)
 }
@@ -278,12 +278,12 @@ export async function branchStatus(projectPath: string, wt: WorktreeRef, reads?:
   const into =
     target ??
     (await (reads ?? new RepoReads(projectPath)).checkedOutBranch().catch((e: Error) => {
-      throw hiveError(M.cantCheck, { branch: wt.branch, why: errorText(e) }, { cause: e })
+      throw combworkError(M.cantCheck, { branch: wt.branch, why: errorText(e) }, { cause: e })
     }))
   const count = await git(projectPath, ['rev-list', '--count', `${into ?? wt.base}..${wt.branch}`])
   const dirty = (await isDir(wt.path)) ? await (reads ? reads.dirty(wt.path) : dirtyCount(wt.path)) : 0
   if (!count.ok || dirty === null) {
-    throw hiveError(M.cantCheck, { branch: wt.branch, why: gitProblemData(gitTool()) ?? (count.ok ? M.statusFailed : count.err.trim() || M.unknownError) })
+    throw combworkError(M.cantCheck, { branch: wt.branch, why: gitProblemData(gitTool()) ?? (count.ok ? M.statusFailed : count.err.trim() || M.unknownError) })
   }
   let ahead = parseInt(count.out.trim(), 10) || 0
   if (ahead > 0 && (await alreadyMerged(projectPath, into ?? wt.base, wt.branch))) ahead = 0
@@ -308,7 +308,7 @@ export async function primaryBranch(projectPath: string): Promise<string | null>
 export async function primaryBranchStrict(projectPath: string, reads?: RepoReads): Promise<string | null> {
   const local = new Set(await (reads ? reads.branchesStrict() : localBranchesStrict(projectPath)))
   const remote = await git(projectPath, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'])
-  if (!remote.ok && !(remote.code === 1 && !remote.err)) throw hiveError(M.readOriginHead, { why: gitWhy(remote.err, 'symbolic-ref') })
+  if (!remote.ok && !(remote.code === 1 && !remote.err)) throw combworkError(M.readOriginHead, { why: gitWhy(remote.err, 'symbolic-ref') })
   // The full ref, cut: `--short` says remotes/origin/x beside a tag origin/x (HI-2426).
   const named = (remote.ok && branchOfRef(remote.out, 'refs/remotes/origin/')) || ''
   return [named, 'main', 'master'].find((b) => b && local.has(b)) ?? null

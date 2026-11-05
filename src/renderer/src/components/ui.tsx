@@ -282,7 +282,7 @@ const TipParent = createContext<((inner: boolean) => void) | null>(null)
  */
 let hovered: { owner: object; wrap: HTMLElement; hide: () => void } | null = null
 /** Whether a hover tooltip holds the slot, and whether its anchor is still in the page, for tests (HI-2084). */
-;(window as unknown as { __hiveHoveredTip?: () => { connected: boolean } | null }).__hiveHoveredTip = () => (hovered ? { connected: hovered.wrap.isConnected } : null)
+;(window as unknown as { __cwHoveredTip?: () => { connected: boolean } | null }).__cwHoveredTip = () => (hovered ? { connected: hovered.wrap.isConnected } : null)
 
 /**
  * Two sentences one after the other, each with its own full stop, spaced as the language does: a space in English,

@@ -7,8 +7,8 @@
 import fs from 'fs'
 import { syncBuiltinESMExports } from 'module'
 
-const marked = fs as typeof fs & { hiveRealWatch?: true }
-if (!marked.hiveRealWatch) {
+const marked = fs as typeof fs & { combworkRealWatch?: true }
+if (!marked.combworkRealWatch) {
   const watch = fs.watch
   const real = (p: unknown): unknown => {
     if (typeof p !== 'string') return p
@@ -19,7 +19,7 @@ if (!marked.hiveRealWatch) {
     }
   }
   fs.watch = ((p: fs.PathLike, ...rest: unknown[]) => (watch as (...a: unknown[]) => fs.FSWatcher)(real(p), ...rest)) as typeof fs.watch
-  marked.hiveRealWatch = true
+  marked.combworkRealWatch = true
   // chokidar imports watch from node:fs as an ES module: this updates that binding too.
   syncBuiltinESMExports()
 }

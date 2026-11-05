@@ -136,7 +136,7 @@ export const fileTimeMs = (created: string): number => Number((BigInt(created) -
 
 /**
  * A lease's journal (#1360): the file its job's supervisor writes each process it follows to, durably, before it
- * follows it (HiveJobs.Journal), so another Hive can end those after a crash. In the project's worktrees folder (or
+ * follows it (CombworkJobs.Journal), so another Hive can end those after a crash. In the project's worktrees folder (or
  * `dir`, tests), made ready here.
  *
  * Sealing it (sealJournal) closes it to writers for good: what it held is moved aside (`<lease>.sealed-<n>`), and a
@@ -206,7 +206,7 @@ const FILETIME_1970 = 116444736000000000n
 const filetimeNow = (): bigint => BigInt(Date.now() + 86_400_000) * 10000n + FILETIME_1970
 
 /**
- * A journal's text as whole records (HiveJobs.Journal writes each as "pid:created:check\n"), or why it isn't one
+ * A journal's text as whole records (CombworkJobs.Journal writes each as "pid:created:check\n"), or why it isn't one
  * (HR4's round 5 finding): every record must end with its newline (an unterminated tail is a torn append), have all
  * three fields, a pid Windows could give (1 to 2^32 - 1), a start (FILETIME) between 1970 and a day from now, and the
  * check the supervisor wrote ((pid + created) mod 1000003), so a record cut short or damaged is never read as another,

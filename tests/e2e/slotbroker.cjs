@@ -71,7 +71,7 @@ async function endFromOutside(app, spare = []) {
  * noted, with how long after `since`, and the read is tried again until one succeeds. Returns { row, refused }: row
  * null if none succeeded within the bound.
  */
-async function readGoneHiveDb(file, sql, since) {
+async function readGoneCombworkDb(file, sql, since) {
   const refused = []
   const row = await lib.until(() => {
     let db
@@ -263,7 +263,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
       kept.push(...keeper)
       check(`${part}: …and Combwork is ended from outside, the broker and its keeper left running`, await endFromOutside(h.app, [pid, helperPid]))
       h = null
-      const read = await readGoneHiveDb(path.join(ws, '.combwork', 'combwork.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
+      const read = await readGoneCombworkDb(path.join(ws, '.combwork', 'combwork.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
       if (read.refused.length) console.log(`INFO ${part}: combwork.db refused ${read.refused.length} read(s) before one succeeded, the keeper ${lib.stillSame(keeper).length ? 'running' : 'gone'}: ${read.refused.slice(0, 5).join(' | ')}`)
       const row = read.row
       check(`${part}: …slot-a still names its run as writer`, row?.run === run, JSON.stringify(row))

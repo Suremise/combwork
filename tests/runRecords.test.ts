@@ -283,7 +283,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       jobs.onEnsure = () => undefined
       jobs.onAdd = () => undefined
       const m = await restarted()
-      m.setHiveIdentity(async () => HIVE)
+      m.setCombworkIdentity(async () => HIVE)
       return m
     }
     const failWrites = (m: typeof import('../src/main/agentProcesses')) => {

@@ -178,18 +178,18 @@ describe('sweeping the leftovers (#1016)', () => {
     const viaTasks = outside('tasks', '1.json.12-1.tmp')
     const viaTasksBak = outside('tasks', '1.json.before-ids.bak')
     const viaMetrics = outside('metrics', join('benchmarks', 'run.json.12-2.tmp'))
-    const viaHive = outside('hive', join('tasks', '2.json.12-3.tmp'))
+    const viaCombwork = outside('hive', join('tasks', '2.json.12-3.tmp'))
     const ws = join(base, 'ws', '.combwork')
     mkdirSync(ws, { recursive: true })
     junction(join(base, 'elsewhere', 'tasks'), join(ws, 'tasks')) // the store itself linked
     junction(join(base, 'elsewhere', 'metrics'), join(ws, 'metrics')) // a folder above metrics/benchmarks linked
-    const linkedHive = join(base, 'linked', '.combwork')
-    mkdirSync(dirname(linkedHive), { recursive: true })
-    junction(join(base, 'elsewhere', 'hive'), linkedHive) // the .combwork itself linked
+    const linkedCombwork = join(base, 'linked', '.combwork')
+    mkdirSync(dirname(linkedCombwork), { recursive: true })
+    junction(join(base, 'elsewhere', 'hive'), linkedCombwork) // the .combwork itself linked
     // A real store beside them is still swept.
     const real = put(join(ws, 'lanes.json.12-4.tmp'), now)
-    const swept = await sweepLeftovers([{ hive: ws, stores: WORKSPACE_STORES }, { hive: linkedHive, stores: WORKSPACE_STORES }], { now })
-    for (const f of [viaTasks, viaTasksBak, viaMetrics, viaHive]) expect(existsSync(f), f).toBe(true)
+    const swept = await sweepLeftovers([{ hive: ws, stores: WORKSPACE_STORES }, { hive: linkedCombwork, stores: WORKSPACE_STORES }], { now })
+    for (const f of [viaTasks, viaTasksBak, viaMetrics, viaCombwork]) expect(existsSync(f), f).toBe(true)
     expect(existsSync(real)).toBe(false)
     expect({ temp: swept.temp, bak: swept.bak }).toEqual({ temp: 1, bak: 0 })
   })

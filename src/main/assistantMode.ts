@@ -2,7 +2,7 @@ import { ASSISTANT_AGENT_ID, assistantModeId, modeMessage, modeSummary } from '.
 import { projectAgents } from '../shared/defaults'
 import { config } from './config'
 import { msg } from '../shared/i18n'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { readMode } from './modes'
 import { sessions } from './sessions'
@@ -64,7 +64,7 @@ export async function switchMode(modeId: string, save = true): Promise<'told' | 
   switches.set(key, rev)
   const current = (): boolean => revision(key) === rev
   const mode = await readMode(modeId)
-  if (!mode) throw hiveError(msg({ id: 'content.mode.unknown', defaultMessage: 'There is no mode "{mode}" in this workspace.', description: "An error switching the Combwork Assistant's mode: the workspace has no mode (a file in .combwork/modes) called {mode}." }), { mode: modeId }, { kind: 'notFound' })
+  if (!mode) throw combworkError(msg({ id: 'content.mode.unknown', defaultMessage: 'There is no mode "{mode}" in this workspace.', description: "An error switching the Combwork Assistant's mode: the workspace has no mode (a file in .combwork/modes) called {mode}." }), { mode: modeId }, { kind: 'notFound' })
   if (!current()) return 'saved'
   // save=false: the choice is already saved (Assistant Settings, which can also choose "the default").
   if (save) {
@@ -76,7 +76,7 @@ export async function switchMode(modeId: string, save = true): Promise<'told' | 
         return {}
       }
       const agents = projectAgents(cfg)
-      if (!agents.some((a) => a.id === AGENT)) throw hiveError(msg({ id: 'content.mode.noAssistant', defaultMessage: 'The Assistant has no settings in this workspace.', description: "An error switching the Combwork Assistant's mode: the workspace's Assistant settings are missing." }))
+      if (!agents.some((a) => a.id === AGENT)) throw combworkError(msg({ id: 'content.mode.noAssistant', defaultMessage: 'The Assistant has no settings in this workspace.', description: "An error switching the Combwork Assistant's mode: the workspace's Assistant settings are missing." }))
       return { agents: agents.map((a) => (a.id === AGENT ? { ...a, mode: modeId } : a)) }
     })
     if (overtaken) return 'saved'

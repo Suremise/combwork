@@ -112,7 +112,7 @@ function prepare() {
   fs.writeFileSync(path.join(fx.claudeHome, 'fake-trusted.json'), JSON.stringify([fx.ws, alpha, beta, gamma, ...slotFolders(alpha), ...slotFolders(beta)].map((f) => f.toLowerCase())))
 }
 
-async function startHive(env = {}) {
+async function startCombwork(env = {}) {
   const { app, page, inv } = await lib.launch({ userData: fx.userData, viewport: { width: 1500, height: 950 }, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: fx.claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', ...env } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.waitForProvider(inv)
@@ -263,7 +263,7 @@ function helpers(h) {
 
 ;(async () => {
   prepare()
-  let h = await startHive()
+  let h = await startCombwork()
   // What the restart needs of the first start: the agents, the lanes, the cards.
   const kept = {}
   try {
@@ -486,7 +486,7 @@ function helpers(h) {
   }
 
   // --- The second start: the restart's Resume All (S35), then the pool (beta) and everyone in the project folder (gamma).
-  h = await startHive()
+  h = await startCombwork()
   try {
     if (kept.ok) {
       const { page, inv } = h

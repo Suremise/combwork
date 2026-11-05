@@ -62,7 +62,7 @@ describe('trash (src/main/trash.ts)', () => {
     // The installed app (never quiet): always the Recycle Bin, whatever else its environment says.
     expect(testTrashDir({ CW_TEST_TRASH_DIR: 'C:\\t\\trash', CW_USER_DATA: 'C:\\p' }, true)).toBeNull()
     expect(testTrashDir({ CW_TEST_TRASH_DIR: 'C:\\t\\trash', CW_USER_DATA: 'C:\\p', CW_TEST_QUIET: '0' }, true)).toBeNull()
-    // A packaged copy a test started (CW_TEST_QUIET=1, lib.hiveEnv): its suite's trash folder, or its profile's.
+    // A packaged copy a test started (CW_TEST_QUIET=1, lib.combworkEnv): its suite's trash folder, or its profile's.
     expect(testTrashDir({ CW_TEST_TRASH_DIR: 'C:\\t\\trash', CW_USER_DATA: 'C:\\p', CW_TEST_QUIET: '1' }, true)).toBe('C:\\t\\trash')
     expect(testTrashDir({ CW_USER_DATA: 'C:\\p', CW_TEST_QUIET: '1' }, true)).toBe(join('C:\\p', 'test-trash'))
     expect(testTrashDir({ CW_TEST_QUIET: '1' }, true)).toBeNull()

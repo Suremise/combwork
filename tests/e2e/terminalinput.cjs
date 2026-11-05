@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -126,8 +126,8 @@ const check = (name, ok, extra = '') => {
 
     // ---- 2. Ctrl+C and Ctrl+V. Text to select: typed into the CLI's input, never sent.
     const TEXT = 'SELECTME alpha beta delta'
-    const textAt = (t) => page.evaluate(([k, x]) => window.__hiveTerminalTextAt(k, x), [key, t])
-    const selection = () => page.evaluate((k) => window.__hiveTerminalSelection(k), key)
+    const textAt = (t) => page.evaluate(([k, x]) => window.__cwTerminalTextAt(k, x), [key, t])
+    const selection = () => page.evaluate((k) => window.__cwTerminalSelection(k), key)
     const ctrlCV = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-ctrl-cv'), key)
     const allKeys = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-all-keys'), key)
     await inv('pty:write', key, TEXT)

@@ -4,7 +4,7 @@
 // or another window's). A value set (an empty string too: "none", over the old `worktreeSetup` / `worktreeCopy`) is the
 // project's own; null removes it, so it falls back (slots.ts `slotOptionsOf`).
 
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { msg } from '../shared/i18n/msg'
 import type { ProjectConfig, SlotDefaults, SlotOptions, WorkflowLevel } from '../shared/types'
 import { config } from './config'
@@ -32,10 +32,10 @@ export interface SlotSettingsNow {
 
 /** Sets (or, with null, removes) one slot setting of a project, under its lock; refused when the key or value isn't one. */
 export async function setSlotSetting(ws: WorkspaceService, projectPath: string, key: SlotSettingKey, value: string | number | null): Promise<SlotSettingsNow> {
-  if (!KEYS.includes(key)) throw hiveError(M.bad, undefined, { kind: 'invalid' })
+  if (!KEYS.includes(key)) throw combworkError(M.bad, undefined, { kind: 'invalid' })
   if (key === 'copiesSize') {
-    if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 32)) throw hiveError(M.badSize, { min: 1, max: 32 }, { kind: 'invalid' })
-  } else if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw hiveError(M.badText, { max: MAX_TEXT }, { kind: 'invalid' })
+    if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 32)) throw combworkError(M.badSize, { min: 1, max: 32 }, { kind: 'invalid' })
+  } else if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw combworkError(M.badText, { max: MAX_TEXT }, { kind: 'invalid' })
   const cfg = await ws.mutateProjectConfig(projectPath, (c) => {
     if (key === 'copiesSize') {
       const copies = { ...c.copies }
@@ -56,7 +56,7 @@ export async function setSlotSetting(ws: WorkspaceService, projectPath: string, 
 
 /** Hive's or the workspace's slot defaults, with what each inherits (Hive's: the built-in default). */
 export function slotLevelForm(ws: WorkspaceService, level: WorkflowLevel): SlotLevelForm {
-  if (level !== 'global' && level !== 'workspace') throw hiveError(M.bad, undefined, { kind: 'invalid' })
+  if (level !== 'global' && level !== 'workspace') throw combworkError(M.bad, undefined, { kind: 'invalid' })
   const levels = slotLevelsOf(config.settings, ws)
   return level === 'global' ? { own: { ...levels.global }, inherited: { copy: slotCopyOf(null, {}) } } : { own: { ...levels.workspace }, inherited: { copy: slotCopyOf(null, { global: levels.global }) } }
 }
@@ -77,9 +77,9 @@ const DEFAULT_KEYS: readonly SlotDefaultKey[] = ['copy']
  * queue, HR5's HI-1765 round 1): throwing refuses it, nothing written.
  */
 export async function setSlotDefault(ws: WorkspaceService, level: WorkflowLevel, key: SlotDefaultKey, value: string | null, check?: (now: SlotDefaults | undefined) => void): Promise<SlotDefaults> {
-  if (level !== 'global' && level !== 'workspace') throw hiveError(M.bad, undefined, { kind: 'invalid' })
-  if (!DEFAULT_KEYS.includes(key)) throw hiveError(M.bad, undefined, { kind: 'invalid' })
-  if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw hiveError(M.badText, { max: MAX_TEXT }, { kind: 'invalid' })
+  if (level !== 'global' && level !== 'workspace') throw combworkError(M.bad, undefined, { kind: 'invalid' })
+  if (!DEFAULT_KEYS.includes(key)) throw combworkError(M.bad, undefined, { kind: 'invalid' })
+  if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw combworkError(M.badText, { max: MAX_TEXT }, { kind: 'invalid' })
   const next = (now: SlotDefaults | undefined): SlotDefaults => {
     const d = { ...now }
     if (value === null) delete d[key]

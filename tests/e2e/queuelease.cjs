@@ -52,7 +52,7 @@ const queueFolders = () =>
   const hives = []
   try {
     // --- A opens the workspace, a card is approved and its check starts: A runs the queue.
-    const a = await q.startHive(fx, { port: PORT })
+    const a = await q.startCombwork(fx, { port: PORT })
     hives.push(a)
     a.page.on('pageerror', (e) => check('no page errors (A)', false, e.message))
     const reviewer = await q.agent(fx, a, 'R1')
@@ -67,7 +67,7 @@ const queueFolders = () =>
     check('…in a queue folder of its own, A the runner', !!oldFolder && viewA?.runHere === true && viewA.runBy === profileA, JSON.stringify({ viewA, oldFolder }))
 
     // --- B opens the same workspace: it doesn't run the queue, and says who does.
-    const b = await q.startHive(fxB, { port: await freePort(), keepOptions: true })
+    const b = await q.startCombwork(fxB, { port: await freePort(), keepOptions: true })
     hives.push(b)
     b.page.on('pageerror', (e) => check('no page errors (B)', false, e.message))
     await lib.fitWindow(b.app, b.page, { width: 1400, height: 900 })

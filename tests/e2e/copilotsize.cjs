@@ -43,17 +43,17 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const api = await startFakeCopilotApi({ log: apiLog })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47820), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47820), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
   // The folder is trusted already (as "Yes, and remember this folder" saves it): Copilot goes straight to loading.
   fs.writeFileSync(path.join(copilotHome, 'config.json'), JSON.stringify({ trustedFolders: [proj] }, null, 2))
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
-  const hiveLog = path.join(userData, 'logs', 'combwork.log')
+  const combworkLog = path.join(userData, 'logs', 'combwork.log')
   /** The size refreshes Combwork has given Copilot so far ("cols × rows"). */
   const refreshes = () => {
     try {
-      return [...fs.readFileSync(hiveLog, 'utf8').matchAll(/size refresh .*?: (\d+) × (\d+)/g)].map((m) => `${m[1]}x${m[2]}`)
+      return [...fs.readFileSync(combworkLog, 'utf8').matchAll(/size refresh .*?: (\d+) × (\d+)/g)].map((m) => `${m[1]}x${m[2]}`)
     } catch {
       return []
     }
@@ -72,8 +72,8 @@ const check = (name, ok, extra = '') => {
     const status = async () => (await live())?.status
     const ready = (ms = 30000) => lib.until(async () => (await status()) === 'ready', ms, 100)
     const stopped = () => lib.until(async () => !(await live()), 30000, 200)
-    const term = () => page.evaluate((k) => window.__hiveTerminalState?.(k) ?? null, key)
-    const lines = () => page.evaluate((k) => window.__hiveTerminalLines?.(k) ?? null, key)
+    const term = () => page.evaluate((k) => window.__cwTerminalState?.(k) ?? null, key)
+    const lines = () => page.evaluate((k) => window.__cwTerminalLines?.(k) ?? null, key)
     const settingsBtn = page.locator('.activity-btn[aria-label="Settings"]')
     const projectsBtn = page.locator('.activity-btn[aria-label="Projects"]')
     const resizeAt = (steps) => steps.map(([ms, w, h]) => new Promise((r) => setTimeout(() => void lib.fitWindow(app, page, { width: w, height: h }).then(r), ms)))
@@ -128,7 +128,7 @@ const check = (name, ok, extra = '') => {
         // Never getContext here: on a canvas without one it would make one (a WebGL context of the probe's own).
         const canvases = [...h.querySelectorAll('canvas')].map((c) => `${c.width}x${c.height}${c.isConnected ? '' : ' detached'}`)
         const rows = h.querySelector('.xterm-rows')
-        return { host: true, box: r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null, bg: getComputedStyle(h).getPropertyValue('--terminal-bg').trim(), connected: !!h.querySelector('.xterm')?.isConnected, canvases, domRows: rows ? rows.children.length : null, domText: rows ? (rows.textContent ?? '').replace(/\s+/g, '').length : null, webgl: window.__hiveWebglCount?.() ?? null }
+        return { host: true, box: r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null, bg: getComputedStyle(h).getPropertyValue('--terminal-bg').trim(), connected: !!h.querySelector('.xterm')?.isConnected, canvases, domRows: rows ? rows.children.length : null, domText: rows ? (rows.textContent ?? '').replace(/\s+/g, '').length : null, webgl: window.__cwWebglCount?.() ?? null }
       }, key)
       const box = state.box
       if (!box || box.width < 10 || box.height < 10) return { ink: 0, state }

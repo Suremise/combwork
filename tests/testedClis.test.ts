@@ -16,14 +16,14 @@ import { PROVIDERS } from '../src/shared/providers'
 import { testedComparison, testedNote, testedSummary } from '../src/shared/testedClis'
 import { tempDir } from './tempDir'
 
-type Suite = { name: string; needs?: string[]; noHive?: string }
+type Suite = { name: string; needs?: string[]; noCombwork?: string }
 type Cli = { provider: string; version: string; path: string | null; home?: string }
 const suites = SUITES as Suite[]
 const real = (need: string) => suites.filter((s) => s.needs?.includes(need)).map((s) => s.name)
 /** Those that need this CLI alone (HI-1742: one needing two, such as cliquit, is a run of both). */
 const alone = (need: string) => suites.filter((s) => s.needs?.length === 1 && s.needs[0] === need).map((s) => s.name)
-/** Those of them that start a test Combwork, which says which version it selected (not noHive). */
-const hived = (need: string) => suites.filter((s) => s.needs?.includes(need) && !s.noHive).map((s) => s.name)
+/** Those of them that start a test Combwork, which says which version it selected (not noCombwork). */
+const hived = (need: string) => suites.filter((s) => s.needs?.includes(need) && !s.noCombwork).map((s) => s.name)
 const CLAUDE: Cli = { provider: 'claude-code', version: '2.1.292', path: 'C:\\Users\\t\\.local\\bin\\claude.exe' }
 const CODEX: Cli = { provider: 'codex', version: '0.160.1', path: 'C:\\Users\\t\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe' }
 /** A passed suite whose test copies of Combwork selected these CLIs (both, as Combwork looks for both). */
@@ -134,8 +134,8 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
     expect(manifestFromRecord(fullRecord({ clis: { claude: ['1.0.0'], codex: ['0.1.0'] } }), suites).manifest.codex.version).toBe('0.160.1')
   })
 
-  it("doesn't ask a suite that runs its CLI without Combwork (noHive) which version, but it must still pass (#921)", () => {
-    const own = [...suites, { name: 'codex-nohive', needs: ['codex'], noHive: 'runs codex itself' }]
+  it("doesn't ask a suite that runs its CLI without Combwork (noCombwork) which version, but it must still pass (#921)", () => {
+    const own = [...suites, { name: 'codex-nohive', needs: ['codex'], noCombwork: 'runs codex itself' }]
     const record = (r: object) => fullRecord({ results: [...fullRecord().results.filter((x: Result) => x.name !== 'codex-nohive'), { ...pass('codex-nohive'), ...r }] })
     expect(manifestFromRecord(record({}), own).problems).toEqual([])
     expect(manifestFromRecord(record({}), own).manifest.codex.version).toBe('0.160.1')
@@ -143,10 +143,10 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
     // One that does name a version is held to it.
     expect(manifestFromRecord(record({ clis: [{ ...CODEX, version: '0.161.0' }] }), own).problems).toEqual(['Codex: its real suites ran different versions (0.160.1, 0.161.0)'])
     // A CLI whose only suites start no Combwork: nothing says its version.
-    const only = [{ name: 'codex-nohive', needs: ['codex'], noHive: 'runs codex itself' }]
+    const only = [{ name: 'codex-nohive', needs: ['codex'], noCombwork: 'runs codex itself' }]
     expect(manifestFromRecord(fullRecord({ results: [pass('codex-nohive')] }), only).problems).toEqual(['Claude Code: none of its real suites ran', 'Codex: none of its real suites says which version Combwork used', 'GitHub Copilot: none of its real suites ran'])
     // Every suite marked so says why, and is a real suite.
-    for (const s of suites.filter((x) => x.noHive)) expect(s.needs?.some((n) => n !== 'packaged'), s.name).toBe(true)
+    for (const s of suites.filter((x) => x.noCombwork)) expect(s.needs?.some((n) => n !== 'packaged'), s.name).toBe(true)
   })
 
   it('refuses a record that is not valid, or not a record', () => {

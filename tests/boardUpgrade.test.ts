@@ -283,7 +283,7 @@ async function close(w: WS): Promise<void> {
   await disposeWorkspaceService(w)
   store.closeBoard(path)
 }
-const hiveOf = (ws: string): string => join(ws, '.combwork')
+const combworkOf = (ws: string): string => join(ws, '.combwork')
 const upgradeSteps = store.BOARD_MIGRATIONS.filter((m) => m.group === '1.0')
 
 /** A workspace whose board 0.9 left (its file before the 1.0 group), with card #1 on it. */
@@ -337,7 +337,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
       await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('Another Combwork has this workspace open: close it first.')
       expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
       expect(await titles(w)).toEqual(['From 0.9'])
-      expect(existsSync(join(hiveOf(ws), 'backups')) ? readdirSync(join(hiveOf(ws), 'backups')).filter((x) => x.includes('before-1.0')) : []).toEqual([])
+      expect(existsSync(join(combworkOf(ws), 'backups')) ? readdirSync(join(combworkOf(ws), 'backups')).filter((x) => x.includes('before-1.0')) : []).toEqual([])
     } finally {
       other.close()
     }
@@ -349,7 +349,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
   it("keeps a presence marker while open; another profile's fresh one refuses the upgrade, a stale one doesn't", async () => {
     const ws = await board09()
     const w = await open(ws)
-    const dir = join(hiveOf(ws), PRESENCE_DIR)
+    const dir = join(combworkOf(ws), PRESENCE_DIR)
     inWorkspace(w, () => store.boardState(w))
     const own = readdirSync(dir)
     expect(own).toHaveLength(1)
@@ -430,7 +430,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     const ws = await board09()
     const w = await open(ws)
     await inWorkspace(w, () => store.upgradeBoard(w))
-    const backups = join(hiveOf(ws), 'backups')
+    const backups = join(combworkOf(ws), 'backups')
     const copies = readdirSync(backups).sort()
     const version = fileSchemaVersion(store.boardFile(ws))
     let hold = holdRelease()
@@ -619,7 +619,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
     const ws = await board09()
     const w = await open(ws)
     await inWorkspace(w, () => store.upgradeBoard(w))
-    const dir = join(hiveOf(ws), 'backups')
+    const dir = join(combworkOf(ws), 'backups')
     const [v2] = readdirSync(dir).filter((x) => x.startsWith('combwork-before-1.0-v2-'))
     // A later copy of the family, of a 1.0 board (as round 1 made one before a later step of the group), named newer.
     const raw = new DatabaseSync(store.boardFile(ws))
@@ -637,7 +637,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
     const ws = await board09()
     const w = await open(ws)
     await inWorkspace(w, () => store.upgradeBoard(w))
-    const dir = join(hiveOf(ws), 'backups')
+    const dir = join(combworkOf(ws), 'backups')
     const raw = new DatabaseSync(store.boardFile(ws))
     raw.prepare('VACUUM INTO ?').run(join(dir, 'combwork-before-1.0-v2-2099-01-01T00-00-00-000Z.db'))
     raw.close()
@@ -789,7 +789,7 @@ describe("what services read before the database was replaced is read again (#12
 })
 
 describe('a workspace closed right after its database was replaced stays closed (#1207 round 3)', () => {
-  const markers = (ws: string): string[] => (existsSync(join(hiveOf(ws), PRESENCE_DIR)) ? readdirSync(join(hiveOf(ws), PRESENCE_DIR)) : [])
+  const markers = (ws: string): string[] => (existsSync(join(combworkOf(ws), PRESENCE_DIR)) ? readdirSync(join(combworkOf(ws), PRESENCE_DIR)) : [])
 
   /**
    * Replaces the database and closes the workspace with setImmediate held (only it: Node's I/O runs as usual), so what

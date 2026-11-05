@@ -29,8 +29,8 @@ import { folderFacts, slotsIn } from './agentFolders'
 import { boardRead, boardWrite, boardWriteOp } from './boardStore'
 import { coalesced } from './coalesce'
 import { config } from './config'
-import { onHiveEvent } from './events'
-import { hiveError } from './combworkError'
+import { onCombworkEvent } from './events'
+import { combworkError } from './combworkError'
 import { listLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -83,7 +83,7 @@ function whyNotNow(ws: WorkspaceService, projectPath: string, project: string, a
  */
 export async function startFreshIfIdle(projectPath: string, agentId: string): Promise<FreshWhy | null> {
   const row = (await freshPlan(projectPath)).find((r) => r.agentId === agentId)
-  if (!row) throw hiveError(M.notFound, { agent: agentId }, { kind: 'notFound' })
+  if (!row) throw combworkError(M.notFound, { agent: agentId }, { kind: 'notFound' })
   if (row.why) return row.why
   const ws = workspaceOf(projectPath)
   const project = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
@@ -240,7 +240,7 @@ let started = false
 export function startFreshNudges(): void {
   if (started) return
   started = true
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'session-status') {
       const key = e.state.projectPath.toLowerCase()
       // Each run reads the latest (a run asked for meanwhile runs once more, after it).

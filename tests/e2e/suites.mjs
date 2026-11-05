@@ -5,7 +5,7 @@
 // claudeHome: 'own' = its Claude Code runs in a home of its own with a made-up API key (no sign-in: the runner asks about none);
 // 'test' = in the signed-in Claude Code test home (CLAUDE_TEST_HOME, never the user's own), for suites that send prompts.
 // Every suite that starts the real Claude Code has one (#368): none runs in the user's ~/.claude (tests/e2esuites.test.ts).
-// noHive (with why): a real suite that runs its CLI without a test copy of Combwork, so the run record has no version Combwork
+// noCombwork (with why): a real suite that runs its CLI without a test copy of Combwork, so the run record has no version Combwork
 // selected for it: npm run tested-clis requires it to pass, and takes the CLI's version from its suites that start Combwork.
 // Suites that start a real CLI (claude, codex) share it with each other, so they run one at a time, in a lane beside
 // the others; those marked serial (with why) and the installer's run last, alone; every other suite is safe to run
@@ -88,19 +88,22 @@ export const SUITES = [
   { name: 'cliquit', needs: ['claude', 'codex'], claudeHome: 'own' },
   { name: 'closewindow' },
   { name: 'codex', needs: ['codex'] },
-  { name: 'codex-appserver', needs: ['codex'], noHive: 'runs codex app-server and its TUI itself (#653)' },
+  { name: 'codex-appserver', needs: ['codex'], noCombwork: 'runs codex app-server and its TUI itself (#653)' },
   { name: 'codex-background', needs: ['codex'] },
   { name: 'codex-extra', needs: ['codex'] },
   { name: 'codex-handover', needs: ['codex'] },
   { name: 'codex-mcpapproval', needs: ['codex'] },
   { name: 'codex-newline', needs: ['codex'] },
   { name: 'codex-setup', needs: ['codex'] },
-  { name: 'codex-storepwsh', needs: ['codex'], noHive: 'runs codex sandbox itself' },
+  { name: 'codex-storepwsh', needs: ['codex'], noCombwork: 'runs codex sandbox itself' },
   { name: 'codexfolder' },
   { name: 'codexnewline' },
   { name: 'codexoverrides', needs: ['codex'] },
-  { name: 'codexownhooks', needs: ['codex'], noHive: "asks codex app-server's hooks/list itself, in a throwaway CODEX_HOME (#1285)" },
+  { name: 'codexownhooks', needs: ['codex'], noCombwork: "asks codex app-server's hooks/list itself, in a throwaway CODEX_HOME (#1285)" },
   { name: 'codexqueued' },
+  { name: 'combworkfolder' },
+  { name: 'combworktools' },
+  { name: 'combworkvcs' },
   { name: 'commitburst' },
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'connectionapi' },
@@ -155,9 +158,6 @@ export const SUITES = [
   { name: 'handovernotice' },
   { name: 'harnessleftovers' },
   { name: 'hiddenredraw' },
-  { name: 'combworkfolder' },
-  { name: 'combworktools' },
-  { name: 'combworkvcs' },
   { name: 'hookscopilot', needs: ['copilot'] },
   { name: 'hookshealth' },
   { name: 'hookstranscript' },

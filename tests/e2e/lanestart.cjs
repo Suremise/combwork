@@ -43,7 +43,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -303,8 +303,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // d2 put back (its slot released): Combwork starts f1 on B1 with nobody asking.
     await inv('tasks:move', d2, 'todo', { confirm: true, reason: 'the e2e puts it back' })
     // Its start refused for the slot is tried again within laneStarts.ts's RETRY_MS (30 s, by its tick), so up to two of them.
-    const byHiveF1 = await until(async () => (await facts(f1)).find((f) => f.kind === 'Started' && f.actor === 'combwork') ?? null, 2 * 30000 + HUNG_MS)
-    check("…its first card is started on B1 by Combwork once the slot is free, and B1 is given it (HI-2029)", !!byHiveF1 && (await card(f1))?.agent === b1.id && !!(await until(async () => (await facts(f1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify({ byHiveF1, f1: await card(f1) }))
+    const byCombworkF1 = await until(async () => (await facts(f1)).find((f) => f.kind === 'Started' && f.actor === 'combwork') ?? null, 2 * 30000 + HUNG_MS)
+    check("…its first card is started on B1 by Combwork once the slot is free, and B1 is given it (HI-2029)", !!byCombworkF1 && (await card(f1))?.agent === b1.id && !!(await until(async () => (await facts(f1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify({ byCombworkF1, f1: await card(f1) }))
 
     // --- HI-2034: B1 owed its new conversation past its wait (as a start over a busy B1 leaves it, 11 minutes on): no
     // more tried, the lane's row says so with Retry New Conversation; Retry gives B1 its new conversation once free.

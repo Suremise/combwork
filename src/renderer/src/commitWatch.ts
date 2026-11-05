@@ -8,7 +8,7 @@ interface Watched {
   combwork?: { commitWatch?: boolean }
   __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown
   /** The largest burst and the longest chain so far, for suites (commitburst) and lib.cjs. */
-  __hiveCommitBurst?: () => { max: number; chain: number }
+  __cwCommitBurst?: () => { max: number; chain: number }
 }
 
 /** The DOM events that start work from outside: the user's input, focus, scrolling, sizes, loads, animations ending. */
@@ -53,7 +53,7 @@ if (w.combwork?.commitWatch && w.__REACT_DEVTOOLS_GLOBAL_HOOK__ === undefined) {
     onScheduleFiberRoot: noop,
     checkDCE: noop
   }
-  w.__hiveCommitBurst = () => ({ max: bursts.max, chain: chains.max })
+  w.__cwCommitBurst = () => ({ max: bursts.max, chain: chains.max })
 }
 
 /** Timers' and frames' callbacks start work from outside too: each marks it first (a string to evaluate stays as it is). */

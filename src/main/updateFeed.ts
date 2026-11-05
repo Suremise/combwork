@@ -52,7 +52,7 @@ export function withFirst(feed: string, tag: string): string {
 
 const isPrerelease = (v: string): boolean => /^v?\d+\.\d+\.\d+-/.test(v)
 
-export class HiveGitHubProvider extends GitHubProvider {
+export class CombworkGitHubProvider extends GitHubProvider {
   private readonly real: AppUpdater
   private readonly view: { on: boolean; version: string }
   /** While a pick is made: the feed already fetched, served again to electron-updater's code. */

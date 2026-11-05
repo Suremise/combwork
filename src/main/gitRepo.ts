@@ -55,7 +55,7 @@ import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
 import { linesOf, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
-import { errorText, HiveError } from './combworkError'
+import { errorText, CombworkError } from './combworkError'
 import { changingFolder } from './folderFence'
 import { createLogger, userText } from './logger'
 import { mergeSlots } from './mergeSlotHost'
@@ -86,7 +86,7 @@ const net = (cwd: string, args: string[]): Promise<GitResult> => git(cwd, args, 
 
 /**
  * The Git view's words (#850): what an action did, why it was refused or failed. Only the window reads them, so what an
- * action did is said in its language at once (`tr`), and a refusal is a HiveError (English to the log, the window's
+ * action did is said in its language at once (`tr`), and a refusal is a CombworkError (English to the log, the window's
  * language through IPC). Git's own words stay as git said them.
  */
 const M = {
@@ -112,7 +112,7 @@ const M = {
 }
 
 /** A refusal or failure from a message and its values. */
-const refusal = (m: Msg, values?: TextValues): HiveError => new HiveError(values ? withValues(m, values) : m)
+const refusal = (m: Msg, values?: TextValues): CombworkError => new CombworkError(values ? withValues(m, values) : m)
 
 /**
  * Git's own words for a failure, a few lines of them (a switch lists the files in the way), without its hints, and with
@@ -604,11 +604,11 @@ async function scrubbed(projectPath: string, e: unknown, urls: string[]): Promis
   const r = await git(projectPath, ['config', '--get-regexp', String.raw`^remote\..*\.(push)?url$`])
   const configured = r.ok ? r.out.split(/\r?\n/).filter(Boolean).map((l) => l.slice(l.indexOf(' ') + 1)) : []
   const secrets = [...new Set([...configured, ...urls].flatMap(urlSecrets))].sort((a, b) => b.length - a.length)
-  // A HiveError's text is cleaned part by part (git's words are values), so the window's language never brings one back.
-  if (e instanceof HiveError) {
+  // A CombworkError's text is cleaned part by part (git's words are values), so the window's language never brings one back.
+  if (e instanceof CombworkError) {
     const text = scrubText(e.text, secrets) as Text
     // agent-protocol: the same error's text with its secrets cleaned out: its messages are found where it was thrown
-    return JSON.stringify(text) === JSON.stringify(e.text) ? e : new HiveError(text, e.kind ? { kind: e.kind } : undefined)
+    return JSON.stringify(text) === JSON.stringify(e.text) ? e : new CombworkError(text, e.kind ? { kind: e.kind } : undefined)
   }
   const message = scrubSecrets(e.message, secrets)
   return message === e.message ? e : new Error(message)
@@ -665,7 +665,7 @@ function folderSlots(projectPath: string): FolderSlot[] {
  */
 async function changeFolder<T>(projectPath: string, action: GitFolderAction, branch: string | null, fn: () => Promise<T>): Promise<T> {
   const why = folderBusyData(await folderAgents(projectPath), folderSlots(projectPath), action)
-  if (why) throw new HiveError(why)
+  if (why) throw new CombworkError(why)
   const locked = (): Promise<T> =>
     withRepoLock(projectPath, () =>
       // The folder is fenced from here to git's end (#646): no line of Hive's is typed into its agents and none starts
@@ -675,7 +675,7 @@ async function changeFolder<T>(projectPath: string, action: GitFolderAction, bra
         // The slot is this action's own now (asUser refuses when anyone else holds or waits for it); without a branch to
         // hold it for (a detached HEAD), the slots are checked again too.
         const now = folderBusyData(await folderAgents(projectPath), branch ? [] : folderSlots(projectPath), action)
-        if (now) throw new HiveError(now)
+        if (now) throw new CombworkError(now)
         return fn()
       }), { project: projectPath }
     )
@@ -692,10 +692,10 @@ async function summaryOf(projectPath: string): Promise<GitRepoSummary> {
   const s = await repoSummary(projectPath)
   // Git's problem as data; else (it changed meanwhile) the summary's English as it is.
   // agent-text: gitProblemData
-  if (s.gitProblem) throw new HiveError(gitProblemData(gitTool()) ?? linesOf([s.gitProblem]))
+  if (s.gitProblem) throw new CombworkError(gitProblemData(gitTool()) ?? linesOf([s.gitProblem]))
   if (!s.isRepo) throw refusal(msg({ id: 'service.gitRepo.notRepo', defaultMessage: "{folder} isn't a git repository.", description: 'An error in the Git view: the project folder {folder} is not in a git repository.' }), { folder: projectPath })
   const parent = parentRepoData(s)
-  if (parent) throw new HiveError(parent)
+  if (parent) throw new CombworkError(parent)
   return s
 }
 
@@ -751,7 +751,7 @@ export async function addRemote(projectPath: string, name: string, url: string):
   name = name.trim()
   url = url.trim()
   const problem = remoteNameProblemData(name) ?? remoteUrlProblemData(url)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     await summaryOf(projectPath)
     const r = await git(projectPath, ['remote', 'add', '--', name, url])
@@ -766,7 +766,7 @@ export async function setRemoteUrl(projectPath: string, name: string, url: strin
   projectPath = workspace.assertProject(projectPath)
   url = url.trim()
   const problem = remoteUrlProblemData(url)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     await summaryOf(projectPath)
     const r = await git(projectPath, ['remote', 'set-url', '--', name, url])
@@ -803,7 +803,7 @@ export async function pull(projectPath: string): Promise<string> {
     if (s.state) throw refusal(msg({ id: 'service.gitRepo.midOperation', defaultMessage: 'Git is in the middle of a {state}: finish or abort it first.', description: "An error pulling in the Git view: a git operation is under way in the project folder; {state} is git's word for it (merge, rebase, cherry-pick, revert or bisect: keep it as it is)." }), { state: s.state })
     // Refused before the fetch too, so a pull that can't go ahead doesn't wait on the network first.
     const why = folderBusyData(await folderAgents(projectPath), folderSlots(projectPath), 'pull')
-    if (why) throw new HiveError(why)
+    if (why) throw new CombworkError(why)
     if (s.upstream.remote) {
       const f = await net(projectPath, ['fetch', '--', s.upstream.remote])
       if (!f.ok) throw failed(M.fetchFailed, {}, f)
@@ -822,7 +822,7 @@ export async function pull(projectPath: string): Promise<string> {
 }
 
 /** A push's refusal, naming the branch: Hive never forces, so the user pulls or merges first. */
-const rejected = (to: string, branch: string): HiveError => refusal(msg({ id: 'service.gitRepo.rejected', defaultMessage: "{to} has commits {branch} hasn't, so the push was refused (Combwork never forces a push). Pull first, or merge them in a terminal.", description: "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused." }), { to, branch })
+const rejected = (to: string, branch: string): CombworkError => refusal(msg({ id: 'service.gitRepo.rejected', defaultMessage: "{to} has commits {branch} hasn't, so the push was refused (Combwork never forces a push). Pull first, or merge them in a terminal.", description: "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused." }), { to, branch })
 
 /** Pushes the branch to its upstream, or to `remote` (setting it as the upstream) when it has none. Never forced. */
 export async function push(projectPath: string, remote?: string): Promise<string> {
@@ -893,7 +893,7 @@ export async function pushToRemote(projectPath: string, remote: string, scope: P
     void checkProject(projectPath)
     const refused = refs.filter((x) => x.result === 'refused')
     const lines = [withValues(refused.length ? M.pushAllRefused : M.pushedAll, { remote, n: refused.length }), ...pushOutcomes(refs)]
-    if (refused.length) throw new HiveError(linesOf(lines))
+    if (refused.length) throw new CombworkError(linesOf(lines))
     return shownText(linesOf(lines))
   })
 }
@@ -959,7 +959,7 @@ export async function renameRemote(projectPath: string, from: string, to: string
   projectPath = workspace.assertProject(projectPath)
   to = to.trim()
   const problem = remoteNameProblemData(to)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     const s = await summaryOf(projectPath)
     if (!s.remotes.includes(from)) throw refusal(M.noRemote, { remote: from })
@@ -1046,7 +1046,7 @@ export async function setIdentity(projectPath: string, name: string, email: stri
   name = name.trim()
   email = email.trim()
   const problem = identityProblemData(name, email)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     await summaryOf(projectPath)
     for (const [key, value] of [['user.name', name], ['user.email', email]] as const) {
@@ -1099,7 +1099,7 @@ const branchNameOk = async (projectPath: string, name: string): Promise<boolean>
  */
 export async function deleteBranches(projectPath: string, items: BranchAt[], unmerged = false): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
-  if (!Array.isArray(items) || !items.length || (unmerged && items.length !== 1)) throw new HiveError({ lines: ['git:deleteBranches takes branches, and one when unmerged'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!Array.isArray(items) || !items.length || (unmerged && items.length !== 1)) throw new CombworkError({ lines: ['git:deleteBranches takes branches, and one when unmerged'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return oneAtATime(projectPath, () =>
     guarded(projectPath, async () => {
         await summaryOf(projectPath)
@@ -1155,7 +1155,7 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
           deleted.push(branch)
         }
         if (deleted.length) log.info(`Deleted ${deleted.length} branch(es) of ${userText(projectPath)}: ${userText(deleted.join(', '))}${unmerged ? ' (unmerged, confirmed)' : ''}`)
-        if (!deleted.length) throw new HiveError(linesOf(notes))
+        if (!deleted.length) throw new CombworkError(linesOf(notes))
         void checkProject(projectPath)
         return shownText(linesOf([withValues(B.deleted, { n: deleted.length, branches: listOf(deleted, 'unit') }), ...notes]))
     })
@@ -1171,7 +1171,7 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
  */
 export async function deleteRemoteBranches(projectPath: string, remote: string, items: BranchAt[]): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
-  if (!Array.isArray(items) || !items.length) throw new HiveError({ lines: ['git:deleteRemoteBranches takes branches'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!Array.isArray(items) || !items.length) throw new CombworkError({ lines: ['git:deleteRemoteBranches takes branches'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return oneAtATime(projectPath, async () => {
     return guarded(projectPath, async () => {
         const s = await summaryOf(projectPath)
@@ -1217,7 +1217,7 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
           }
           ready.push({ name: full, branch, sha })
         }
-        if (!ready.length) throw new HiveError(linesOf(said))
+        if (!ready.length) throw new CombworkError(linesOf(said))
         // The push under the lock too (round 3): no slot, worktree or target change lands between the checks and it.
         const r = await net(projectPath, ['push', '--porcelain', ...ready.map((g) => `--force-with-lease=refs/heads/${g.branch}:${g.sha}`), '--', remote, ...ready.map((g) => `:refs/heads/${g.branch}`)])
         const got = parsePushPorcelain(r.out)
@@ -1227,7 +1227,7 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
         if (done.length) log.info(`Deleted ${done.length} branch(es) on ${userText(remote)} of ${userText(projectPath)}: ${userText(done.map((g) => g.branch).join(', '))}`)
         void checkProject(projectPath)
         const lines = [...(done.length ? [withValues(B.remoteDeleted, { n: done.length, remote, branches: listOf(done.map((g) => g.branch), 'unit') })] : []), ...(refused.length ? [withValues(B.remoteRefused, { remote, branches: listOf(refused.map((g) => g.branch), 'unit') })] : []), ...said]
-        if (!done.length) throw new HiveError(linesOf(lines))
+        if (!done.length) throw new CombworkError(linesOf(lines))
         return shownText(linesOf(lines))
     })
   })
@@ -1401,7 +1401,7 @@ async function updateLocked(projectPath: string, branch: string, how: BranchUpda
     // Checked again under the locks: nothing changes between this and git starting.
     const plan = await branchUpdatePlan(projectPath, branch)
     // agent-text: branchUpdatePlan
-    if (plan.blocked) throw new HiveError(linesOf([plan.blocked]))
+    if (plan.blocked) throw new CombworkError(linesOf([plan.blocked]))
     if (plan.behind === 0) return tr(UPDATE.upToDate, { branch, target: plan.target })
     // The target branch's commit, read now (HR4's round 1, finding 2): git is given it, never the name, which a tag of the
     // same name would take.
@@ -1462,13 +1462,13 @@ async function updateLocked(projectPath: string, branch: string, how: BranchUpda
         const { error, undone } = await undo(tmp, was, r, true)
         // Not undone: kept as git left it, as the error says. Undone: removed, and said if it couldn't be.
         const left = undone ? await removed() : null
-        throw left ? new HiveError(linesOf([errorText(error), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : error
+        throw left ? new CombworkError(linesOf([errorText(error), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : error
       }
       head = (await git(tmp, ['rev-parse', 'HEAD'])).out.trim()
       // Moved only from the commit it was updated from: a branch that moved meanwhile is left as it is.
       const moved = (await git(projectPath, ['update-ref', `refs/heads/${branch}`, head, was])).ok
       note = await removed()
-      if (!moved) throw note ? new HiveError(linesOf([withValues(UPDATE.moved, { branch }), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : refusal(UPDATE.moved, { branch })
+      if (!moved) throw note ? new CombworkError(linesOf([withValues(UPDATE.moved, { branch }), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : refusal(UPDATE.moved, { branch })
     }
     // What it was asked to do, done: the target's commit is in the branch now.
     if (!(await git(projectPath, ['merge-base', '--is-ancestor', target, head])).ok) throw refusal(UPDATE.missed, { branch, target: plan.target })

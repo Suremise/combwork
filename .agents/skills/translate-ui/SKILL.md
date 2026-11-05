@@ -17,7 +17,7 @@ the shared note `plans/2026-10-14-i18n-design.md`.
 - A message whose English changes keeps its id unless its meaning changes: its translations are then marked outdated
   and redone (below).
 - **Numbers in plain placeholders**: `npm run i18n:numbers` (`-- --changed`: the branch's files) lists each place
-  passing a number to a plain `{x}` (via `tr`, `tRich`, `hiveError` and helpers taking a message), typing plain
+  passing a number to a plain `{x}` (via `tr`, `tRich`, `combworkError` and helpers taking a message), typing plain
   placeholders `string` in a copy of `src`. Apart, it lists values that may be numbers, calls of a message unknown where
   made (a `Msg` variable: check the messages it can be), and placeholders used both plain and as a plural. A review aid,
   not a check: ids, ports, exit codes and small counts stay plain; a count, size or amount that can reach 1,000 needs

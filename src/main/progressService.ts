@@ -10,7 +10,7 @@ import { hashText, readJson, removePath, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { ProgressStore } from './progress'
 import { sessions } from './sessions'
-import { hiveWindows, windowShowing } from './windows'
+import { combworkWindows, windowShowing } from './windows'
 import { WorkspaceService } from './workspace'
 
 const log = createLogger('progress')
@@ -113,6 +113,6 @@ export function startProgress(): void {
     generation++
     if (!s.general.progressPanel) progress.clear()
     // The taskbar follows at once either way.
-    for (const e of hiveWindows()) if (e.ws.path) showTaskbar(e.ws.path, progress.list(e.ws.path))
+    for (const e of combworkWindows()) if (e.ws.path) showTaskbar(e.ws.path, progress.list(e.ws.path))
   })
 }

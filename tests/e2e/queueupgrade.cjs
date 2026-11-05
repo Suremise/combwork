@@ -94,7 +94,7 @@ const log = () => {
   fs.mkdirSync(path.join(fx.alpha, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(fx.alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // Opened as the user opens it: the ask shows, nothing is pre-answered (no CW_TEST_BOARD_UPGRADE), options kept for after.
-  let h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const ask = h.page.locator('.dialog', { hasText: ASK })
@@ -192,7 +192,7 @@ const log = () => {
       await startAgain(crash ? { CW_TEST_MERGE_CHOICE_CRASH: crash } : {})
     }
     const startAgain = async (env = {}) => {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env })
       reviewer = await q.rejoin(fx, h, reviewer)
       builder = await q.rejoin(fx, h, builder)
     }

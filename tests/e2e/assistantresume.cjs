@@ -57,7 +57,7 @@ const mode = ({ name, word: w }) =>
   fs.mkdirSync(path.join(ws, '.combwork', 'modes'), { recursive: true })
   for (const [id, m] of Object.entries(modes)) fs.writeFileSync(path.join(ws, '.combwork', 'modes', `codeword-${id}.md`), mode(m))
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47926), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47926), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -101,7 +101,7 @@ const mode = ({ name, word: w }) =>
     const before = (await items(id)).length
     const prompt = 'What is your codeword? Reply with the codeword only.'
     let question
-    const sent = await lib.sendPrompt(inv, key, prompt, { ready: () => lib.hiveToolsConnected(userData, 'assistant', launchMark), submitted: async () => {
+    const sent = await lib.sendPrompt(inv, key, prompt, { ready: () => lib.combworkToolsConnected(userData, 'assistant', launchMark), submitted: async () => {
       question = (await items(id)).find((i) => i.id >= before && i.kind === 'user' && i.text.trim() === prompt)
       return !!question
     } })
@@ -138,7 +138,7 @@ const mode = ({ name, word: w }) =>
   await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, 5000)
   // Combwork's log as each launch starts: ask() types its question once that launch's hive tools connected, as Combwork types
   // nothing before (#1148: a question typed into a just-started Claude Code wasn't taken).
-  let launchMark = lib.hiveLogLines(userData).length
+  let launchMark = lib.combworkLogLines(userData).length
   await inv('session:start', home, { agentId: 'assistant' })
   let session = ''
   await lib.cliStep('the Assistant starts in Alpha and gives its codeword', { session: key }, async () => {
@@ -158,7 +158,7 @@ const mode = ({ name, word: w }) =>
     const dialog = page.locator('.dialog', { hasText: `Restart in ${modes.bravo.name} mode?` })
     check('Restart in This Mode… asks first', !!(await lib.until(async () => (await dialog.count()) === 1, 5000)))
     const before = (await live())?.runId
-    launchMark = lib.hiveLogLines(userData).length
+    launchMark = lib.combworkLogLines(userData).length
     await dialog.getByRole('button', { name: 'Restart', exact: true }).click()
     check('…and resumes the same conversation', !!(await lib.until(async () => { const l = await live(); return !!l && l.runId !== before && l.sessionId === session && ['ready', 'finished'].includes(l.status) }, 90000, 500)), (await live())?.sessionId)
     const reply = await ask(session)
@@ -171,7 +171,7 @@ const mode = ({ name, word: w }) =>
   // --- Switched while it is stopped, then resumed: told the mode once, and on Charlie's instructions.
   await menu(modes.charlie.name)
   check('switching while it is stopped saves the mode', !!(await lib.until(async () => JSON.parse(fs.readFileSync(path.join(home, '.combwork', 'project.json'), 'utf8')).agents?.[0]?.mode === 'codeword-charlie', 5000)))
-  launchMark = lib.hiveLogLines(userData).length
+  launchMark = lib.combworkLogLines(userData).length
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await lib.cliStep('resumed after a switch while stopped', { session: key }, async () => {
     check('Claude Code resumes the conversation', !!(await idle()) && (await live())?.sessionId === session, (await live())?.sessionId)

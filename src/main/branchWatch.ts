@@ -1,8 +1,8 @@
 import { basename } from 'path'
-import type { AgentBranchStatus, HiveEvent, ProjectInfo } from '../shared/types'
+import type { AgentBranchStatus, CombworkEvent, ProjectInfo } from '../shared/types'
 import { leasedLine, legacyWorktree, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
-import { emit, onHiveEvent } from './events'
+import { emit, onCombworkEvent } from './events'
 import { createLogger, userText } from './logger'
 import { openWorkspaces, workspaceFor } from './workspace'
 import * as wt from './worktrees'
@@ -184,7 +184,7 @@ export function knownStatus(projectPath: string, agentId: string): AgentBranchSt
   return known.get(keyOf(projectPath, agentId))?.status ?? null
 }
 
-function onEvent(e: HiveEvent): void {
+function onEvent(e: CombworkEvent): void {
   switch (e.type) {
     case 'session-status': {
       const { projectPath, agentId, status } = e.state
@@ -215,7 +215,7 @@ let started = false
 export function startBranchWatch(): void {
   if (started) return
   started = true
-  onHiveEvent(onEvent)
+  onCombworkEvent(onEvent)
   setInterval(() => {
     for (const { projectPath, agentId, status } of known.values()) if (status && (status.ahead > 0 || status.dirty > 0)) void check(projectPath, agentId)
   }, 60_000).unref()

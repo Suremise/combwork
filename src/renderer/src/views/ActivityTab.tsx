@@ -32,7 +32,7 @@ export const NO_NOW: ActivityNow = { launches: [], tasks: [] }
  * (#1254, a live update under one frame) reads them from a test copy's window.
  */
 const renders: number[] = []
-;(window as unknown as { __hiveActivityRenders?: number[] }).__hiveActivityRenders = renders
+;(window as unknown as { __cwActivityRenders?: number[] }).__cwActivityRenders = renders
 
 /** What the tab is drawn from: held as it was while the tab is frozen (HI-1743). */
 interface Reads {

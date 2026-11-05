@@ -2,8 +2,8 @@
 // several workspaces), from their refreshes, and lets a workspace's go as it closes. The minute and window focus read
 // the refs again, for what a watch missed.
 
-import type { HiveEvent } from '../../shared/types'
-import { onHiveEvent } from '../events'
+import type { CombworkEvent } from '../../shared/types'
+import { onCombworkEvent } from '../events'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { observer, type ObservedProject } from './observe'
 
@@ -23,7 +23,7 @@ function projects(closing?: string): ObservedProject[] {
 let lastFocus = 0
 let stop: (() => void) | null = null
 
-function onEvent(e: HiveEvent): void {
+function onEvent(e: CombworkEvent): void {
   if (e.type === 'workspace-changed') observer.follow(projects())
   else if (e.type === 'window-state' && e.focused && Date.now() - lastFocus > FOCUS_RESCAN_MS) {
     lastFocus = Date.now()
@@ -34,7 +34,7 @@ function onEvent(e: HiveEvent): void {
 /** Starts following the open workspaces' projects. */
 export function startObserving(): void {
   if (stop) return
-  const off = onHiveEvent(onEvent)
+  const off = onCombworkEvent(onEvent)
   const closing = (path: string): void => observer.follow(projects(path))
   WorkspaceService.closingListeners.add(closing)
   const timer = setInterval(() => observer.rescan(), RESCAN_MS)

@@ -73,7 +73,7 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47830), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, COPILOT_HOME: copilotHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47830), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, COPILOT_HOME: copilotHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

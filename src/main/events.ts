@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
-import type { HiveEvent, ToastAction, ToastLevel, ToastMessage, ToastTarget } from '../shared/types'
+import type { CombworkEvent, ToastAction, ToastLevel, ToastMessage, ToastTarget } from '../shared/types'
 
 /**
  * Where events and terminal output go. With several windows, each shows one workspace: an event about a
@@ -9,13 +9,13 @@ import type { HiveEvent, ToastAction, ToastLevel, ToastMessage, ToastTarget } fr
  */
 export interface EventRouter {
   /** The windows an event is for. */
-  forEvent: (event: HiveEvent) => BrowserWindow[]
+  forEvent: (event: CombworkEvent) => BrowserWindow[]
   /** The windows a terminal's output is for (by its key, e.g. session:<project path>#<agent>). */
   forPty: (key: string) => BrowserWindow[]
 }
 
 let router: EventRouter = { forEvent: () => [], forPty: () => [] }
-const listeners = new Set<(e: HiveEvent) => void>()
+const listeners = new Set<(e: CombworkEvent) => void>()
 
 export function setEventRouter(r: EventRouter): void {
   router = r
@@ -26,23 +26,23 @@ function send(wins: BrowserWindow[], channel: string, ...args: unknown[]): void 
 }
 
 /** Sends an event to the window(s) it is for and to in-process listeners (e.g. the Agent API event stream). */
-export function emit(event: HiveEvent): void {
+export function emit(event: CombworkEvent): void {
   send(router.forEvent(event), 'hive:event', event)
   for (const l of listeners) l(event)
 }
 
 /** Sends an event to one window (e.g. its own maximized state, or its workspace's changes). */
-export function emitTo(win: BrowserWindow, event: HiveEvent): void {
+export function emitTo(win: BrowserWindow, event: CombworkEvent): void {
   send([win], 'hive:event', event)
   for (const l of listeners) l(event)
 }
 
 /** Tells in-process listeners only (the Agent API's event stream), no window: a notice shown as a Windows notification. */
-export function tellListeners(event: HiveEvent): void {
+export function tellListeners(event: CombworkEvent): void {
   for (const l of listeners) l(event)
 }
 
-export function onHiveEvent(listener: (e: HiveEvent) => void): () => void {
+export function onCombworkEvent(listener: (e: CombworkEvent) => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
 }

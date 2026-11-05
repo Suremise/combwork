@@ -42,7 +42,7 @@ const read = (rel) => fs.readFileSync(path.join(proj, rel), 'utf8')
 const HUNG_MS = 10000
 
 ;(async () => {
-  const env = lib.hiveEnv({ CW_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))

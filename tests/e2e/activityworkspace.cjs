@@ -4,7 +4,7 @@
 // Whole workspace, and each project's row opening that project's own tab, whose filters stay its own. Opened from a card
 // (its agents now: a project card's builder; a workspace card's agents in both projects, found again when one stops),
 // from a Progress panel run's details and from a lane's menu (Show in Activity). Frozen when opened; nothing read or
-// drawn while the window is minimised (the view's own counters, __hiveWorkspaceActivity), one call a tick for what runs
+// drawn while the window is minimised (the view's own counters, __cwWorkspaceActivity), one call a tick for what runs
 // now in every project; a status change alone never finds a card's agents again or reads the session lists beyond their
 // cadence. A card whose builder went on to its next card (its session's record keeping this one) has nobody on it. A
 // card's Activity whose agents come back after the window went elsewhere (another view, another workspace) doesn't open
@@ -57,7 +57,7 @@ const AGENTS = [
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_SLOW_IPC: 'activity:cardAgents=2500', ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_SLOW_IPC: 'activity:cardAgents=2500', ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const shots = path.join(lib.WORK, 'activityworkspace-shots')
   fs.rmSync(shots, { recursive: true, force: true })
@@ -134,7 +134,7 @@ const AGENTS = [
     await page.keyboard.press('Escape')
 
     // --- Nothing read or drawn while the window is hidden; one call a tick for every project's processes.
-    const counts = () => page.evaluate(() => ({ ...window.__hiveWorkspaceActivity }))
+    const counts = () => page.evaluate(() => ({ ...window.__cwWorkspaceActivity }))
     const before = await counts()
     await until(async () => (await counts()).now >= before.now + 3, HUNG_MS)
     const shownCounts = await counts()
@@ -170,7 +170,7 @@ const AGENTS = [
     await page.mouse.move(5, 5)
     await shoot('2-for-card-dark')
     // Another view chosen while its agents are found: it doesn't open over it.
-    const settled = () => page.evaluate(() => ({ ...window.__hiveCardActivity }))
+    const settled = () => page.evaluate(() => ({ ...window.__cwCardActivity }))
     const s0 = await settled()
     await page.locator('.activity-btn[aria-label="Task Board"]').click()
     await card.click()

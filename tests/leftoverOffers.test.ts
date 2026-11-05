@@ -49,7 +49,7 @@ vi.mock('../src/main/processSupervisor', () => ({
 }))
 vi.mock('../src/main/events', () => ({
   emit: (e: unknown) => H.listeners.forEach((l) => l(e)),
-  onHiveEvent: (l: (e: unknown) => void) => {
+  onCombworkEvent: (l: (e: unknown) => void) => {
     H.listeners.push(l)
     return () => undefined
   },

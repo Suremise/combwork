@@ -261,7 +261,7 @@ describe('a workspace', () => {
       expect(readdirSync(join(ws, '.combwork', 'modes')).length).toBe(readdirSync(join(RES, 'modes')).length)
 
       // The views: the edited copy is "changed", the deleted one "missing" (Restore), the rest Combwork's.
-      const listed = await wsMod.inWorkspace(w, () => skills.hiveSkills(true))
+      const listed = await wsMod.inWorkspace(w, () => skills.combworkSkills(true))
       const state = Object.fromEntries(listed.map((s) => [s.name, s.bundled]))
       expect(state).toMatchObject({ handover: 'same', 'merge-ready': 'changed', 'pick-up': 'missing', 'work-on-card': 'same' })
 
@@ -274,7 +274,7 @@ describe('a workspace', () => {
 
       // Restore puts one back as Combwork's, and later updates follow it again.
       await wsMod.inWorkspace(w, () => skills.restoreBundledSkill('pick-up'))
-      expect((await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((s) => s.name === 'pick-up')?.bundled).toBe('same')
+      expect((await wsMod.inWorkspace(w, () => skills.combworkSkills(true))).find((s) => s.name === 'pick-up')?.bundled).toBe('same')
     } finally {
       await wsMod.disposeWorkspaceService(w)
     }
@@ -399,7 +399,7 @@ describe('a workspace', () => {
       m.skills.handover.from = oldHash
       writeFileSync(join(ws, '.combwork', 'bundled.json'), JSON.stringify(m))
       await wsMod.inWorkspace(w, () => mod.syncBundled())
-      const h = (await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((s) => s.name === 'handover')!
+      const h = (await wsMod.inWorkspace(w, () => skills.combworkSkills(true))).find((s) => s.name === 'handover')!
       expect(h.bundled).toBe('changed')
       expect(h.updateAvailable).toBe(true)
       expect(readFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), 'utf8')).toContain('My addition.')
@@ -421,7 +421,7 @@ describe('a workspace', () => {
       await wsMod.inWorkspace(w, () => mod.syncBundled())
       expect(readFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), 'utf8')).toBe(OLD_HANDOVER)
       expect(readFileSync(join(skillsDir(ws), 'handover', 'references', 'custom.md'), 'utf8')).toBe('My own reference.')
-      expect((await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((x) => x.name === 'handover')?.bundled).toBe('changed')
+      expect((await wsMod.inWorkspace(w, () => skills.combworkSkills(true))).find((x) => x.name === 'handover')?.bundled).toBe('changed')
     } finally {
       await wsMod.disposeWorkspaceService(w)
     }
@@ -442,7 +442,7 @@ describe('a workspace', () => {
       writeFileSync(join(ws, '.combwork', 'bundled.json'), JSON.stringify(m))
       await wsMod.inWorkspace(w, () => mod.syncBundled())
       expect(readFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), 'utf8')).toBe('A newer handover.\n')
-      const h = (await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((x) => x.name === 'handover')!
+      const h = (await wsMod.inWorkspace(w, () => skills.combworkSkills(true))).find((x) => x.name === 'handover')!
       expect([h.bundled, h.updateAvailable]).toEqual(['changed', undefined])
       const status = await wsMod.inWorkspace(w, () => mod.bundledStatus('modes', 'planner', join(ws, '.combwork', 'modes', 'planner.md')))
       expect(status).toEqual({ bundled: 'changed' })
@@ -461,7 +461,7 @@ describe('a workspace', () => {
     writeFileSync(join(skillsDir(ws), 'my-own', 'SKILL.md'), '---\nname: my-own\ndescription: A user skill.\n---\n')
     const w = await opened(ws)
     try {
-      const names = async (role: 'agent' | 'assistant') => (await wsMod.inWorkspace(w, () => skills.hiveSkills(false, role))).map((s) => s.name)
+      const names = async (role: 'agent' | 'assistant') => (await wsMod.inWorkspace(w, () => skills.combworkSkills(false, role))).map((s) => s.name)
       const forAgents = await names('agent')
       const forAssistant = await names('assistant')
       expect(forAgents).toEqual(expect.arrayContaining(['my-own', 'work-on-card', 'review-agent-work', 'merge-ready', 'handover', 'split-work']))

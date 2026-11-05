@@ -29,7 +29,7 @@ const beta = path.join(fx.ws, 'beta')
 ;(async () => {
   q.prepare(fx)
   lib.gitProject(beta)
-  let h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     const { inv } = h
     let page = h.page
@@ -271,7 +271,7 @@ const beta = path.join(fx.ws, 'beta')
     // Resume until the record is gone (nothing left to offer) and no offer shows.
     const restartRecord = path.join(fx.userData, 'restart.json')
     const offered = fs.existsSync(restartRecord)
-    h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { CW_LANG: 'ja' } })
+    h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env: { CW_LANG: 'ja' } })
     page = h.page
     page.on('pageerror', (e) => check('no page errors (ja)', false, e.message))
     await lib.fitWindow(h.app, page, { width: 1500, height: 950 })

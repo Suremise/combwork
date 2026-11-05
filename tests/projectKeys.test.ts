@@ -380,13 +380,13 @@ describe("another project's card, for an agent confined to its own (round 1, fin
     const w = await open(ws)
     await keys.keyProjects(w)
     const [h, a] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'H', project: 'hive' }, user), await tasks.createTask({ title: 'A', project: 'ambrosia' }, user)])
-    const asHive = (ref: string): number | null => keys.cardOfRef(w, ref, 'hive')
-    expect([asHive('HI-1'), asHive('AM-1'), asHive('AM-99')]).toEqual([h.number, null, null])
+    const asCombwork = (ref: string): number | null => keys.cardOfRef(w, ref, 'hive')
+    expect([asCombwork('HI-1'), asCombwork('AM-1'), asCombwork('AM-99')]).toEqual([h.number, null, null])
     await keys.changeProjectKey(w, join(ws, 'ambrosia'), 'AMB')
-    expect([asHive('AM-1'), asHive('AMB-1')]).toEqual([null, null])
+    expect([asCombwork('AM-1'), asCombwork('AMB-1')]).toEqual([null, null])
     // Moved to hive: now its; its old keys find it for hive's agents, as they do for the Assistant.
     await inWorkspace(w, () => tasks.updateTask(a.number, { project: 'hive' }, user))
-    expect([asHive('AMB-1'), asHive('HI-2'), keys.cardOfRef(w, 'AMB-1')]).toEqual([a.number, a.number, a.number])
+    expect([asCombwork('AMB-1'), asCombwork('HI-2'), keys.cardOfRef(w, 'AMB-1')]).toEqual([a.number, a.number, a.number])
     // Names: by key only within the scope.
     expect(keys.cardNamesOf(w, 'ambrosia')(h.number)).toBe(`#${h.number}`)
     expect(keys.cardNamesOf(w, 'hive')(h.number)).toBe('HI-1')

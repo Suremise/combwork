@@ -36,7 +36,7 @@ const saved = () => deliveriesOf(alpha)
 
 /** Starts Combwork on the suite's profile and workspace; its helpers. */
 async function start() {
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_DELIVERY_OVERDUE_MS: String(OVERDUE_MS) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_DELIVERY_OVERDUE_MS: String(OVERDUE_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

@@ -86,8 +86,8 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       const sid = (await live(alpha, b1.id))?.sessionId
       return lines(path.join(claudeHome, 'fake-launches.jsonl')).findLast((l) => l.sessionId === sid && l.opts['--mcp-config'])
     }, HUNG_MS)
-    const hiveEnv = JSON.parse(fs.readFileSync(b1Launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
-    const tb1 = JSON.parse(fs.readFileSync(hiveEnv.CW_API_TOKEN_FILE, 'utf8')).token
+    const combworkEnv = JSON.parse(fs.readFileSync(b1Launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const tb1 = JSON.parse(fs.readFileSync(combworkEnv.CW_API_TOKEN_FILE, 'utf8')).token
     const call = async (method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${tb1}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }

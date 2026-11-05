@@ -44,7 +44,7 @@ const slash = (p) => p.replace(/\\/g, '/')
   // the queue can use.
   const noGlobal = path.join(fx.tools, 'empty.gitconfig')
   fs.writeFileSync(noGlobal, '')
-  const h = await q.startHive(fx, { port: PORT, env: { GIT_CONFIG_GLOBAL: noGlobal, GIT_CONFIG_NOSYSTEM: '1' }, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, env: { GIT_CONFIG_GLOBAL: noGlobal, GIT_CONFIG_NOSYSTEM: '1' }, keepOptions: true })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

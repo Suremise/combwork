@@ -28,7 +28,7 @@ import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
 import { builderCountOf, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
@@ -433,7 +433,7 @@ function stopWhenIdle(projectPath: string, lease: SlotLease, slot: Slot, w: Slot
     log.info(`Stopping ${userText(w.agent)}'s ${r.starting ? 'start' : 'session'} in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)
     sessions.stop(projectPath, w.agent)
   }
-  off = onHiveEvent((e) => {
+  off = onCombworkEvent((e) => {
     if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
   })
   look()
@@ -693,7 +693,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
     retire: async (why) => void (await cancelFromSource(projectPath, LANE_END_SOURCE, lease.id, why)),
     quit: (why, force) => sessions.quit(projectPath, w.agent, w.run, { fenced, why, force, ready: () => laneEndHeldNow(projectPath, w.agent, w.run), cause: 'lane' }),
     watch: (look) => {
-      const offEvents = onHiveEvent((e) => {
+      const offEvents = onCombworkEvent((e) => {
         if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
       })
       const offDeliveries = onDeliveriesChanged((host, agents) => {

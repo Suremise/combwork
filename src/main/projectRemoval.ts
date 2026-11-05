@@ -181,7 +181,7 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
     }
     // Its merge queues go with it (#1360): this Hive's runners released, their worktrees and records removed.
     await forgetProjectQueues({ store: FactStore.forBoard(ws, { project: name, key: name }), project: p, root: join(ws.worktreesRoot, name), locked: (fn) => boardWrite(ws, async () => fn()) }).catch((e) => log.warn(`removing ${userText(name)}'s merge queue folders`, e))
-    const done = how === 'remove' ? await removeFromHive(ws, p, info, agents) : await deleteProject(ws, p, info, agents)
+    const done = how === 'remove' ? await removeFromCombwork(ws, p, info, agents) : await deleteProject(ws, p, info, agents)
     // Its agents' terminals' kept sizes and output go with it (#489); a hidden project keeps them.
     forgetPtys(agentPtyKey(p, ''))
     return done
@@ -194,7 +194,7 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
   }
 }
 
-async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, agents: AgentDef[]): Promise<{ warnings: string[] }> {
+async function removeFromCombwork(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, agents: AgentDef[]): Promise<{ warnings: string[] }> {
   const name = basename(p)
   const held = unmergedWork(info.worktrees)
   if (held) throw new Error(held)

@@ -83,8 +83,8 @@ const EMPTY_WORKSPACE: LoadedDialect = { path: WORKSPACE_FILE, name: 'Workspace'
  * its layer can be edited), then each folder (its CLI file first, then its model files and test copies by name), the
  * API's last. A folder's own CLI file that is missing has no row.
  */
-export async function listDialects(hiveDir: string): Promise<DialectRow[]> {
-  const dir = dialectsDir(hiveDir)
+export async function listDialects(combworkDir: string): Promise<DialectRow[]> {
+  const dir = dialectsDir(combworkDir)
   const set = await loadDialects(dir, agentTextSchema())
   const shipped = await shippedIds()
   const files: LoadedDialect[] = [set.workspace ?? EMPTY_WORKSPACE]
@@ -105,10 +105,10 @@ const layerOf = (layer: DialectLayer['layer'], f: LoadedDialect | null): Dialect
  * beneath it (top first; the Default beneath all) and the models the other files of its folder claim. Null for a path
  * that isn't a dialect file's, or a file that isn't there.
  */
-export async function dialectFileView(hiveDir: string, path: string): Promise<DialectFileView | null> {
+export async function dialectFileView(combworkDir: string, path: string): Promise<DialectFileView | null> {
   const place = placeOf(path)
   if (!place) return null
-  const dir = dialectsDir(hiveDir)
+  const dir = dialectsDir(combworkDir)
   const read = await readFile(join(dir, ...path.split('/')), 'utf8').catch(() => null)
   // The Workspace file not made yet: empty, and its first Save (from the base '') makes it.
   if (read === null && place.kind !== 'workspace') return null
@@ -133,8 +133,8 @@ export async function dialectFileView(hiveDir: string, path: string): Promise<Di
 }
 
 /** The files a folder offers an agent of its CLI (Agent Settings' Dialect): its model files and test copies. */
-export async function dialectChoices(hiveDir: string, cli: string): Promise<{ path: string; name: string; model?: string }[]> {
-  const set = await loadDialects(dialectsDir(hiveDir), agentTextSchema())
+export async function dialectChoices(combworkDir: string, cli: string): Promise<{ path: string; name: string; model?: string }[]> {
+  const set = await loadDialects(dialectsDir(combworkDir), agentTextSchema())
   return (set.folders[cli]?.files ?? []).map((f) => ({ path: f.path, name: f.name, ...(f.model !== undefined && !f.claimTaken ? { model: f.model } : {}) })).sort((a, b) => (a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1))
 }
 
@@ -145,7 +145,7 @@ export async function dialectChoices(hiveDir: string, cli: string): Promise<{ pa
 interface Picked {
   file: string
   window: number
-  hiveDir: string
+  combworkDir: string
   at: number
 }
 
@@ -154,29 +154,29 @@ const TOKEN_MS = 10 * 60_000
 const picked = new Map<string, Picked>()
 
 /** Keeps a file the user picked under an opaque token, for its window and workspace, for a while; the oldest go first. */
-export function rememberPick(file: string, window: number, hiveDir: string, now = Date.now()): string {
+export function rememberPick(file: string, window: number, combworkDir: string, now = Date.now()): string {
   for (const [t, p] of picked) if (now - p.at > TOKEN_MS) picked.delete(t)
   while (picked.size >= TOKEN_LIMIT) picked.delete(picked.keys().next().value!)
   const token = randomUUID()
-  picked.set(token, { file, window, hiveDir: hiveDir.toLowerCase(), at: now })
+  picked.set(token, { file, window, combworkDir: combworkDir.toLowerCase(), at: now })
   return token
 }
 
 /** The file a token holds, for the same window and workspace while it lasts; null otherwise. */
-export function pickOfToken(token: string, window: number, hiveDir: string, now = Date.now()): string | null {
+export function pickOfToken(token: string, window: number, combworkDir: string, now = Date.now()): string | null {
   const p = picked.get(token)
   if (!p) return null
   if (now - p.at > TOKEN_MS) {
     picked.delete(token)
     return null
   }
-  return p.window === window && p.hiveDir === hiveDir.toLowerCase() ? p.file : null
+  return p.window === window && p.combworkDir === combworkDir.toLowerCase() ? p.file : null
 }
 
 /** A token used (a successful import): gone. */
 export const spendPick = (token: string): boolean => picked.delete(token)
 
 /** A window closed, or its workspace closed or switched: its tokens go. */
-export function forgetPicks(match: { window?: number; hiveDir?: string }): void {
-  for (const [t, p] of picked) if ((match.window !== undefined && p.window === match.window) || (match.hiveDir !== undefined && p.hiveDir === match.hiveDir.toLowerCase())) picked.delete(t)
+export function forgetPicks(match: { window?: number; combworkDir?: string }): void {
+  for (const [t, p] of picked) if ((match.window !== undefined && p.window === match.window) || (match.combworkDir !== undefined && p.combworkDir === match.combworkDir.toLowerCase())) picked.delete(t)
 }

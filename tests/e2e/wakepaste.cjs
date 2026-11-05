@@ -42,7 +42,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // A short wait for a wake to be taken (10 s in Combwork): a wake that isn't taken shows soon.
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47833), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_WAKE_TAKE_MS: '3000' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47833), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_WAKE_TAKE_MS: '3000' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -57,16 +57,16 @@ const check = (name, ok, extra = '') => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
   }
-  const hiveLog = () => {
+  const combworkLog = () => {
     const f = path.join(userData, 'logs', 'combwork.log')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
   }
   /** Combwork's log lines about wakes typed into agent `id`. */
-  const wakeLines = (id) => hiveLog().split('\n').filter((l) => l.includes(id) && /\[watches\] (Woke|The wake typed into)/.test(l))
+  const wakeLines = (id) => combworkLog().split('\n').filter((l) => l.includes(id) && /\[watches\] (Woke|The wake typed into)/.test(l))
   /** How many of those wakes Combwork's check has ended for: taken in time, or marked (a mark the CLI's late take clears). */
   const settled = (id) => wakeLines(id).filter((l) => /was taken after \d+ ms|still wasn't taken|wasn't taken, and Enter couldn't/.test(l)).length
   /** Combwork's check of the agent's nth wake has ended, and no mark stays: it counts the line taken. */
-  const hiveSawTaken = async (p, id, n) => !!(await lib.until(async () => settled(id) >= n && !(await live(p, id))?.untakenLine, HUNG_MS))
+  const combworkSawTaken = async (p, id, n) => !!(await lib.until(async () => settled(id) >= n && !(await live(p, id))?.untakenLine, HUNG_MS))
   const say = async (p, id, text) => {
     // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
@@ -102,7 +102,7 @@ const check = (name, ok, extra = '') => {
     name = first?.agent
     check(`${who}: a wake typed while the CLI reads as usual is taken`, !!first && first.text.includes(`Read as usual, for ${who}`), JSON.stringify(first))
     check(`${who}: …at its first Enter`, first?.enter === 1, JSON.stringify(first))
-    check(`${who}: …and Combwork counts it taken`, await hiveSawTaken(p, id, 1), wakeLines(id).join(' | '))
+    check(`${who}: …and Combwork counts it taken`, await combworkSawTaken(p, id, 1), wakeLines(id).join(' | '))
     await lib.until(() => idle(p, id), HUNG_MS)
 
     // Busy for a moment: Combwork types nothing of the wake until a key of its own shows in the input box (HI-1979), so it
@@ -111,12 +111,12 @@ const check = (name, ok, extra = '') => {
     const knob = path.join(claudeHome, `fake-slow-input-${String(name).replace(/[^\w-]/g, '_')}.txt`)
     fs.writeFileSync(knob, '')
     check(`${who}: its CLI stops reading its input`, !!(await lib.until(() => fs.existsSync(knob.replace(/\.txt$/, '.paused')), HUNG_MS)))
-    const putOff = () => hiveLog().split('\n').filter((l) => l.includes("its input wasn't seen empty")).length
+    const putOff = () => combworkLog().split('\n').filter((l) => l.includes("its input wasn't seen empty")).length
     const typed = wakeLines(id).filter((l) => / Woke /.test(l)).length
     const offBefore = putOff()
     const taken = mine().length
     await inv('tasks:comment', card, `Read in one go, for ${who}`)
-    check(`${who}: Combwork puts the wake off meanwhile`, !!(await lib.until(() => putOff() > offBefore, HUNG_MS)), hiveLog().split('\n').slice(-5).join(' | '))
+    check(`${who}: Combwork puts the wake off meanwhile`, !!(await lib.until(() => putOff() > offBefore, HUNG_MS)), combworkLog().split('\n').slice(-5).join(' | '))
     check(`${who}: …typing none of it`, wakeLines(id).filter((l) => / Woke /.test(l)).length === typed, wakeLines(id).join(' | '))
     fs.rmSync(knob, { force: true })
     // Combwork has typed it and pressed Enter (its log says Woke once the Enter is in).
@@ -124,7 +124,7 @@ const check = (name, ok, extra = '') => {
     const got = await lib.until(() => mine().length > taken && mine().at(-1), HUNG_MS)
     check(`${who}: the wake its CLI read in one go is taken`, !!got && got.text.includes(`Read in one go, for ${who}`), JSON.stringify(mine()))
     check(`${who}: …at its first Enter, not lost in a paste`, got?.enter === 1, JSON.stringify(got))
-    check(`${who}: …and Combwork counts it taken: nothing marked as not taken`, await hiveSawTaken(p, id, 2), wakeLines(id).join(' | '))
+    check(`${who}: …and Combwork counts it taken: nothing marked as not taken`, await combworkSawTaken(p, id, 2), wakeLines(id).join(' | '))
     await lib.until(() => idle(p, id), HUNG_MS)
   }
 

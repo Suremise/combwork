@@ -176,7 +176,7 @@ const check = (name, ok, extra = '') => {
     await settingsSection('Version Control')
     check('Settings opens Version Control on the tab last chosen, Workspace defaults', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults', HUNG_MS)), String(await selectedTab()))
     const hive = page.locator('.workflow-level[data-level="global"]')
-    const hiveRow = (option) => hive.locator(`.workflow-option[data-option="${option}"]`)
+    const combworkRow = (option) => hive.locator(`.workflow-option[data-option="${option}"]`)
     // A draft in the workspace's tab (not saved) stays through switching and a save of Combwork's (HR5's HI-1768 check), its
     // tab marked meanwhile, and is discarded after.
     const unsaved = async () => group.locator('[role="tab"]').evaluateAll((els) => els.filter((e) => e.querySelector('[data-unsaved]')).map((e) => e.getAttribute('data-setting-tab')))
@@ -184,9 +184,9 @@ const check = (name, ok, extra = '') => {
     await row('stopOwnRuns').locator('[role="switch"], input[type="checkbox"]').first().click()
     check('a workspace draft: its Save on, its tab marked unsaved, named so for screen readers', !!(await lib.until(async () => (await form.locator('[data-action="save"]').isEnabled()) && (await unsaved()).join() === 'workflow.workspaceDefaults', HUNG_MS)) && (await tab('workflow.workspaceDefaults').getAttribute('aria-label')) === 'Workspace defaults (workflowdefaults-ws) (unsaved changes)', JSON.stringify(await unsaved()))
     await tab('workflow.defaults').click()
-    check('Combwork defaults: its editor alone, the workspace’s tab still marked', !!(await lib.until(async () => (await hiveRow('dependenciesDone').isVisible()) && JSON.stringify((await shownParts()).levels) === '["global"]', HUNG_MS)) && (await unsaved()).join() === 'workflow.workspaceDefaults')
+    check('Combwork defaults: its editor alone, the workspace’s tab still marked', !!(await lib.until(async () => (await combworkRow('dependenciesDone').isVisible()) && JSON.stringify((await shownParts()).levels) === '["global"]', HUNG_MS)) && (await unsaved()).join() === 'workflow.workspaceDefaults')
     await shots('tabs-unsaved', group.locator('h2'))
-    await hiveRow('dependenciesDone').locator('[role="switch"], input[type="checkbox"]').first().click()
+    await combworkRow('dependenciesDone').locator('[role="switch"], input[type="checkbox"]').first().click()
     check('both drafts: both tabs marked', !!(await lib.until(async () => (await unsaved()).join() === 'workflow.defaults,workflow.workspaceDefaults', HUNG_MS)), JSON.stringify(await unsaved()))
     await hive.locator('[data-action="save"]').click()
     await dialog.waitFor({ timeout: HUNG_MS })
@@ -204,25 +204,25 @@ const check = (name, ok, extra = '') => {
     await tab('workflow.defaults').click()
     check('the project inherits Combwork’s default, under the workspace’s (style still its own)', !!form2 && form2.options.dependenciesDone === true && form2.origins.style === 'project', JSON.stringify(form2?.origins))
     // Maximum agents at Combwork's level (HI-2058): staged as typed, and saved in Combwork's settings, not the workspace's.
-    const hiveMax = hiveRow('maxAgents').locator('input')
-    await hiveMax.fill('20')
+    const combworkMax = combworkRow('maxAgents').locator('input')
+    await combworkMax.fill('20')
     check('Maximum agents typed at Combwork’s level: Save lights before the box loses focus', !!(await lib.until(async () => hive.locator('[data-action="save"]').isEnabled(), HUNG_MS)))
     await hive.locator('[data-action="save"]').click()
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
-    const hiveLevel = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).settings?.workflow
-    check('…saved in Combwork’s settings, the workspace’s own 18 kept', !!(await lib.until(async () => hiveLevel()?.git?.maxAgents === 20, HUNG_MS)) && wsJson().workflow?.git?.maxAgents === 18, JSON.stringify({ hive: hiveLevel(), workspace: wsJson().workflow }))
+    const combworkLevel = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).settings?.workflow
+    check('…saved in Combwork’s settings, the workspace’s own 18 kept', !!(await lib.until(async () => combworkLevel()?.git?.maxAgents === 20, HUNG_MS)) && wsJson().workflow?.git?.maxAgents === 18, JSON.stringify({ hive: combworkLevel(), workspace: wsJson().workflow }))
     await shots('hive', hive.locator('.workflow-level-head'))
     // Combwork's files copied into new slots (HI-1765), with Git's options: the default, .env*, until set here.
-    const hiveCopy = hive.locator('[data-slot-default="copy"][data-level="global"]')
-    check('Combwork’s level has the files copied into new slots, at the default, .env*', !!(await lib.until(async () => (await hiveCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'default' && (await text(hiveCopy)).includes('.env*'), HUNG_MS)), await text(hiveCopy))
-    await shots('hive-copy', hiveCopy)
+    const combworkCopy = hive.locator('[data-slot-default="copy"][data-level="global"]')
+    check('Combwork’s level has the files copied into new slots, at the default, .env*', !!(await lib.until(async () => (await combworkCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'default' && (await text(combworkCopy)).includes('.env*'), HUNG_MS)), await text(combworkCopy))
+    await shots('hive-copy', combworkCopy)
     // Changed elsewhere (the settings tool, another window) while open: the row follows (HR5's round 1), and so does the
     // workspace's, inheriting it, then its own changed elsewhere.
     const copyOf = async (l) => ({ origin: await l.locator('.workflow-origin').getAttribute('data-origin').catch(() => ''), field: await l.locator('textarea').inputValue().catch(() => ''), text: await text(l) })
     await inv('slots:setLevelDefault', 'global', 'copy', 'changed.env')
-    check('…following a change made elsewhere while it is open', !!(await lib.until(async () => { const c = await copyOf(hiveCopy); return c.origin === 'here' && c.field === 'changed.env' }, HUNG_MS)), JSON.stringify(await copyOf(hiveCopy)))
+    check('…following a change made elsewhere while it is open', !!(await lib.until(async () => { const c = await copyOf(combworkCopy); return c.origin === 'here' && c.field === 'changed.env' }, HUNG_MS)), JSON.stringify(await copyOf(combworkCopy)))
     await tab('workflow.workspaceDefaults').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
     check('the workspace’s copied files inherit it, From Combwork defaults', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('changed.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
@@ -261,7 +261,7 @@ const check = (name, ok, extra = '') => {
     check('the workspace’s level inherits it: From Combwork defaults', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Combwork defaults'), HUNG_MS)))
     // Its "From Combwork defaults" opens Combwork defaults' tab, where that value is set; and the copied files' too.
     await row('dependenciesDone').locator('[data-origin-link="global"]').click()
-    check('…a link to Combwork defaults’ tab', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await hiveRow('dependenciesDone').isVisible()), HUNG_MS)), String(await selectedTab()))
+    check('…a link to Combwork defaults’ tab', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await combworkRow('dependenciesDone').isVisible()), HUNG_MS)), String(await selectedTab()))
     await tab('workflow.workspaceDefaults').click()
     await inv('slots:setLevelDefault', 'global', 'copy', 'link.env')
     await wsCopy.locator('[data-origin-link="global"]').waitFor({ timeout: HUNG_MS })

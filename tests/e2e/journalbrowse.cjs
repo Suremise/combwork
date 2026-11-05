@@ -223,9 +223,9 @@ function seed(cards, secondKey) {
       delete process.env.CW_TEST_SLOW_IPC
     })
     await view.locator('.journal-forget').click()
-    const askHive = page.locator('.dialog', { hasText: 'Forget 1 entry?' })
-    check("Forget asks with the filter's own count", !!(await lib.until(async () => (await askHive.count()) === 1, HUNG_MS)) && /1 entry matches/.test(await askHive.innerText()), await page.locator('.dialog').innerText().catch(() => ''))
-    await askHive.getByRole('button', { name: 'Cancel' }).click()
+    const askCombwork = page.locator('.dialog', { hasText: 'Forget 1 entry?' })
+    check("Forget asks with the filter's own count", !!(await lib.until(async () => (await askCombwork.count()) === 1, HUNG_MS)) && /1 entry matches/.test(await askCombwork.innerText()), await page.locator('.dialog').innerText().catch(() => ''))
+    await askCombwork.getByRole('button', { name: 'Cancel' }).click()
     await view.locator('.journal-source').selectOption('')
     await lib.until(async () => (await rows.count()) === 4, HUNG_MS)
 

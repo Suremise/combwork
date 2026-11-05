@@ -52,7 +52,7 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // Combwork started with a CLAUDE_CODE_TMPDIR of the user's own: kept while the setting is empty, overridden when it is set.
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CLAUDE_CODE_TMPDIR: inherited, CW_TEST_HOLD_AGENT_TEMP: holdGo })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CLAUDE_CODE_TMPDIR: inherited, CW_TEST_HOLD_AGENT_TEMP: holdGo })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

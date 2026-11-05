@@ -21,7 +21,7 @@ import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
 import { claudeScopeHooks, rowsOfHooksTable } from '../../hookListing'
 import type { HookListing } from '../../../shared/hooks'
 import { connectionsManaged } from '../../connectionSeam'
-import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
+import { combworkStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { MEMORY_ENV_OVERRIDES, connectionMemoryDir, memoryBase } from './memoryDir'
 import { claudeBackgroundTasks } from './background'
 import { claudeRetryWait } from './retry'
@@ -543,7 +543,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // same JSON, and shows its output: Hive still reads the status.
     const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
     const own = launchOverrides(ctx.overrides, CLAUDE_CODE, 'statusLine') ? null : ownStatusLine(scopes)
-    const statusLine = hiveStatusLine((echo) => hookForwardCommand(`${ctx.hookUrl}&statusline${echo ? '&echo' : ''}`, ctx.hookAuthFile, timeout), own)
+    const statusLine = combworkStatusLine((echo) => hookForwardCommand(`${ctx.hookUrl}&statusline${echo ? '&echo' : ''}`, ctx.hookAuthFile, timeout), own)
     // On a connection, its auto memory written without asking, as without one (HI-1899): the home's `projects` is a link,
     // so Claude Code is given the memory folder by its resolved path. Not where something else names the folder.
     const home = ctx.env.CLAUDE_CONFIG_DIR
@@ -610,7 +610,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // it gets none. Not where the user's own arguments choose, nor with the switch off (#1167).
     const refresh = appended || ctx.promptAddedBefore === true
     if (refresh && ctx.resume && launchOverrides(ctx.overrides, CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
-    if (ctx.trustedHiveTools?.length && ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveCombworkTools')) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__${TOOLS_SERVER}__${t}`).join(','))
+    if (ctx.trustedCombworkTools?.length && ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveCombworkTools')) args.push('--allowedTools', ctx.trustedCombworkTools.map((t) => `mcp__${TOOLS_SERVER}__${t}`).join(','))
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
     if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)
     if (ctx.effort) args.push('--effort', ctx.effort)
@@ -1144,7 +1144,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   skillRoots(home = claudeHome()): SkillRoots {
-    return { machine: [join(home, 'skills')], plugins: join(home, 'plugins'), local: [join('.claude', 'skills')], hiveCopyPrefix: null }
+    return { machine: [join(home, 'skills')], plugins: join(home, 'plugins'), local: [join('.claude', 'skills')], combworkCopyPrefix: null }
   }
 
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {

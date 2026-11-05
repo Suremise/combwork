@@ -1,4 +1,4 @@
-// #848 (E10d): the `worktrees` area, a project's agents and their worktrees. Refusals are HiveErrors: agents (the Agent
+// #848 (E10d): the `worktrees` area, a project's agents and their worktrees. Refusals are CombworkErrors: agents (the Agent
 // API's add and change agent) read them in English exactly as before, with the same status, and the window in its
 // language; git's own words stay as git said them, inside either. Why an unused worktree isn't reused is English for the
 // Agent API (`notReused`) and data for the window (`notReusedText`). Reasons and a merge's errors only the window reads

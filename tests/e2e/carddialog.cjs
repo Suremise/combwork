@@ -40,7 +40,7 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(path.join(ws, 'alpha'))
   if (NATIVE) console.log('Native maximise and restore (CW_E2E_NATIVE=1): the test window comes on screen and takes the focus.')
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47895), CW_TEST_TIPS: 'off', ...(NATIVE ? { CW_TEST_QUIET: '0' } : {}) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47895), CW_TEST_TIPS: 'off', ...(NATIVE ? { CW_TEST_QUIET: '0' } : {}) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

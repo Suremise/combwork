@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.providers['claude-code'].extraArgs = `--append-system-prompt=${PRIVATE}-inline --allowedTools -${PRIVATE}-dash`
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -148,11 +148,11 @@ const check = (name, ok, extra = '') => {
     check("Combwork's events aren't captured until the window watches them", notYet.status === 200 && notYet.body.source.capturing === false, JSON.stringify(notYet.body))
     await inv('console:subscribe', [b1Source.id, sources.find((s) => s.kind === 'combwork').id])
     await api('GET', '/v1/status', b1Token)
-    const hiveEvents = await lib.until(async () => {
+    const combworkEvents = await lib.until(async () => {
       const r = await api('GET', '/v1/console/events?source=combwork')
       return r.body?.events?.find((e) => e.kind === 'api' && e.name === 'GET /v1/status') ? r.body : null
     }, HUNG_MS)
-    check("an agent's API call is in Combwork's events, who made it and how it went", /by agent .* → 200 ok/.test(hiveEvents?.events.find((e) => e.name === 'GET /v1/status')?.summary ?? ''), JSON.stringify(hiveEvents))
+    check("an agent's API call is in Combwork's events, who made it and how it went", /by agent .* → 200 ok/.test(combworkEvents?.events.find((e) => e.name === 'GET /v1/status')?.summary ?? ''), JSON.stringify(combworkEvents))
     check('…and in its own session', (await inv('console:snapshot', b1Source.id, 0)).some((e) => e.kind === 'api' && e.name === 'GET /v1/status'))
     check("…but the console's own reads aren't", !(await inv('console:snapshot', b1Source.id, 0)).some((e) => e.name.includes('/v1/console')))
 

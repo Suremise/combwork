@@ -53,7 +53,7 @@ function writeProject(dir, cfg) {
   fs.writeFileSync(path.join(inner, 'index.js'), 'module.exports = 1\n')
   lib.gitProject(outer, { 'README.md': '# Outer\n' })
 
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   const { page, inv, app } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

@@ -15,7 +15,7 @@ import { AGENT_TEMP_FOLDER_ID } from '../shared/advanced'
 import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { takesTestSeams } from './testQuiet'
 import type { WorkspaceService } from './workspace'
 
@@ -126,20 +126,20 @@ export interface AgentTempLaunch {
 export async function prepareAgentTemp(o: AgentTempLaunch): Promise<string | null> {
   if (!o.setting?.trim()) return null
   const root = expandRoot(o.setting.trim(), o.env ?? process.env)
-  if (!root) throw hiveError(M.unset, { folder: o.setting }, { kind: 'conflict' })
+  if (!root) throw combworkError(M.unset, { folder: o.setting }, { kind: 'conflict' })
   const dir = agentTempFolder(root, o.host, o.agentId, o.assistant)
   const before = await protectedHit(dir, o.protect)
-  if (before) throw hiveError(M.inside, { folder: dir, inside: before }, { kind: 'conflict' })
+  if (before) throw combworkError(M.inside, { folder: dir, inside: before }, { kind: 'conflict' })
   try {
     await mkdir(dir, { recursive: true })
     if (!(await stat(dir)).isDirectory()) throw new Error('not a folder') // i18n-ignore: the system's reason, in English
   } catch (e) {
-    throw hiveError(M.notMade, { folder: dir, why: (e as Error).message }, { kind: 'conflict' })
+    throw combworkError(M.notMade, { folder: dir, why: (e as Error).message }, { kind: 'conflict' })
   }
   await testHold()
   // Made: where it really is now (a junction made meanwhile, or one inside the root) must still be outside them.
   const after = await protectedHit(dir, o.protect)
-  if (after) throw hiveError(M.inside, { folder: dir, inside: after }, { kind: 'conflict' })
+  if (after) throw combworkError(M.inside, { folder: dir, inside: after }, { kind: 'conflict' })
   return dir
 }
 

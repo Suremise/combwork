@@ -19,7 +19,7 @@ import { endLeaseJob, queueHost } from '../src/main/workflow/queueJobs'
 import { forgetEnded, LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
 import { checkGit, gitExe, gitTool, realGitBehind, setGitToolForTests } from '../src/main/gitTool'
-import { git as hiveGit, withGitRoute } from '../src/main/git'
+import { git as combworkGit, withGitRoute } from '../src/main/git'
 import { gitRepo, put, sh } from './workflow/harness'
 
 const req = createRequire(import.meta.url)
@@ -655,7 +655,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       // And git() in the queue's route (the host, through gitOutcome), several at once: the same.
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone })
       const held = runner
-      const routed = await withGitRoute((m) => held.gitOutcome(m), () => Promise.all([1, 2, 3].map(() => hiveGit(w.project, ['rev-parse', 'HEAD'], undefined, undefined, { env }))))
+      const routed = await withGitRoute((m) => held.gitOutcome(m), () => Promise.all([1, 2, 3].map(() => combworkGit(w.project, ['rev-parse', 'HEAD'], undefined, undefined, { env }))))
       for (const r of routed) expect(r).toMatchObject({ ok: true })
       expect(gitTool().state).not.toBe('missing')
       // Its check again, settled before the next test.

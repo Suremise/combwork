@@ -1,6 +1,6 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
-import { HiveCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
+import { CombworkCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortOption, FallbackModel, McpCatalogSettings, ModelPrice, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
@@ -67,7 +67,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'keybindings.editor': () => <KeybindingsEditor />,
   'providers.list': () => <ProvidersList />,
   'general.language': () => <LanguagePicker />,
-  'general.commands': () => <HiveCommands />,
+  'general.commands': () => <CombworkCommands />,
   'general.onQuit': () => <QuitPoint />,
   'notifications.chimeSound': () => <ChimePicker />,
   'sessions.usageCacheClear': () => <ClearUsageCacheButton />,

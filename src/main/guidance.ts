@@ -1,12 +1,12 @@
 import { agentMsg, currentChain, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { inDefaultDialect } from '../shared/agentText/asyncScope'
-import { assistantSkillsLine, controlRules, hiveInstructions, journalRule, sessionContract } from '../shared/combworkGuidance'
+import { assistantSkillsLine, controlRules, combworkInstructions, journalRule, sessionContract } from '../shared/combworkGuidance'
 import { taskPrompt } from '../shared/tasks'
 import type { SkillInfo } from '../shared/types'
 import { ContentTooLarge, hashText } from './fsutil'
 import { coalesced, revisionOf } from './revisions'
 import { clock as metricsClock, metricsHandle, recordSkills } from './metrics'
-import { hiveSkills } from './skills'
+import { combworkSkills } from './skills'
 import type { SkillDelivery } from './providers/types'
 import { utf8Bytes } from '../shared/metrics'
 import { currentWorkspace, inWorkspace, type WorkspaceService } from './workspace'
@@ -26,9 +26,9 @@ export const GUIDANCE_REVISION = inDefaultDialect(guidanceHash)
 function guidanceHash(): string {
   return hashText(
     [
-      hiveInstructions('{project}', 'agent'),
-      hiveInstructions('{project}', 'agent', false),
-      hiveInstructions('', 'assistant'),
+      combworkInstructions('{project}', 'agent'),
+      combworkInstructions('{project}', 'agent', false),
+      combworkInstructions('', 'assistant'),
       controlRules('look'),
       controlRules('agents'),
       controlRules('projects'),
@@ -144,7 +144,7 @@ function scannedRevisions(): Promise<ScannedRevision[]> {
 
 async function scanRevisions(): Promise<ScannedRevision[]> {
   const out: ScannedRevision[] = []
-  for (const s of await hiveSkills()) {
+  for (const s of await combworkSkills()) {
     const r: ScannedRevision = { name: s.name, audience: s.audience ?? 'agents', revision: '', problems: [] }
     // Nobody gets it (its header is broken or its audience unknown): its audience is none, and why.
     if (s.problem) {
@@ -165,7 +165,7 @@ async function scanRevisions(): Promise<ScannedRevision[]> {
 
 /**
  * The parts of what a launch tells a session, for the performance metrics (exact sizes): the core session contract
- * (hiveInstructions, the same for every session of a role), what Hive adds for the project (the rest of `guidance`: the
+ * (combworkInstructions, the same for every session of a role), what Hive adds for the project (the rest of `guidance`: the
  * latest handover's pointer, and the Workspace notes note given as `notes`, #1433), and for the Assistant its role and
  * its mode (which ends its text). Text that doesn't start or end as expected is counted whole as core or role, never
  * split by guesswork.

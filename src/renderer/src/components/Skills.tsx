@@ -60,7 +60,7 @@ const M = {
   notGivenTip: msg({ id: 'assistant.skills.notGivenTip', defaultMessage: "Nobody gets this skill until its header is fixed: {problem}. A skill's header starts and ends with a --- line; for who gets it, put audience: agents, assistant or all under metadata:.", description: "Tooltip on Not given: a Combwork skill whose header (SKILL.md's front matter) can't be read. {problem} says what is wrong. Keep ---, audience:, agents, assistant, all and metadata: as they are." }),
   notGiven: msg({ id: 'assistant.skills.notGiven', defaultMessage: 'Not given', description: "A badge on a Combwork skill nobody gets, because its header can't be read." }),
   nameRule: msg({ id: 'assistant.skills.nameRule', defaultMessage: 'Use letters, numbers, "-" and "_" (max 64)', description: "A skill's name that can't be used." }),
-  whereHive: msg({ id: 'assistant.skills.whereCombwork', defaultMessage: 'the workspace (.combwork/skills)', description: 'Where a skill is added, inside New Skill and Add Skill from File: the Combwork skills. Lower case: it is part of a sentence.' }),
+  whereCombwork: msg({ id: 'assistant.skills.whereCombwork', defaultMessage: 'the workspace (.combwork/skills)', description: 'Where a skill is added, inside New Skill and Add Skill from File: the Combwork skills. Lower case: it is part of a sentence.' }),
   whereLocal: msg({ id: 'assistant.skills.whereLocal', defaultMessage: "{provider}'s local skills", description: "Where a skill is added, inside New Skill and Add Skill from File: a project's own skills of {provider} (Claude Code, Codex…). Lower case: it is part of a sentence." }),
   readFailed: msg({ id: 'assistant.skills.readFailed', defaultMessage: 'Could not read the file', description: 'An error notice, adding a skill from a file.' }),
   alsoFor: msg({ id: 'assistant.skills.alsoFor', defaultMessage: 'Also add it for {provider}', description: "A tick box in New Skill: add it to the other provider's local skills too." }),
@@ -74,7 +74,7 @@ const M = {
   deleteTitle: msg({ id: 'assistant.skills.deleteTitle', defaultMessage: 'Delete skill?', description: "Confirmation before a skill is deleted: its title." }),
   deleteMessage: msg({ id: 'assistant.skills.deleteMessage', defaultMessage: 'Move "{name}" to the Recycle Bin?', description: 'Confirmation before a skill is deleted. {name} is the skill.' }),
   deleteNobody: msg({ id: 'assistant.skills.deleteNobody', defaultMessage: "It's removed from the workspace. Nobody gets it now ({problem}), so no session loses it.", description: "Confirmation before a Combwork skill nobody gets is deleted. {problem} says what is wrong with its header." }),
-  deleteHive: msg({ id: 'assistant.skills.deleteCombwork', defaultMessage: "It's removed from the workspace, so new sessions of {audience, select, assistant {the Assistant} all {the project agents and the Assistant} other {the project agents}} no longer get it. A running Claude Code session keeps its own copy until it restarts. Codex sessions share the copy in their folder: a running one loses it when another Codex session in that folder starts.", description: 'Confirmation before a Combwork skill is deleted: who loses it and when.' }),
+  deleteCombwork: msg({ id: 'assistant.skills.deleteCombwork', defaultMessage: "It's removed from the workspace, so new sessions of {audience, select, assistant {the Assistant} all {the project agents and the Assistant} other {the project agents}} no longer get it. A running Claude Code session keeps its own copy until it restarts. Codex sessions share the copy in their folder: a running one loses it when another Codex session in that folder starts.", description: 'Confirmation before a Combwork skill is deleted: who loses it and when.' }),
   deleteLocal: msg({ id: 'assistant.skills.deleteLocal', defaultMessage: '{known, select, yes {{provider} agents} other {The agents}} in this project no longer load it in new sessions.', description: "Confirmation before a project's own skill is deleted. {provider} is Claude Code, Codex…" }),
   delete: msg({ id: 'assistant.skills.delete', defaultMessage: 'Delete', description: 'Confirmation before a skill is deleted: its button.' }),
   deleteFailed: msg({ id: 'assistant.skills.deleteFailed', defaultMessage: 'Could not delete the skill', description: "An error notice: a skill couldn't be deleted; the reason follows." }),
@@ -115,7 +115,7 @@ const AUDIENCE_LABEL: Record<SkillAudience, Msg> = {
 export const SKILL_ICON: Record<SkillLevel, string> = { combwork: 'sparkle', machine: 'account', plugin: 'extensions', local: 'folder' }
 
 /** Over the Hive skills view and a Hive skill being edited there: these skills steer the agents. */
-export function HiveSkillsWarning() {
+export function CombworkSkillsWarning() {
   return (
     <div className="banner warn skills-warning" role="note">
       <Icon name="warning" />
@@ -163,7 +163,7 @@ export function AudienceBadge({ audience, small }: { audience: SkillAudience | u
 const NAME_RULE = (v: string): string | null => (/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(v.trim()) ? null : tr(M.nameRule))
 
 function where(target: SkillTarget): string {
-  return target.kind === 'combwork' ? tr(M.whereHive) : tr(M.whereLocal, { provider: providerDescriptor(target.provider).name })
+  return target.kind === 'combwork' ? tr(M.whereCombwork) : tr(M.whereLocal, { provider: providerDescriptor(target.provider).name })
 }
 
 /** "Claude Code agents", or "The agents" for a skill of no provider, in a message's select. */
@@ -208,7 +208,7 @@ export async function deleteSkill(s: SkillInfo): Promise<boolean> {
   const ok = await confirm({
     title: tr(M.deleteTitle),
     message: tr(M.deleteMessage, { name: s.name }),
-    detail: hive ? (s.problem ? tr(M.deleteNobody, { problem: skillProblem(s) ?? '' }) : tr(M.deleteHive, { audience: s.audience ?? 'agents' })) : tr(M.deleteLocal, agentsOf(s)),
+    detail: hive ? (s.problem ? tr(M.deleteNobody, { problem: skillProblem(s) ?? '' }) : tr(M.deleteCombwork, { audience: s.audience ?? 'agents' })) : tr(M.deleteLocal, agentsOf(s)),
     confirmLabel: tr(M.delete),
     danger: true
   })
@@ -383,7 +383,7 @@ export function SkillDetail({ skill, where: place, projectPath, onDeleted, onRes
         onLink={onLink}
         readOnly={!editable || !workspace}
         defaultPreview={!editing}
-        editingNote={skill.level === 'combwork' && place === 'workspace' ? <HiveSkillsWarning /> : undefined}
+        editingNote={skill.level === 'combwork' && place === 'workspace' ? <CombworkSkillsWarning /> : undefined}
         toolbarExtra={
           <>
             <Tooltip content={SKILL_LEVEL_TIP[skill.level]}>

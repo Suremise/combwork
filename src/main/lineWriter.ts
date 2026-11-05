@@ -111,7 +111,7 @@ export function whyNoLine(projectPath: string, agentId: string, need: DeliveryNe
   if (sessions.cliAsks(projectPath, agentId)) return say(T.cliAsks)
   if (sessions.launchTaskWaiting(projectPath, agentId)) return say(T.launchTask)
   // A doorbell before its hive tools have connected is a turn that can't read the inbox (#865: a resumed Claude Code).
-  if (sessions.hiveToolsWaiting(projectPath, agentId)) return say(T.toolsWaiting)
+  if (sessions.combworkToolsWaiting(projectPath, agentId)) return say(T.toolsWaiting)
   // Its folder being changed under it (#646: a Git switch or pull): no turn of Hive's starts there until that is done.
   const changing = folderChanging(st.cwd)
   if (changing) return say(T.folder, { what: changing })

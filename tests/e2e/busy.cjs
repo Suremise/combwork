@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({
+  const env = lib.combworkEnv({
     CW_USER_DATA: userData,
     CW_API_PORT: lib.port(47894),
     CLAUDE_CONFIG_DIR: claudeHome,

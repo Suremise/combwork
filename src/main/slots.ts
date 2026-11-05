@@ -96,7 +96,7 @@ const T = {
   takeoverNotReady: agentMsg({ id: 'slot.takeover.notReady', text: "isn't ready ({state})", note: "As slot.takeover.gone: the slot isn't lent. {state} is its state's id (ready, dirty…)." }),
   takeoverLent: agentMsg({ id: 'slot.takeover.lent', text: 'is lent again', note: 'As slot.takeover.gone: another lease has it.' }),
   takeoverOtherRun: agentMsg({ id: 'slot.takeover.otherRun', text: 'has another run in it now', note: 'As slot.takeover.gone: another run writes there now.' }),
-  takeoverOtherHive: agentMsg({ id: 'slot.takeover.otherCombwork', text: "is held by another Combwork's run", note: 'As slot.takeover.gone: a run of another Combwork (another profile) holds it.' }),
+  takeoverOtherCombwork: agentMsg({ id: 'slot.takeover.otherCombwork', text: "is held by another Combwork's run", note: 'As slot.takeover.gone: a run of another Combwork (another profile) holds it.' }),
   takeoverHolds: agentMsg({ id: 'slot.takeover.holdsLease', text: "can't be taken over while its agent holds another lease", note: 'As slot.takeover.gone: one agent, one slot (HI-1762).' }),
   closed: agentMsg({ id: 'slot.error.closed', text: 'the workspace closed', note: "A slot's setup or preparation stopped: its workspace closed. Kept on the slot as its error." }),
   notListed: agentMsg({ id: 'slot.error.notListed', text: 'its folder is there but git does not list it as a worktree', note: "A slot's setup error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone." }),
@@ -679,7 +679,7 @@ export class SlotStore {
     if (openLeaseIn(db, this.project, s.name)) return say(T.takeoverLent)
     const w = s.writer
     if (!w || w.agent !== agent || w.run !== run) return say(T.takeoverOtherRun)
-    if (w.pid !== holder.pid || w.started !== holder.started) return say(T.takeoverOtherHive)
+    if (w.pid !== holder.pid || w.started !== holder.started) return say(T.takeoverOtherCombwork)
     if (this.dispatchOf(db, agent)) return say(T.takeoverHolds)
     return null
   }
@@ -1215,7 +1215,7 @@ export interface SlotRenamer {
  * removed unseen. Any other folder there (a `hive-*` one included, after the names upgrade: HI-2594) isn't ignored, and
  * keeps the slot as an untracked file does.
  */
-async function hiveSkillFolders(folder: string): Promise<string[]> {
+async function combworkSkillFolders(folder: string): Promise<string[]> {
   const entries = await readdir(join(folder, '.agents', 'skills'), { withFileTypes: true }).catch((e: NodeJS.ErrnoException) => {
     if (e.code === 'ENOENT') return []
     throw e
@@ -2066,7 +2066,7 @@ export class SlotPool {
           // Hive's skill copies are git-ignored, so the guards don't count them (#1500): its own unchanged ones go first,
           // and a `cw-*` folder left (an edited copy, or the user's own) keeps the slot.
           await this.deps.removeSkillCopies?.(slot.folder)
-          const copies = await hiveSkillFolders(slot.folder)
+          const copies = await combworkSkillFolders(slot.folder)
           if (copies.length) return await keep({ why: 'editedSkillCopy', copies })
           // Still ours, nothing leased meanwhile, right before the one step that can't be undone.
           if (!(await this.store.fenced(name, token, (db, now) => !openLeaseIn(db, this.store.project, name) && !now.job))) return await keep({ why: 'busy', state: from })

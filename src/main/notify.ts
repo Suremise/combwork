@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { Notification, type BrowserWindow } from 'electron'
-import { kindOfLevel, notifyRoute, toldWhenAway, type FocusedHive, type NotifyRoute } from '../shared/notify'
+import { kindOfLevel, notifyRoute, toldWhenAway, type FocusedCombwork, type NotifyRoute } from '../shared/notify'
 import type { Notice, NotifyKind, ToastAction, ToastLevel, ToastMessage, ToastTarget } from '../shared/types'
 import type { TextPart } from '../shared/advanced'
 import { config } from './config'
@@ -21,7 +21,7 @@ const log = createLogger('notify')
 /** What tell() needs of the windows, given by index.ts (windows.ts and workspace.ts would make a cycle here). */
 export interface NotifyHost {
   /** The Hive window the user is using (visible, not minimised, focused), or null with Hive in the background. */
-  focused: () => (FocusedHive & { win: BrowserWindow }) | null
+  focused: () => (FocusedCombwork & { win: BrowserWindow }) | null
   /** The window to own an entry when none is focused: the one showing its project's workspace, else the last focused. */
   fallback: (projectPath: string | null, source?: string) => BrowserWindow | null
   /** The workspace a project belongs to, for the pop-up scope. */
@@ -38,7 +38,7 @@ export function setNotifyHost(h: NotifyHost): void {
   host = h
 }
 
-export function focusedHive(): (FocusedHive & { win: BrowserWindow }) | null {
+export function focusedCombwork(): (FocusedCombwork & { win: BrowserWindow }) | null {
   return host.focused()
 }
 

@@ -115,11 +115,11 @@ export const RING_MAX_BYTES = 1024 * 1024
 export const EVENT_MAX_BYTES = 32 * 1024
 
 const sessionPrefix = 'session:'
-const hivePrefix = 'combwork:'
+const combworkPrefix = 'combwork:'
 export const sessionSourceId = (projectPath: string, agentId: string): string => `${sessionPrefix}${projectPath.toLowerCase()}#${agentId}`
-export const hiveSourceId = (workspacePath: string): string => `${hivePrefix}${workspacePath.toLowerCase()}`
+export const combworkSourceId = (workspacePath: string): string => `${combworkPrefix}${workspacePath.toLowerCase()}`
 export function parseSourceId(id: string): { kind: 'session'; projectPath: string; agentId: string } | { kind: 'combwork'; workspacePath: string } | null {
-  if (id.startsWith(hivePrefix) && id.length > hivePrefix.length) return { kind: 'combwork', workspacePath: id.slice(hivePrefix.length) }
+  if (id.startsWith(combworkPrefix) && id.length > combworkPrefix.length) return { kind: 'combwork', workspacePath: id.slice(combworkPrefix.length) }
   if (!id.startsWith(sessionPrefix)) return null
   const at = id.lastIndexOf('#')
   if (at <= sessionPrefix.length || at === id.length - 1) return null
@@ -294,7 +294,7 @@ export function safeWord(v: unknown, max = 64): string {
 }
 
 /** A name of Hive's own (an agent's, a project's) for display: cut and on one line; secrets masked. */
-export const hiveName = (v: unknown, max = 40): string => (typeof v === 'string' ? maskSecrets(v.replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, max)) : '')
+export const combworkName = (v: unknown, max = 40): string => (typeof v === 'string' ? maskSecrets(v.replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, max)) : '')
 
 /** An event's name and summary at most (characters). */
 const NAME_MAX = 80
@@ -318,7 +318,7 @@ function maskAll(v: unknown): unknown {
  * (a project's folder and an agent's id, never a CLI's), compared, never shown.
  */
 export function makeEvent(seq: number, at: string, source: string, c: CapturedEvent, opts: RedactOptions = {}): ConsoleEvent {
-  const e: ConsoleEvent = { seq, at, source: source.slice(0, 600), kind: c.kind, name: maskText(hiveName(c.name, NAME_MAX)), summary: maskText(hiveName(c.summary, SUMMARY_MAX)), bytes: 0 }
+  const e: ConsoleEvent = { seq, at, source: source.slice(0, 600), kind: c.kind, name: maskText(combworkName(c.name, NAME_MAX)), summary: maskText(combworkName(c.summary, SUMMARY_MAX)), bytes: 0 }
   if (c.provider) e.provider = c.provider
   if (c.raw !== undefined) e.raw = maskAll(redactPayload(c.raw, opts, c.safe?.raw))
   if (c.made !== undefined) e.made = maskAll(redactPayload(c.made, opts, c.safe?.made))

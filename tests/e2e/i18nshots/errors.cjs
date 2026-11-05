@@ -1,4 +1,4 @@
-// Screenshot cases for the `errors` area (#845): a call the main process refuses (ipc.ts's HiveErrors) as the window
+// Screenshot cases for the `errors` area (#845): a call the main process refuses (ipc.ts's CombworkErrors) as the window
 // shows it, in the run's language, reached for the i18nshots route (tests/e2e/i18nshots.cjs has the case format) with
 // locale-independent means only: IPC, command ids and structural hooks, never English text. Windows draws the native
 // dialogs' titles, so they can't be photographed here.

@@ -2,10 +2,10 @@ import { app, type BrowserWindow } from 'electron'
 import { existsSync, writeFileSync } from 'original-fs'
 import { basename, join, sep } from 'path'
 import { homedir } from 'os'
-import type { CloseCommandRun, CloseCommandStep, CloseReason, CommandRef, CommandsHive } from '../../shared/types'
+import type { CloseCommandRun, CloseCommandStep, CloseReason, CommandRef, CommandsCombwork } from '../../shared/types'
 import { OBSERVE_MS, resolvePoint, type CommandReason, type CommandValues } from '../../shared/commands'
 import { msg } from '../../shared/i18n'
-import { hiveError } from '../combworkError'
+import { combworkError } from '../combworkError'
 import { config } from '../config'
 import type { ListControl, ListStatus, ListStep } from './listRunner'
 import { emitTo } from '../events'
@@ -371,7 +371,7 @@ export function closeWithCommand(ws: WorkspaceService, reason: CloseReason, win:
   }
   if (!path) return ws.close().then(() => 'skipped' as const)
   const op: CloseOp = { path, place: ws.openPlace, skip: new AbortController(), wantDrain: !!o.drain, drainedOk: false, showSaving: () => undefined, done: Promise.resolve('skipped') }
-  const plan = planList(ws.config.commands?.onClose, { hive: hiveCommands().list, workspace: ws.config.commands?.list }, reason, { runs: closeCommandsRun() })
+  const plan = planList(ws.config.commands?.onClose, { hive: combworkCommands().list, workspace: ws.config.commands?.list }, reason, { runs: closeCommandsRun() })
   // Its placeholders' values as it closes: its folder and projects, read while it is still open.
   const values = workspaceValues(ws, reason)
   op.done = closeAndRun(ws, op, plan, win, values)
@@ -463,7 +463,7 @@ async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<t
  * When Hive quits, run: in `win`, once every window's workspace has closed. `blocked`: one's close failed ('failed': the
  * panel says it didn't run) or the user didn't wait for one to finish saving ('left': it doesn't run, quietly).
  */
-export async function runQuitCommand(commands: CommandsHive, reason: CloseReason, win: BrowserWindow | null, blocked: 'failed' | 'left' | null): Promise<RunOutcome> {
+export async function runQuitCommand(commands: CommandsCombwork, reason: CloseReason, win: BrowserWindow | null, blocked: 'failed' | 'left' | null): Promise<RunOutcome> {
   const plan = planList(commands.onQuit, { hive: commands.list }, reason, { runs: closeCommandsRun() })
   if ('skip' in plan) {
     if (plan.skip !== 'none') log.info(`When Combwork quits, run: not run (${plan.skip === 'test' ? 'a test copy of Combwork' : 'Combwork is restarting for an update'})`)
@@ -481,10 +481,10 @@ export async function runQuitCommand(commands: CommandsHive, reason: CloseReason
 }
 
 /** Whether When Hive quits, run will run for this quit (set, not a test copy, not skipped for an update). */
-export const quitCommandPlanned = (commands: CommandsHive, reason: CloseReason): boolean => 'steps' in planList(commands.onQuit, { hive: commands.list }, reason, { runs: closeCommandsRun() })
+export const quitCommandPlanned = (commands: CommandsCombwork, reason: CloseReason): boolean => 'steps' in planList(commands.onQuit, { hive: commands.list }, reason, { runs: closeCommandsRun() })
 
 /** Whether a quit has anything to run: a window's workspace with a command, or When Hive quits. */
-export function quitRunsAny(workspaces: WorkspaceService[], commands: CommandsHive): boolean {
+export function quitRunsAny(workspaces: WorkspaceService[], commands: CommandsCombwork): boolean {
   if (!closeCommandsRun()) return false
   return commands.onQuit.run.length > 0 || workspaces.some((w) => !!w.path && !!w.config.commands?.onClose.run.length)
 }
@@ -495,9 +495,9 @@ export function quitRunsAny(workspaces: WorkspaceService[], commands: CommandsHi
  * A test copy runs one only through the suites' seam, as it runs the points.
  */
 export function runByHand(win: BrowserWindow, ws: WorkspaceService | null, ref: CommandRef): void {
-  const c = resolvePoint({ run: [ref] }, { hive: hiveCommands().list, workspace: ws?.config.commands?.list })[0]?.command
-  if (!c) throw hiveError(M.gone, undefined, { kind: 'notFound' })
-  if (!closeCommandsRun()) throw hiveError(M.testCopy, undefined, { kind: 'conflict' })
+  const c = resolvePoint({ run: [ref] }, { hive: combworkCommands().list, workspace: ws?.config.commands?.list })[0]?.command
+  if (!c) throw combworkError(M.gone, undefined, { kind: 'notFound' })
+  if (!closeCommandsRun()) throw combworkError(M.testCopy, undefined, { kind: 'conflict' })
   const place = ws?.path ? (ws.openPlace ?? ws.path.toLowerCase()) : null
   const step = { name: c.name, command: c.command, folder: c.folder ?? '', needed: false }
   void runListInWindow(win, 'manual', place, [step], () => (ws?.path ? workspaceValues(ws, 'manual') : { reason: 'manual' })) // i18n-ignore: {reason}'s value, as the command reads it
@@ -519,7 +519,7 @@ export async function runOpenCommands(ws: WorkspaceService): Promise<void> {
   if (!gate?.held || !ws.path) return
   const name = userText(basename(ws.path))
   try {
-    const plan = planList(ws.config.commands?.onOpen, { hive: hiveCommands().list, workspace: ws.config.commands?.list }, 'open', { runs: closeCommandsRun() })
+    const plan = planList(ws.config.commands?.onOpen, { hive: combworkCommands().list, workspace: ws.config.commands?.list }, 'open', { runs: closeCommandsRun() })
     if (!('steps' in plan)) {
       gate.settle('done')
       return
@@ -538,7 +538,7 @@ export async function runOpenCommands(ws: WorkspaceService): Promise<void> {
 }
 
 /** Hive's own commands, as saved (Settings → Commands at Hive's level). */
-const hiveCommands = (): CommandsHive => config.settings.commands
+const combworkCommands = (): CommandsCombwork => config.settings.commands
 
 /** What a workspace's commands' placeholders stand for now: its folder, its name, why, and its projects by name. */
 export function workspaceValues(ws: WorkspaceService, reason: CommandReason, known: Record<string, string> = {}): CommandValues {

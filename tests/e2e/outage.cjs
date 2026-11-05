@@ -51,7 +51,7 @@ function standIn() {
   const values = { 'cw.outage.resume': true, 'cw.outage.checkFirstSeconds': 1, 'cw.outage.checkMostSeconds': 2, 'cw.outage.checkUrl.claude-code': `http://127.0.0.1:${host.port}/` }
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values }, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47921), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47921), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

@@ -5,7 +5,7 @@ import type { LaneInfo, TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { ANSWER_MAX, cardChange, historyMovedTo, historyReturned, reviewStep, isReturnNote, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind, type WakeAbout } from '../shared/watch'
 import { boardRead } from './boardStore'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { laneNow, onLanesWritten } from './lanes'
 import { laneStartDue, ownOpen } from '../shared/lanes'
 import { loopReviewerOf, poolCard } from './loopReviewer'
@@ -206,7 +206,7 @@ function laneNextOf(ws: WorkspaceService, card: TaskCard, agentId: string, kind:
   if (lane.state === 'paused') return laneNextWords('paused')
   const next = cards.find(ownOpen)
   if (!next) return laneNextWords('last')
-  const is = next.column === 'doing' || next.column === 'review' || next.column === 'passed' ? 'started' : next.column !== 'todo' || next.blocked ? 'waits' : !rulesEnforced() ? 'start' : laneStartDue(lane)?.number === next.number ? 'hiveStarts' : 'waits'
+  const is = next.column === 'doing' || next.column === 'review' || next.column === 'passed' ? 'started' : next.column !== 'todo' || next.blocked ? 'waits' : !rulesEnforced() ? 'start' : laneStartDue(lane)?.number === next.number ? 'combworkStarts' : 'waits'
   return laneNextWords({ card: next.number, title: next.title, is })
 }
 
@@ -473,7 +473,7 @@ export function initLoopWakes(): void {
   onAction('wake', (a, ws) => track('a loop handoff', wakeFromAction(a, ws)), 'delivered')
   // A lane written counts at once: its settled lanes-changed event comes 300 ms later (#578 round 2).
   onLanesWritten(() => rolesSeq++)
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'lanes-changed') rolesSeq++
   })
   onWatchStarted((ws, projectPath, agentId, cond) => track('telling a builder of its returned card', tellReturned(ws, projectPath, agentId, cond.cards, cond.column)))

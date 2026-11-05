@@ -34,7 +34,7 @@ const f = q.folderHelpers(fx)
 
 ;(async () => {
   q.prepare(fx)
-  let h = await q.startHive(fx, { port: PORT })
+  let h = await q.startCombwork(fx, { port: PORT })
   let crew = null
   try {
     const { page, inv } = h
@@ -291,7 +291,7 @@ const f = q.folderHelpers(fx)
   // listed file edited after; the Work section shows the state, and For you's request brings it into view.
   if (crew) {
     try {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { CW_TEST_QUEUE_CRASH: 'afterFiles' } })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env: { CW_TEST_QUEUE_CRASH: 'afterFiles' } })
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options() })
       await h.inv('advanced:set', 'cw.queue.checkedOutTarget', 'auto')
       crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
@@ -302,7 +302,7 @@ const f = q.folderHelpers(fx)
       check('needs you: Combwork ended at the seam', !!(await until(() => ended, HUNG_MS)), JSON.stringify(steps))
       await h.app.close().catch(() => {})
       fs.writeFileSync(path.join(fx.alpha, 'stuck.txt'), 'edited after the crash\n')
-      h = await q.startHive(fx, { port: PORT, keepOptions: true })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
       const { page, inv } = h
       page.on('pageerror', (e) => check('no page errors (needs you)', false, e.message))
       await lib.fitWindow(h.app, page, { width: 1400, height: 900 })
@@ -349,7 +349,7 @@ const f = q.folderHelpers(fx)
       // touched the files; the merge then put into the folder by hand (its files as merged, main where it was). The
       // journal says nothing was touched, the files say otherwise: §16.9.2's terminal state, with the command that
       // finishes it (main moved to the merge) and the one that undoes it (the files put back). Neither is run.
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { CW_TEST_QUEUE_CRASH: 'afterStarted' } })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env: { CW_TEST_QUEUE_CRASH: 'afterStarted' } })
       crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
       let ended2 = false
       h.app.process().once('exit', () => (ended2 = true))
@@ -360,7 +360,7 @@ const f = q.folderHelpers(fx)
       const result = lib.git(fx.alpha, ['for-each-ref', '--format=%(objectname)', 'refs/cw/queue/']).trim().split(String.fromCharCode(10))[0].trim()
       lib.git(fx.alpha, ['read-tree', '-m', '-u', expected, result])
       check('…the merge put into the folder by hand, main where it was', f.text('cmd.txt') === 'cmd\n' && q.head(fx, 'main') === expected)
-      h = await q.startHive(fx, { port: PORT, keepOptions: true })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
       const p2 = h.page
       p2.on('pageerror', (e) => check('no page errors (commands)', false, e.message))
       await lib.fitWindow(h.app, p2, { width: 1400, height: 900 })

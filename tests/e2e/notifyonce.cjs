@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -69,7 +69,7 @@ const check = (name, ok, extra = '') => {
         w.emit(f ? 'focus' : 'blur')
       }, on)
     const log = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
-    const bell = () => page.evaluate(() => window.__hiveBell())
+    const bell = () => page.evaluate(() => window.__cwBell())
     const popupTexts = () => page.locator('.popups .popup').allInnerTexts()
     /** Everything Combwork did for one event, found by its title: entries told, Windows notifications, bell rows, pop-ups. */
     const told = async (title) => {

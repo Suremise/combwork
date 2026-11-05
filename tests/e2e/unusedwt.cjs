@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
 
 /** The run context's PATH for a test copy without the folders that hold git. */
 function pathWithoutGit() {
-  const env = lib.hiveEnv({ CW_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   return (env[key] ?? '')
     .split(path.delimiter)

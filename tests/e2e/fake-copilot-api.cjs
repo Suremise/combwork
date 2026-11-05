@@ -243,7 +243,7 @@ function startFakeCopilotApi({ port = 0, log = null, systems = false } = {}) {
 }
 
 /**
- * The environment the real Copilot CLI needs to use the stand-in, for a test Combwork's hiveEnv: offline, this API, a model
+ * The environment the real Copilot CLI needs to use the stand-in, for a test Combwork's combworkEnv: offline, this API, a model
  * id it knows. Its home (COPILOT_HOME) and the hidden GitHub CLI login (GH_CONFIG_DIR) come from the caller.
  */
 function offlineEnv(api) {
@@ -254,7 +254,7 @@ function offlineEnv(api) {
  * A test Combwork's environment for running the real Copilot CLI offline against `api`, in folders of the caller's (`dir`):
  * its own COPILOT_HOME, a fake profile folder (Copilot also reads ~/.agents and the like), and the GitHub CLI's login
  * hidden (an empty GH_CONFIG_DIR, gh off PATH: with no stored login Copilot signs in with `gh auth token`). Never the
- * user's ~/.copilot, and no token variable (hiveEnv's allowlist passes none).
+ * user's ~/.copilot, and no token variable (combworkEnv's allowlist passes none).
  * `above`, the profile folder, is a folder above every folder this Copilot works in (its workspace, projects,
  * worktrees, the Assistant's home): outside a git repository Copilot takes skills from every folder above its working
  * folder up to its profile folder, so one under the user's profile (combwork-test is) would otherwise reach the user's own

@@ -14,8 +14,8 @@ import { workspace, workspaceFor, workspaceOf, type WorkspaceService } from './w
 import { keepBeforeIds } from './beforeIds'
 import { rebase, samePath } from '../shared/movePaths'
 import { NO_PROJECT_IDS, type ProjectIdIndex } from '../shared/projectIds'
-import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
-import { hiveName, safeWord } from '../shared/devConsole'
+import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
+import { combworkName, safeWord } from '../shared/devConsole'
 import { addLeftMerge } from './lastRun'
 import { cardNamesOf } from './projectKeys'
 import { fmt, msg, tr } from '../shared/i18n'
@@ -72,11 +72,11 @@ function changed(projectPath: string): void {
   void save(ws).catch((e) => log.warn('saving the merge slots', e))
   testLog(ws)
   // The developer console (#636): who holds the project's slots and who waits, as they change.
-  devConsole.capture([hiveSourceId(ws)], () => {
+  devConsole.capture([combworkSourceId(ws)], () => {
     const slots = workspaceSlots(ws).filter((s) => s.project.toLowerCase() === basename(projectPath).toLowerCase())
     const made = slots.map((s) => ({ branch: s.branch, holder: s.holder && { agentId: s.holder.agentId ?? null, name: s.holder.name, cards: s.holder.cards }, waiting: s.waiting.map((w) => w.name) }))
-    const line = slots.slice(0, 5).map((s) => `${safeWord(s.branch)}: ${s.holder ? `held by ${hiveName(s.holder.name)}` : 'free'}${s.waiting.length ? `, ${s.waiting.length} waiting` : ''}`).join('; ') // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
-    return { kind: 'merge-slot', name: 'slots changed', raw: { project: basename(projectPath) }, made, safe: { raw: { project: true }, made: { branch: true, holder: { agentId: true, name: true }, waiting: true } }, summary: `merge slot ${hiveName(basename(projectPath))} → ${line || 'free'}` } // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+    const line = slots.slice(0, 5).map((s) => `${safeWord(s.branch)}: ${s.holder ? `held by ${combworkName(s.holder.name)}` : 'free'}${s.waiting.length ? `, ${s.waiting.length} waiting` : ''}`).join('; ') // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+    return { kind: 'merge-slot', name: 'slots changed', raw: { project: basename(projectPath) }, made, safe: { raw: { project: true }, made: { branch: true, holder: { agentId: true, name: true }, waiting: true } }, summary: `merge slot ${combworkName(basename(projectPath))} → ${line || 'free'}` } // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
   })
 }
 
@@ -99,7 +99,7 @@ export function slotTestEvent(agent: SlotAgent, projectPath: string, branch: str
   const outcome = 'held' in result ? (result.held ? 'held' : 'in line') : 'released' in result ? 'released' : 'left' in result ? 'left' : 'none' // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
   const ws = workspacePathOf(projectPath)
   const event = 'held' in result ? 'claim' : 'release'
-  devConsole.capture([ws && hiveSourceId(ws), sessionSourceId(projectPath, agent.agentId)], () => ({ kind: 'merge-slot', name: event, raw: { project: basename(projectPath), branch, agent: agent.agentName }, made: { outcome }, safe: { raw: { project: true, branch: true, agent: true }, made: { outcome: true } }, summary: `merge slot ${event} by ${hiveName(agent.agentName)} on ${safeWord(branch)} → ${outcome}` })) // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+  devConsole.capture([ws && combworkSourceId(ws), sessionSourceId(projectPath, agent.agentId)], () => ({ kind: 'merge-slot', name: event, raw: { project: basename(projectPath), branch, agent: agent.agentName }, made: { outcome }, safe: { raw: { project: true, branch: true, agent: true }, made: { outcome: true } }, summary: `merge slot ${event} by ${combworkName(agent.agentName)} on ${safeWord(branch)} → ${outcome}` })) // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
   writeTestLog({ at: new Date().toISOString(), event: 'held' in result ? 'claim' : 'release', project: projectPath, branch, agentId: agent.agentId, agent: agent.agentName, outcome })
 }
 

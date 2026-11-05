@@ -8,7 +8,7 @@ import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, agentSetting, checkSettingValue, effortTakes, settingDefault, settingEntry, settingHelps, settingKind, settingOptions, settingPatch, settingPath, settingReadOnly, settingValue, settingValueText, shownSettingPath, workflowTakes, PLATFORM_SETTING_KEY, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
 import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platformSwitch'
-import { agentError, HiveError } from './combworkError'
+import { agentError, CombworkError } from './combworkError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
 import { setSlotDefault } from './slotSettings'
 import { workflowWrite } from './workflow/writes'
@@ -59,7 +59,7 @@ const T = {
   // When a change applies.
   restartSessions: agentMsg({ id: 'settings.agent.tool.restart.sessions', text: 'to sessions started afterwards (running agents show Restart session)', note: 'When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it.' }),
   restartAssistant: agentMsg({ id: 'settings.agent.tool.restart.assistant', text: 'to the Assistant after it restarts', note: 'When a change applies: to the Assistant once it restarts (#676).' }),
-  restartHive: agentMsg({ id: 'settings.agent.tool.restart.cw', text: 'when Combwork restarts (Settings → Advanced offers Restart Combwork)', note: 'When a change applies: once Combwork restarts (#676). Restart Combwork is the name of the button.' }),
+  restartCombwork: agentMsg({ id: 'settings.agent.tool.restart.cw', text: 'when Combwork restarts (Settings → Advanced offers Restart Combwork)', note: 'When a change applies: once Combwork restarts (#676). Restart Combwork is the name of the button.' }),
   // The rows a plain listing sums up.
   workflowMoreTitle: agentMsg({ id: 'settings.agent.tool.more.workflowTitle', text: 'query "workflow" lists them', note: "cw_list_settings: the row that stands for the workflow defaults left out of a plain listing (#1422). query is the tool's argument." }),
   workflowMoreDesc: agentMsg({ id: 'settings.agent.tool.more.workflowDesc', text: "Combwork defaults and the workspace's (Settings → Version Control), per version control (inherit).", note: 'cw_list_settings: what the workflow defaults left out are (#1422).' }),
@@ -136,7 +136,7 @@ function takesText(e: SettingEntry, project: ProjectConfig | null): string {
   }
 }
 
-const RESTART_TEXT = { sessions: T.restartSessions, assistant: T.restartAssistant, combwork: T.restartHive } as const
+const RESTART_TEXT = { sessions: T.restartSessions, assistant: T.restartAssistant, combwork: T.restartCombwork } as const
 
 // A listing row's gist (#1312): its first sentence, cut at a word within 60 characters, so a query's rows stay lean.
 const firstSentence = (s: string): string => {
@@ -360,7 +360,7 @@ async function switchSetting(value: unknown, projectPath: string | null, guard?:
     const r = await setPlatform(workspace, projectPath, value, { ...(guard ? { guard } : {}) })
     return { old: r.from, new: r.to, ...(note && r.from !== r.to ? { note } : {}) }
   } catch (err) {
-    throw err instanceof HiveError ? new SettingRefused(409, say(T.switchRefused, { error: agentError(err) })) : err
+    throw err instanceof CombworkError ? new SettingRefused(409, say(T.switchRefused, { error: agentError(err) })) : err
   }
 }
 

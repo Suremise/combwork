@@ -8,7 +8,7 @@ import type { AgentInstallInfo, ReadinessIssue, RecacheEstimate, SessionUsage } 
 import { readFirstLineOf } from '../transcriptFiles'
 import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, sourceProblem, swapIn, swapOut, tooBigToDeliver, withFileLock } from '../fsutil'
 import { createLogger, userText } from '../logger'
-import { hiveError } from '../combworkError'
+import { combworkError } from '../combworkError'
 import { git } from '../git'
 import type { HookIds, LaunchContext, SkillCopyBook, SkillCopyRecord, SkillDelivery } from './types'
 
@@ -137,7 +137,7 @@ export function toSpawnable(file: string, args: string[]): { file: string; args:
     const out = { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', file, ...args] }
     const length = commandLineLength(out.file, out.args)
     if (length > CMD_MAX_CHARS) {
-      throw hiveError(CMD_TOO_LONG, { file: basename(file), max: CMD_MAX_CHARS, length })
+      throw combworkError(CMD_TOO_LONG, { file: basename(file), max: CMD_MAX_CHARS, length })
     }
     return out
   }
@@ -362,7 +362,7 @@ async function unchangedCopy(aside: string): Promise<boolean> {
  * Hive's own copies go (ownCopies); a user's skill, a copy edited since, and anything else in the folder stay. Records of
  * copies no longer there are dropped. Says which skills' copies were removed.
  */
-export async function removeHiveCopies(folder: string, project: string, book: SkillCopyBook | undefined, busy: () => boolean): Promise<string[]> {
+export async function removeCombworkCopies(folder: string, project: string, book: SkillCopyBook | undefined, busy: () => boolean): Promise<string[]> {
   const dir = join(folder, AGENTS_SKILLS)
   return withFileLock(dir, async () => {
     if (busy()) return []

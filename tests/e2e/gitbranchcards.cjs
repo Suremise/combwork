@@ -27,7 +27,7 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 150)
   q.prepare(fx)
   // A branch no card works on.
   lib.git(fx.alpha, ['branch', 'feature/plain'])
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

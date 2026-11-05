@@ -1,5 +1,5 @@
 import { basename, dirname, join, resolve as resolvePath } from 'path'
-import type { HiveEvent, LiveSessionState, ProgressRun } from '../shared/types'
+import type { CombworkEvent, LiveSessionState, ProgressRun } from '../shared/types'
 import { activityFields, publicReason } from '../shared/assistantActivity'
 import { cardRefText } from '../shared/progress'
 import { agentField } from '../shared/advanced'
@@ -14,7 +14,7 @@ import { agentField } from '../shared/advanced'
  * viewer tokens get every event; a project agent's token (`agent`) only its own project's session, notice, progress,
  * merge-slot and agent events, and none of the Hive Assistant's actions.
  */
-export const API_EVENTS = ['session-status', 'session-exit', 'workspace-changed', 'notes-changed', 'skills-changed', 'tasks-changed', 'lanes-changed', 'lane-ended', 'queue-changed', 'progress-changed', 'merge-slots-changed', 'notice', 'notice-resolved', 'assistant-activity', 'agent-added'] as const satisfies readonly HiveEvent['type'][]
+export const API_EVENTS = ['session-status', 'session-exit', 'workspace-changed', 'notes-changed', 'skills-changed', 'tasks-changed', 'lanes-changed', 'lane-ended', 'queue-changed', 'progress-changed', 'merge-slots-changed', 'notice', 'notice-resolved', 'assistant-activity', 'agent-added'] as const satisfies readonly CombworkEvent['type'][]
 
 /** A project agent's scope: its workspace and project. */
 export interface StreamScope {
@@ -133,7 +133,7 @@ function titleFromCommand(r: ProgressRun): boolean {
 }
 
 /** The payload an event-stream client gets for `event`, or null when it gets nothing. `agent`: null for the workspace and viewer tokens. */
-export function apiEventFor(event: HiveEvent, agent: StreamScope | null): Record<string, unknown> | null {
+export function apiEventFor(event: CombworkEvent, agent: StreamScope | null): Record<string, unknown> | null {
   const own = (projectPath: string | null): boolean => !agent || (projectPath !== null && same(projectPath, agent.projectPath))
   const ownWorkspace = (workspacePath: string): boolean => !agent || same(workspacePath, agent.workspace)
   switch (event.type) {

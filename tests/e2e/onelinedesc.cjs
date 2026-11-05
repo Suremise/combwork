@@ -15,7 +15,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
 const HUNG_MS = 10000
 ;(async () => {
   lib.enableProviders(userData)
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData }) })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData }) })
   try {
     const page = await app.firstWindow()
     await lib.fitWindow(app, page, { width: 1300, height: 800 })

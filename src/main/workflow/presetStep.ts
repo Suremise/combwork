@@ -7,7 +7,7 @@
 import { createLogger, userText } from '../logger'
 import { projectPlatform } from '../platform/registry'
 import { isPlatformId } from '../../shared/platform/descriptors'
-import { HiveError } from '../combworkError'
+import { CombworkError } from '../combworkError'
 import { asksPreset } from '../../shared/workflow/presetStep'
 import { setPresetAsked } from '../../shared/workflow/projectWorkflow'
 import type { WorkspaceService } from '../workspace'
@@ -22,10 +22,10 @@ const log = createLogger('workflow')
  * own question isn't answered for it, HR3's #1423 round 1).
  */
 export function presetNotNow(ws: WorkspaceService, projectPath: string, shown: unknown): Promise<void> {
-  if (!isPlatformId(shown)) return Promise.reject(new HiveError({ lines: ['A version control is one of: none, git'] }, { kind: 'invalid' })) // i18n-ignore: a mistake in a caller, never the window's
+  if (!isPlatformId(shown)) return Promise.reject(new CombworkError({ lines: ['A version control is one of: none, git'] }, { kind: 'invalid' })) // i18n-ignore: a mistake in a caller, never the window's
   return workflowWrite(async () => {
     const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
-    if (!p?.platform) throw new HiveError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
+    if (!p?.platform) throw new CombworkError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
     let answered = false
     await ws.mutateProjectConfig(p.path, (cfg) => {
       const platform = projectPlatform(p.path, cfg.platform).id

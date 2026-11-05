@@ -66,7 +66,7 @@ async function killedSuite(work, profile) {
 /** A test copy of Combwork started outside Playwright, detached, its identity once it is up (it has written its log). */
 async function detachedCopy(profile) {
   fs.mkdirSync(profile, { recursive: true })
-  const child = spawn(lib.ELECTRON, [lib.ROOT, `--combwork-test-profile=${profile}`], { cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: profile }), detached: true, stdio: 'ignore', windowsHide: true })
+  const child = spawn(lib.ELECTRON, [lib.ROOT, `--combwork-test-profile=${profile}`], { cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: profile }), detached: true, stdio: 'ignore', windowsHide: true })
   child.unref()
   const id = lib.identify([child.pid])[0] ?? null
   if (id) ids.push(id)

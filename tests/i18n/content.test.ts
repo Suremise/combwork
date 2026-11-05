@@ -1,5 +1,5 @@
 // #849 (E10e): the `content` area, the services behind the workspace's content: MCP servers, skills, shared notes,
-// agent templates, the Assistant's modes. Refusals are HiveErrors: the Agent API and every reader of `.message` get the
+// agent templates, the Assistant's modes. Refusals are CombworkErrors: the Agent API and every reader of `.message` get the
 // English exactly as before, the window (IPC) its language. What a skill's header or an MCP server's definition has
 // wrong is kept English (`problem`, `error`: agents and launches read them) with the window's text beside it
 // (`problemText`, `errorText`). A template's load plan is the window's: its reasons are in its language, and what a
@@ -151,7 +151,7 @@ describe("a skill's header problem: English for agents, the window's text beside
     expect(text).toContain('description: Describe when the agent should use this skill.')
     expect(text).toContain('Write the instructions the agent should follow when this skill applies.')
     writeFileSync(join(made.path, 'SKILL.md'), '---\nname: fresh\nmetadata:\n  audience: assitant\n---\n')
-    const listed = (await run(() => skills.hiveSkills())).find((s) => s.name === 'fresh')!
+    const listed = (await run(() => skills.combworkSkills())).find((s) => s.name === 'fresh')!
     expect(listed.problem).toBe('its audience is "assitant", not agents, assistant or all')
     expect(shownText(listed.problemText!)).toBe('sein Publikum ist „assitant“, nicht agents, assistant oder all')
   })

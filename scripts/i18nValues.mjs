@@ -1,6 +1,6 @@
 // Typed values (#768): each message's placeholders and their types, generated per area from the English catalogue
 // (locales/en/<area>.json) into src/shared/i18n/values/<area>.d.ts, so `tr(m, values)` checks the names and the types
-// under TypeScript (shared/i18n/msg.ts, HiveMessageValues). `npm run i18n:extract` writes them with the catalogues, and
+// under TypeScript (shared/i18n/msg.ts, CombworkMessageValues). `npm run i18n:extract` writes them with the catalogues, and
 // tests/i18nCatalogues.test.ts fails when one is out of date.
 import { parse, TYPE } from '@formatjs/icu-messageformat-parser'
 
@@ -34,7 +34,7 @@ export function valuesDts(area, catalogue, plain = PLAIN) {
   const lines = [
     `// Generated from locales/en/${area}.json: do not edit. Each message's placeholders and their types, for tr(): a`,
     "// global script, so its interface merges with every other area's (shared/i18n/msg.ts).",
-    'interface HiveMessageValues {'
+    'interface CombworkMessageValues {'
   ]
   for (const [id, m] of Object.entries(catalogue)) {
     const args = [...placeholderTypes(m.defaultMessage, plain)]

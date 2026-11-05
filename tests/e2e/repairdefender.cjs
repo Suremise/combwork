@@ -165,7 +165,7 @@ const check = (name, ok, extra = '') => {
       check('…the user’s exclusion left alone', JSON.stringify(changes('move-requested').map((c) => [c.remove, c.paths])) === JSON.stringify([[[scratch.ws], [tools.ws]]]), JSON.stringify(changes('move-requested')))
       const s = await inv('antivirus:status', true)
       const state = (p) => s.paths.find((x) => x.path === p)
-      check('the Antivirus status follows: the new workspace excluded, as Combwork’s; its worktrees scanned', state(tools.ws)?.state === 'excluded' && state(tools.ws)?.addedByHive && state(tools.trees)?.state === 'not-excluded' && !state(tools.trees)?.addedByHive, JSON.stringify(s.paths))
+      check('the Antivirus status follows: the new workspace excluded, as Combwork’s; its worktrees scanned', state(tools.ws)?.state === 'excluded' && state(tools.ws)?.addedByCombwork && state(tools.trees)?.state === 'not-excluded' && !state(tools.trees)?.addedByCombwork, JSON.stringify(s.paths))
       await inv('settings:update', { appearance: { theme: 'dark' } })
       await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'dark'), HUNG_MS)
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-report-dark.png') })
@@ -208,7 +208,7 @@ const check = (name, ok, extra = '') => {
       check('a policy keeps the change from applying: Repair says so, as a failure', report.failed.some((l) => /Defender accepted the change but 3 folders aren't as asked/.test(l)) && !report.done.some((l) => /exclusions/.test(l)), JSON.stringify(report))
       check('…one elevated run, for both kinds', JSON.stringify(changes('move').slice(-1).map((c) => [c.remove, c.paths])) === JSON.stringify([[[third.ws, third.trees], [fourth.ws, fourth.trees]]]), JSON.stringify(changes('move')))
       const s = await inv('antivirus:status', true)
-      check('…and nothing of the new folders is remembered as Combwork’s', s.paths.every((p) => !p.path.startsWith(fourth.ws) || !p.addedByHive), JSON.stringify(s.paths))
+      check('…and nothing of the new folders is remembered as Combwork’s', s.paths.every((p) => !p.path.startsWith(fourth.ws) || !p.addedByCombwork), JSON.stringify(s.paths))
       // Combwork's Add for Fourth: the workspace (its worktrees folder is the user's).
       setFixture({ exclusions: [scratch.trees, tools.ws, third.ws, third.trees, fourth.trees] })
       const prepared = await inv('antivirus:prepare', 'add')

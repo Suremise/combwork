@@ -1036,13 +1036,13 @@ describe("a workspace's accounts", () => {
       })
 
       it('a project added that it already trusts: the windows are told when the answer for the new set is in, though it reads the same (round 3)', async () => {
-        const { onHiveEvent } = await import('../src/main/events')
+        const { onCombworkEvent } = await import('../src/main/events')
         held[0].answer([true])
         await vi.waitFor(() => expect(row().trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
         // What a window reloading on each connections-changed would show (it reloads only then), for the events the trust
         // read sends: the login check's own (its folder's watch, any time) would hide a missing one.
         const shown: unknown[] = []
-        const off = onHiveEvent((e) => void (e.type === 'connections-changed' && /\brunTrust\b/.test(new Error().stack ?? '') && shown.push(row().trust)))
+        const off = onCombworkEvent((e) => void (e.type === 'connections-changed' && /\brunTrust\b/.test(new Error().stack ?? '') && shown.push(row().trust)))
         try {
           await projectsNow(2)
           // The window reloads for the new project list: Checking… while it is read.

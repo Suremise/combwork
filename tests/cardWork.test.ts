@@ -6,7 +6,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 import type { ForYouSummary } from '../src/shared/workflow/workView'
 
 const base = tempDir('hive-card-work-')
@@ -18,7 +18,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
 const { cardWork, factRow, forgetBadges, forgetForYou, forYou, workBadges } = await import('../src/main/workflow/cardWork')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { revisionShort } = await import('../src/shared/platform/descriptors')
 
 const user = { kind: 'user' } as const
@@ -210,8 +210,8 @@ describe("a card's work from the board (#1223)", () => {
   it('tells the window once a fact is written in a board change (tasks-changed after it commits)', async () => {
     const w = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Observed', project: 'p' }, user))).number
-    const seen: HiveEvent[] = []
-    const off = onHiveEvent((e) => e.type === 'tasks-changed' && seen.push(e))
+    const seen: CombworkEvent[] = []
+    const off = onCombworkEvent((e) => e.type === 'tasks-changed' && seen.push(e))
     try {
       const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
       await store.boardWrite(w, async () => {

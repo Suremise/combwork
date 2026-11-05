@@ -95,7 +95,7 @@ export function updateSummary(u: UpdateState | null): string {
 }
 
 /** Hive's mark as a line drawing in the text colour (hexagon, prompt and cursor), like the status bar's other icons. */
-export function HiveMark({ className = 'status-hex' }: { className?: string }) {
+export function CombworkMark({ className = 'status-hex' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="478,256 367,448 145,448 34,256 145,64 367,64" />
@@ -128,7 +128,7 @@ export function UpdateStatusItem() {
   return (
     <Tooltip content={tr(M.versionTip, { app: APP_NAME, version: info.version, dev: info.isPackaged ? 'no' : 'yes', electron: info.electron, hasSummary: u && u.status !== 'disabled' ? 'yes' : 'no', summary: u && u.status !== 'disabled' ? updateSummary(u) : '' })}>
       <div className="status-item" onClick={() => set({ aboutOpen: true })}>
-        {u?.status === 'checking' ? <Icon name="loading" spin /> : <HiveMark />} {label}
+        {u?.status === 'checking' ? <Icon name="loading" spin /> : <CombworkMark />} {label}
       </div>
     </Tooltip>
   )

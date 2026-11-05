@@ -31,14 +31,14 @@
 !ifndef BUILD_UNINSTALLER
 ; How long it waits (ms): a test harness shortens it (tests/installer, #1647).
 !define /ifndef CW_INSTALLER_WAIT_MS 600000
-LangString hiveInstallerBusy 1033 "Another Combwork installer is still running, or Combwork couldn't tell whether one is. Nothing was installed: run this installer again once the other one has finished."
-LangString hiveInstallerBusy 1031 "Ein anderes Combwork-Installationsprogramm läuft noch, oder Combwork konnte nicht feststellen, ob eines läuft. Es wurde nichts installiert: Starten Sie dieses Installationsprogramm erneut, sobald das andere fertig ist."
-LangString hiveInstallerBusy 3082 "Todavía se está ejecutando otro instalador de Combwork, o Combwork no ha podido saber si lo hay. No se ha instalado nada: vuelve a ejecutar este instalador cuando el otro haya terminado."
-LangString hiveInstallerBusy 1036 "Un autre programme d'installation de Combwork est encore en cours, ou Combwork n'a pas pu savoir s'il y en a un. Rien n'a été installé : relancez ce programme d'installation une fois l'autre terminé."
-LangString hiveInstallerBusy 1041 "別の Combwork インストーラーがまだ実行中か、実行中かどうかを確認できませんでした。何もインストールされていません。もう一方が終了してから、このインストーラーをもう一度実行してください。"
-LangString hiveInstallerBusy 1045 "Inny instalator Combwork nadal działa albo Combwork nie mógł ustalić, czy działa. Nic nie zostało zainstalowane: uruchom ten instalator ponownie, gdy tamten się zakończy."
-LangString hiveInstallerBusy 1046 "Outro instalador do Combwork ainda está em execução, ou o Combwork não conseguiu saber se há um. Nada foi instalado: execute este instalador de novo quando o outro terminar."
-LangString hiveInstallerBusy 2052 "另一个 Combwork 安装程序仍在运行，或者 Combwork 无法确定是否有安装程序在运行。未安装任何内容：请在另一个安装程序结束后重新运行此安装程序。"
+LangString combworkInstallerBusy 1033 "Another Combwork installer is still running, or Combwork couldn't tell whether one is. Nothing was installed: run this installer again once the other one has finished."
+LangString combworkInstallerBusy 1031 "Ein anderes Combwork-Installationsprogramm läuft noch, oder Combwork konnte nicht feststellen, ob eines läuft. Es wurde nichts installiert: Starten Sie dieses Installationsprogramm erneut, sobald das andere fertig ist."
+LangString combworkInstallerBusy 3082 "Todavía se está ejecutando otro instalador de Combwork, o Combwork no ha podido saber si lo hay. No se ha instalado nada: vuelve a ejecutar este instalador cuando el otro haya terminado."
+LangString combworkInstallerBusy 1036 "Un autre programme d'installation de Combwork est encore en cours, ou Combwork n'a pas pu savoir s'il y en a un. Rien n'a été installé : relancez ce programme d'installation une fois l'autre terminé."
+LangString combworkInstallerBusy 1041 "別の Combwork インストーラーがまだ実行中か、実行中かどうかを確認できませんでした。何もインストールされていません。もう一方が終了してから、このインストーラーをもう一度実行してください。"
+LangString combworkInstallerBusy 1045 "Inny instalator Combwork nadal działa albo Combwork nie mógł ustalić, czy działa. Nic nie zostało zainstalowane: uruchom ten instalator ponownie, gdy tamten się zakończy."
+LangString combworkInstallerBusy 1046 "Outro instalador do Combwork ainda está em execução, ou o Combwork não conseguiu saber se há um. Nada foi instalado: execute este instalador de novo quando o outro terminar."
+LangString combworkInstallerBusy 2052 "另一个 Combwork 安装程序仍在运行，或者 Combwork 无法确定是否有安装程序在运行。未安装任何内容：请在另一个安装程序结束后重新运行此安装程序。"
 
 !macro preInit
   ${IfNot} ${UAC_IsInnerInstance}
@@ -88,7 +88,7 @@ LangString hiveInstallerBusy 2052 "另一个 Combwork 安装程序仍在运行�
       ${EndIf}
     ${EndIf}
     ${If} $4 == "fail"
-      MessageBox MB_OK|MB_ICONSTOP "$(hiveInstallerBusy)" /SD IDOK
+      MessageBox MB_OK|MB_ICONSTOP "$(combworkInstallerBusy)" /SD IDOK
       SetErrorLevel 3
       Quit
     ${EndIf}
@@ -130,14 +130,14 @@ LangString hiveLegacyBusy 1045 "Instalator Hive Desktop nadal działa albo Combw
 LangString hiveLegacyBusy 1046 "Um instalador do Hive Desktop ainda está em execução, ou o Combwork não conseguiu saber se há um. Nada foi instalado: execute este instalador de novo quando o outro terminar."
 LangString hiveLegacyBusy 2052 "Hive Desktop 安装程序仍在运行，或者 Combwork 无法确定是否有安装程序在运行。未安装任何内容：请在另一个安装程序结束后重新运行此安装程序。"
 
-LangString hiveStillRunning 1033 "Combwork or Hive Desktop is still running. Nothing was installed: close it, then run this installer again."
-LangString hiveStillRunning 1031 "Combwork oder Hive Desktop läuft noch. Es wurde nichts installiert: Schließen Sie das Programm und starten Sie dieses Installationsprogramm erneut."
-LangString hiveStillRunning 3082 "Combwork o Hive Desktop todavía se está ejecutando. No se ha instalado nada: ciérralo y vuelve a ejecutar este instalador."
-LangString hiveStillRunning 1036 "Combwork ou Hive Desktop est encore en cours d'exécution. Rien n'a été installé : fermez-le, puis relancez ce programme d'installation."
-LangString hiveStillRunning 1041 "Combwork または Hive Desktop がまだ実行中です。何もインストールされていません。終了してから、このインストーラーをもう一度実行してください。"
-LangString hiveStillRunning 1045 "Combwork lub Hive Desktop nadal działa. Nic nie zostało zainstalowane: zamknij program, a potem uruchom ten instalator ponownie."
-LangString hiveStillRunning 1046 "O Combwork ou o Hive Desktop ainda está em execução. Nada foi instalado: feche-o e execute este instalador de novo."
-LangString hiveStillRunning 2052 "Combwork 或 Hive Desktop 仍在运行。未安装任何内容：请关闭它，然后重新运行此安装程序。"
+LangString combworkStillRunning 1033 "Combwork or Hive Desktop is still running. Nothing was installed: close it, then run this installer again."
+LangString combworkStillRunning 1031 "Combwork oder Hive Desktop läuft noch. Es wurde nichts installiert: Schließen Sie das Programm und starten Sie dieses Installationsprogramm erneut."
+LangString combworkStillRunning 3082 "Combwork o Hive Desktop todavía se está ejecutando. No se ha instalado nada: ciérralo y vuelve a ejecutar este instalador."
+LangString combworkStillRunning 1036 "Combwork ou Hive Desktop est encore en cours d'exécution. Rien n'a été installé : fermez-le, puis relancez ce programme d'installation."
+LangString combworkStillRunning 1041 "Combwork または Hive Desktop がまだ実行中です。何もインストールされていません。終了してから、このインストーラーをもう一度実行してください。"
+LangString combworkStillRunning 1045 "Combwork lub Hive Desktop nadal działa. Nic nie zostało zainstalowane: zamknij program, a potem uruchom ten instalator ponownie."
+LangString combworkStillRunning 1046 "O Combwork ou o Hive Desktop ainda está em execução. Nada foi instalado: feche-o e execute este instalador de novo."
+LangString combworkStillRunning 2052 "Combwork 或 Hive Desktop 仍在运行。未安装任何内容：请关闭它，然后重新运行此安装程序。"
 
 LangString hiveOldNotRemoved 1033 "Hive Desktop couldn't be uninstalled, so Combwork wasn't installed and your data folders weren't moved. Its uninstall may have stopped partway: check Installed apps, then run this installer again."
 LangString hiveOldNotRemoved 1031 "Hive Desktop konnte nicht deinstalliert werden, daher wurde Combwork nicht installiert und Ihre Datenordner wurden nicht verschoben. Die Deinstallation wurde möglicherweise unterbrochen: Prüfen Sie die installierten Apps und starten Sie dieses Installationsprogramm erneut."
@@ -178,7 +178,7 @@ LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 C
     Pop $0
     DetailPrint "The upgrade from Hive Desktop: $0"
     ${If} $0 == "5"
-      MessageBox MB_OK|MB_ICONSTOP "$(hiveStillRunning)" /SD IDOK
+      MessageBox MB_OK|MB_ICONSTOP "$(combworkStillRunning)" /SD IDOK
       SetErrorLevel 5
       Quit
     ${ElseIf} $0 == "6"

@@ -101,7 +101,7 @@ describe('i18n:numbers', () => {
         "      Type 'number' is not assignable to type 'string'.",
         "src/main/c.ts(9,1): error TS2322: Type 'TextPart' is not assignable to type 'string | Text'.",
         "  Type 'number' is not assignable to type 'string | Text'.",
-        "src/main/d.ts(2,4): error TS2322: Type 'number' is not assignable to type 'string | boolean | Date | HiveDynamicMessage | null | undefined'.",
+        "src/main/d.ts(2,4): error TS2322: Type 'number' is not assignable to type 'string | boolean | Date | CombworkDynamicMessage | null | undefined'.",
         "src/main/e.ts(1,1): error TS2741: Property 'why' is missing in type '{}'."
       ].join('\r\n'),
       'D:\\copy\\run-1'

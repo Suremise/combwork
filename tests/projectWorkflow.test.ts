@@ -82,7 +82,7 @@ describe("the workflow's writers keep its other fields", () => {
     await form.setWorkflowOptions(w, repo, { preset: 'pair', options: pair })
     expect(onDisk(repo)).toMatchObject({ preset: 'pair', options: { finish: 'combworkMerges' }, ...OTHERS })
     // A Paste: another project's copied options, saved as they came.
-    const pasted = JSON.parse(JSON.stringify({ hiveWorkflow: 1, platform: 'git', preset: 'solo', options: preset('git', 'solo') }))
+    const pasted = JSON.parse(JSON.stringify({ combworkWorkflow: 1, platform: 'git', preset: 'solo', options: preset('git', 'solo') }))
     const { platform: _q, ...solo } = pasted.options
     await form.setWorkflowOptions(w, repo, { preset: pasted.preset, options: solo })
     expect(onDisk(repo)).toMatchObject({ preset: 'solo', options: { finish: 'committed' }, ...OTHERS })

@@ -2,7 +2,7 @@ import { Children, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from '@shared/devConsole'
 import { language, msg, onLanguageChange, tr, tRich, type Msg } from '@shared/i18n'
 import { clockTime, filterChoices, filterEvents, mergeEvents, sourceGroups, sourceOption, startsOpen } from '@shared/consoleView'
-import type { AppSettings, HiveEvent } from '@shared/types'
+import type { AppSettings, CombworkEvent } from '@shared/types'
 import { providerName } from '@shared/providers'
 import { FLIGHT_TRIGGER_NAME, readFlightWhat, FLIGHT_WHAT, type FlightTrigger } from '@shared/flightRecorder'
 import { timeAgo } from './util'
@@ -148,7 +148,7 @@ export function ConsoleApp() {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const onScheme = (): void => applyTheme(settings)
     mq.addEventListener('change', onScheme)
-    const off = window.combwork.onEvent((e: HiveEvent) => {
+    const off = window.combwork.onEvent((e: CombworkEvent) => {
       if (e.type === 'settings-changed') {
         settings = e.settings
         applyTheme(e.settings)

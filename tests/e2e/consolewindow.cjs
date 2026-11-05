@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -291,8 +291,8 @@ const check = (name, ok, extra = '') => {
     await dc.locator('.dc-record').click()
     await dc.locator('.dc-record-start').click()
     const switched = await lib.until(async () => (await recordingText()).trim().match(/^Recording \d+ events to (console-\S+\.jsonl)/)?.[1] ?? null, HUNG_MS)
-    const hiveOption = (await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).find((v) => v.startsWith('combwork:'))
-    await dc.locator('.dc-source').selectOption(hiveOption)
+    const combworkOption = (await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).find((v) => v.startsWith('combwork:'))
+    await dc.locator('.dc-source').selectOption(combworkOption)
     // The file's end line is written before the window hears it ended: wait for both.
     const switchedEnd = await lib.until(async () => {
       const end = readRecording(switched).find((l) => l.type === 'end')
@@ -314,8 +314,8 @@ const check = (name, ok, extra = '') => {
     check('…the shortcut and Help open the same window, not another', consoles().length === 1)
 
     // --- Closing it while a recording's start is still on its way (#638 round 2): nothing records, nothing captures.
-    const hiveLog = path.join(userData, 'logs', 'combwork.log')
-    const notStarted = () => (fs.readFileSync(hiveLog, 'utf8').match(/recording not started/g) ?? []).length
+    const combworkLog = path.join(userData, 'logs', 'combwork.log')
+    const notStarted = () => (fs.readFileSync(combworkLog, 'utf8').match(/recording not started/g) ?? []).length
     const refusedBefore = notStarted()
     const filesBefore = new Set(fs.readdirSync(recordingsDir))
     await app.evaluate(() => {

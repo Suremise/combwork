@@ -428,12 +428,12 @@ $r.inOther = [OtherJob]::Assign([OtherJob]::CreateJobObject([IntPtr]::Zero, [Int
 $gone = & $sleeper
 $gone.Kill()
 $null = $gone.WaitForExit(10000)
-$r.added = [HiveJobs]::Add('t', $gone.Id)
-$r.taken = [HiveJobs]::Take('t', $a.Id, $PID, [HiveJobs]::CreatedOf($a.Id))
-$r.followed = [HiveJobs]::IsFollowed($a.Id)
-$r.inJob = [HiveJobs]::List('t') -contains $a.Id
-$r.listed = [HiveJobs]::Members('t') -contains $a.Id
-$r.ended = [HiveJobs]::Kill('t') -and $a.WaitForExit(10000)
+$r.added = [CombworkJobs]::Add('t', $gone.Id)
+$r.taken = [CombworkJobs]::Take('t', $a.Id, $PID, [CombworkJobs]::CreatedOf($a.Id))
+$r.followed = [CombworkJobs]::IsFollowed($a.Id)
+$r.inJob = [CombworkJobs]::List('t') -contains $a.Id
+$r.listed = [CombworkJobs]::Members('t') -contains $a.Id
+$r.ended = [CombworkJobs]::Kill('t') -and $a.WaitForExit(10000)
 if (-not $a.HasExited) { Stop-Process -Id $a.Id -Force }
 $r | ConvertTo-Json -Compress
 `
@@ -458,12 +458,12 @@ Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -R
 $s = [System.Diagnostics.ProcessStartInfo]::new($node, '-e "setTimeout(() => {}, 60000)"'); $s.UseShellExecute = $false; $s.CreateNoWindow = $true
 $a = [System.Diagnostics.Process]::Start($s)
 $r = [ordered]@{}
-$r.added = [HiveJobs]::Add('t', $a.Id)
-$c = [HiveJobs]::CreatedOf($a.Id)
+$r.added = [CombworkJobs]::Add('t', $a.Id)
+$c = [CombworkJobs]::CreatedOf($a.Id)
 $r.id = "$($a.Id):$c"
-$r.paths = [HiveJobs]::Paths("$($a.Id):$c,$($a.Id):1,99999991:$c")
-$r.running = [HiveJobs]::Running('NODE.exe,hive-no-such-process-2304.exe')
-$r.ended = [HiveJobs]::Kill('t') -and $a.WaitForExit(10000)
+$r.paths = [CombworkJobs]::Paths("$($a.Id):$c,$($a.Id):1,99999991:$c")
+$r.running = [CombworkJobs]::Running('NODE.exe,hive-no-such-process-2304.exe')
+$r.ended = [CombworkJobs]::Kill('t') -and $a.WaitForExit(10000)
 if (-not $a.HasExited) { Stop-Process -Id $a.Id -Force }
 $r | ConvertTo-Json -Compress
 `
@@ -546,7 +546,7 @@ public static class Catch {
       if (pid == 0 || !Hold(pid, cliCreated, at)) continue;
       bool any;
       bool none = IsProcessInJob(caught, IntPtr.Zero, out any) && !any;
-      if (HiveJobs.Take(id, pid, cli, at)) return none;
+      if (CombworkJobs.Take(id, pid, cli, at)) return none;
     }
     return false;
   }
@@ -568,10 +568,10 @@ $r = [ordered]@{ caught = $false; tries = 0; refused = 0 }
 # ended by its clean-up; the one the snapshot saw is (a sleeper of this script's stands in for both).
 $u = Start-Quiet $node '-e "setTimeout(() => {}, 60000)"'
 try {
-  $uc = [HiveJobs]::CreatedOf($u.Id)
+  $uc = [CombworkJobs]::CreatedOf($u.Id)
   $r.staleKept = [Catch]::Hold($u.Id, 0, $uc - 1)
   [Catch]::End()
-  $r.staleSurvived = [HiveJobs]::CreatedOf($u.Id) -eq $uc
+  $r.staleSurvived = [CombworkJobs]::CreatedOf($u.Id) -eq $uc
   $r.ownKept = [Catch]::Hold($u.Id, 0, $uc)
   [Catch]::End()
   $r.ownEnded = $u.WaitForExit(10000)
@@ -587,7 +587,7 @@ for ($i = 1; $i -le 10 -and -not $r.caught; $i++) {
   try {
     # The launch: its CLI joins the job, then on "go" starts the Store PowerShell, which joins its package's job.
     $c = Start-Quiet $node ('"' + $cli + '" "' + $pwsh + '"') -stdin
-    $null = [HiveJobs]::Add($job, $c.Id)
+    $null = [CombworkJobs]::Add($job, $c.Id)
     $c.StandardInput.WriteLine('go')
     $r.caught = [Catch]::Take($job, $c.Id, 10000)
     $a = [Catch]::Pid
@@ -597,10 +597,10 @@ for ($i = 1; $i -le 10 -and -not $r.caught; $i++) {
       try { $b = Start-Quiet $pwsh '-NoProfile -Command Start-Sleep 10' } catch { $r.refused++; $r.caught = $false }
       if ($b) {
         Wait-Until { [Catch]::In($b.Id) }
-        $r.shellFollowed = [HiveJobs]::IsFollowed($a)
-        $r.shellInJob = [HiveJobs]::List($job) -contains $a
-        $r.otherInJob = [HiveJobs]::List($job) -contains $b.Id
-        $r.otherListed = [HiveJobs]::Members($job) -contains $b.Id
+        $r.shellFollowed = [CombworkJobs]::IsFollowed($a)
+        $r.shellInJob = [CombworkJobs]::List($job) -contains $a
+        $r.otherInJob = [CombworkJobs]::List($job) -contains $b.Id
+        $r.otherListed = [CombworkJobs]::Members($job) -contains $b.Id
       }
     } elseif ($c.WaitForExit(0) -and $c.ExitCode -eq 3) { $r.refused++ }
   } finally {
@@ -608,7 +608,7 @@ for ($i = 1; $i -le 10 -and -not $r.caught; $i++) {
     if ($b -and -not $b.HasExited) { $b.Kill() }
     [Catch]::End()
     if ($c -and -not $c.HasExited) { $c.Kill() }
-    [HiveJobs]::Forget($job)
+    [CombworkJobs]::Forget($job)
   }
 }
 $r | ConvertTo-Json -Compress
@@ -641,33 +641,33 @@ Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -R
 $sleeper = { $s = [System.Diagnostics.ProcessStartInfo]::new($node, '-e "console.log(''up''); setTimeout(() => {}, 60000)"'); $s.UseShellExecute = $false; $s.CreateNoWindow = $true; $s.RedirectStandardOutput = $true; [System.Diagnostics.Process]::Start($s) }
 $r = [ordered]@{}
 $m = & $sleeper
-$r.added = [HiveJobs]::Add('t', $m.Id)
+$r.added = [CombworkJobs]::Add('t', $m.Id)
 # The port holds the member it reports.
-for ($i = 0; $i -lt 100 -and -not [HiveJobs]::IsHeld($m.Id); $i++) { Start-Sleep -Milliseconds 50 }
-$r.memberHeld = [HiveJobs]::IsHeld($m.Id)
+for ($i = 0; $i -lt 100 -and -not [CombworkJobs]::IsHeld($m.Id); $i++) { Start-Sleep -Milliseconds 50 }
+$r.memberHeld = [CombworkJobs]::IsHeld($m.Id)
 # Started after "the snapshot", by this shell: no child of the member's, whatever a stale snapshot said.
 $u = & $sleeper
-$r.unrelatedHeld = [HiveJobs]::Hold('t', $u.Id)
+$r.unrelatedHeld = [CombworkJobs]::Hold('t', $u.Id)
 # Snapshot times from its exact creation stamp, not a clock read (#616): DateTime.UtcNow is the coarse system clock,
 # which can still be before the stamp of a process started before it was read.
-$created = [HiveJobs]::CreatedOf($u.Id)
-$r.staleTaken = [HiveJobs]::Take('t', $u.Id, $m.Id, $created - 1)
+$created = [CombworkJobs]::CreatedOf($u.Id)
+$r.staleTaken = [CombworkJobs]::Take('t', $u.Id, $m.Id, $created - 1)
 # The same pair, from a snapshot taken as it started, is taken: it is the snapshot's time that refuses it above.
-$r.freshTaken = [HiveJobs]::Take('t', $u.Id, $m.Id, $created)
+$r.freshTaken = [CombworkJobs]::Take('t', $u.Id, $m.Id, $created)
 # Followed: one through a handle that can't end it, one that can.
 $v = & $sleeper
 $w = & $sleeper
 # Running its script, so past starting up (#616): Kill ends the console host it was given (adopted, as its child), and
 # a process whose console host ends while it starts fails to start (0xC0000142), which is not End's to prevent.
 $r.survivorStarted = $v.StandardOutput.ReadLine() -eq 'up'
-$r.followed = [HiveJobs]::Follow('t', $v.Id, 0) -and [HiveJobs]::Follow('t', $w.Id, 1)
-$r.kill = [HiveJobs]::Kill('t')
+$r.followed = [CombworkJobs]::Follow('t', $v.Id, 0) -and [CombworkJobs]::Follow('t', $w.Id, 1)
+$r.kill = [CombworkJobs]::Kill('t')
 $r.endedOne = $w.WaitForExit(10000)
 $r.survivorRuns = -not $v.HasExited
-$r.survivorFollowed = [HiveJobs]::IsFollowed($v.Id)
-$r.survivorListed = [HiveJobs]::Members('t') -contains $v.Id
-$r.followedAgain = [HiveJobs]::Follow('t', $v.Id, 1)
-$r.killAgain = [HiveJobs]::Kill('t')
+$r.survivorFollowed = [CombworkJobs]::IsFollowed($v.Id)
+$r.survivorListed = [CombworkJobs]::Members('t') -contains $v.Id
+$r.followedAgain = [CombworkJobs]::Follow('t', $v.Id, 1)
+$r.killAgain = [CombworkJobs]::Kill('t')
 $r.survivorEnded = $v.WaitForExit(10000)
 $r.othersEnded = $m.WaitForExit(10000) -and $u.WaitForExit(10000)
 foreach ($p in @($m, $u, $v, $w)) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
@@ -715,34 +715,34 @@ Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -R
 $s = [System.Diagnostics.ProcessStartInfo]::new($node, '-e "setTimeout(() => {}, 60000)"'); $s.UseShellExecute = $false; $s.CreateNoWindow = $true
 $m = [System.Diagnostics.Process]::Start($s)
 $r = [ordered]@{}
-$r.added = [HiveJobs]::Add('old', $m.Id)
+$r.added = [CombworkJobs]::Add('old', $m.Id)
 # The port holds the member it reports.
-for ($i = 0; $i -lt 200 -and [HiveJobs]::HeldBy($m.Id) -ne 'old'; $i++) { Start-Sleep -Milliseconds 50 }
-$r.heldOld = [HiveJobs]::HeldBy($m.Id)
-$turn = [HiveJobs].GetField('turn', [System.Reflection.BindingFlags]'NonPublic,Static').GetValue($null)
+for ($i = 0; $i -lt 200 -and [CombworkJobs]::HeldBy($m.Id) -ne 'old'; $i++) { Start-Sleep -Milliseconds 50 }
+$r.heldOld = [CombworkJobs]::HeldBy($m.Id)
+$turn = [CombworkJobs].GetField('turn', [System.Reflection.BindingFlags]'NonPublic,Static').GetValue($null)
 [System.Threading.Monitor]::Enter($turn)
 try {
   # Its exit gathered while it still runs.
-  [HiveJobs]::Notify('old', 7, $m.Id)
-  [HiveJobs]::Settle()
-  $r.runningKept = [HiveJobs]::HeldBy($m.Id)
+  [CombworkJobs]::Notify('old', 7, $m.Id)
+  [CombworkJobs]::Settle()
+  $r.runningKept = [CombworkJobs]::HeldBy($m.Id)
   # Its exit gathered, then its job forgotten before the batch ends, and the id held again by another job, whose process
   # has exited too as the batch ends.
-  [HiveJobs]::Notify('old', 7, $m.Id)
-  [HiveJobs]::Forget('old')
-  $r.forgotten = [HiveJobs]::HeldBy($m.Id)
-  $r.addedNew = [HiveJobs]::Add('new', $m.Id)
-  [HiveJobs]::Notify('new', 6, $m.Id)
-  $r.heldNew = [HiveJobs]::HeldBy($m.Id)
+  [CombworkJobs]::Notify('old', 7, $m.Id)
+  [CombworkJobs]::Forget('old')
+  $r.forgotten = [CombworkJobs]::HeldBy($m.Id)
+  $r.addedNew = [CombworkJobs]::Add('new', $m.Id)
+  [CombworkJobs]::Notify('new', 6, $m.Id)
+  $r.heldNew = [CombworkJobs]::HeldBy($m.Id)
   $m.Kill()
   $r.exited = $m.WaitForExit(10000)
-  [HiveJobs]::Settle()
-  $r.newKept = [HiveJobs]::HeldBy($m.Id)
+  [CombworkJobs]::Settle()
+  $r.newKept = [CombworkJobs]::HeldBy($m.Id)
   # Its own exit lets it go.
-  [HiveJobs]::Notify('new', 7, $m.Id)
-  [HiveJobs]::Settle()
-  $r.letGo = [HiveJobs]::HeldBy($m.Id)
-  [HiveJobs]::Forget('new')
+  [CombworkJobs]::Notify('new', 7, $m.Id)
+  [CombworkJobs]::Settle()
+  $r.letGo = [CombworkJobs]::HeldBy($m.Id)
+  [CombworkJobs]::Forget('new')
 } finally {
   [System.Threading.Monitor]::Exit($turn)
   if (-not $m.HasExited) { Stop-Process -Id $m.Id -Force }
@@ -769,22 +769,22 @@ $r | ConvertTo-Json -Compress
 $ErrorActionPreference = 'Stop'
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -Raw $src)
 $w = [System.IO.StringWriter]::new()
-[HiveJobs]::Notices = $w
+[CombworkJobs]::Notices = $w
 $told = { ($w.ToString() -split "\`n" | Where-Object { $_.Trim() -eq 'new' }).Count }
 $r = [ordered]@{}
 # A joins; B is listed before the notice is written.
-[HiveJobs]::Joined('a'); $null = [HiveJobs]::Describe('b', 5); [HiveJobs]::Tell()
+[CombworkJobs]::Joined('a'); $null = [CombworkJobs]::Describe('b', 5); [CombworkJobs]::Tell()
 $r.otherListed = & $told
 # A again, not listed since: nothing more.
-[HiveJobs]::Joined('a'); [HiveJobs]::Tell()
+[CombworkJobs]::Joined('a'); [CombworkJobs]::Tell()
 $r.again = & $told
 # B joins: told on its own.
-[HiveJobs]::Joined('b'); [HiveJobs]::Tell()
+[CombworkJobs]::Joined('b'); [CombworkJobs]::Tell()
 $r.otherJob = & $told
 # A listed, then many join it: told once.
-$null = [HiveJobs]::Describe('a', 5)
-for ($i = 0; $i -lt 20; $i++) { [HiveJobs]::Joined('a') }
-[HiveJobs]::Tell(); [HiveJobs]::Tell()
+$null = [CombworkJobs]::Describe('a', 5)
+for ($i = 0; $i -lt 20; $i++) { [CombworkJobs]::Joined('a') }
+[CombworkJobs]::Tell(); [CombworkJobs]::Tell()
 $r.afterListing = & $told
 $r | ConvertTo-Json -Compress
 `
@@ -904,7 +904,7 @@ function Pick($roots, $tree, $now) {
   $running = [Func[IntPtr,bool]]{ param($h) $now[[int]$h].running -ne $false }
   $close = [Action[IntPtr]]{ param($h) $closed.Add([int]$h) }
   $peek = [Func[int,long]]{ param($id) if ($now.ContainsKey($id)) { [long]$now[$id].peek } else { 0 } }
-  $picked = [HiveJobs]::PickTree($roots, $children, 200, $open, $absent, $created, $running, $close, $peek, $failed, $unverified)
+  $picked = [CombworkJobs]::PickTree($roots, $children, 200, $open, $absent, $created, $running, $close, $peek, $failed, $unverified)
   [ordered]@{ picked = @($picked | ForEach-Object { '{0}:{1}' -f $_.pid, $_.created }); closed = @($closed); failed = @($failed); unverified = @($unverified) }
 }
 $r = [ordered]@{}

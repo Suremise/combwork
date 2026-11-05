@@ -10,7 +10,7 @@
 import { basename } from 'path'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
-import { HiveError, hiveError } from '../combworkError'
+import { CombworkError, combworkError } from '../combworkError'
 import { foundKey, projectPlatform } from '../platform/registry'
 import { isPlatformId, type PlatformId } from '../../shared/platform/descriptors'
 import { PLATFORM_NAME, SWITCH_REFUSED, switchRefused, switchRefusalText } from '../../shared/platform/switching'
@@ -31,12 +31,12 @@ const log = createLogger('workflow')
 /** A project of the workspace by its folder (the Assistant's home has no platform). */
 function projectOf(ws: WorkspaceService, projectPath: string): { path: string; name: string } {
   const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
-  if (!p?.platform) throw new HiveError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!p?.platform) throw new CombworkError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
   return { path: p.path, name: p.name }
 }
 
 function platformArg(to: unknown): PlatformId {
-  if (!isPlatformId(to)) throw new HiveError({ lines: [`A version control is one of: none, git`] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!isPlatformId(to)) throw new CombworkError({ lines: [`A version control is one of: none, git`] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return to
 }
 
@@ -94,14 +94,14 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
   await ws.mutateProjectConfig(project.path, (cfg) => {
     const now = projectPlatform(project.path, cfg.platform)
     from = now.id
-    if (expected && expected !== from) throw hiveError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
+    if (expected && expected !== from) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
     o.guard?.(from)
     if (from === to) return {}
     const refused = switchRefused(to, now.detected)
     if (refused) {
       const t = switchRefusalText(refused)
       // agent-text: switchRefusalText
-      throw new HiveError(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
+      throw new CombworkError(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
     }
     // A project from before 1.0 the upgrade hasn't given options yet has no `workflow`: only its platform changes. What
     // the folder shows now is kept, so the switch isn't offered back while it shows that (None for a Git folder).

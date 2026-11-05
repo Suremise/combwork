@@ -10,7 +10,7 @@ import type { HookEvent, HookIds } from './providers/types'
  * The rules (the Assistant's, for #648):
  * 1. **Only a start opens or reopens a turn.** A prompt opens one. After its Stop, a turn reopens only on a start of it:
  *    a tool start with a call id not seen in it before (or none: a CLI whose hooks name no calls), or Hive's own
- *    continuation of a Stop (`hiveContinued`). End news (a tool end, an interrupt, the CLI idle, a refused sign-in, a
+ *    continuation of a Stop (`combworkContinued`). End news (a tool end, an interrupt, the CLI idle, a refused sign-in, a
  *    Stop) never reopens one. Any hook naming a turn that is neither the open nor the latest one is stale, with no effect
  *    on status, and **an id Hive doesn't remember is stale, never new**: the bound on the ids kept (`seen`) can't make an
  *    old one a new turn. A prompt alone opens a turn under an id never seen (the CLI awaits its hook before the turn, so
@@ -172,12 +172,12 @@ function what(ev: HookEvent): string {
 }
 
 /**
- * Takes a hook in: what the status rules should make of it. `hiveContinued`: Hive answered this Stop with a
+ * Takes a hook in: what the status rules should make of it. `combworkContinued`: Hive answered this Stop with a
  * continuation. `woke`: the CLI's transcript says a background task of it just ended, so it may begin a turn by itself.
  * `now`: when the hook reached Hive (before it waited its turn in the launch's queue). Counts it (seq) and that the CLI
  * was heard.
  */
-export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { hiveContinued?: boolean; woke?: boolean; now?: number } = {}): Admitted {
+export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { combworkContinued?: boolean; woke?: boolean; now?: number } = {}): Admitted {
   const now = opts.now ?? Date.now()
   ledger.seq++
   ledger.heard = Math.max(ledger.heard, now)
@@ -287,7 +287,7 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
       if (!a) begin(ledger, null, now)
       const t = ledger.active!
       t.stops++
-      if (opts.hiveContinued) {
+      if (opts.combworkContinued) {
         // Hive's own continuation is a start of it (rule 1).
         if (t.state === 'over') reopen(t, now)
         else t.runFrom = now

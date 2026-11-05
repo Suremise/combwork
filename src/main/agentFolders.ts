@@ -14,8 +14,8 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperObservation, keeperState, nothingHolds, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
-import { hiveError } from './combworkError'
+import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperObservation, keeperState, nothingHolds, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setCombworkIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
+import { combworkError } from './combworkError'
 import { fmt, msg, tr } from '../shared/i18n'
 import { toast } from './events'
 import { resolveOffer } from './notify'
@@ -68,7 +68,7 @@ export function setWriterHost(h: WriterHost | null): void {
   writerHost = h ?? standIn()
 }
 // The keeper's receipts name this Hive as its slot writers do (HI-2055): whichever host is set when it is asked.
-setHiveIdentity(async () => {
+setCombworkIdentity(async () => {
   const me = await writerHost.self()
   return `${me.pid}:${me.started}`
 })
@@ -670,15 +670,15 @@ async function restartList(projectPath: string, w: { run: string; agent: string;
  * the Assistant's Control and session) runs just before the processes are ended and in the write that clears it.
  */
 export async function releaseHeldWriter(projectPath: string, slot: string, run: string, o: { end: boolean; guard?: () => void }): Promise<void> {
-  const changed = (): Error => hiveError(msg({ id: 'slots.release.changed', defaultMessage: '{slot} changed meanwhile: its writer is no longer the one shown. Look again.', description: 'Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open.' }), { slot }, { kind: 'conflict' })
+  const changed = (): Error => combworkError(msg({ id: 'slots.release.changed', defaultMessage: '{slot} changed meanwhile: its writer is no longer the one shown. Look again.', description: 'Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open.' }), { slot }, { kind: 'conflict' })
   const w = await heldWriter(projectPath, slot)
   if (!w || w.run !== run) throw changed()
-  if (w.live) throw hiveError(msg({ id: 'slots.release.live', defaultMessage: "{slot}'s writer is still running in this Combwork: stop the agent, or end or keep what it left running, first.", description: "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Combwork, or Combwork still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them)." }), { slot }, { kind: 'conflict' })
-  if (!w.hive.self && w.hive.alive !== false) throw hiveError(msg({ id: 'slots.release.otherCombwork', defaultMessage: '{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.', description: 'Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).' }), { slot, pid: w.hive.pid }, { kind: 'conflict' })
+  if (w.live) throw combworkError(msg({ id: 'slots.release.live', defaultMessage: "{slot}'s writer is still running in this Combwork: stop the agent, or end or keep what it left running, first.", description: "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Combwork, or Combwork still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them)." }), { slot }, { kind: 'conflict' })
+  if (!w.hive.self && w.hive.alive !== false) throw combworkError(msg({ id: 'slots.release.otherCombwork', defaultMessage: '{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.', description: 'Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).' }), { slot, pid: w.hive.pid }, { kind: 'conflict' })
   if (o.end && w.processes) o.guard?.()
   if (o.end && w.processes?.from === 'leftovers') await settleLeftovers(projectPath, w.agent, 'end', run)
   if (o.end && w.processes?.from === 'restart' && !(await endProcessesExactly(w.processes.list))) {
-    throw hiveError(msg({ id: 'slots.release.notEnded', defaultMessage: "Some of the processes listed still run: Windows didn't let Combwork end them, so {slot} wasn't released. Try again, or release it without ending them.", description: 'Release Slot… with "End these processes first": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was.' }), { slot }, { kind: 'conflict' })
+    throw combworkError(msg({ id: 'slots.release.notEnded', defaultMessage: "Some of the processes listed still run: Windows didn't let Combwork end them, so {slot} wasn't released. Try again, or release it without ending them.", description: 'Release Slot… with "End these processes first": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was.' }), { slot }, { kind: 'conflict' })
   }
   const { ws, project } = await hostOf(projectPath)
   if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run, o.guard))) throw changed()

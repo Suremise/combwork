@@ -122,9 +122,9 @@ describe('update checks', () => {
 
   it("a packaged Combwork reads GitHub's releases through Combwork's provider (HI-2311); a development build sets no feed", async () => {
     delete process.env.CW_TEST_QUIET
-    const { HiveGitHubProvider } = await import('../src/main/updateFeed')
+    const { CombworkGitHubProvider } = await import('../src/main/updateFeed')
     ;(await import('../src/main/updater')).initUpdater({ restart: () => undefined })
-    expect(st.feeds).toEqual([{ provider: 'custom', updateProvider: HiveGitHubProvider, owner: 'Suremise', repo: 'combwork' }])
+    expect(st.feeds).toEqual([{ provider: 'custom', updateProvider: CombworkGitHubProvider, owner: 'Suremise', repo: 'combwork' }])
     vi.resetModules()
     st.feeds = []
     ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = false

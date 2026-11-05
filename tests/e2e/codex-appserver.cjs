@@ -1,7 +1,7 @@
 // What a Codex launch through its app server would rely on (#653's spike, before Combwork builds that launch mode): the
 // real TUI attached to `codex app-server` with `--remote`, and a client of Combwork's on the same WebSocket. Checked against
 // the installed Codex so that a Codex update that changes any of it (the WebSocket is documented as experimental) fails
-// here first. In the Codex test home (a few short turns, low effort), without a test Combwork (noHive). Each part:
+// here first. In the Codex test home (a few short turns, low effort), without a test Combwork (noCombwork). Each part:
 // - the TUI's thread is joined (thread/resume) once its first turn is written (joining earlier says "no rollout found");
 // - a typed turn and a turn Combwork starts (turn/start) both come as identified turn/started and turn/completed, and their
 //   user message's clientId tells them apart (Combwork's own id, or the TUI's); the TUI shows Combwork's turn, and a draft the
@@ -275,9 +275,9 @@ async function client(port) {
       const h1 = seenHooks.length
       const m = c.events.length
       const started = await c.call('turn/start', { threadId, clientUserMessageId: 'hive-m1', input: text('[CW] New in your inbox: 1 message (m1). Reply with just: two') })
-      const hiveDone = await lib.until(() => c.seen('turn/completed', (e) => e.params.turn.id === started.result?.turn?.id, m), HUNG_MS)
+      const combworkDone = await lib.until(() => c.seen('turn/completed', (e) => e.params.turn.id === started.result?.turn?.id, m), HUNG_MS)
       const own = c.events.slice(m).find((e) => e.method === 'item/completed' && e.params?.item?.type === 'userMessage')
-      check('a turn Combwork starts comes as identified turn events too, with the id turn/start answered', !!hiveDone && hiveDone.params.turn.status === 'completed', JSON.stringify(started.error ?? hiveDone?.params?.turn?.status))
+      check('a turn Combwork starts comes as identified turn events too, with the id turn/start answered', !!combworkDone && combworkDone.params.turn.status === 'completed', JSON.stringify(started.error ?? combworkDone?.params?.turn?.status))
       check("…its user message has Combwork's clientUserMessageId", own?.params?.item?.clientId === 'hive-m1', JSON.stringify(own?.params?.item?.clientId))
       check('…the TUI shows it, and the draft the user is typing stays in its prompt', !!(await lib.until(() => /New in your inbox: 1 message \(m1\)/.test(ui.screen()) && /DRAFT kept/.test(ui.screen()), 15000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
       check("…and Combwork's hooks run for it too", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h1)))

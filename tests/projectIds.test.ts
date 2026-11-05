@@ -358,9 +358,9 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   })
 
   it('a project renamed while the window is open tells the board, so it reads its cards again', async () => {
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const seen: string[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'tasks-changed') seen.push(e.workspacePath)
     })
     try {
@@ -381,9 +381,9 @@ describe('a project seen missing between reads, then at another folder, tells th
     project(wsPath, 'mu')
     const w = createWorkspaceService()
     await w.open(wsPath)
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const seen: string[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'tasks-changed') seen.push(e.workspacePath)
     })
     try {
@@ -411,9 +411,9 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
     WorkspaceService.absentIdsKept = 2
     const w = createWorkspaceService()
     await w.open(wsPath)
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const seen: string[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'tasks-changed') seen.push(e.workspacePath)
     })
     try {
@@ -775,9 +775,9 @@ describe('merge holds Combwork closed under are told in their project now (#508 
   /** What recovery told: each warning's place and text. */
   const recover = async (ws: string): Promise<{ source?: string; message?: string }[]> => {
     const { recoverMergeSlots } = await import('../src/main/mergeSlotHost')
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const seen: { source?: string; message?: string }[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'toast') seen.push({ source: e.toast.source, message: e.toast.message })
     })
     try {

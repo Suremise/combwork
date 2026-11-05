@@ -77,7 +77,7 @@ const becomes = async (fn) => !!(await lib.until(() => Promise.resolve().then(fn
 const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? '').catch(() => '')
 
 ;(async () => {
-  const env = lib.hiveEnv({ CW_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.PACKAGED_EXE, args: [], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))

@@ -7,7 +7,7 @@ import { cardDecisions, cardReadsBy, newDecisionsOn } from './decisionNotices'
 import { NOTICE_PREFIX } from '../shared/doorbell'
 import { agentMsg, inDialectOf, say, type AgentMsg } from '../shared/agentText'
 import { recordDecisionsReceived } from './workflow/recorder'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -56,7 +56,7 @@ const telling = new Set<string>()
 const boardGen = new Map<string, number>()
 const genOf = (ws: WorkspaceService): number => boardGen.get((ws.path ?? '').toLowerCase()) ?? 0
 // Counted from the start, whether or not decision lines are wired in (initDecisionWakes), so tests see it too.
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type === 'tasks-changed') boardGen.set(e.workspacePath.toLowerCase(), (boardGen.get(e.workspacePath.toLowerCase()) ?? 0) + 1)
 })
 
@@ -323,7 +323,7 @@ export function initDecisionWakes(): void {
   started = true
   // Its delivery carries the action's id: run until marked, made once.
   onAction('wakeOnDecision', (a, ws) => decisionFromAction(a, ws), 'delivered')
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'tasks-changed') {
       const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())
       // One look at a time (#1011): a slow one isn't overlapped by the next.

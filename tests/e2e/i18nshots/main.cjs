@@ -158,7 +158,7 @@ async function installFolder(ctx) {
   fs.mkdirSync(locked, { recursive: true })
   icacls(locked, '/grant:r', '*S-1-3-4:(OI)(CI)(RX)', `*${PACKAGE}:(OI)(CI)(RX)`, '/inheritance:r')
   icacls(locked, '/grant', FOLDER_ENTRY)
-  const env = lib.hiveEnv({ CW_USER_DATA: path.join(base, 'profile'), CW_API_PORT: lib.port(47883), CW_LANG: lang, CW_TEST_INSTALL_DIR: locked, CW_TEST_NOTIFY_LOG: log, CW_TEST_DIALOG_SNAPSHOT: snapshot })
+  const env = lib.combworkEnv({ CW_USER_DATA: path.join(base, 'profile'), CW_API_PORT: lib.port(47883), CW_LANG: lang, CW_TEST_INSTALL_DIR: locked, CW_TEST_NOTIFY_LOG: log, CW_TEST_DIALOG_SNAPSHOT: snapshot })
   const child = spawn(lib.ELECTRON, [lib.ROOT], { cwd: lib.ROOT, env, stdio: 'ignore' })
   let code = null
   child.on('exit', (c) => (code = c ?? -1))

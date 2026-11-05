@@ -36,7 +36,7 @@ const SHELL = [
 async function launch(name) {
   const userData = path.join(lib.WORK, `icons-profile-${name}`)
   fs.rmSync(userData, { recursive: true, force: true })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47896), CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47896), CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check(`${name}: no page errors`, false, e.message))

@@ -13,11 +13,11 @@ import { assistantHome } from './assistantControl'
 import { config } from './config'
 import { leaveDelivery } from './deliveries'
 import { journalFactAt } from './journalService'
-import { onHiveEvent, toast } from './events'
+import { onCombworkEvent, toast } from './events'
 import { dropOfferActions, resolveOffer } from './notify'
 import { crashDumps, type CrashDump } from './exitLog'
 import { renameRetrying } from './fsutil'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { adoptInstalledRun, ownsResume } from './restartResume'
@@ -218,7 +218,7 @@ export function startRunMarker(): void {
   writeMarker()
   timer = setInterval(writeMarker, HEARTBEAT_MS)
   timer.unref()
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'session-exit' || e.type === 'session-status' || e.type === 'workspace-changed') writeSoon()
   })
   onLaunchProcessJoined(writeSoon)
@@ -412,9 +412,9 @@ export async function stopLeftAfterClose(): Promise<number> {
   // A test run's child Hive could neither end nor check may still run: never a success (#1008), on any click (#1028).
   if (!n && !u && !tried) return 0
   const ids = fmt.list(left.unverified.map(String))
-  if (n && u) throw hiveError(msg({ id: 'main.unexpectedClose.notStoppedNorChecked', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Combwork end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stopping the processes the agents had started before Combwork closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Combwork neither end nor check, so Combwork can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { n, u, ids })
-  if (n) throw hiveError(msg({ id: 'main.unexpectedClose.notStopped', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it.} other {# processes are still running: Windows didn't let Combwork end them.}} Stop Them in the notice tries again.", description: "Stopping the processes the agents had started before Combwork closed unexpectedly failed for some. {n} is how many still run; Stop Them is the notice's button." }), { n })
-  if (u) throw hiveError(msg({ id: 'main.unexpectedClose.notChecked', defaultMessage: "{u, plural, one {A process started by a test run may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stop Them (in the notice that Combwork closed unexpectedly) ended what it could, but {u} processes a test run had started may still run: Windows let Combwork neither end nor check them, and with what started them ended Combwork can't tell them from other processes any more, so pressing Stop Them again won't reach them. {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { u, ids })
+  if (n && u) throw combworkError(msg({ id: 'main.unexpectedClose.notStoppedNorChecked', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Combwork end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stopping the processes the agents had started before Combwork closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Combwork neither end nor check, so Combwork can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { n, u, ids })
+  if (n) throw combworkError(msg({ id: 'main.unexpectedClose.notStopped', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it.} other {# processes are still running: Windows didn't let Combwork end them.}} Stop Them in the notice tries again.", description: "Stopping the processes the agents had started before Combwork closed unexpectedly failed for some. {n} is how many still run; Stop Them is the notice's button." }), { n })
+  if (u) throw combworkError(msg({ id: 'main.unexpectedClose.notChecked', defaultMessage: "{u, plural, one {A process started by a test run may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stop Them (in the notice that Combwork closed unexpectedly) ended what it could, but {u} processes a test run had started may still run: Windows let Combwork neither end nor check them, and with what started them ended Combwork can't tell them from other processes any more, so pressing Stop Them again won't reach them. {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { u, ids })
   settled('stop', 'success', tr(msg({ id: 'main.unexpectedClose.stopped', defaultMessage: '{n, plural, one {Stopped one process} other {Stopped # processes}}', description: "A notice's title: the processes the agents had started before Combwork closed unexpectedly were ended ({n} of them)." }), { n: stopped }))
   return stopped
 }

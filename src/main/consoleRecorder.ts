@@ -8,7 +8,7 @@ import { devConsole } from './devConsole'
 import { readFlightWhat, type FlightWhat } from '../shared/flightRecorder'
 import { providerService } from './providerService'
 import { createLogger, userText } from './logger'
-import { englishError, hiveError, shownError } from './combworkError'
+import { englishError, combworkError, shownError } from './combworkError'
 import { requireMasking } from './keyCoverage'
 import { msg } from '../shared/i18n'
 
@@ -126,7 +126,7 @@ export async function writeAll(fh: FileHandle, text: string): Promise<number> {
   let at = 0
   while (at < buf.length) {
     const { bytesWritten } = await fh.write(buf, at, buf.length - at, null)
-    if (bytesWritten <= 0) throw hiveError(msg({ id: 'console.fileFull', defaultMessage: 'The recording file took nothing more', description: "Why a developer console recording failed: writing to its file wrote nothing (the disk may be full)." }))
+    if (bytesWritten <= 0) throw combworkError(msg({ id: 'console.fileFull', defaultMessage: 'The recording file took nothing more', description: "Why a developer console recording failed: writing to its file wrote nothing (the disk may be full)." }))
     at += bytesWritten
   }
   return buf.length
@@ -226,7 +226,7 @@ async function finish(slot: Slot, reason: RecordingEnd['reason']): Promise<Conso
 export function startRecording(wc: WebContents, source: ConsoleSource, workspace: string, includeText: boolean, stillWanted: () => boolean): Promise<ConsoleRecordingInfo> {
   const cancelled = (): Error => {
     log.info('developer console: recording not started (cancelled: the window closed, stopped watching that source or started another)')
-    return hiveError(msg({ id: 'console.cancelled', defaultMessage: 'The recording was cancelled: the console stopped watching that source', description: "Why a developer console recording didn't start: meanwhile the window closed, picked another source or started another recording." }))
+    return combworkError(msg({ id: 'console.cancelled', defaultMessage: 'The recording was cancelled: the console stopped watching that source', description: "Why a developer console recording didn't start: meanwhile the window closed, picked another source or started another recording." }))
   }
   if (wc.isDestroyed()) return Promise.reject(cancelled())
   const slot = slotOf(wc)

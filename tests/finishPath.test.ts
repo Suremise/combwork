@@ -94,7 +94,7 @@ describe("a finish's handler (HI-2014)", () => {
     const { parent, dependent, finish } = await overridden(w)
     // The effects as the first run made them, then the crash: no FinishStep written.
     const key = wf.store.cardByKey(`#${parent}`)!.key
-    await inWorkspace(w, () => tasks.commentAsHive(dependent, storedText(HISTORY.startsWithout, { card: key, reason: 'merged elsewhere' }), w, () => true, dependentNoteId(key, finish)))
+    await inWorkspace(w, () => tasks.commentAsCombwork(dependent, storedText(HISTORY.startsWithout, { card: key, reason: 'merged elsewhere' }), w, () => true, dependentNoteId(key, finish)))
     expect(facts(w).facts(parent).some((f) => f.kind === 'FinishStep')).toBe(false)
     await runFinish(w, wf, repo, parent, finish)
     const notes = (await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.appText?.id === 'tasks.history.startsWithout')

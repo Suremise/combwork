@@ -2,7 +2,7 @@
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import type { CombworkBridge } from '../shared/api'
-import type { HiveEvent } from '../shared/types'
+import type { CombworkEvent } from '../shared/types'
 import { COMMIT_WATCH_ARG, FROM_MAIN_EVENT } from '../shared/commitWatch'
 
 /**
@@ -24,7 +24,7 @@ const noteArrived = (what: string): void => {
   arrived.push({ at, what, n: 1 })
   if (arrived.length > 300) arrived.shift()
 }
-ipcRenderer.on('hive:event', (_: IpcRendererEvent, event: HiveEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: combwork.log, in English
+ipcRenderer.on('hive:event', (_: IpcRendererEvent, event: CombworkEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: combwork.log, in English
 ipcRenderer.on('pty:data', () => noteArrived('terminal output')) // i18n-ignore: combwork.log, in English
 ipcRenderer.on('pty:exit', () => noteArrived('terminal exit')) // i18n-ignore: combwork.log, in English
 
@@ -38,7 +38,7 @@ const bridge: CombworkBridge = {
       }
     ),
   onEvent(listener) {
-    const handler = (_: IpcRendererEvent, event: HiveEvent): void => listener(event)
+    const handler = (_: IpcRendererEvent, event: CombworkEvent): void => listener(event)
     ipcRenderer.on('hive:event', handler)
     return () => ipcRenderer.removeListener('hive:event', handler)
   },

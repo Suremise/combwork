@@ -13,7 +13,7 @@ export type { NotifyKind }
 export type NotifyRoute = 'popup' | 'windows' | 'bell' | 'none'
 
 /** The Hive window you are using: the workspace it holds and the project it shows. */
-export interface FocusedHive {
+export interface FocusedCombwork {
   workspacePath: string | null
   projectPath: string | null
 }
@@ -43,7 +43,7 @@ const samePath = (a: string | null, b: string | null): boolean => !!a && !!b && 
  *    passes every scope.
  * Chimes are not routed: they follow the chime settings whatever the route.
  */
-export function notifyRoute(n: Gates, kind: NotifyKind, focused: FocusedHive | null, from: { workspacePath: string | null; projectPath: string | null }): { route: NotifyRoute; why: string } {
+export function notifyRoute(n: Gates, kind: NotifyKind, focused: FocusedCombwork | null, from: { workspacePath: string | null; projectPath: string | null }): { route: NotifyRoute; why: string } {
   if (GATED.has(kind) && !n.desktopNotifications) return { route: 'none', why: 'notifications off' } // i18n-ignore: the log's reason (English)
   if (kind === 'finished' && !n.notifyOnFinished) return { route: 'none', why: 'finished notices off' } // i18n-ignore: the log's reason (English)
   if (kind === 'needsYou' && !n.notifyOnWaiting) return { route: 'none', why: 'waiting notices off' } // i18n-ignore: the log's reason (English)

@@ -75,7 +75,7 @@ export interface AvPath {
   kind: AvPathKind
   state: AvPathState
   /** Hive added this exclusion (so Remove may take it away again). */
-  addedByHive: boolean
+  addedByCombwork: boolean
   /** Defender lists this folder itself, not only a folder holding it (known only when its list is: #1302). */
   listed?: boolean
   devDrive: AvDevDrive
@@ -228,7 +228,7 @@ export function unsafeFolder(path: string, guarded: string[]): string | null {
 }
 
 /** Hive's test area is offered only to people developing Hive: a dev or test build, or a workspace holding Hive's repository. */
-export const testsEligible = (opts: { packaged: boolean; holdsHive: boolean }): boolean => !opts.packaged || opts.holdsHive
+export const testsEligible = (opts: { packaged: boolean; holdsCombwork: boolean }): boolean => !opts.packaged || opts.holdsCombwork
 
 /**
  * The workspace's folders from their resolved paths (null: absent, or couldn't be resolved): duplicates dropped, each
@@ -287,13 +287,13 @@ export function statusOf(workspacePath: string, probe: AvProbe, folders: { path:
   const known = live ?? admin?.exclusions ?? null
   const added = opts.added.map(normPath)
   const paths: AvPath[] = folders.map((f) => {
-    const addedByHive = added.includes(normPath(f.path))
-    const state: AvPathState = known ? (covered(f.path, known) ? 'excluded' : 'not-excluded') : addedByHive ? 'added' : 'unknown'
+    const addedByCombwork = added.includes(normPath(f.path))
+    const state: AvPathState = known ? (covered(f.path, known) ? 'excluded' : 'not-excluded') : addedByCombwork ? 'added' : 'unknown'
     const drive = driveOf(f.path)
     const checked = drive ? opts.adminCheck?.devDrives?.[drive] : undefined
     const fs = drive ? probe.volumes[drive] : undefined
     const devDrive: AvDevDrive = checked ?? (fs === undefined || fs === null ? 'unknown' : /^refs$/i.test(fs) ? 'refs' : 'no')
-    return { path: f.path, kind: f.kind, state, addedByHive, ...(known && listed(f.path, known) ? { listed: true } : {}), devDrive, ...(f.unsafe ? { unsafe: f.unsafe } : {}) }
+    return { path: f.path, kind: f.kind, state, addedByCombwork, ...(known && listed(f.path, known) ? { listed: true } : {}), devDrive, ...(f.unsafe ? { unsafe: f.unsafe } : {}) }
   })
   const realTime = scan === 'defender' ? d!.realTime : null
   // A trusted Dev Drive in performance mode is scanned lightly; an untrusted one, or performance mode off, is scanned like any other.
@@ -381,7 +381,7 @@ export function emptyStatus(workspacePath: string, scan: 'not-applicable' | 'tes
     performanceMode: null,
     exclusionsFrom: null,
     others: [],
-    paths: folders.map((f) => ({ path: f.path, kind: f.kind, state: 'unknown', addedByHive: false, devDrive: 'unknown', ...(f.unsafe ? { unsafe: f.unsafe } : {}) })),
+    paths: folders.map((f) => ({ path: f.path, kind: f.kind, state: 'unknown', addedByCombwork: false, devDrive: 'unknown', ...(f.unsafe ? { unsafe: f.unsafe } : {}) })),
     checkedAt: now.toISOString(),
     ...(error ? { error } : {}),
     slowed: false,
@@ -505,13 +505,13 @@ export function defenderMovePlan(status: AntivirusStatus, oldPaths: string[]): A
   if (status.scan !== 'defender') return { ...base, remove: [], add: [], theirs: [] }
   // Only an entry for the old folder itself is stale: one for a folder holding it (D:\Development) may cover the new
   // folder too, and isn't Hive's to remove nor the user's to be told about. With the list hidden, Hive's own count.
-  const mine = old.filter((p) => p.addedByHive && (p.listed || p.state === 'added'))
+  const mine = old.filter((p) => p.addedByCombwork && (p.listed || p.state === 'added'))
   const moved = new Set(mine.map((p) => p.kind))
   const remove = mine.map((p) => p.path)
   return {
     ...base,
     remove,
     add: now.filter((p) => !p.unsafe && (moved.has(p.kind) || covered(p.path, remove))).map((p) => p.path),
-    theirs: old.filter((p) => !p.addedByHive && p.listed).map((p) => p.path)
+    theirs: old.filter((p) => !p.addedByCombwork && p.listed).map((p) => p.path)
   }
 }

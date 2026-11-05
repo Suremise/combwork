@@ -24,7 +24,7 @@ import type {
   ArchiveResult,
   CloseCommandRun,
   CommandRef,
-  CommandsHive,
+  CommandsCombwork,
   CommandsWorkspace,
   UnarchiveResult,
   BoardFold,
@@ -75,7 +75,7 @@ import type {
   GitDiff,
   HiddenProject,
   GitStatus,
-  HiveEvent,
+  CombworkEvent,
   LiveSessionState,
   StartedSession,
   McpFileServer,
@@ -173,7 +173,7 @@ export type SettingsPatch = DeepPartial<AppSettings>
  * Every request the renderer can make of the main process.
  * The preload bridge exposes these as `window.combwork.invoke(channel, ...args)`.
  */
-export interface HiveRequests {
+export interface CombworkRequests {
   'app:info': () => AppInfo
   /** The plan usage each provider last reported (e.g. 5-hour and weekly limits), by provider. */
   'app:planUsage': () => Record<ProviderId, PlanUsage>
@@ -194,7 +194,7 @@ export interface HiveRequests {
   /** Settings → Commands at the workspace's level (HI-1954): its commands and its open and close points, saved in workspace.json; returns them as saved. Only the user's window sets them. */
   'commands:setWorkspace': (workspacePath: string, commands: CommandsWorkspace) => CommandsWorkspace
   /** Settings → Commands at Hive's level (HI-1954): Hive's commands and When Hive quits, run; returns them as saved. */
-  'commands:setHive': (commands: CommandsHive) => CommandsHive
+  'commands:setCombwork': (commands: CommandsCombwork) => CommandsCombwork
   /** Runs one command by hand in this window (HI-1954): its panel, as a point's, with one step. */
   'commands:run': (ref: CommandRef) => void
   /** Current quit state, for a window that reloads while a quit dialog or pending quit is open. */
@@ -447,11 +447,11 @@ export interface HiveRequests {
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
   'queue:retry': (n: number, reason?: string) => TaskCard
   /** Adds the project's .combwork to its git repository's info/exclude (#345); refuses where no git repository holds it. */
-  'project:excludeHive': (projectPath: string) => WorkspaceInfo
+  'project:excludeCombwork': (projectPath: string) => WorkspaceInfo
   /** The files under the project's .combwork git tracks (#364), for the confirmation before untracking them. */
-  'project:hiveTracked': (projectPath: string) => string[]
+  'project:combworkTracked': (projectPath: string) => string[]
   /** `git rm --cached` of exactly the files confirmed (#364), refused if git tracks others now: their removal staged, the files left on disk. */
-  'project:untrackHive': (projectPath: string, files: string[]) => WorkspaceInfo
+  'project:untrackCombwork': (projectPath: string, files: string[]) => WorkspaceInfo
   'project:openInExplorer': (projectPath: string) => void
   'project:openTerminal': (projectPath: string) => void
   /** What hiding, removing or deleting the project would touch (Project → Remove Project…). */
@@ -1141,11 +1141,11 @@ export interface HiveRequests {
   'api:revokeViewer': (id: string) => AgentApiInfo
 }
 
-export type HiveChannel = keyof HiveRequests
+export type CombworkChannel = keyof CombworkRequests
 
 export interface CombworkBridge {
-  invoke<C extends HiveChannel>(channel: C, ...args: Parameters<HiveRequests[C]>): Promise<ReturnType<HiveRequests[C]>>
-  onEvent(listener: (event: HiveEvent) => void): () => void
+  invoke<C extends CombworkChannel>(channel: C, ...args: Parameters<CombworkRequests[C]>): Promise<ReturnType<CombworkRequests[C]>>
+  onEvent(listener: (event: CombworkEvent) => void): () => void
   onPtyData(listener: (key: string, data: string) => void): () => void
   onPtyExit(listener: (key: string, code: number) => void): () => void
   /** Full path of a file dropped from Explorer. */

@@ -1,4 +1,4 @@
-// #846 (E10b): the `tasks` area, the board's service. Its refusals are HiveErrors: agents (the Agent API, the hive
+// #846 (E10b): the `tasks` area, the board's service. Its refusals are CombworkErrors: agents (the Agent API, the hive
 // tools) read them in English exactly as before, with the same status, and the window in its language. A card's
 // history keeps its English (`what`: agents read it, Combwork's code and the scenarios match it) and stores the line as
 // data beside it (`whatText`: a message id and values), which the card dialog shows in the window's language; entries
@@ -115,7 +115,7 @@ describe('the tasks area', () => {
 
   it('every history line has its message in the table the window reads, and an unknown id or an old entry has none', () => {
     for (const m of Object.values(HISTORY)) expect(storedMessage({ id: m.id })).toBe(m)
-    expect(storedMessage({ id: 'tasks.history.fromANewerHive' })).toBeNull()
+    expect(storedMessage({ id: 'tasks.history.fromANewerCombwork' })).toBeNull()
     expect(storedMessage(undefined)).toBeNull()
   })
 })
@@ -453,7 +453,7 @@ describe('lines and a comment Combwork writes from outside the board service (#8
   it("puts the comment on a card with its English for agents and its data for the window", async () => {
     const c = await run(() => tasks.createTask({ title: 'Guarded', project: 'alpha' }, user))
     const said = safeguardComment({ at: '2026-10-15T15:10:00.000Z', tools: [], stops: 1, switched: { from: 'a', to: 'b', at: '2026-10-15T15:12:00.000Z' } }, 'Agent 1', (m) => m, null)
-    expect(await run(() => tasks.commentAsHive(c.number, said))).toBe(true)
+    expect(await run(() => tasks.commentAsCombwork(c.number, said))).toBe(true)
     const comment = (await run(() => tasks.getTask(c.number))).comments.at(-1)!
     expect(comment.text).toBe(englishOf(said))
     expect(comment.text).toMatch(/^\*\*Agent 1, after a safeguard stop:\*\* A safety classifier stopped a response at \d\d:\d\d\. It now runs on b instead of a \(since \d\d:\d\d\)\.$/)

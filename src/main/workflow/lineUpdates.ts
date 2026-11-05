@@ -17,7 +17,7 @@
 import { AsyncResource } from 'async_hooks'
 import { advanced } from '../advanced'
 import { boardWaits } from '../boardStore'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { createLogger, userText } from '../logger'
 import { coalesced } from '../coalesce'
 import { gitStep } from '../platform/git'
@@ -228,7 +228,7 @@ let started = false
 export function startLineUpdates(): void {
   if (started) return
   started = true
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'tasks-changed') {
       const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())
       if (ws) soon(ws)

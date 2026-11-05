@@ -6,7 +6,7 @@ import { keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, merg
 import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, readSetUp, rereadTrust, serverEnv } from './accounts'
 import { hasPty } from './ptyHost'
 import { emit } from './events'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { keyInfo, removeKey, saveKey, withKey } from './keyStore'
 import { createLogger, userText } from './logger'
 import { plainHttpGet, type PlainReply } from './plainHttpsJson'
@@ -46,33 +46,33 @@ const NO_SERVERS = msg({ id: 'main.server.unsupported', defaultMessage: "{cli} c
 
 function capsOf(cli: ProviderId): ServerCaps {
   const caps = providerDescriptor(cli).capabilities.connections?.server
-  if (!caps) throw hiveError(NO_SERVERS, { cli: providerDescriptor(cli).name }, { kind: 'invalid' })
+  if (!caps) throw combworkError(NO_SERVERS, { cli: providerDescriptor(cli).name }, { kind: 'invalid' })
   return caps
 }
 
 function serverOf(id: string): { a: Account; server: ServerConnection; caps: ServerCaps } {
   const a = mustGet(id)
-  if (!isServer(a) || !a.server) throw hiveError(NOT_SERVER, undefined, { kind: 'invalid' })
+  if (!isServer(a) || !a.server) throw combworkError(NOT_SERVER, undefined, { kind: 'invalid' })
   return { a, server: a.server, caps: capsOf(a.provider) }
 }
 
 function checkedUrl(raw: string): { url: string; origin: string; local: boolean } {
   const b = parseBaseUrl(raw)
-  if (!b.ok) throw hiveError(URL_PROBLEM[b.why], undefined, { kind: 'invalid' })
+  if (!b.ok) throw combworkError(URL_PROBLEM[b.why], undefined, { kind: 'invalid' })
   return b
 }
 
 function checkedKey(key: string): string {
   const p = keyProblem(key)
-  if (p === 'length') throw hiveError(KEY_PROBLEM.length, { min: 16, max: 512 }, { kind: 'invalid' })
-  if (p) throw hiveError(KEY_PROBLEM.chars, undefined, { kind: 'invalid' })
+  if (p === 'length') throw combworkError(KEY_PROBLEM.length, { min: 16, max: 512 }, { kind: 'invalid' })
+  if (p) throw combworkError(KEY_PROBLEM.chars, undefined, { kind: 'invalid' })
   return key
 }
 
 /** Refuses a key that also appears in a field kept unencrypted (its name, base URL or a model id). */
 function assertKeyNotIn(key: string, fields: { name: string; url: string; models: readonly ServerModel[] }): void {
   const field = fields.name.includes(key) ? 'name' : fields.url.includes(key) ? 'url' : fields.models.some((m) => m.id.includes(key)) ? 'models' : null
-  if (field) throw hiveError(KEY_IN, { field }, { kind: 'invalid' })
+  if (field) throw combworkError(KEY_IN, { field }, { kind: 'invalid' })
 }
 
 export interface ServerInput {
@@ -286,7 +286,7 @@ export async function setUpServerConnection(id: string, folder?: string): Promis
     await connectionInternals.assertUsable(a)
     const b = checkedUrl(server.baseUrl)
     const got = await withKey(id, b.origin)
-    if (!got && !b.local) throw hiveError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
+    if (!got && !b.local) throw combworkError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
     const homeEnv = providerDescriptor(a.provider).capabilities.connections!.homeEnv
     // Once it ends, its set-up state is read again (HI-1870).
     return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => (void readSetUp(id), rereadTrust(id)), { env: serverEnv(caps, server, got?.key ?? null), cwd: folder ?? accountFolder(id) })

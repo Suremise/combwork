@@ -48,7 +48,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -75,13 +75,13 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
       return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
     }
     /** An agent's hive server as its launch has it (command and environment), or null. */
-    const hiveOf = async (id) => {
+    const combworkOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const launch = await until(() => launches().findLast((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
       return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
     }
     const tokenOf = async (id) => {
-      const hive = await hiveOf(id)
+      const hive = await combworkOf(id)
       return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id), second: await tokenOf(second.id) }
@@ -235,10 +235,10 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
 
     // An agent's hive tool: cw_start_card runs the start intent. Called through cw-mcp.js with the builder's own
     // hive server settings (from its launch), not typed into its pane, where Combwork's own wakes may be typed meanwhile.
-    const builderHive = await hiveOf(builder.id)
+    const builderCombwork = await combworkOf(builder.id)
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_start_card', arguments: { card: key } } }) + '\n',
-      env: lib.childEnv(builderHive.env),
+      env: lib.childEnv(builderCombwork.env),
       timeout: HUNG_MS
     }).toString()
     const reply = JSON.parse(out.split('\n')[0]).result

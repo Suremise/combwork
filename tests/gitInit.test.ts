@@ -30,7 +30,7 @@ vi.mock('../src/main/mergeSlotHost', () => ({ mergeSlots: {} }))
 vi.mock('../src/main/branchWatch', () => ({ checkProject: async () => undefined }))
 
 const { initCheck, initRepo } = await import('../src/main/gitInit')
-const { HiveError, shownError } = await import('../src/main/combworkError')
+const { CombworkError, shownError } = await import('../src/main/combworkError')
 const { setLanguage } = await import('../src/shared/i18n')
 const { shownText } = await import('../src/shared/advanced')
 
@@ -329,12 +329,12 @@ describe("its refusals (#881): English in the log, the window's language in the 
   const german = (): Record<string, string> => Object.assign({}, ...readdirSync(DE).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(DE, f), 'utf8'))))
   afterEach(() => setLanguage('en', {}))
 
-  it('a run that stops part way is a HiveError: its message English, shown in German, the steps capitalised in both', async () => {
+  it('a run that stops part way is a CombworkError: its message English, shown in German, the steps capitalised in both', async () => {
     globalIdentity()
     const p = project('unignored-de', { '.gitignore': '!/.combwork/\n', 'a.txt': 'a\n' })
     setLanguage('de', german())
     const e = await initRepo(p, { gitignore: 'none' }).catch((x: unknown) => x)
-    expect(e).toBeInstanceOf(HiveError)
+    expect(e).toBeInstanceOf(CombworkError)
     expect((e as Error).message).toMatch(/^Initialised a git repository on main, but git still doesn't ignore \.combwork here/)
     expect(shownError(e)).toMatch(/^Ein Git-Repository auf main initialisiert, aber git ignoriert \.combwork hier noch immer nicht/)
   })
@@ -347,7 +347,7 @@ describe("its refusals (#881): English in the log, the window's language in the 
     writeFileSync(join(p, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n')
     setLanguage('de', german())
     const e = await initRepo(p, { gitignore: 'node' }).catch((x: unknown) => x)
-    expect(e).toBeInstanceOf(HiveError)
+    expect(e).toBeInstanceOf(CombworkError)
     expect((e as Error).message).toMatch(/^Added a Node \.gitignore, but couldn't make the first commit: /)
     expect(shownError(e)).toMatch(/^Eine \.gitignore für Node hinzugefügt, aber der erste Commit konnte nicht erstellt werden: /)
     setLanguage('en', {})
@@ -363,7 +363,7 @@ describe("its refusals (#881): English in the log, the window's language in the 
     expect(check.refused).toBe('This folder is a git repository already.')
     expect(shownText(check.refusedText!)).toBe('Dieser Ordner ist schon ein Git-Repository.')
     const e = await initRepo(p, { gitignore: 'none' }).catch((x: unknown) => x)
-    expect(e).toBeInstanceOf(HiveError)
+    expect(e).toBeInstanceOf(CombworkError)
     expect((e as Error).message).toBe('This folder is a git repository already.')
     expect(shownError(e)).toBe('Dieser Ordner ist schon ein Git-Repository.')
   })

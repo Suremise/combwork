@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   for (const p of [alpha, beta]) lib.gitProject(p)
   const claude = lib.fakeClaude(userData, path.join(lib.WORK, 'narrowmain-claude-home'), [ws])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47936), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47936), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -261,7 +261,7 @@ const check = (name, ok, extra = '') => {
   // German, two stopped agents in two columns (HI-2536): "Neue Sitzung" and the split "Fortsetzen" are wider than
   // English, and at 900 px their row made a sideways scrollbar under each pane. They wrap instead: no placeholder
   // scrolls sideways, at 900 px and 1400 px, in both themes.
-  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47936), ...claude, CW_LANG: 'de' }) })
+  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47936), ...claude, CW_LANG: 'de' }) })
   try {
     const dpage = await de.firstWindow()
     dpage.on('pageerror', (e) => check('German: no page errors', false, e.message))

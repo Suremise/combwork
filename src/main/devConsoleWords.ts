@@ -7,7 +7,7 @@ import type { LiveDetails } from './providers/types'
 /**
  * The developer console's summary lines (#636): what came in and what Hive made of it, in Hive's own words. Never the
  * CLI's or anyone's text: values go through safeWord(), which keeps numbers and identifiers only and says the rest is
- * text; Hive's own names (agents, projects) through hiveName() as the event is kept.
+ * text; Hive's own names (agents, projects) through combworkName() as the event is kept.
  */
 
 export function hookSummary(name: string, tool: unknown, event: string, status: string, actions: string[], replied: boolean): string {

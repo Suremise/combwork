@@ -5,11 +5,11 @@ import { CW_DIR } from '../shared/defaults'
 import { EXCLUDE_COMMENT } from '../shared/combworkFolderMove'
 import { git, gitReading } from './git'
 import { gitTool } from './gitTool'
-import type { HiveVcs } from '../shared/types'
+import type { CombworkVcs } from '../shared/types'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 
 /**
  * Keeping a project's .combwork (sessions, transcript backups, launch settings: this machine's, not the project's) out of
@@ -125,7 +125,7 @@ async function gitIgnores(projectPath: string, excludeFile: string): Promise<boo
  * nothing (no info folder, no line): a project whose project.json went, which a refresh doesn't set up again. A function
  * is asked at each write, as it is made, so a project.json that goes while this runs stops it too (HR2's round 1).
  */
-export async function ensureHiveExcluded(projectPath: string, opts: { readOnly?: boolean | (() => boolean) } = {}): Promise<{ excluded: boolean; root: string; added: boolean; unconfirmed?: boolean } | null> {
+export async function ensureCombworkExcluded(projectPath: string, opts: { readOnly?: boolean | (() => boolean) } = {}): Promise<{ excluded: boolean; root: string; added: boolean; unconfirmed?: boolean } | null> {
   const readOnly = (): boolean => (typeof opts.readOnly === 'function' ? opts.readOnly() : !!opts.readOnly)
   const found = vcsOf(projectPath)
   if (found?.kind !== 'git') return null
@@ -181,7 +181,7 @@ const trackedCache = new Map<string, { stamp: string; files: string[] | null }>(
  * when the repository's index changes (a commit, `git rm --cached`), not at every refresh, or with `fresh`. Null when git
  * can't say (not kept: asked again next time).
  */
-export async function trackedHiveFiles(projectPath: string, root: string, opts: { fresh?: boolean } = {}): Promise<string[] | null> {
+export async function trackedCombworkFiles(projectPath: string, root: string, opts: { fresh?: boolean } = {}): Promise<string[] | null> {
   const key = projectPath.toLowerCase()
   let stamp = ''
   const index = indexOf(root)
@@ -214,22 +214,22 @@ const RM_CHUNK = 100
  * `git rm --cached` on those literal paths alone (`--literal-pathspecs`, never the folder, so nothing added meanwhile is
  * touched), which stages their removal and leaves them on disk; the user commits it. Returns how many.
  */
-export async function untrackHive(projectPath: string, confirmed: string[]): Promise<number> {
+export async function untrackCombwork(projectPath: string, confirmed: string[]): Promise<number> {
   const found = vcsOf(projectPath)
-  if (found?.kind !== 'git') throw hiveError(msg({ id: 'service.combworkVcs.noRepo', defaultMessage: 'No git repository holds this project.', description: "An error untracking the project's .combwork folder (Combwork's own files) from git: the project isn't in a git repository." }))
-  const now = await trackedHiveFiles(projectPath, found.root, { fresh: true })
+  if (found?.kind !== 'git') throw combworkError(msg({ id: 'service.combworkVcs.noRepo', defaultMessage: 'No git repository holds this project.', description: "An error untracking the project's .combwork folder (Combwork's own files) from git: the project isn't in a git repository." }))
+  const now = await trackedCombworkFiles(projectPath, found.root, { fresh: true })
   if (now === null) {
     const problem = gitProblemData(gitTool())
     throw problem
-      ? hiveError(msg({ id: 'service.combworkVcs.cantListWhy', defaultMessage: "Git couldn't list the files it tracks in .combwork ({problem}).", description: "An error untracking the project's .combwork folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .combwork as it is (a folder name)." }), { problem })
-      : hiveError(msg({ id: 'service.combworkVcs.cantList', defaultMessage: "Git couldn't list the files it tracks in .combwork.", description: "An error untracking the project's .combwork folder from git: git couldn't list them. Keep .combwork as it is (a folder name)." }))
+      ? combworkError(msg({ id: 'service.combworkVcs.cantListWhy', defaultMessage: "Git couldn't list the files it tracks in .combwork ({problem}).", description: "An error untracking the project's .combwork folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .combwork as it is (a folder name)." }), { problem })
+      : combworkError(msg({ id: 'service.combworkVcs.cantList', defaultMessage: "Git couldn't list the files it tracks in .combwork.", description: "An error untracking the project's .combwork folder from git: git couldn't list them. Keep .combwork as it is (a folder name)." }))
   }
   const shown = new Set(Array.isArray(confirmed) ? confirmed.filter((f) => typeof f === 'string') : [])
-  if (now.length !== shown.size || now.some((f) => !shown.has(f))) throw hiveError(msg({ id: 'service.combworkVcs.changed', defaultMessage: 'The files git tracks in .combwork changed since you were shown them: nothing was untracked. Look again.', description: "An error untracking the project's .combwork folder from git: the list of its tracked files changed after Combwork showed it, so nothing changed. Keep .combwork as it is." }), undefined, { kind: 'conflict' })
+  if (now.length !== shown.size || now.some((f) => !shown.has(f))) throw combworkError(msg({ id: 'service.combworkVcs.changed', defaultMessage: 'The files git tracks in .combwork changed since you were shown them: nothing was untracked. Look again.', description: "An error untracking the project's .combwork folder from git: the list of its tracked files changed after Combwork showed it, so nothing changed. Keep .combwork as it is." }), undefined, { kind: 'conflict' })
   try {
     for (let i = 0; i < now.length; i += RM_CHUNK) {
       const r = await git(projectPath, ['--literal-pathspecs', 'rm', '--cached', '--quiet', '--', ...now.slice(i, i + RM_CHUNK)])
-      if (!r.ok) throw hiveError(msg({ id: 'service.combworkVcs.rmFailed', defaultMessage: 'git rm --cached failed: {why}', description: "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run." }), { why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(msg({ id: 'service.combworkVcs.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }), { code: r.code })) })
+      if (!r.ok) throw combworkError(msg({ id: 'service.combworkVcs.rmFailed', defaultMessage: 'git rm --cached failed: {why}', description: "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run." }), { why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(msg({ id: 'service.combworkVcs.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }), { code: r.code })) })
     }
   } finally {
     trackedCache.delete(projectPath.toLowerCase())
@@ -267,18 +267,18 @@ let roots: { at: number; list: [string, string][] } | null = null
 
 /**
  * Whether the project's .combwork is kept out of version control, ensuring it for git first (at each refresh).
- * `readOnly` (HI-2564): asked only, nothing written (ensureHiveExcluded's).
+ * `readOnly` (HI-2564): asked only, nothing written (ensureCombworkExcluded's).
  */
-export async function hiveVcs(projectPath: string, opts: { readOnly?: boolean | (() => boolean) } = {}): Promise<HiveVcs> {
+export async function combworkVcs(projectPath: string, opts: { readOnly?: boolean | (() => boolean) } = {}): Promise<CombworkVcs> {
   // Sync folders change rarely: read them at most once a minute.
   if (!roots || Date.now() - roots.at > 60_000) roots = { at: Date.now(), list: syncRoots() }
   const sync = syncServiceOf(projectPath, roots.list)
-  const withSync = (v: HiveVcs): HiveVcs => (sync ? { ...v, sync } : v)
+  const withSync = (v: CombworkVcs): CombworkVcs => (sync ? { ...v, sync } : v)
   const found = vcsOf(projectPath)
   if (!found) return withSync({ state: 'none' })
   if (found.kind === 'other') return withSync({ state: 'other-vcs', vcs: found.name })
-  const r = await ensureHiveExcluded(projectPath, opts).catch(() => null)
+  const r = await ensureCombworkExcluded(projectPath, opts).catch(() => null)
   // Excluded or not, files committed before stay tracked (#364).
-  const tracked = (await trackedHiveFiles(projectPath, found.root).catch(() => null))?.length ?? 0
+  const tracked = (await trackedCombworkFiles(projectPath, found.root).catch(() => null))?.length ?? 0
   return withSync({ state: r?.excluded ? 'excluded' : 'not-excluded', ...(tracked ? { tracked } : {}) })
 }

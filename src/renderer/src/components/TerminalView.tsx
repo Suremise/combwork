@@ -78,21 +78,21 @@ function putBack(term: Terminal, mount: HTMLElement | null): void {
 }
 
 /** How many terminals hold a WebGL context (for tests). */
-;(window as unknown as { __hiveWebglCount?: () => number }).__hiveWebglCount = () => webglHolders.size
+;(window as unknown as { __cwWebglCount?: () => number }).__cwWebglCount = () => webglHolders.size
 
 /**
  * Glyph atlas pages merged away, as the terminals sharing the atlas heard it (each hears every page), for tests (#1048):
- * counted, and window.__hiveAtlasMerges there, only in development and test builds (from a terminal's first WebGL).
+ * counted, and window.__cwAtlasMerges there, only in development and test builds (from a terminal's first WebGL).
  */
 let atlasMerges = 0
 function countAtlasMerges(): boolean {
   if (useStore.getState().appInfo?.isPackaged !== false) return false
-  ;(window as unknown as { __hiveAtlasMerges?: () => number }).__hiveAtlasMerges ??= () => atlasMerges
+  ;(window as unknown as { __cwAtlasMerges?: () => number }).__cwAtlasMerges ??= () => atlasMerges
   return true
 }
 
 /** Where some text is on screen in a terminal (the middle of its first character), for tests that point at it. */
-;(window as unknown as { __hiveTerminalTextAt?: (key: string, text: string) => { x: number; y: number } | null }).__hiveTerminalTextAt = (key, text) => {
+;(window as unknown as { __cwTerminalTextAt?: (key: string, text: string) => { x: number; y: number } | null }).__cwTerminalTextAt = (key, text) => {
   const term = terminals.get(key)
   const screen = term?.element?.querySelector('.xterm-screen')
   if (!term || !screen) return null
@@ -109,7 +109,7 @@ function countAtlasMerges(): boolean {
  * The text a terminal shows on a background colour of its program's (not the default), each run as a string, for tests:
  * a program drawing its own selection (Copilot, #1299) shows it this way, and a user copies what they see highlighted.
  */
-;(window as unknown as { __hiveTerminalHighlighted?: (key: string) => string[] | null }).__hiveTerminalHighlighted = (key) => {
+;(window as unknown as { __cwTerminalHighlighted?: (key: string) => string[] | null }).__cwTerminalHighlighted = (key) => {
   const term = terminals.get(key)
   if (!term) return null
   const buf = term.buffer.active
@@ -133,14 +133,14 @@ function countAtlasMerges(): boolean {
 }
 
 /** A terminal's size and scroll, for tests: scrolled to the bottom when viewportY is baseY; `mouse`, the mouse tracking its program turned on. */
-;(window as unknown as { __hiveTerminalState?: (key: string) => { cols: number; rows: number; viewportY: number; baseY: number; mouse: string } | null }).__hiveTerminalState = (key) => {
+;(window as unknown as { __cwTerminalState?: (key: string) => { cols: number; rows: number; viewportY: number; baseY: number; mouse: string } | null }).__cwTerminalState = (key) => {
   const term = terminals.get(key)
   if (!term) return null
   return { cols: term.cols, rows: term.rows, viewportY: term.buffer.active.viewportY, baseY: term.buffer.active.baseY, mouse: term.modes.mouseTrackingMode }
 }
 
 /** The lines a terminal shows now, as drawn (trailing spaces kept), for tests that check what is on screen. */
-;(window as unknown as { __hiveTerminalLines?: (key: string) => string[] | null }).__hiveTerminalLines = (key) => {
+;(window as unknown as { __cwTerminalLines?: (key: string) => string[] | null }).__cwTerminalLines = (key) => {
   const term = terminals.get(key)
   if (!term) return null
   const buf = term.buffer.active
@@ -152,7 +152,7 @@ function countAtlasMerges(): boolean {
  * fit counts as fitted). A pane that just changed size is fitted a moment later (FIT_SETTLE_MS), and xterm re-wraps its
  * lines then (#896): tests that photograph terminals wait for this first.
  */
-;(window as unknown as { __hiveTerminalsFitted?: () => boolean }).__hiveTerminalsFitted = () =>
+;(window as unknown as { __cwTerminalsFitted?: () => boolean }).__cwTerminalsFitted = () =>
   [...terminals.entries()].every(([key, term]) => {
     const host = term.element?.closest<HTMLElement>('.terminal-host')
     if (!host || host.classList.contains('hidden') || host.offsetWidth === 0 || host.offsetHeight === 0) return true
@@ -164,7 +164,7 @@ function countAtlasMerges(): boolean {
  * Whether every terminal on screen is drawn inside its pane: its screen (cols × cell width) ends within its host, so
  * nothing of it is cut at the pane's edge (#1037). A terminal too small to fit counts as fitted above, not here.
  */
-;(window as unknown as { __hiveTerminalsInside?: () => boolean }).__hiveTerminalsInside = () =>
+;(window as unknown as { __cwTerminalsInside?: () => boolean }).__cwTerminalsInside = () =>
   [...terminals.values()].every((term) => {
     const host = term.element?.closest<HTMLElement>('.terminal-host')
     if (!host || host.classList.contains('hidden') || host.offsetWidth === 0 || host.offsetHeight === 0) return true
@@ -174,10 +174,10 @@ function countAtlasMerges(): boolean {
   })
 
 /** A terminal's own selection (Shift+drag, or a drag where the program doesn't track the mouse), for tests. */
-;(window as unknown as { __hiveTerminalSelection?: (key: string) => string | null }).__hiveTerminalSelection = (key) => terminals.get(key)?.getSelection() ?? null
+;(window as unknown as { __cwTerminalSelection?: (key: string) => string | null }).__cwTerminalSelection = (key) => terminals.get(key)?.getSelection() ?? null
 
 /** Writes text to a terminal as if its program printed it (escape sequences too), for tests; resolves once xterm has parsed it. */
-;(window as unknown as { __hiveTerminalOutput?: (key: string, data: string) => Promise<boolean> }).__hiveTerminalOutput = (key, data) => {
+;(window as unknown as { __cwTerminalOutput?: (key: string, data: string) => Promise<boolean> }).__cwTerminalOutput = (key, data) => {
   const term = terminals.get(key)
   return new Promise((resolve) => (term ? term.write(data, () => resolve(true)) : resolve(false)))
 }
@@ -185,12 +185,12 @@ function countAtlasMerges(): boolean {
 /**
  * Mouse reports a terminal would send its program (xterm's SGR or X10 encodings), held back while a test holds them,
  * for tests (#1167): a right-click passed to a real CLI can be seen without the CLI acting on it (its paste would read
- * the machine's clipboard). `__hiveHoldMouseReports(key, true)` starts holding; `false` stops and returns what was held.
+ * the machine's clipboard). `__cwHoldMouseReports(key, true)` starts holding; `false` stops and returns what was held.
  * Development and test builds only (null in a packaged one).
  */
 const heldMouseReports = new Map<string, string[]>()
 const MOUSE_REPORT = /^\x1b\[(?:<\d+;\d+;\d+[Mm]|M[\s\S]{3})+$/
-;(window as unknown as { __hiveHoldMouseReports?: (key: string, hold: boolean) => string[] | null }).__hiveHoldMouseReports = (key, hold) => {
+;(window as unknown as { __cwHoldMouseReports?: (key: string, hold: boolean) => string[] | null }).__cwHoldMouseReports = (key, hold) => {
   if (useStore.getState().appInfo?.isPackaged !== false) return null
   const held = heldMouseReports.get(key) ?? []
   if (hold) heldMouseReports.set(key, held)
@@ -199,7 +199,7 @@ const MOUSE_REPORT = /^\x1b\[(?:<\d+;\d+;\d+[Mm]|M[\s\S]{3})+$/
 }
 
 /** Scrolls a terminal by some lines without any input, as xterm's own late scroll syncs do, for tests. */
-;(window as unknown as { __hiveTerminalScrollLines?: (key: string, lines: number) => void }).__hiveTerminalScrollLines = (key, lines) => terminals.get(key)?.scrollLines(lines)
+;(window as unknown as { __cwTerminalScrollLines?: (key: string, lines: number) => void }).__cwTerminalScrollLines = (key, lines) => terminals.get(key)?.scrollLines(lines)
 
 /**
  * Pastes text into a mounted terminal as a real paste (bracketed when the program asked for it),
@@ -231,7 +231,7 @@ export function terminalMinWidth(): number {
   return Math.ceil((MIN_COLS + 2) * cell) + PANE_EXTRA_PX
 }
 /** terminalMinWidth(), for tests (#1050: the focus view's strip is at its least before a pane is at this). */
-;(window as unknown as { __hiveTerminalMinWidth?: () => number }).__hiveTerminalMinWidth = () => terminalMinWidth()
+;(window as unknown as { __cwTerminalMinWidth?: () => number }).__cwTerminalMinWidth = () => terminalMinWidth()
 /** A layout that is still settling (a view shown again re-renders its header as it measures it) is fitted once, at its final size. */
 const FIT_SETTLE_MS = 100
 /** How long after a fit, or being shown, a terminal following its output is held at the bottom (see TerminalView). */

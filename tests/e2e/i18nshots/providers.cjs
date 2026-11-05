@@ -92,7 +92,7 @@ async function closeStray(ctx) {
 
 /**
  * A start refused at its launch (#842): alpha's Claude Code agents get a --settings with no value, so the window's New
- * Session fails with main's HiveError, in the run's language.
+ * Session fails with main's CombworkError, in the run's language.
  */
 async function launchRefused(ctx) {
   const { inv, page } = ctx

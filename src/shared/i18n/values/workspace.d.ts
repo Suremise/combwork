@@ -1,6 +1,6 @@
 // Generated from locales/en/workspace.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'workspace.activity.activity': undefined
   'workspace.activity.assistant': undefined
   'workspace.activity.board': undefined

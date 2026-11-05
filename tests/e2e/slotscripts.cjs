@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   const archive = path.join(fx.tools, 'archive.js')
   fs.writeFileSync(archive, ["const fs = require('fs')", `fs.appendFileSync(${JSON.stringify(archiveLog)}, process.env.CW_SLOT + ' ' + fs.existsSync('.git') + '\\n')`, `process.exit(Number(fs.readFileSync(${JSON.stringify(exitFile)}, 'utf8')))`, ''].join('\n'))
   const archived = () => (fs.existsSync(archiveLog) ? fs.readFileSync(archiveLog, 'utf8').trim().split('\n').filter(Boolean) : [])
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     const { page, inv } = h
     page.on('pageerror', (e) => check('no page errors', false, e.message))

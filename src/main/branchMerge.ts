@@ -11,7 +11,7 @@ import { msg } from '../shared/i18n'
 import type { AgentBranchStatus, MergeBranch, MergeBranchList, MergeResult } from '../shared/types'
 import { folderFacts } from './agentFolders'
 import { checkProject } from './branchWatch'
-import { capturedText, HiveError, hiveError } from './combworkError'
+import { capturedText, CombworkError, combworkError } from './combworkError'
 import { placeKey, samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import { mergeInProject } from './projectAgents'
@@ -36,7 +36,7 @@ const M = {
 export async function lineConfirmed(projectPath: string, branch: string | null | undefined, card: number | undefined): Promise<void> {
   if (!branch) return
   const line = await lineCard(projectPath, branch)
-  if (line && card !== line.number) throw hiveError(M.cardWork, { branch, card: line.key }, { kind: 'conflict' })
+  if (line && card !== line.number) throw combworkError(M.cardWork, { branch, card: line.key }, { kind: 'conflict' })
 }
 
 /** The card whose line `branch` is, while it isn't Done (started, any stage but done; put back too). Null otherwise. */
@@ -86,8 +86,8 @@ async function folderOf(projectPath: string, branch: string): Promise<string> {
 /** Checks the branch and the target are local branches and not the same; the branch's folder. */
 async function picked(projectPath: string, branch: string, target: string): Promise<string> {
   const local = await wt.localBranches(projectPath)
-  for (const b of [branch, target]) if (!local.includes(b)) throw hiveError(M.notBranch, { branch: b })
-  if (branch === target) throw hiveError(M.sameBranch, { branch })
+  for (const b of [branch, target]) if (!local.includes(b)) throw combworkError(M.notBranch, { branch: b })
+  if (branch === target) throw combworkError(M.sameBranch, { branch })
   return folderOf(projectPath, branch)
 }
 
@@ -111,7 +111,7 @@ export async function mergeBranch(projectPath: string, branch: string, opts: { t
     const live = sessions.liveStates().find((s) => s.cwd && samePlace(s.cwd, folder) && s.projectPath.toLowerCase() === projectPath.toLowerCase())
     const name = live ? (projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === live.agentId)?.name ?? live.agentId) : ''
     // agent-text: mergeBlocked
-    if (live && mergeBlocked(name, live.status)) throw new HiveError(capturedText((t) => mergeBlocked(name, live.status, t))!, { kind: 'conflict' })
+    if (live && mergeBlocked(name, live.status)) throw new CombworkError(capturedText((t) => mergeBlocked(name, live.status, t))!, { kind: 'conflict' })
   }
   const result = await mergeInProject(projectPath, { path: folder, branch, base: opts.target }, { squash: opts.squash, message: opts.message, target: opts.target })
   if (result.ok) log.info(`Merged ${userText(branch)} into ${userText(opts.target)} in ${userText(basename(projectPath))} from the Merge dialog${card ? ` (card #${card.number}'s line, outside its rules)` : ''}`)

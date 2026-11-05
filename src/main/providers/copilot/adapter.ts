@@ -300,11 +300,11 @@ export class CopilotAdapter implements ProviderAdapter {
       for (const name of this.otherMcpServers(ctx.cwd)) if (!ctx.mcpServers[name]) args.push('--disable-mcp-server', name)
     }
     // Hive's own tools run without asking in every mode, as for the other CLIs: the Agent API decides what an agent may
-    // do with them. The Assistant only the ones its Control settings let it use without asking (trustedHiveTools).
+    // do with them. The Assistant only the ones its Control settings let it use without asking (trustedCombworkTools).
     // Copilot's patterns: <server> for all its tools, <server>(<tool>) for one (#468).
     // Switched off (#1281), none: Copilot asks per its own mode.
     if (ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, COPILOT, 'preApproveCombworkTools')) {
-      if (ctx.trustedHiveTools) for (const t of ctx.trustedHiveTools) args.push(`--allow-tool=${TOOLS_SERVER}(${t})`)
+      if (ctx.trustedCombworkTools) for (const t of ctx.trustedCombworkTools) args.push(`--allow-tool=${TOOLS_SERVER}(${t})`)
       else args.push(`--allow-tool=${TOOLS_SERVER}`)
     }
     if (ctx.model) args.push('--model', ctx.model)
@@ -592,7 +592,7 @@ export class CopilotAdapter implements ProviderAdapter {
    * (where Hive's copies are, shared with Codex) and .claude/skills: first found by name wins.
    */
   skillRoots(): SkillRoots {
-    return { machine: [join(copilotHome(), 'skills'), join(homedir(), '.agents', 'skills')], plugins: join(copilotHome(), 'installed-plugins'), local: [join('.github', 'skills'), AGENTS_SKILLS, join('.claude', 'skills')], hiveCopyPrefix: 'cw-' }
+    return { machine: [join(copilotHome(), 'skills'), join(homedir(), '.agents', 'skills')], plugins: join(copilotHome(), 'installed-plugins'), local: [join('.github', 'skills'), AGENTS_SKILLS, join('.claude', 'skills')], combworkCopyPrefix: 'cw-' }
   }
 
   /** Servers in the project's .github/mcp.json, which Hive leaves off until copied to the workspace. */

@@ -937,7 +937,7 @@ describe('watches (main/watches.ts)', async () => {
   })
 
   it("a verdict, move and comment in one call are saved together: the builder's wake names the reviewer's comment (#138)", async () => {
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const { w, alpha } = await open()
     const st = fake(alpha)
     const reviewer = { kind: 'agent', name: 'Reviewer (alpha)', self: { project: 'alpha', agentId: 'a2' }, scope: 'alpha' } as const
@@ -947,7 +947,7 @@ describe('watches (main/watches.ts)', async () => {
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict', 'column'], column: 'done' })
     // What anything reading the card sees the moment a change is announced (a watch waking its agent reads it then).
     const seen: { column: string; latest: string | undefined }[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type !== 'tasks-changed') return
       const card = readCard(w, c.number) as unknown as TaskCard
       seen.push({ column: card.column, latest: card.comments.at(-1)?.text })

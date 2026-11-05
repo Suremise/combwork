@@ -35,7 +35,7 @@ import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '../shared/inbo
 import { advanced } from './advanced'
 import * as assistant from './assistantControl'
 import { config } from './config'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { placeKey, readCapped, readJson, realPath, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
@@ -1432,7 +1432,7 @@ async function staleOf(host: string, records: readonly DeliveryRecord[]): Promis
 
 /** Board changes seen (tasks-changed): a relevance read one has overtaken is read again, or not acted on (Relevance). */
 let boardChanges = 0
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type === 'tasks-changed') boardChanges++
 })
 
@@ -1823,11 +1823,11 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
   }
   /**
    * Waits while the agent's hive tools are connecting (#865 round 3: a task given in the second after it became ready):
-   * held, not refused, until they connect or the bound passes (sessions.hiveToolsSettled). Whether it waited.
+   * held, not refused, until they connect or the bound passes (sessions.combworkToolsSettled). Whether it waited.
    */
   const heldByTools = async (): Promise<boolean> => {
-    if (!sessions.hiveToolsWaiting(host, nd.agentId) || !readyFor(sessions.liveFor(host, nd.agentId), nd.need ?? 'idle')) return false
-    await sessions.hiveToolsSettled(host, nd.agentId)
+    if (!sessions.combworkToolsWaiting(host, nd.agentId) || !readyFor(sessions.liveFor(host, nd.agentId), nd.need ?? 'idle')) return false
+    await sessions.combworkToolsSettled(host, nd.agentId)
     return true
   }
   const rec = await createDelivery(host, nd, { ...hooks, ...(holds ? { holds } : {}) })
@@ -1962,7 +1962,7 @@ export function initDeliveries(): void {
   started = true
   followWorkspaceCloses()
   sessions.lineLost = (host, agentId, runId, ids) => void ringLostLine(host, agentId, runId, ids).catch((e) => log.warn('ringing a lost line again', e))
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'workspace-changed') {
       // Restored as a workspace opens: its projects' and its Assistant's (refusals shown, panes filled in).
       const hosts = [...(e.workspace?.projects ?? []).map((p) => p.path), ...(e.workspace?.assistant ? [e.workspace.assistant.path] : [])]
@@ -1990,7 +1990,7 @@ export function initDeliveries(): void {
   })
   // A team resuming (HI-2081): what its pause held has its time moved on by how long it was held (never expired for the
   // pause: a weekend's still resumes), then each source's refresh decides from things as they are now, and it is offered.
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'team-pause-changed' && !e.pause && e.was) void rebaseHeld(e.workspacePath, e.was.since).catch((err) => log.warn('offering what the team pause held', err))
   })
   // The user's pause after typing, a line taken, overdue: nothing tells of those, so they are looked at now and then.

@@ -41,7 +41,7 @@ const pidOf = (tag) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.sessions = { ...cfg.settings.sessions, confirmStop: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47867), CODEX_HOME: lib.CODEX_HOME })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47867), CODEX_HOME: lib.CODEX_HOME })
   // Codex runs commands in PowerShell 7 where there is one: kept on PATH, the Microsoft Store's too (an alias in
   // WindowsApps). That one is a packaged app whose children start outside every job, and Codex doesn't end them as it
   // exits: Combwork's process tracker takes them in (#543, SPEC §6.2 Leftover processes), so they are listed and ended.

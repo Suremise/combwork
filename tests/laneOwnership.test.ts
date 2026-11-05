@@ -8,7 +8,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, LaneCard } from '../src/shared/types'
+import type { CombworkEvent, LaneCard } from '../src/shared/types'
 import { laneNextText, laneStatus, laneStatusText, type LaneCardFacts } from '../src/shared/lanes'
 import { laneHits, type LaneNow } from '../src/shared/laneWatch'
 import { tempDir } from './tempDir'
@@ -26,7 +26,7 @@ const store = await import('../src/main/boardStore')
 const { advanced } = await import('../src/main/advanced')
 const { ENFORCE, workflowFor } = await import('../src/main/workflow/service')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { deliveriesOf } = await import('../src/main/deliveries')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const tables = await import('../src/main/storeTables')
@@ -92,7 +92,7 @@ describe('Combwork owns the lane (lanes.ts, #1270)', () => {
   let w: WS
   const wsPath = join(base, 'ws')
   const project = join(wsPath, 'alpha')
-  const ended: HiveEvent[] = []
+  const ended: CombworkEvent[] = []
   let off: () => void
   const user = { kind: 'user' } as const
   beforeAll(async () => {
@@ -105,7 +105,7 @@ describe('Combwork owns the lane (lanes.ts, #1270)', () => {
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
-    off = onHiveEvent((e) => e.type === 'lane-ended' && ended.push(e))
+    off = onCombworkEvent((e) => e.type === 'lane-ended' && ended.push(e))
   })
   afterAll(async () => {
     off()

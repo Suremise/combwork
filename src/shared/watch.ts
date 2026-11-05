@@ -632,7 +632,7 @@ const W = {
   loopSaid: agentMsg({ id: 'wake.loop.said', text: '. {whose, select, reviewerAsks {The reviewer asks} builderReplies {The builder replies} builder {The builder} reviewer {The reviewer} other {Combwork}}: "{text}"', note: "#912, #1382: in a loop wake, what a request, step or Combwork's note says (cut with … to fit), and whose it is." }),
   lanePaused: agentMsg({ id: 'wake.lane.paused', text: 'Your lane is paused: cw_lane next says why', note: "HI-1990: a builder's Done wake when its lane is paused." }),
   laneLast: agentMsg({ id: 'wake.lane.last', text: "That was your lane's last card: the lane ends by itself, so end your turn unless you have other work", note: "HI-1990: a builder's Done wake on its lane's last card." }),
-  laneNextHiveStarts: agentMsg({ id: 'wake.lane.nextCombworkStarts', text: "Your lane's next card is {card} (\"{title}\"): Combwork starts it for you once your turn ends, so end your turn now", note: "HI-1990: a builder's Done wake, its lane's rules on: Combwork starts the next card." }),
+  laneNextCombworkStarts: agentMsg({ id: 'wake.lane.nextCombworkStarts', text: "Your lane's next card is {card} (\"{title}\"): Combwork starts it for you once your turn ends, so end your turn now", note: "HI-1990: a builder's Done wake, its lane's rules on: Combwork starts the next card." }),
   laneNextStart: agentMsg({ id: 'wake.lane.nextStart', text: "Your lane's next card is {card} (\"{title}\"): start it now (cw_lane next, then cw_start_card); this card's own prompt doesn't narrow the lane", note: "HI-1990: a builder's Done wake, its lane's rules off: it starts the next card." }),
   laneNextStarted: agentMsg({ id: 'wake.lane.nextStarted', text: "Your lane's next card, {card} (\"{title}\"), is under way: carry on with it", note: "HI-1990: a builder's Done wake when its next card is already under way." }),
   laneNextWaits: agentMsg({ id: 'wake.lane.nextWaits', text: "Your lane's next card is {card} (\"{title}\"): cw_lane next says when it can start", note: "HI-1990: a builder's Done wake when its next card can't start yet." }),
@@ -732,17 +732,17 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
 
 /**
  * What comes next in a builder's lane, as its Done wake says it (HI-1990; English, agent-facing): its next card, which
- * Hive starts for it once its turn ends (`hiveStarts`, rules on), for it to start (`start`, rules off), already under way
+ * Hive starts for it once its turn ends (`combworkStarts`, rules on), for it to start (`start`, rules off), already under way
  * (`started`) or not yet startable (`waits`); the lane paused; or none left.
  */
-export function laneNextWords(next: { card: number; title: string; is: 'hiveStarts' | 'start' | 'started' | 'waits' } | 'paused' | 'last'): string {
+export function laneNextWords(next: { card: number; title: string; is: 'combworkStarts' | 'start' | 'started' | 'waits' } | 'paused' | 'last'): string {
   if (next === 'paused') return say(W.lanePaused)
   if (next === 'last') return say(W.laneLast)
   const title = [...next.title.trim()]
   const values = { card: cardRef(next.card), title: title.length > 60 ? `${title.slice(0, 59).join('')}…` : title.join('') }
   switch (next.is) {
-    case 'hiveStarts':
-      return say(W.laneNextHiveStarts, values)
+    case 'combworkStarts':
+      return say(W.laneNextCombworkStarts, values)
     case 'start':
       return say(W.laneNextStart, values)
     case 'started':

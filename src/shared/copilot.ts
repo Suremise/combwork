@@ -241,7 +241,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   permissionModes: withCliOwn(COPILOT_PERMISSION_MODES),
   // Ask, with edits in the agent's folder approved (#468).
   defaultPermissionMode: 'accept-edits',
-  // Reads are approved by Copilot itself, and Hive's own tools are pre-approved (the Assistant's: trustedHiveTools).
+  // Reads are approved by Copilot itself, and Hive's own tools are pre-approved (the Assistant's: trustedCombworkTools).
   assistantMode: 'ask',
   effortLevels: [
     { value: 'none', label: 'None', text: EFFORT_TEXT.none }, // i18n-ignore: agent-facing English (text is the window's)

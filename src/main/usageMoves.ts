@@ -12,7 +12,7 @@ import { accountById, allAccounts, allConnections, firstUsableAccount, getConnec
 import { choiceCount, onManualChoice } from './agentChoice'
 import { coalesced } from './coalesce'
 import { config } from './config'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { createLogger, userText } from './logger'
 import { tell } from './notify'
 import { connectionLoginNow } from './planUsage'
@@ -339,7 +339,7 @@ function manualChoice(projectPath: string, before: AgentDef): void {
 
 /** Usage moves' part of Hive's start (index.ts): they follow usage reports, accounts, workspaces and the Advanced switch. */
 export function initUsageMoves(): void {
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'connections-changed' || e.type === 'advanced-changed' || e.type === 'settings-changed' || e.type === 'workspace-changed') revalidate()
     if ((e.type === 'plan-usage' && e.connection) || e.type === 'connections-changed' || e.type === 'advanced-changed' || e.type === 'workspace-changed') void lookAtUsageMoves()
   })

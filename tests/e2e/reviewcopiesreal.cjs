@@ -102,7 +102,7 @@ const namingCopies = () => {
   const homeFiles = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^(config|settings)\.(json|toml)$|^\.claude\.json$/i.test(f)).map((f) => path.join(dir, f)) : [])
   const homesBefore = new Map([...homeFiles(CLAUDE_TEST_HOME), ...homeFiles(CODEX_HOME), ...homeFiles(path.join(copilotDir, 'copilot-home'))].map((f) => [f, fs.readFileSync(f, 'utf8')]))
 
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME, CODEX_HOME, ...copilotEnv, CW_TEST_TIPS: 'off' }) })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME, CODEX_HOME, ...copilotEnv, CW_TEST_TIPS: 'off' }) })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))

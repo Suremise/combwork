@@ -40,7 +40,7 @@ import { exitBy } from './exitLog'
 import { legacyWorktree, rebindSession, slotHeldWords, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { onLineFreed, whyNoLine } from './lineWriter'
 import { changingFolder, folderChanging, folderSteady } from './folderFence'
 import { containsPlace, samePlace } from './fsutil'
@@ -60,7 +60,7 @@ import { brokerWorkingIn } from './agentProcesses'
 import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
-import { HiveError } from './combworkError'
+import { CombworkError } from './combworkError'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
 import { withoutWriteFence, type CardRecord } from './workflow/factStore'
@@ -833,7 +833,7 @@ function until(projectPath: string, agentId: string, ok: () => boolean, over: ()
       if (over()) return finish(false)
       if (ok()) finish(true)
     }
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if ((e.type === 'session-status' && e.state.agentId === agentId && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
     })
     // A restart resume of the agent settling (HI-1746: a placement waits while one will bring it back).
@@ -1414,7 +1414,7 @@ function nextLook(projectPath: string, agentId: string, over: () => boolean, bui
     quietTimer?.unref?.()
     const cwd = sessions.liveFor(projectPath, agentId)?.cwd
     if (folderChanging(cwd)) void folderSteady(cwd).then(() => finish())
-    if (sessions.hiveToolsWaiting(projectPath, agentId)) void sessions.hiveToolsSettled(projectPath, agentId).then(() => finish())
+    if (sessions.combworkToolsWaiting(projectPath, agentId)) void sessions.combworkToolsSettled(projectPath, agentId).then(() => finish())
     const finish = (): void => {
       if (done) return
       done = true
@@ -1426,7 +1426,7 @@ function nextLook(projectPath: string, agentId: string, over: () => boolean, bui
       clearTimeout(quietTimer)
       resolve(!over())
     }
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if ((e.type === 'session-status' && same(e.state.projectPath, e.state.agentId)) || (!held && e.type === 'progress-changed') || (held && e.type === 'agent-leftovers' && e.leftovers.projectPath.toLowerCase() === projectPath.toLowerCase())) finish()
     })
     const offEntry = onResumeEntry((p, a) => {
@@ -1534,7 +1534,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       // Another start of it won (the restart queue, Resume All): not this resume's failure; the next look finds it running.
       if (sessions.liveFor(projectPath, agentId) || sessions.pendingStart(projectPath, agentId)) throw e
       // Its slot not ready for it yet (a crashed run's processes not known ended, a setup under way): a wait, not a try.
-      if (e instanceof HiveError && e.kind === 'conflict') {
+      if (e instanceof CombworkError && e.kind === 'conflict') {
         log.info(`#${n} waits to resume ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)}: ${userText(e.message)}`)
         const told = 'refused'
         if (!track.told.has(told)) {
@@ -1572,7 +1572,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         if (isPlacedHow(was)) how = was
       }
     } else {
-      const cardPrompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane })
+      const cardPrompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.combworkMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane })
       // Its lane's brief as it is now (HI-1795), after the card's own prompt (the window's or offered one kept whole): in
       // every placement of the lane's cards, whatever conversation works the card. Fixed with the delivery once made.
       // A read that fails is unknown, never "no brief": it throws, and the pass tries again (HR4's round 1).
@@ -2022,7 +2022,7 @@ export function startSlotCards(): void {
   setLaneSlotHeld(laneSlotHeld)
   // A lane's free slot held by a session (HI-2466): its agent's session ending or going idle may free it, so the
   // project's pass looks again at once rather than at its next pause.
-  const offSessions = onHiveEvent((e) => {
+  const offSessions = onCombworkEvent((e) => {
     const where = e.type === 'session-exit' ? e.projectPath : e.type === 'session-status' && (e.state.status === 'ready' || e.state.status === 'finished') ? e.state.projectPath : null
     if (!where) return
     const ws = workspaceFor(where)
@@ -2035,7 +2035,7 @@ export function startSlotCards(): void {
   const offLanes = onLanesWritten(() => void settleAll().catch((e) => log.warn("settling the lanes' slots", e)))
   // A workspace opening (Hive's start, a restart after a crash): what its cards are owed is done.
   const seen = new WeakSet<AbortSignal>()
-  const offOpen = onHiveEvent((e) => {
+  const offOpen = onCombworkEvent((e) => {
     if (e.type !== 'workspace-changed') return
     pruneLaneHolds()
     for (const ws of openWorkspaces()) {
@@ -2053,7 +2053,7 @@ export function startSlotCards(): void {
   // A board change (a card put back or Done outside the rules writes no slot action): its leases looked at, at most once
   // a second per workspace.
   let boardSoon: NodeJS.Timeout | null = null
-  const offBoard = onHiveEvent((e) => {
+  const offBoard = onCombworkEvent((e) => {
     // The team resuming (HI-2081) is one too: what waited for it is placed.
     if ((e.type !== 'tasks-changed' && e.type !== 'team-pause-changed') || boardSoon) return
     boardSoon = setTimeout(() => {

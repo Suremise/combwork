@@ -6,10 +6,10 @@
 // submission is always in it. Without file locks (Settings: Off) sessions take none, and nothing is recorded.
 import { isAbsolute, relative, resolve } from 'path'
 import { inBoardWrite } from '../boardStore'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { createLogger, userText } from '../logger'
 import { workspaceOf, type WorkspaceService } from '../workspace'
-import type { HiveEvent } from '../../shared/types'
+import type { CombworkEvent } from '../../shared/types'
 import type { LockSeen } from './runtime'
 import { workflowFor, workflowNow } from './service'
 
@@ -40,7 +40,7 @@ function projectPaths(projectPath: string, cwd: string, files: readonly string[]
 }
 
 /** Handles one event, synchronously: what to record is decided and queued now, in the order events come. */
-export function onLockEvent(e: HiveEvent): void {
+export function onLockEvent(e: CombworkEvent): void {
   if (e.type === 'session-exit') {
     seen.delete(liveKey(e.projectPath, e.agentId))
     return
@@ -77,5 +77,5 @@ export function onLockEvent(e: HiveEvent): void {
 
 /** Starts recording (the app, as it starts); returns the stop. */
 export function startLockRecords(): () => void {
-  return onHiveEvent(onLockEvent)
+  return onCombworkEvent(onLockEvent)
 }

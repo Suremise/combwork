@@ -128,7 +128,7 @@ describe('import tokens', () => {
     const w = rememberPick('b', 3, 'W', 0)
     const v = rememberPick('c', 4, 'V', 0)
     forgetPicks({ window: 3 })
-    forgetPicks({ hiveDir: 'v' })
+    forgetPicks({ combworkDir: 'v' })
     expect(pickOfToken(w, 3, 'W', 1)).toBeNull()
     expect(pickOfToken(v, 4, 'V', 1)).toBeNull()
     const many = Array.from({ length: 9 }, (_, i) => rememberPick(`f${i}`, 5, 'W', 100 + i))

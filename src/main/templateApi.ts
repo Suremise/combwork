@@ -7,7 +7,7 @@ import { overlayTemplateWorkflow, TEMPLATE_PLATFORMS, type TemplateOptions, type
 import { nameTaken, suggestTemplateAgentName } from '../shared/agentNames'
 import { workspaceAgents } from './agentNames'
 import { noteChange } from './assistantChanges'
-import { HiveError } from './combworkError'
+import { CombworkError } from './combworkError'
 import { agentField } from '../shared/advanced'
 import { projectKeyOf } from './projectKeys'
 import { applyConnections, connectionsPlan, listAllTemplates, listTemplates, loadTemplateWith, templatePlanEnglish } from './templates'
@@ -25,7 +25,7 @@ import { workspaceOf } from './workspace'
  */
 
 /** A refusal of the Agent API's, in English: its text said where it is made, in the caller's scope. */
-const refused = (text: string, kind: 'invalid' | 'notFound' | 'conflict'): HiveError => new HiveError({ lines: [text] }, { kind })
+const refused = (text: string, kind: 'invalid' | 'notFound' | 'conflict'): CombworkError => new CombworkError({ lines: [text] }, { kind })
 
 /** The template routes' agent text (dialects, HI-2447): refusals and what a load or Choose Connections couldn't do. */
 const T = {
@@ -229,7 +229,7 @@ async function suggestions(projectPath: string, taken: readonly { name: string; 
 }
 
 /** A load refused for names another project's agent has: each with a free one to give in names. */
-async function takenRefusal(projectPath: string, taken: readonly { name: string; project: string }[], chosen: readonly string[]): Promise<HiveError> {
+async function takenRefusal(projectPath: string, taken: readonly { name: string; project: string }[], chosen: readonly string[]): Promise<CombworkError> {
   const free = await suggestions(projectPath, taken, chosen)
   return refused(say(T.taken, { taken: free.map((t) => say(T.takenOne, { name: t.name, project: t.project, suggestion: t.suggestion })).join('; ') }), 'conflict')
 }

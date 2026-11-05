@@ -12,7 +12,7 @@ import type { LaneInfo, LaneTitle, LiveSessionState, StoredText, TaskCard, TaskC
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { config } from './config'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { placeKey, readCapped, renameRetrying } from './fsutil'
 import { openTable, saveTable } from './storeTables'
 import { dbGenerationAt, onDbReplaced } from './boardStore'
@@ -27,13 +27,13 @@ import { sessions } from './sessions'
 import { cardsNow, getTask, inScope, liveCardHeads, noteOnCard, unknownTask } from './tasks'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { queueReturnOf, resubmittedOf } from './queueReturn'
-import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
+import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { readSavedUsage, usageHits, usageLimitLine, usageWakeLine, usageWatchLabel, type UsageWatch } from '../shared/usageWatch'
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
 import { inFlightNow as writerInFlight, onLineComing, settled as writerSettled } from './lineWriter'
 import { readyFor } from './readiness'
-import { HiveError } from './combworkError'
+import { CombworkError } from './combworkError'
 import { cardNamesOf, withCardNames } from './projectKeys'
 import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
@@ -1041,7 +1041,7 @@ const assertNotPlacing = async (ws: WorkspaceService, projectPath: string, agent
   if (scope === null) return
   const why = await placing(ws, projectPath, agentId)
   // agent-protocol: the placing check's reason as its owner said it (onWatchPlacing)
-  if (why) throw new HiveError({ shown: why, agent: why }, { kind: 'conflict' })
+  if (why) throw new CombworkError({ shown: why, agent: why }, { kind: 'conflict' })
 }
 
 /** Told when an agent's card watch begins (HI-1721: loopWakes tells a builder of its returned card it waits on). */
@@ -2320,7 +2320,7 @@ onLineComing((projectPath, agentId) => !!storeFor(projectPath)?.list.some((x) =>
 function toldBy(store: Store, rec: WatchRecord, told: Told): void {
   const key = agentKey(rec.projectPath, rec.agentId)
   // The developer console (#636): the wake as it was received (its line is in the agent's own events, as input).
-  devConsole.capture([store.ws.path && hiveSourceId(store.ws.path), sessionSourceId(rec.projectPath, rec.agentId)], () => {
+  devConsole.capture([store.ws.path && combworkSourceId(store.ws.path), sessionSourceId(rec.projectPath, rec.agentId)], () => {
     const what = rec.lanes ? 'lanes' : rec.agents ? `${rec.agents.agents.length} agent(s)` : rec.cond.cards.map((n) => `#${n}`).join(', ')
     // agent-protocol: the developer console's summary of a wake, not said to an agent
     return { kind: 'watch', name: 'wake', raw: { cards: rec.cond.cards, agents: rec.agents?.agents.length ?? 0, lanes: !!rec.lanes, firedAt: rec.fired?.at ?? null }, made: { typed: true, replies: told.replies }, safe: { raw: { firedAt: true } }, summary: `watch woke ${rec.agentId} (${what})` }
@@ -2407,7 +2407,7 @@ async function deliverFor(store: Store, rec: WatchRecord): Promise<void> {
   }
   // Not over a line it hasn't taken (#430): its next wake waits until it takes that one, or the user presses Enter there.
   // Nor before its CLI has taken its launch's task (#721), or connected its hive tools (#865).
-  if (!readyFor(sessions.liveFor(rec.projectPath, rec.agentId)) || sessions.userMayBeTyping(rec.projectPath, rec.agentId) || sessions.lineWaiting(rec.projectPath, rec.agentId) || sessions.launchTaskWaiting(rec.projectPath, rec.agentId) || sessions.hiveToolsWaiting(rec.projectPath, rec.agentId)) return
+  if (!readyFor(sessions.liveFor(rec.projectPath, rec.agentId)) || sessions.userMayBeTyping(rec.projectPath, rec.agentId) || sessions.lineWaiting(rec.projectPath, rec.agentId) || sessions.launchTaskWaiting(rec.projectPath, rec.agentId) || sessions.combworkToolsWaiting(rec.projectPath, rec.agentId)) return
   const token = { cancelled: false }
   store.delivering.set(rec.id, token)
   const current = (): boolean => !token.cancelled && alive(store) && store.list.includes(rec)
@@ -3063,7 +3063,7 @@ export function initWatches(): void {
   config.onSettingsChanged((s, prev) => {
     if (prev.assistant?.tellReplies !== false && s.assistant?.tellReplies === false) inBackground('withdrawing replies', revokeReplies())
   })
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'tasks-changed') {
       const ws = openWorkspaces().find((w) => w.path && same(w.path, e.workspacePath))
       // One check at a time for board changes (#1011): those told while one runs are seen by one more check after it.

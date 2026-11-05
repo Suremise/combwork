@@ -5,7 +5,7 @@ import { cardRef } from '../shared/projectKeys'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { agentNowOf } from './cardStall'
 import { coalesced } from './coalesce'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { LANES_FRESH_START_WAIT_MINUTES, withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
@@ -330,7 +330,7 @@ let started = false
 export function startLaneStarts(): void {
   if (started) return
   started = true
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'lanes-changed') {
       const ws = openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())
       if (ws) soon(ws)

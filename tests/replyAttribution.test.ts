@@ -80,7 +80,7 @@ describe("Combwork's own line isn't the user's reply (HI-2218)", () => {
     expect(writes.join('')).toContain('New in your inbox')
     expect(replies, "Combwork's line is told as nobody's reply").toEqual([])
     // The user then types a prompt of their own and sends it, their Enter later than Combwork's: told.
-    await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(e.hiveEnterAt as number))
+    await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(e.combworkEnterAt as number))
     sessions.noteUserInput(pty, 'Red\r')
     prompted(e, 'Red')
     expect(replies).toEqual(['Red'])

@@ -217,7 +217,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     }
   }
   const stateOf = (ws: string, id: number): string => (store.workspaceDb(ws).reader.prepare('SELECT state FROM card_actions WHERE id = ?').get(id) as { state: string }).state
-  const hiveComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Combwork')
+  const combworkComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Combwork')
 
   it('written once on the card, its English and its message; a run again (after a restart) writes nothing more', async () => {
     const { w, ws } = await open()
@@ -226,7 +226,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, id)).toBe('done')
-    const said = await hiveComments(w, c)
+    const said = await combworkComments(w, c)
     expect(said).toHaveLength(1)
     expect(said[0]).toMatchObject({ id: `action-${id}`, text: expect.stringMatching(/^alpha-\d+ came back from the merge queue: a conflict with main in a\.txt\./), appText: { id: 'tasks.history.queueReturned' } })
     // As a restart would find it: pending again, run again. Its comment is there already (its id): none more.
@@ -234,7 +234,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, id)).toBe('done')
-    expect(await hiveComments(w, c)).toHaveLength(1)
+    expect(await combworkComments(w, c)).toHaveLength(1)
   })
 
   it("a write that fails: the action is recorded failed, never done without its comment; an archived card's is done with none", async () => {
@@ -249,7 +249,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
       notices.noticeTestHooks.commentFails = undefined
     }
     expect(stateOf(ws, id)).toBe('failed')
-    expect(await hiveComments(w, failing)).toHaveLength(0)
+    expect(await combworkComments(w, failing)).toHaveLength(0)
     // Archived since: nothing to say it on, done.
     const c = await newCard(w)
     await inWorkspace(w, () => tasks.archiveTask(c, true))
@@ -257,7 +257,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, gone)).toBe('done')
-    expect(await hiveComments(w, c)).toHaveLength(0)
+    expect(await combworkComments(w, c)).toHaveLength(0)
   })
 })
 

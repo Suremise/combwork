@@ -7,7 +7,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, LiveSessionState } from '../src/shared/types'
+import type { CombworkEvent, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
 import { DatabaseSync } from 'node:sqlite'
@@ -35,7 +35,7 @@ vi.mock('../src/main/tasks', async (importOriginal) => {
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { coalesced, coalescing } = await import('../src/main/coalesce')
 const { recordLiveCardsSoon } = await import('../src/main/cardSessions')
 const { boardFile } = await import('../src/main/boardStore')
@@ -101,7 +101,7 @@ describe('board events (#1011)', () => {
     writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
-    off = onHiveEvent((e: HiveEvent) => {
+    off = onCombworkEvent((e: CombworkEvent) => {
       if (e.type === 'tasks-changed' && e.workspacePath === wsPath) seen.push(Date.now())
     })
   })

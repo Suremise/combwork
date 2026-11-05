@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { advanced } from '../src/main/advanced'
 import { overridesNow } from '../src/main/advancedValues'
 import { claudeCode } from '../src/main/providers/claude/adapter'
-import { codex, outrankNativeHive } from '../src/main/providers/codex/adapter'
+import { codex, outrankNativeCombwork } from '../src/main/providers/codex/adapter'
 import { copilot, toolNamesLine } from '../src/main/providers/copilot/adapter'
 import { copilotEnv } from '../src/main/providers/copilot/home'
 import { copilotCheckEnv, copilotSignIn, ignoredTokens } from '../src/main/providers/copilot/install'
@@ -200,7 +200,7 @@ describe('Copilot: not updating itself (row 22)', () => {
 })
 
 describe("Combwork's tools pre-approved (row 3)", () => {
-  const assistant = (over: Partial<LaunchContext> = {}): LaunchContext => context({ trustedHiveTools: ['cw_list_tasks', 'cw_read_task'], ...over })
+  const assistant = (over: Partial<LaunchContext> = {}): LaunchContext => context({ trustedCombworkTools: ['cw_list_tasks', 'cw_read_task'], ...over })
 
   it('Claude Code: the Assistant’s trusted Combwork tools with the switch on, none with it off', async () => {
     const allowed = (): string[] => { const a = claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args; const i = a.indexOf('--allowedTools'); return i < 0 ? [] : a[i + 1].split(',') }
@@ -250,7 +250,7 @@ describe("Copilot: other tools' GitHub tokens (row 8)", () => {
 })
 
 describe("Codex: Combwork's tools pre-approved (row 3, #1174) and its own MCP servers (row 5)", () => {
-  const hiveTable = (ctx: LaunchContext): string | undefined => codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.combwork='))
+  const combworkTable = (ctx: LaunchContext): string | undefined => codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.combwork='))
   const home = (): string => process.env.CODEX_HOME!
   const nativeConfig = (toml: string): void => {
     mkdirSync(home(), { recursive: true })
@@ -259,13 +259,13 @@ describe("Codex: Combwork's tools pre-approved (row 3, #1174) and its own MCP se
   afterEach(() => rmSync(join(home(), 'config.toml'), { force: true }))
 
   it("approves the whole hive server for an agent, only the Assistant's trusted tools for it, and none with the switch off", async () => {
-    expect(hiveTable(context())).toContain('default_tools_approval_mode="approve"')
-    expect(hiveTable(context())).toContain('enabled=true')
-    const assistant = hiveTable(context({ trustedHiveTools: ['cw_list_tasks', 'cw_read_task'] }))!
+    expect(combworkTable(context())).toContain('default_tools_approval_mode="approve"')
+    expect(combworkTable(context())).toContain('enabled=true')
+    const assistant = combworkTable(context({ trustedCombworkTools: ['cw_list_tasks', 'cw_read_task'] }))!
     expect(assistant).not.toContain('default_tools_approval_mode')
     expect(assistant).toContain('tools={cw_list_tasks={approval_mode="approve"},cw_read_task={approval_mode="approve"}}')
     await advanced.set(overrideId('codex', 'preApproveCombworkTools'), false)
-    for (const t of [hiveTable(context()), hiveTable(context({ trustedHiveTools: ['cw_list_tasks'] }))]) {
+    for (const t of [combworkTable(context()), combworkTable(context({ trustedCombworkTools: ['cw_list_tasks'] }))]) {
       expect(t).not.toContain('approval_mode')
       // Still Combwork's server, on.
       expect(t).toContain('enabled=true')
@@ -331,7 +331,7 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
     await advanced.set('codex.mcp.startupTimeoutSeconds', 45)
     expect(table(where('home', 'command = "node"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\n'))).toMatchObject({ startup_timeout_sec: 45, startup_timeout_ms: 45000 })
     // Combwork's own env stays Combwork's (here the context's server has none to set).
-    const own = outrankNativeHive([], { env: { CW_PROJECT: 'p' } }, 'all', 'C:\\p')
+    const own = outrankNativeCombwork([], { env: { CW_PROJECT: 'p' } }, 'all', 'C:\\p')
     expect(own).toEqual({})
   })
 
@@ -341,10 +341,10 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
       // An agent: everything approved, the native per-tool "prompt" too.
       expect(table(where(place, native)), place).toMatchObject({ default_tools_approval_mode: 'approve', tools: { cw_write_shared_note: { approval_mode: 'approve' }, cw_list_tasks: { approval_mode: 'approve' } } })
       // The Assistant: its trusted tools approved, the native blanket and per-tool approvals of the rest taken back.
-      const a = table({ ...where(place, native), trustedHiveTools: ['cw_list_tasks'] })
+      const a = table({ ...where(place, native), trustedCombworkTools: ['cw_list_tasks'] })
       expect(a, place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_list_tasks: { approval_mode: 'approve' }, cw_write_shared_note: { approval_mode: 'auto' } } })
       // An Assistant trusted with nothing: nothing approved.
-      expect(table({ ...where(place, native), trustedHiveTools: [] }), place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_write_shared_note: { approval_mode: 'auto' }, cw_list_tasks: { approval_mode: 'auto' } } })
+      expect(table({ ...where(place, native), trustedCombworkTools: [] }), place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_write_shared_note: { approval_mode: 'auto' }, cw_list_tasks: { approval_mode: 'auto' } } })
     }
     // The switch off: nothing approved, for an agent either.
     await advanced.set(overrideId('codex', 'preApproveCombworkTools'), false)
@@ -361,7 +361,7 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
   })
 
   it('none: nothing added', () => {
-    expect(outrankNativeHive([join(base, 'missing.toml')], {}, 'all', 'C:\\p')).toEqual({})
+    expect(outrankNativeCombwork([join(base, 'missing.toml')], {}, 'all', 'C:\\p')).toEqual({})
   })
 
   // HI-2594: a native server named hive is the user's own like any other (the name isn't reserved after 1.1): turned off
@@ -459,12 +459,12 @@ describe("Claude Code's status line (#1285, row 12)", () => {
     const { execFileSync, spawnSync } = await import('child_process')
     const bash = join(execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim(), '..', '..', '..', 'bin', 'bash.exe')
     expect(existsSync(bash), bash).toBe(true)
-    const { hiveStatusLine } = await import('../src/main/providers/claude/launchSettings')
+    const { combworkStatusLine } = await import('../src/main/providers/claude/launchSettings')
     const json = '{"model":{"display_name":"Opus 5.5"},"note":"a  b\\n#c"}'
     // Combwork's forwarding command stands in as what it prints: the JSON its server echoed.
     const forward = (echo: boolean): string => (echo ? `printf '%s' '${json}'` : 'true')
     const run = (command: string): { out: string; code: number | null } => {
-      const line = hiveStatusLine(forward, { type: 'command', command, padding: 3 })
+      const line = combworkStatusLine(forward, { type: 'command', command, padding: 3 })
       expect(line.padding).toBe(3)
       const r = spawnSync(bash, ['-c', line.command], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '' } })
       return { out: r.stdout, code: r.status }

@@ -32,7 +32,7 @@ import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
 
 /**
- * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `HiveError` (main/combworkError.ts
+ * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `CombworkError` (main/combworkError.ts
  * has the whole contract). What they store or return as data keeps its English field, which agents, the log, old
  * records and any code matching it go on reading, and gains its text as data beside it: a `…Text` field (a `Text`,
  * shared/advanced.ts, or a `StoredText` in a file). The window shows the `…Text` in the user's language and falls back
@@ -41,11 +41,11 @@ import type { StageDef } from './workflow/compile'
  * companion behind (`entryForAgents`, `metricsForAgents`, `addedForAgents`).
  */
 /** What kind of refusal an error is: the Agent API's status for it (400, 403, 404, 409). */
-export type HiveErrorKind = 'invalid' | 'forbidden' | 'notFound' | 'conflict'
+export type CombworkErrorKind = 'invalid' | 'forbidden' | 'notFound' | 'conflict'
 /** A failure as data, in a result or an event: its text as data (or a plain error's message, as it came), and its kind. */
-export interface HiveErrorData {
+export interface CombworkErrorData {
   text: TextPart
-  kind?: HiveErrorKind
+  kind?: CombworkErrorKind
 }
 /**
  * Text kept in a file (#845): a message's id and its values, never its English or its note, so a record stays small and
@@ -158,7 +158,7 @@ export interface AppSettings {
   /** The user's changes to the default keyboard shortcuts. */
   keybindings: KeybindingOverrides
   /** Hive's own commands (HI-1954, Settings → Commands at Hive's level) and When Hive quits, run. */
-  commands: CommandsHive
+  commands: CommandsCombwork
   /** The MCP catalogues the MCP view lists servers from (HI-545, Settings → MCP Catalogues). */
   mcpCatalogs: McpCatalogSettings
   /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
@@ -616,7 +616,7 @@ export interface AppConfig {
     skillsFold?: Record<string, { hive?: boolean; provider?: boolean }>
     /** Each project's Sessions tree branches the user opened (true) or folded (false), by project path in lower case (#239). */
     sessionsTree?: Record<string, Record<string, boolean>>
-    /** The .combwork version control notice each project's Overview no longer shows (#345): the situation dismissed (`hiveVcsKey`), by project path in lower case. */
+    /** The .combwork version control notice each project's Overview no longer shows (#345): the situation dismissed (`combworkVcsKey`), by project path in lower case. */
     hiveVcsNotice?: Record<string, string>
     /** The connections notice's entries dismissed (HI-1770): `<project path in lower case>|<moved entry's id>`. */
     connectionsNoticeDismissed?: string[]
@@ -1016,7 +1016,7 @@ export interface CommandPoint {
 }
 
 /** Hive's commands and When Hive quits, run (its commands only). */
-export interface CommandsHive {
+export interface CommandsCombwork {
   list: CustomCommand[]
   onQuit: CommandPoint
 }
@@ -2606,7 +2606,7 @@ export interface ProjectInfo {
   /** The folder holds what Remove from Hive packed (handovers, board cards), which Hive offers to restore. */
   removedData?: RemovedData | null
   /** Whether its .combwork is kept out of version control (#345); absent for the Assistant's home. */
-  hiveVcs?: HiveVcs
+  combworkVcs?: CombworkVcs
   /** Its version control platform, capabilities and detection (SPEC §16.3); absent for the Assistant's home. */
   platform?: ProjectPlatform
 }
@@ -2618,7 +2618,7 @@ export interface ProjectInfo {
  * doesn't configure; `none`: no version control holds the folder. `sync` names a sync service whose folder holds it
  * (OneDrive, Dropbox), which copies .combwork whatever version control does.
  */
-export interface HiveVcs {
+export interface CombworkVcs {
   state: 'excluded' | 'not-excluded' | 'other-vcs' | 'none'
   vcs?: string
   sync?: string
@@ -3745,7 +3745,7 @@ export interface OpenProgress {
 }
 
 /** Events pushed from main to renderer. */
-export type HiveEvent =
+export type CombworkEvent =
   | { type: 'workspace-changed'; workspace: WorkspaceInfo | null }
   /** A workspace's team paused or resumed (HI-2081): its pause now, or null. */
   | { type: 'team-pause-changed'; workspacePath: string; pause: import('./teamPause').TeamPause | null; was?: import('./teamPause').TeamPause | null }

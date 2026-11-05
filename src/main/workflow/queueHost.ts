@@ -23,7 +23,7 @@ import { basename, join } from 'path'
 import { app } from 'electron'
 import { detect } from '../platform/registry'
 import { boardRead, boardReadOnly, boardWrite, onBoardUpgraded } from '../boardStore'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { exitBy } from '../exitLog'
 import { git, withGitRoute } from '../git'
 import { createLogger, userText } from '../logger'
@@ -500,7 +500,7 @@ export function startQueueHosts(): void {
     if (wf) await wf.platformOf(wf.store.card(a.card)).perform('pin', a.payload)
   })
   const seen = new WeakSet<AbortSignal>()
-  const off = onHiveEvent((e) => {
+  const off = onCombworkEvent((e) => {
     // The team resuming (HI-2081): its queues go on with what waited, as when the rules are turned on again.
     if (e.type === 'team-pause-changed') {
       const ws = e.pause ? null : openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())

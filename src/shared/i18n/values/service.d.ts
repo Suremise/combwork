@@ -1,6 +1,6 @@
 // Generated from locales/en/service.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'service.advanced.asIs': { problem: string | number }
   'service.advanced.changedOutside': undefined
   'service.advanced.fixFirst': { problem: string | number }

@@ -1,6 +1,6 @@
 // Generated from locales/en/agents.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'agents.add.add': undefined
   'agents.add.checkingConnection': undefined
   'agents.add.failed': undefined

@@ -157,7 +157,7 @@ describe('the English catalogues and typed values (i18n:extract)', () => {
       'progress.d': { defaultMessage: 'No values' }
     }) as string
     expect(dts.split('\n').slice(2)).toEqual([
-      'interface HiveMessageValues {',
+      'interface CombworkMessageValues {',
       "  'progress.a': { n: number; name: string | number }",
       "  'progress.b': { at: Date | number; who: string }",
       "  'progress.c': { n: number }",

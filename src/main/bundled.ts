@@ -129,7 +129,7 @@ export interface BundledStatus {
   updateAvailable?: true
 }
 
-const manifestPath = (): string => join(workspace.hiveDir, 'bundled.json')
+const manifestPath = (): string => join(workspace.combworkDir, 'bundled.json')
 
 async function readManifest(): Promise<Manifest | null> {
   return manifestOf(await readJson<unknown>(manifestPath(), null))
@@ -154,7 +154,7 @@ function changeManifest(fn: (m: Manifest) => void): Promise<void> {
   })
 }
 
-const folderOf = (kind: BundledKind): string => (kind === 'skills' ? workspace.skillsDir : kind === 'modes' ? workspace.modesDir : dialectsDir(workspace.hiveDir))
+const folderOf = (kind: BundledKind): string => (kind === 'skills' ? workspace.skillsDir : kind === 'modes' ? workspace.modesDir : dialectsDir(workspace.combworkDir))
 
 /** What an item is called in the log. */
 const itemWord = (kind: BundledKind): string => (kind === 'skills' ? 'skill' : kind === 'modes' ? 'mode' : 'dialect file') // i18n-ignore: the log's words for a bundled item
@@ -254,8 +254,8 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
  * the next time; one an older Hive made again beside .combwork/modes is left alone.
  */
 async function moveLegacyModes(): Promise<void> {
-  const from = join(workspace.hiveDir, LEGACY_MODES_DIR)
-  const to = join(workspace.hiveDir, MODES_DIR)
+  const from = join(workspace.combworkDir, LEGACY_MODES_DIR)
+  const to = join(workspace.combworkDir, MODES_DIR)
   if (existsSync(to) || !existsSync(from)) return
   try {
     // A moment's lock (an indexer, a virus scan) is waited out; a file held open fails it.

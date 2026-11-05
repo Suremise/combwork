@@ -38,7 +38,7 @@ const notifyLog = path.join(lib.WORK, 'installdir-notify.log')
 /** Starts Combwork on a test folder it can't fix and returns its exit code and the message it recorded. */
 async function cantStart(dir, vars = {}) {
   fs.rmSync(notifyLog, { force: true })
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47883), CW_TEST_INSTALL_DIR: dir, CW_TEST_NOTIFY_LOG: notifyLog, ...vars })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47883), CW_TEST_INSTALL_DIR: dir, CW_TEST_NOTIFY_LOG: notifyLog, ...vars })
   const child = spawn(lib.ELECTRON, [lib.ROOT], { cwd: lib.ROOT, env, stdio: 'ignore' })
   const code = await new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -88,7 +88,7 @@ function pasted(message) {
   run(icu, '/inheritance:d')
   for (const p of [fixable, icu]) check(`${path.basename(p)} has a package entry and no ALL APPLICATION PACKAGES`, lacks(p), sddl(p))
   check('icudtl.dat inherits nothing', sddl(icu).startsWith('D:P'), sddl(icu))
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47883), CW_TEST_INSTALL_DIR: fixable, CW_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47883), CW_TEST_INSTALL_DIR: fixable, CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.appReady(page)

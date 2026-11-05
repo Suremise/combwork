@@ -4,7 +4,7 @@ import { CW_DIR } from '../shared/defaults'
 import { msg, type Msg } from '../shared/i18n'
 import { boardFileNeeded, moveBoardFile, NEW_DB_FILE } from './boardFileMove'
 import { writeTextAtomic } from './fsutil'
-import { HiveError, errorText, hiveError } from './combworkError'
+import { CombworkError, errorText, combworkError } from './combworkError'
 import { createLogger } from './logger'
 import { present } from './fsPresence'
 import { upgradeWorkspaceFiles } from './nameUpgradeFiles'
@@ -92,7 +92,7 @@ export interface UpgradeOptions {
   setAside?: (cards: number) => Promise<void> | void
 }
 
-/** The steps (under the move's lock, nothing of the workspace open): each throws a HiveError naming it when it can't. */
+/** The steps (under the move's lock, nothing of the workspace open): each throws a CombworkError naming it when it can't. */
 export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<void> {
   const dir = join(ws, CW_DIR)
   if (o.only) {
@@ -136,8 +136,8 @@ async function step(what: WorkspaceStep, stop: () => void, fn: () => Promise<voi
   try {
     await fn()
   } catch (e) {
-    if (e instanceof HiveError) throw e
+    if (e instanceof CombworkError) throw e
     log.warn(`the names upgrade's ${what} step`, e)
-    throw hiveError(M.failed, { what: M.what[what], error: errorText(e) }, { kind: 'conflict' })
+    throw combworkError(M.failed, { what: M.what[what], error: errorText(e) }, { kind: 'conflict' })
   }
 }

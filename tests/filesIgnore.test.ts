@@ -40,7 +40,7 @@ vi.mock('../src/main/git', async (original) => {
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const files = await import('../src/main/files')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 
 const BUSY = { err: 'fatal: .git/index: index file open failed: Permission denied' }
 const base = tempDir('hive-ignore-')
@@ -66,7 +66,7 @@ beforeEach(() => {
 const dimmed = async (rel = '') => (await files.listDir(proj, rel)).filter((f) => f.ignored).map((f) => f.name)
 const relists = () => {
   const seen: string[][] = []
-  const off = onHiveEvent((e) => e.type === 'files-changed' && seen.push(e.dirs))
+  const off = onCombworkEvent((e) => e.type === 'files-changed' && seen.push(e.dirs))
   return { seen, off }
 }
 

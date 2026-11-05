@@ -7,7 +7,7 @@ import { tempDir, tempRoot } from '../tempDir'
 // provider's install info (readiness, notes) is kept in English, for GET /v1/status and /v1/providers, and the window is
 // sent it in its language (shownInstallInfo), again when the language changes; a transcript's notices are cached as data
 // and shown in the window's language; tool names, hook names, commands and status messages in the CLI's place stay as
-// they are. Errors thrown at a launch reach the window and the Agent API alike: they are HiveErrors (#842), English for
+// they are. Errors thrown at a launch reach the window and the Agent API alike: they are CombworkErrors (#842), English for
 // the Agent API and in the window's language for the window.
 
 vi.mock('electron', () => ({ app: { getPath: () => tempRoot(), isPackaged: false, getVersion: () => '0.0.0' } }))
@@ -22,7 +22,7 @@ const { shownNotice, transcriptMarkdown } = await import('../../src/main/provide
 const { autoCompactOf, settingsScopes, UNREAD_SOURCES } = await import('../../src/main/providers/claude/autoCompact')
 const { strayCodexWarning } = await import('../../src/main/providers/codex/strayFolder')
 const { providerService } = await import('../../src/main/providerService')
-const { onHiveEvent } = await import('../../src/main/events')
+const { onCombworkEvent } = await import('../../src/main/events')
 type Info = import('../../src/shared/types').AgentInstallInfo
 
 const ROOT = resolve(__dirname, '../..')
@@ -47,9 +47,9 @@ describe('the providers area', () => {
     }
   })
 
-  it('its files have no text left to convert, and no error both audiences read waits for HiveError any more (#842)', () => {
+  it('its files have no text left to convert, and no error both audiences read waits for CombworkError any more (#842)', () => {
     for (const f of FILES) expect(existsSync(join(ROOT, 'i18n/allow', `${f.replace(/\//g, '__')}.json`)), f).toBe(false)
-    for (const f of FILES) expect(readFileSync(join(ROOT, f), 'utf8'), f).not.toMatch(/HiveError \(E10a\)/)
+    for (const f of FILES) expect(readFileSync(join(ROOT, f), 'utf8'), f).not.toMatch(/CombworkError \(E10a\)/)
   })
 })
 
@@ -144,7 +144,7 @@ describe("a provider's install info: English for agents and Combwork's own code,
 
   it('a language change sends the windows each provider in it; what the API and Combwork read stays English', () => {
     const seen: { type: string; info?: Info }[] = []
-    const off = onHiveEvent((e) => void seen.push(e as never))
+    const off = onCombworkEvent((e) => void seen.push(e as never))
     try {
       // As a detection leaves it: English.
       ;(providerService as unknown as { infos: Map<string, Info> }).infos.set('codex', info({ provider: 'codex', readiness: provider('codex').readiness(info({ provider: 'codex', found: false })) }))

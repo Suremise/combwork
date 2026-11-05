@@ -311,7 +311,7 @@
       "hasProject": "select",
       "project": "plain",
       "at": "plain",
-      "byHive": "select",
+      "byCombwork": "select",
       "importance": "plain",
       "changed": "select",
       "updatedAt": "plain"

@@ -6,7 +6,7 @@ import { autoProviderPending, providerDescriptor } from '../shared/providers'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { msg, tr } from '../shared/i18n'
 import { config } from './config'
-import { onHiveEvent, toast } from './events'
+import { onCombworkEvent, toast } from './events'
 import { createLogger, userText } from './logger'
 import { accountById, accountHere, effortUsable, getConnection, newConnectionId } from './accounts'
 import { testHomeSeam } from './connectionSeam'
@@ -262,7 +262,7 @@ export function initConnectionMoves(): void {
       void migrateWorkspace(ws)
     }
   }
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'connections-changed' || e.type === 'settings-changed') looked.clear()
     if (e.type === 'workspace-changed' || e.type === 'connections-changed' || e.type === 'settings-changed') look()
   })

@@ -28,7 +28,7 @@ const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'Wi
 /** Why the host couldn't start (its owner says it in its own words). */
 export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
 
-/** The host's requests (HiveJobs.Answer). */
+/** The host's requests (CombworkJobs.Answer). */
 export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper' | 'running' | 'paths' | 'workingin'
 
 /** The most processes one `workingin` answer describes (HI-2467); more, and it says it isn't whole. */
@@ -59,7 +59,7 @@ using System.Collections.Generic;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
-public static class HiveJobs {
+public static class CombworkJobs {
   [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateJobObject(IntPtr a, IntPtr name);
   [DllImport("kernel32.dll", SetLastError=true)] static extern bool AssignProcessToJobObject(IntPtr job, IntPtr proc);
   [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
@@ -812,12 +812,12 @@ public static class HiveJobs {
    * (keepDir null), it exits at the end of its input as before.
    */
   static string keepDir;
-  static string keepHive;
+  static string keepCombwork;
   static string keepSelf;
   /** Configures the keeper: its Hive's identity ("pid:started", as its slot writers name it) and the folder. Its own identity, "pid:created". */
   public static string Keeper(string hive, string dir) {
     int me = System.Diagnostics.Process.GetCurrentProcess().Id;
-    keepHive = hive;
+    keepCombwork = hive;
     keepDir = dir;
     keepSelf = me + ":" + CreatedOf(me);
     return keepSelf;
@@ -872,7 +872,7 @@ public static class HiveJobs {
   }
   /** A job's state as JSON, its members (null: none said) by id, start time and name (never a command line). */
   static string StateJson(string id, string state, string observed, int[] members) {
-    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"app\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":" + Q(observed));
+    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"app\":" + Q(keepCombwork) + ",\"state\":" + Q(state) + ",\"observed\":" + Q(observed));
     if (members != null) {
       b.Append(",\"total\":").Append(members.Length).Append(",\"members\":[");
       for (int i = 0; i < members.Length && i < ${MAX_LISTED}; i++) {
@@ -1319,10 +1319,10 @@ const HOST_SCRIPT = `
 [Console]::Out.WriteLine('pid ' + $PID)
 $ErrorActionPreference = 'Stop'
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadLine())))
-[HiveJobs]::Notices = [Console]::Out
+[CombworkJobs]::Notices = [Console]::Out
 [Console]::Out.WriteLine('ready')
-while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([HiveJobs]::Answer($line)); [HiveJobs]::TellQueue() }
-[HiveJobs]::Keep()
+while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([CombworkJobs]::Answer($line)); [CombworkJobs]::TellQueue() }
+[CombworkJobs]::Keep()
 `
 const HOST_INPUT = Buffer.from(HOST_SOURCE, 'utf8').toString('base64') + '\n'
 
@@ -1337,7 +1337,7 @@ const LAUNCH_SOURCE = String.raw`
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-public static class HiveLaunch {
+public static class CombworkLaunch {
   [StructLayout(LayoutKind.Sequential)] struct StartupInfoEx {
     public int cb; public IntPtr reserved, desktop, title;
     public int x, y, xSize, ySize, xChars, yChars, fill, flags;
@@ -1449,7 +1449,7 @@ export function helperLaunch(script = HOST_SCRIPT): { file: string; args: string
   const line = `"${POWERSHELL}" ${psArgs(script).join(' ')}`
   const launcher = `$ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(LAUNCH_SOURCE)}')))
-exit [HiveLaunch]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(line)}')))
+exit [CombworkLaunch]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(line)}')))
 `
   const args = psArgs(launcher)
   if (line.length > LINE_MAX || [POWERSHELL, ...args].join(' ').length + 8 > LINE_MAX) throw new Error('the helper’s command line is too long') // i18n-ignore: a technical error, logged (it can't happen with the scripts as they are)

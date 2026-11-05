@@ -5,7 +5,7 @@ import { app, safeStorage } from 'electron'
 import { msg } from '../shared/i18n'
 import { emit } from './events'
 import { writeJsonAtomic } from './fsutil'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { addKeyFingerprint, resetCoverage } from './keyCoverage'
 import { createLogger } from './logger'
 
@@ -103,7 +103,7 @@ const UNSAFE = msg({ id: 'main.keys.unsafe', defaultMessage: "Combwork can't sto
 
 /** Whether a key can be stored encrypted: never in plain text (safeStorage's `basic_text` backend, off Windows). */
 function assertSafe(): void {
-  if (!safeStorage.isEncryptionAvailable() || safeStorage.getSelectedStorageBackend?.() === 'basic_text') throw hiveError(UNSAFE, undefined, { kind: 'conflict' })
+  if (!safeStorage.isEncryptionAvailable() || safeStorage.getSelectedStorageBackend?.() === 'basic_text') throw combworkError(UNSAFE, undefined, { kind: 'conflict' })
 }
 
 /** Saves a connection's key for an origin (Save, Replace): one write, its version moved on. Returns what the view shows. */

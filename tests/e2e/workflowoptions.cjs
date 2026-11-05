@@ -112,7 +112,7 @@ async function theForm(page, app, inv) {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -472,7 +472,7 @@ async function theForm(page, app, inv) {
     await themes('none', section.locator('.workflow-group[data-group="review"]'))
     check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
     await themes('none-loops', section.locator('.workflow-group[data-group="loops"]'))
-    const noneBase = { hiveWorkflow: 1, platform: 'none', preset: null, options: {} }
+    const noneBase = { combworkWorkflow: 1, platform: 'none', preset: null, options: {} }
     const merging = await pasteIn({ ...noneBase, options: { finish: 'combworkMerges' } })
     check('None: a merge pasted is refused, merging needs Git', !!(await lib.until(async () => (await merging.innerText()).includes('Merging needs Git'), HUNG_MS)), await merging.innerText())
     await merging.locator('textarea').fill(JSON.stringify({ ...noneBase, options: { folder: 'slots' } }))
@@ -649,7 +649,7 @@ async function theForm(page, app, inv) {
   q.prepare(fx)
   let h = null
   try {
-    h = await q.startHive(fx, { port: lib.port(47857), keepOptions: true })
+    h = await q.startCombwork(fx, { port: lib.port(47857), keepOptions: true })
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges', mergeChecks: [] }) })
     await h.page.getByText('alpha', { exact: true }).first().click()
     await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).click()

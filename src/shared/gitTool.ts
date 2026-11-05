@@ -88,7 +88,7 @@ export function gitProblemEnglish(t: GitTool | null | undefined): string | null 
 
 /**
  * The same as text as data (#848), for errors both audiences read: formatted in English for agents and in the window's
- * language for the window (a HiveError's value, shared/advanced.ts `Text`). Null when git runs.
+ * language for the window (a CombworkError's value, shared/advanced.ts `Text`). Null when git runs.
  */
 export function gitProblemData(t: GitTool | null | undefined): Text | null {
   if (t?.state === 'missing') return M.missing

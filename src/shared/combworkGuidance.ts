@@ -19,7 +19,7 @@ import { agentList, agentMsg, say } from './agentText/index.ts'
 /** Settings → Assistant → Control (AssistantControl). */
 type AssistantControlLevel = 'look' | 'agents' | 'projects'
 
-export type HiveRole = 'agent' | 'assistant'
+export type CombworkRole = 'agent' | 'assistant'
 
 const A = {
   agentHost: agentMsg({
@@ -112,7 +112,7 @@ const A = {
   otherWorkspaceNote: agentMsg({ id: 'contract.board.other.workspaceNote', text: 'shared notes', note: 'What the workspace-note skill covers, in the list of the other skills.' }),
   otherMergeReady: agentMsg({ id: 'contract.board.other.mergeReady', text: 'merging', note: 'What the merge-ready skill covers, in the list of the other skills.' }),
   otherSplitWork: agentMsg({ id: 'contract.board.other.splitWork', text: 'splitting work', note: 'What the split-work skill covers, in the list of the other skills.' }),
-  otherUseHiveApi: agentMsg({ id: 'contract.board.other.useCombworkApi', text: 'its HTTP API', note: 'What the use-cw-api skill covers, in the list of the other skills.' }),
+  otherUseCombworkApi: agentMsg({ id: 'contract.board.other.useCombworkApi', text: 'its HTTP API', note: 'What the use-cw-api skill covers, in the list of the other skills.' }),
   otherSkills: agentMsg({
     id: 'contract.board.skills',
     text: "{afterRoutes, select, yes {Combwork's other skills cover {list}.} other {Combwork's skills cover {list}.}}",
@@ -211,7 +211,7 @@ const OTHER_SKILLS = [
   ['workspace-note', A.otherWorkspaceNote],
   ['merge-ready', A.otherMergeReady],
   ['split-work', A.otherSplitWork],
-  ['use-cw-api', A.otherUseHiveApi]
+  ['use-cw-api', A.otherUseCombworkApi]
 ] as const
 
 /**
@@ -237,11 +237,11 @@ export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
 export const assistantSkillsLine = (journal: boolean): string => say(A.assistantSkills, { journal: journal ? 'yes' : 'no' })
 
 /**
- * The session contract alone: what hiveInstructions gives before the journal's rule. `journal`: the Assistant's journal
+ * The session contract alone: what combworkInstructions gives before the journal's rule. `journal`: the Assistant's journal
  * is on, so its skills line leaves out handover (an agent's contract has no such line). launchParts tells the contract
  * from what follows it with this.
  */
-export function sessionContract(project: string, role: HiveRole = 'agent', progress = true, skillsOff?: ReadonlySet<string>, journal = false): string {
+export function sessionContract(project: string, role: CombworkRole = 'agent', progress = true, skillsOff?: ReadonlySet<string>, journal = false): string {
   if (role === 'assistant') return [say(A.assistantHost), assistantSkillsLine(journal), say(A.docs), `${say(A.inboxRule)} ${say(A.inboxAssistant)}`].join('\n')
   return [
     say(A.agentHost, { hasProject: project ? 'yes' : 'no', project }),
@@ -262,7 +262,7 @@ export function sessionContract(project: string, role: HiveRole = 'agent', progr
  * name. `journal`: the kinds the Assistant's journal stores while it is on (null: off), whose rule then follows the
  * contract and whose skills line leaves out handover (HI-2048); an agent's contract only gains the rule.
  */
-export function hiveInstructions(project: string, role: HiveRole = 'agent', progress = true, skillsOff?: ReadonlySet<string>, journal: readonly string[] | null = null): string {
+export function combworkInstructions(project: string, role: CombworkRole = 'agent', progress = true, skillsOff?: ReadonlySet<string>, journal: readonly string[] | null = null): string {
   const contract = sessionContract(project, role, progress, skillsOff, journal !== null)
   return journal ? `${contract}\n${journalRule(journal)}` : contract
 }

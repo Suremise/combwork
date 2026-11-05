@@ -14,7 +14,7 @@ import { createLogger, userText } from './logger'
 import { sessions, type ListContext } from './sessions'
 import { workspace, workspaceOf } from './workspace'
 import { usageHistory } from './usageHistory'
-import { hiveError, shownError } from './combworkError'
+import { combworkError, shownError } from './combworkError'
 import { insideReal, placeKey } from './fsutil'
 import { folderFacts, legacyWorktree } from './agentFolders'
 import { unusedWorktreeFolders } from './unusedWorktrees'
@@ -502,7 +502,7 @@ const M_PURGE = {
 async function removeAttachments(host: string, dir: string, listed: PurgeItem[], permanent: boolean): Promise<PurgeItem[]> {
   const root = await attachmentsDir(host)
   const st = await lstat(dir).catch(() => null)
-  if (!st?.isDirectory() || st.isSymbolicLink() || resolve(dirname(dir)).toLowerCase() !== resolve(root).toLowerCase() || !insideReal(dir, [root])) throw hiveError(M_PURGE.notKept)
+  if (!st?.isDirectory() || st.isSymbolicLink() || resolve(dirname(dir)).toLowerCase() !== resolve(root).toLowerCase() || !insideReal(dir, [root])) throw combworkError(M_PURGE.notKept)
   const same: PurgeItem[] = []
   const changed: PurgeItem[] = []
   for (const i of listed) (resolve(dirname(i.path!)).toLowerCase() === resolve(dir).toLowerCase() && unchanged(i, await fileNow(i.path!)) ? same : changed).push(i)
@@ -530,7 +530,7 @@ export async function purge(previewId: string, listed: string[], permanent: bool
   if (typeof previewId !== 'string' || !Array.isArray(listed)) throw new Error('previewId and listed: a preview and its keys') // i18n-ignore: a refusal no person sees (the window sends these)
   pruneExpiredPreviews(Date.now())
   const preview = previews.get(previewId)
-  if (!preview) throw hiveError(M_PURGE.expired)
+  if (!preview) throw combworkError(M_PURGE.expired)
   previews.delete(previewId)
   const { target } = preview
   const only = target.kind === 'session' ? target.sessionId : undefined
@@ -593,11 +593,11 @@ export async function purge(previewId: string, listed: string[], permanent: bool
           },
           // With the session reserved and its backups locked, just before anything goes.
           async () => {
-            for (const i of backups) if (!unchanged(i, await fileNow(i.path!))) throw hiveError(M_PURGE.sessionChanged)
+            for (const i of backups) if (!unchanged(i, await fileNow(i.path!))) throw combworkError(M_PURGE.sessionChanged)
             // A leftover gone since is fine (sessions.purge passes over it); one written to isn't what was listed.
             for (const i of leftovers) {
               const now = await fileNow(i.path!)
-              if (now && !unchanged(i, now)) throw hiveError(M_PURGE.sessionChanged)
+              if (now && !unchanged(i, now)) throw combworkError(M_PURGE.sessionChanged)
             }
           }
         )
@@ -618,7 +618,7 @@ export async function purge(previewId: string, listed: string[], permanent: bool
       try {
         if (i.kind === 'deleted-usage') await purgeDeletedUsage(host, i.sessionId!)
         else await whileUnclaimed(host, i.sessionId!, async () => {
-          if (!unchanged(i, await fileNow(i.path!))) throw hiveError(M_PURGE.changed)
+          if (!unchanged(i, await fileNow(i.path!))) throw combworkError(M_PURGE.changed)
           await remove(i.path!)
         })
         done(i)
@@ -651,9 +651,9 @@ export async function purge(previewId: string, listed: string[], permanent: bool
 async function whileUnclaimed<T>(host: string, name: string, fn: () => Promise<T>): Promise<T> {
   return sessions.whileCleaning(host, name, async () => {
     const lower = name.toLowerCase()
-    if ((await workspace.sessionsFile(host)).sessions.some((s) => s.id.toLowerCase() === lower)) throw hiveError(msg({ id: 'main.storage.purgeClaimed', defaultMessage: 'It belongs to a session again.', description: 'Purge skipped a file or folder of a session Combwork no longer had: it has one again.' }))
+    if ((await workspace.sessionsFile(host)).sessions.some((s) => s.id.toLowerCase() === lower)) throw combworkError(msg({ id: 'main.storage.purgeClaimed', defaultMessage: 'It belongs to a session again.', description: 'Purge skipped a file or folder of a session Combwork no longer had: it has one again.' }))
     // After the read above: nothing is awaited between this check and fn's first look at the files.
-    if (sessions.liveAnywhere(name) || sessions.projectStates(host).some((s) => `run-${s.runId}`.toLowerCase() === lower)) throw hiveError(msg({ id: 'main.storage.purgeRunning', defaultMessage: 'Its session is running.', description: 'Purge skipped a file or folder: its session is running now.' }))
+    if (sessions.liveAnywhere(name) || sessions.projectStates(host).some((s) => `run-${s.runId}`.toLowerCase() === lower)) throw combworkError(msg({ id: 'main.storage.purgeRunning', defaultMessage: 'Its session is running.', description: 'Purge skipped a file or folder: its session is running now.' }))
     return fn()
   })
 }
@@ -662,7 +662,7 @@ async function whileUnclaimed<T>(host: string, name: string, fn: () => Promise<T
 async function purgeDeletedUsage(host: string, id: string): Promise<void> {
   const k = (await workspace.sessionsFile(host)).deletedUsage?.find((x) => x.id === id)
   if (!k) return
-  if (!(await usageHistory.recordKept(host, k).catch(() => false))) throw hiveError(msg({ id: 'main.storage.purgeUnrecorded', defaultMessage: "Combwork couldn't record it in the usage history, so it is kept.", description: "Purge kept a deleted session's old usage: Combwork couldn't save it in the usage history, which the totals keep." }))
+  if (!(await usageHistory.recordKept(host, k).catch(() => false))) throw combworkError(msg({ id: 'main.storage.purgeUnrecorded', defaultMessage: "Combwork couldn't record it in the usage history, so it is kept.", description: "Purge kept a deleted session's old usage: Combwork couldn't save it in the usage history, which the totals keep." }))
   await workspace.mutateSessions(host, (f) => {
     if (f.deletedUsage?.some((x) => x.id === id)) f.deletedUsage = f.deletedUsage.filter((x) => x.id !== id)
   })

@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
   // Typed letters, each timed from its key to its echo on the agent's input line.
   let typed = ''
   const echoes = []
-  const lines = () => page.evaluate((k) => window.__hiveTerminalLines(k) ?? [], key)
+  const lines = () => page.evaluate((k) => window.__cwTerminalLines(k) ?? [], key)
   async function typeOne() {
     const ch = String.fromCharCode(97 + (typed.length % 26))
     const want = typed + ch

@@ -21,7 +21,7 @@ const LISTS_AT_ONCE = 2
  * tick for what runs now) reads them from a test copy's window.
  */
 const counts = { now: 0, lists: 0, turns: 0, cardAgents: 0, renders: 0, active: false }
-;(window as unknown as { __hiveWorkspaceActivity?: typeof counts }).__hiveWorkspaceActivity = counts
+;(window as unknown as { __cwWorkspaceActivity?: typeof counts }).__cwWorkspaceActivity = counts
 
 /**
  * A store value taken in only while the view is active: hidden (the window minimised), the store's changes (agents'

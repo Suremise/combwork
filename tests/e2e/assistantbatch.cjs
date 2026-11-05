@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47919), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47919), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -78,7 +78,7 @@ const check = (name, ok, extra = '') => {
       const host = document.querySelector(`.assistant-panel .terminal-host[data-pty="${CSS.escape(key)}"]`)
       const first = window.__probeFirst
       const screen = host?.querySelector('.xterm-screen')
-      const t = window.__hiveTerminalState?.(key)
+      const t = window.__cwTerminalState?.(key)
       return {
         panel: p ? Math.round(p.getBoundingClientRect().width) : null,
         host: host ? Math.round(host.getBoundingClientRect().width) : null,
@@ -87,7 +87,7 @@ const check = (name, ok, extra = '') => {
         same: !!first && !!host && host === first.host && host.querySelector('.xterm') === first.xterm,
         lost: !!first?.lost,
         webgl: !!host?.querySelector('canvas:not(.xterm-link-layer)') && !host.querySelector('.xterm-rows')?.childElementCount,
-        contexts: window.__hiveWebglCount?.() ?? null
+        contexts: window.__cwWebglCount?.() ?? null
       }
     }, assistantKey)
   // Every WebGL context the window makes is kept here: garbage collection, which used to give back the contexts of

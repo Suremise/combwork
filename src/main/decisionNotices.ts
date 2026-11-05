@@ -1,7 +1,7 @@
 import { basename } from 'path'
 import { workStartedAt } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { liveDecisionCards } from './tasks'
 import type { WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
@@ -51,7 +51,7 @@ let listening = false
 function board(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
   if (!listening) {
     listening = true
-    onHiveEvent((e) => {
+    onCombworkEvent((e) => {
       if (e.type !== 'tasks-changed') return
       changes++
       boards.delete(e.workspacePath.toLowerCase())

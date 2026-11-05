@@ -30,7 +30,7 @@ async function call(h, who, method, url, body) {
 
 ;(async () => {
   q.prepare(fx)
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const reviewer = await q.agent(fx, h, 'R1')

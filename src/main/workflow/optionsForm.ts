@@ -14,7 +14,7 @@ import { cardLabel } from '../../shared/projectKeys'
 import { MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry } from '../../shared/workflow/facts'
 import { refusal } from '../../shared/workflow/refusals'
 import { config } from '../config'
-import { HiveError, hiveError } from '../combworkError'
+import { CombworkError, combworkError } from '../combworkError'
 import { projectPlatform } from '../platform/registry'
 import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
 import { listLanes } from '../lanes'
@@ -53,7 +53,7 @@ const IN_FLIGHT = new Set(['active', 'review', 'approved', 'merging'])
 /** A project of the workspace by its folder, with its platform (the Assistant's home has none). */
 function projectOf(ws: WorkspaceService, projectPath: string): { path: string; name: string; platform: PlatformId } {
   const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
-  if (!p?.platform) throw new HiveError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!p?.platform) throw new CombworkError({ lines: [`${projectPath} isn't a project of this workspace`] }, { kind: 'notFound' }) // i18n-ignore: a mistake in a caller, never the window's
   return { path: p.path, name: p.name, platform: p.platform.id }
 }
 
@@ -185,7 +185,7 @@ const isOptions = (v: unknown): v is Partial<WorkflowOptions> => !!v && typeof v
 function shapeOf(change: unknown): WorkflowChange {
   const c = change as Partial<WorkflowChange> | null
   const base = c?.base
-  if (!c || typeof c !== 'object' || !PRESET_IDS.includes(c.preset ?? null) || !isOptions(c.options) || (base !== undefined && (!base || !PRESET_IDS.includes(base.preset ?? null) || !isOptions(base.options)))) throw new HiveError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!c || typeof c !== 'object' || !PRESET_IDS.includes(c.preset ?? null) || !isOptions(c.options) || (base !== undefined && (!base || !PRESET_IDS.includes(base.preset ?? null) || !isOptions(base.options)))) throw new CombworkError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return { preset: c.preset ?? null, options: keptNames(c.options), ...(base ? { base: { preset: base.preset ?? null, options: base.options } } : {}) }
 }
 
@@ -201,7 +201,7 @@ const M = {
 }
 
 /** A form's save refused: the options changed after it read them (#1418). */
-export class WorkflowStale extends HiveError {
+export class WorkflowStale extends CombworkError {
   constructor() {
     super(M.changedMeanwhile, { kind: 'conflict' })
   }
@@ -257,7 +257,7 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
 }
 
 /** Options that can't be saved: refused with every reason, each a whole sentence of its own (in the window's language there). */
-export class WorkflowRefused extends HiveError {
+export class WorkflowRefused extends CombworkError {
   constructor(readonly problems: WorkflowProblem[]) {
     // agent-text: problemShown
     super({ lines: problems.map(problemShown) }, { kind: 'invalid' })
@@ -292,7 +292,7 @@ interface MergeAnswer {
 export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
   const project = projectOf(ws, projectPath)
   const a = raw as { card?: unknown; request?: unknown; style?: unknown; commitMessage?: unknown } | null
-  if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new HiveError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new CombworkError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   const answer: MergeAnswer = { card: a.card as number, request: a.request, style: a.style as WorkflowOptions['style'], commitMessage: a.commitMessage as CommitMessage }
   await withRepoLocks([project.path], () => workflowWrite(() => saveWorkflowOptions(ws, project.path, null, { answer })), { quiet: true, project: project.path })
 }
@@ -440,7 +440,7 @@ if (crashAt === 'recorded' || crashAt === 'beforeFile') saveSeams[crashAt] = () 
 function planOptions(ws: WorkspaceService, project: { path: string; name: string; platform: PlatformId }, cfg: ProjectConfig, change: WorkflowChange, answering: boolean): { workflow: ProjectWorkflow; changed: (keyof WorkflowOptions)[]; chosen: boolean } {
   // Its version control switched since the form was read (#1419): these options are the other platform's, refused.
   const now = projectPlatform(project.path, cfg.platform).id
-  if (now !== project.platform) throw hiveError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[now] }, { kind: 'conflict' })
+  if (now !== project.platform) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[now] }, { kind: 'conflict' })
   // A form read before another change (the Assistant's tool, another window) never writes over it (#1418).
   if (change.base && !sameBase(change.base, ownNow(cfg, project.platform))) throw new WorkflowStale()
   const c = changeOf(ws, project.platform, ownOf(cfg, project.platform), change, project.path)

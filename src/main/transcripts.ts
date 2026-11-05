@@ -5,7 +5,7 @@ import type { ProviderId, Transcript, TranscriptItem, TranscriptSearchResult, Tr
 import { TRANSCRIPT_WINDOW, assertSessionId } from '../shared/defaults'
 import { formatDateTime } from '../shared/dates'
 import { msg, tr } from '../shared/i18n'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { provider } from './providers'
 import { searchItems, shownNotice, transcriptMarkdown } from './providers/conversation'
 import type { ConversationParserLike } from './providers/types'
@@ -67,7 +67,7 @@ async function parsed(projectPath: string, sessionId: string): Promise<Entry> {
   // The id becomes part of a file name, so only accept plain ids (UUIDs).
   assertSessionId(sessionId)
   // Not while its files move: archiving or deleting it reserves it first.
-  if (sessions.reserved(projectPath, sessionId)) throw hiveError(M.busy, undefined, { kind: 'conflict' })
+  if (sessions.reserved(projectPath, sessionId)) throw combworkError(M.busy, undefined, { kind: 'conflict' })
   const key = `${projectPath.toLowerCase()}|${sessionId}`
   const run = (pending.get(key) ?? Promise.resolve()).then(
     () => whileReading(projectPath, sessionId, () => parseNow(projectPath, sessionId, key)),
@@ -83,7 +83,7 @@ async function parsed(projectPath: string, sessionId: string): Promise<Entry> {
 
 async function parseNow(projectPath: string, sessionId: string, key: string): Promise<Entry> {
   const path = await sessions.anyTranscript(projectPath, sessionId)
-  if (!path) throw hiveError(msg({ id: 'service.transcripts.none', defaultMessage: 'This session has no transcript yet.', description: "An error in the Sessions tab: the session's CLI hasn't written its conversation's file yet." }), undefined, { kind: 'notFound' })
+  if (!path) throw combworkError(msg({ id: 'service.transcripts.none', defaultMessage: 'This session has no transcript yet.', description: "An error in the Sessions tab: the session's CLI hasn't written its conversation's file yet." }), undefined, { kind: 'notFound' })
   const st = await stat(path)
   const size = st.size
   // A compressed backup (#1110) is replaced whole when a resumed session ends, possibly by one of the same size: it is
@@ -169,7 +169,7 @@ export const transcripts = {
 
   async tool(projectPath: string, sessionId: string, itemId: number): Promise<TranscriptTool> {
     const item = (await parsed(projectPath, sessionId)).parser.items[itemId]
-    if (item?.kind !== 'tool') throw hiveError(msg({ id: 'service.transcripts.noTool', defaultMessage: 'No such tool call', description: "An error in the Sessions tab: the tool call asked for isn't in the conversation (any more)." }), undefined, { kind: 'notFound' })
+    if (item?.kind !== 'tool') throw combworkError(msg({ id: 'service.transcripts.noTool', defaultMessage: 'No such tool call', description: "An error in the Sessions tab: the tool call asked for isn't in the conversation (any more)." }), undefined, { kind: 'notFound' })
     return item.tool
   },
 
@@ -181,10 +181,10 @@ export const transcripts = {
   async imageNow(projectPath: string, sessionId: string, imageId: number): Promise<string> {
     const e = await parsed(projectPath, sessionId)
     const loc = e.parser.images[imageId]
-    if (!loc) throw hiveError(msg({ id: 'service.transcripts.noImage', defaultMessage: 'No such image', description: "An error in the Sessions tab: the image asked for isn't in the conversation (any more)." }), undefined, { kind: 'notFound' })
+    if (!loc) throw combworkError(msg({ id: 'service.transcripts.noImage', defaultMessage: 'No such image', description: "An error in the Sessions tab: the image asked for isn't in the conversation (any more)." }), undefined, { kind: 'notFound' })
     const entry = JSON.parse((await readBytes(e.path, loc.offset, loc.offset + loc.length)).toString('utf8'))
     const url = provider(e.provider).imageData(entry, loc)
-    if (!url) throw hiveError(msg({ id: 'service.transcripts.imageNotKept', defaultMessage: 'The image is not stored in the transcript', description: "An error in the Sessions tab: the conversation's file mentions the image but doesn't hold it." }), undefined, { kind: 'notFound' })
+    if (!url) throw combworkError(msg({ id: 'service.transcripts.imageNotKept', defaultMessage: 'The image is not stored in the transcript', description: "An error in the Sessions tab: the conversation's file mentions the image but doesn't hold it." }), undefined, { kind: 'notFound' })
     return url
   },
 
@@ -193,7 +193,7 @@ export const transcripts = {
     projectPath = workspace.assertSessionHost(projectPath)
     if (sessionId !== null) assertSessionId(sessionId)
     // Not a session being archived or deleted: its view opens once that is over (and reads it then).
-    if (sessionId !== null && sessions.reserved(projectPath, sessionId)) throw hiveError(M.busy, undefined, { kind: 'conflict' })
+    if (sessionId !== null && sessions.reserved(projectPath, sessionId)) throw combworkError(M.busy, undefined, { kind: 'conflict' })
     setViewing(window, view, projectPath, sessionId)
   },
 

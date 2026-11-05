@@ -1296,7 +1296,7 @@ export async function openCardActivity(c: TaskCard): Promise<void> {
 
 /** A card's Activity openings settled, and those dropped as the window went elsewhere: a test copy's window reads them. */
 const cardOpenings = { settled: 0, dropped: 0 }
-;(window as unknown as { __hiveCardActivity?: typeof cardOpenings }).__hiveCardActivity = cardOpenings
+;(window as unknown as { __cwCardActivity?: typeof cardOpenings }).__cwCardActivity = cardOpenings
 
 /** Shows an agent's pane on the Session tab and focuses it. */
 export function revealAgent(p: ProjectInfo, agentId: string): void {

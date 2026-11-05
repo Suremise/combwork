@@ -81,7 +81,7 @@ const check = (name, ok, extra = '') => {
   setFixture({ probe: probe(), elevated: { exclusions: [root], error: 'Something went wrong', unlisted: true } })
   await add()
   await dialog.locator('.btn.primary').click()
-  check('a failed run that couldn’t read Defender’s list: said, and the folders stay unknown (never “Scanned”)', !!(await lib.until(async () => /refused the change/.test(await panel.innerText()), 5000)) && (await rows.allInnerTexts()).every((t) => /Unknown/.test(t)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByHive), await panel.innerText())
+  check('a failed run that couldn’t read Defender’s list: said, and the folders stay unknown (never “Scanned”)', !!(await lib.until(async () => /refused the change/.test(await panel.innerText()), 5000)) && (await rows.allInnerTexts()).every((t) => /Unknown/.test(t)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork), await panel.innerText())
 
   // Defender's list redacted even with administrator rights: which exclusions exist can't be known, so nothing
   // changes; and its "N/A" answer, from Add or from a check, never counts as a list.
@@ -115,7 +115,7 @@ const check = (name, ok, extra = '') => {
   check('…asking Defender only for the one not already excluded', JSON.stringify(changes('add-requested').at(-1)?.paths) === JSON.stringify([tests]), JSON.stringify(changes('add-requested')))
   check('…both shown excluded, as read with administrator rights', !!(await lib.until(async () => /no longer scans this folder/.test(await panel.innerText()) && (await rows.allInnerTexts()).every((t) => /Excluded/.test(t)), 5000)) && /with administrator rights/.test(await panel.innerText()), await panel.innerText())
   s = await inv('antivirus:status', false)
-  check('…only the one Combwork added is Combwork’s', JSON.stringify(s.paths.map((p) => p.addedByHive)) === JSON.stringify([false, true]) && s.slowed === false, JSON.stringify(s.paths))
+  check('…only the one Combwork added is Combwork’s', JSON.stringify(s.paths.map((p) => p.addedByCombwork)) === JSON.stringify([false, true]) && s.slowed === false, JSON.stringify(s.paths))
   await shot('added-dark')
 
   // Remove: only what Combwork added; the user's own exclusion stays.
@@ -131,11 +131,11 @@ const check = (name, ok, extra = '') => {
   setFixture({ probe: probe(), elevated: { cancelled: true } })
   await add()
   await dialog.locator('.btn.primary').click()
-  check('a declined administrator prompt: nothing changed, and it says so', !!(await lib.until(async () => /prompt was declined/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByHive))
+  check('a declined administrator prompt: nothing changed, and it says so', !!(await lib.until(async () => /prompt was declined/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork))
   setFixture({ probe: probe(), elevated: { policy: true } })
   await add()
   await dialog.locator('.btn.primary').click()
-  check('a policy keeping local exclusions from applying: said, not counted as added', !!(await lib.until(async () => /organisation/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByHive), await panel.innerText())
+  check('a policy keeping local exclusions from applying: said, not counted as added', !!(await lib.until(async () => /organisation/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork), await panel.innerText())
 
   // Another antivirus, ReFS and a Dev Drive, not Windows.
   const checkAgain = async () => {

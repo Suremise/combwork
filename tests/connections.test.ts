@@ -330,7 +330,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       c.release()
       await opened
       expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id] } })
-      expect(accounts.hiveAccounts().map((x) => x.id)).toEqual([b.id, a.id])
+      expect(accounts.combworkAccounts().map((x) => x.id)).toEqual([b.id, a.id])
     } finally {
       accounts.accountTestHooks.beforeOrderRead = undefined
       release()

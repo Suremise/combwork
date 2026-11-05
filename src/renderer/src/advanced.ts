@@ -21,7 +21,7 @@ export function useAdvancedValue<T extends string | number | string[] | boolean>
   return advancedRow(advancedDef(id)!, state).value as T
 }
 /** An advanced value as this window has it now, for tests: a change reaches the window in the states' batch (HI-1938), after its IPC answers. */
-;(window as unknown as { __hiveAdvancedValue?: (id: string) => unknown }).__hiveAdvancedValue = (id) => {
+;(window as unknown as { __cwAdvancedValue?: (id: string) => unknown }).__cwAdvancedValue = (id) => {
   const def = advancedDef(id)
   return def ? advancedRow(def, useStore.getState().advanced).value : undefined
 }

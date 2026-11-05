@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
   const api = copilot ? await startFakeCopilotApi({ log: apiLog, systems: true }) : null
   const copilotEnv = api ? copilotTestEnv(api, copilotDir, { above: lib.WORK }) : {}
   const PORT = lib.port(47816)
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, ...copilotEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, ...copilotEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -166,8 +166,8 @@ const check = (name, ok, extra = '') => {
 
     // --- A project agent reads the note but can't write it; a script with the workspace's token can.
     const launch = lines(path.join(claudeHome, 'fake-launches.jsonl')).filter((x) => x.cwd.toLowerCase() === claudeP.cwd.toLowerCase()).at(-1)
-    const hiveEnv = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
-    const agentToken = JSON.parse(fs.readFileSync(hiveEnv.CW_API_TOKEN_FILE, 'utf8')).token
+    const combworkEnv = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const agentToken = JSON.parse(fs.readFileSync(combworkEnv.CW_API_TOKEN_FILE, 'utf8')).token
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const call = async (token, method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })

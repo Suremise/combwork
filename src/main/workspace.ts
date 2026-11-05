@@ -18,8 +18,8 @@ import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { MIGRATED_CLOSE, migrateWorkspaceCommands } from '../shared/commands'
 import { OpenGate } from './openGate'
-import { HiveError, englishError, hiveError } from './combworkError'
-import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
+import { CombworkError, englishError, combworkError } from './combworkError'
+import type { AgentDef, AgentInfo, HiddenProject, CombworkEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
 import { changesConfig, viewOf, withoutView } from '../shared/projectView'
 import { emit, emitTo, toast } from './events'
@@ -33,7 +33,7 @@ import { createLogger, userText } from './logger'
 import { changeSessionRecord, changeSessions, exportSessions, readAgentSessions, readCardSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
-import { ensureHiveExcluded, gitDirOf, hiveVcs } from './combworkVcs'
+import { ensureCombworkExcluded, gitDirOf, combworkVcs } from './combworkVcs'
 import { detect, projectPlatform } from './platform/registry'
 import type { ProjectPlatform } from '../shared/platform/descriptors'
 import { gitProblem } from './gitTool'
@@ -83,7 +83,7 @@ const M = {
   openVc: msg({ id: 'service.workspace.platformOpen', defaultMessage: 'Open Version Control', description: "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Combwork offers the switch (glossary 2.1)." })
 }
 // What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
-setFenceReason(() => hiveError(M.closed, undefined, { kind: 'conflict' }))
+setFenceReason(() => combworkError(M.closed, undefined, { kind: 'conflict' }))
 
 /** The notice that a project's folder no longer has the version control Hive recorded for it (SPEC §16.3.5). */
 function platformNotice(project: string, p: ProjectPlatform): { title: string; message: string } {
@@ -202,7 +202,7 @@ const CONNECTION_GONE = msg({ id: 'service.workspace.connectionGone', defaultMes
 /** Refuses a write giving an agent a connection that is gone or being removed (an agent keeping its own is never refused). */
 function assertConnectionsAssignable(before: readonly AgentDef[], after: readonly AgentDef[]): void {
   const was = new Map(before.map((a) => [a.id, a.connection]))
-  for (const a of after) if (a.connection && a.connection !== was.get(a.id) && !connectionAssignable(a.connection)) throw hiveError(CONNECTION_GONE, { agent: a.name ?? a.id }, { kind: 'conflict' })
+  for (const a of after) if (a.connection && a.connection !== was.get(a.id) && !connectionAssignable(a.connection)) throw combworkError(CONNECTION_GONE, { agent: a.name ?? a.id }, { kind: 'conflict' })
 }
 
 /** What a project.json gives (kept by its stat, HI-1814): its config over the defaults, and the view fields it still has. */
@@ -220,8 +220,8 @@ export class WorkspaceService {
   private place: string | null = null
   private wsConfig: WorkspaceConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
   private watcher: FSWatcher | null = null
-  /** .combwork's own top, watched natively (watchHive). */
-  private hiveTop: RootWatcher | null = null
+  /** .combwork's own top, watched natively (watchCombwork). */
+  private combworkTop: RootWatcher | null = null
   private rootWatcher: RootWatcher | null = null
   private refreshTimer: NodeJS.Timeout | null = null
   /** The refresh scheduleRefresh has waiting, told once it has run (or was dropped): refreshesSettled waits for it. */
@@ -359,34 +359,34 @@ export class WorkspaceService {
     return this.life.signal
   }
 
-  get hiveDir(): string {
-    if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+  get combworkDir(): string {
+    if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     return join(this.path, CW_DIR)
   }
 
   get skillsDir(): string {
-    return join(this.hiveDir, 'skills')
+    return join(this.combworkDir, 'skills')
   }
 
   get mcpDir(): string {
-    return join(this.hiveDir, 'mcp')
+    return join(this.combworkDir, 'mcp')
   }
 
   get sharedDir(): string {
-    return join(this.hiveDir, 'shared')
+    return join(this.combworkDir, 'shared')
   }
 
   /** The Hive Assistant's modes: their folder from before 0.9.3 while the workspace has only that one (LEGACY_MODES_DIR). */
   get modesDir(): string {
-    const dir = join(this.hiveDir, MODES_DIR)
+    const dir = join(this.combworkDir, MODES_DIR)
     if (existsSync(dir)) return dir
-    const legacy = join(this.hiveDir, LEGACY_MODES_DIR)
+    const legacy = join(this.combworkDir, LEGACY_MODES_DIR)
     return existsSync(legacy) ? legacy : dir
   }
 
   /** The Hive Assistant's home: its one-agent config, sessions and backups (its agent works in the workspace folder). */
   get assistantHome(): string {
-    return join(this.hiveDir, ASSISTANT_DIR)
+    return join(this.combworkDir, ASSISTANT_DIR)
   }
 
   /** Whether a path is this workspace's Assistant home. */
@@ -402,7 +402,7 @@ export class WorkspaceService {
 
   /** Where new worktrees are created, next to the workspace folder. */
   get worktreesRoot(): string {
-    if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+    if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     return worktreesRoot(this.path)
   }
 
@@ -440,7 +440,7 @@ export class WorkspaceService {
 
   private async openNow(path: string): Promise<WorkspaceInfo> {
     const abs = resolve(path)
-    if (!(await isDir(abs))) throw hiveError(msg({ id: 'service.workspace.notFound', defaultMessage: 'Folder not found: {folder}', description: 'An error opening a workspace: the folder {folder} is not there.' }), { folder: abs })
+    if (!(await isDir(abs))) throw combworkError(msg({ id: 'service.workspace.notFound', defaultMessage: 'Folder not found: {folder}', description: 'An error opening a workspace: the folder {folder} is not there.' }), { folder: abs })
     // The skills and modes of the workspace this window had, still being brought up to date (HI-1705), first: its close
     // waits for them, and no other window's open should wait behind that in the admission.
     await this.itemsSynced
@@ -451,9 +451,9 @@ export class WorkspaceService {
       // By real paths: the same folder by another name (an 8.3 short name, a junction) is the same workspace (#455).
       for (const w of services) {
         if (w === this || !w.path) continue
-        if (samePlace(abs, w.path)) throw hiveError(msg({ id: 'service.workspace.openElsewhere', defaultMessage: '{folder} is already open in another window.', description: 'An error opening a workspace: the folder {folder} is the workspace of another Combwork window.' }), { folder: abs }, { kind: 'conflict' })
-        if (containsPlace(w.path, abs)) throw hiveError(msg({ id: 'service.workspace.insideOpen', defaultMessage: "{folder} is inside the workspace {workspace}, which is open in another window. Close that workspace first, or open this folder's projects from there.", description: 'An error opening a workspace: the folder {folder} is inside {workspace}, the workspace of another Combwork window (a workspace inside another would share its projects).' }), { folder: abs, workspace: w.path }, { kind: 'conflict' })
-        if (containsPlace(abs, w.path)) throw hiveError(msg({ id: 'service.workspace.holdsOpen', defaultMessage: 'The workspace {workspace}, open in another window, is inside {folder}. Close it first to open {name} as a workspace.', description: "An error opening a workspace: another Combwork window's workspace {workspace} is inside the folder {folder} (its name: {name})." }), { folder: abs, workspace: w.path, name: basename(abs) }, { kind: 'conflict' })
+        if (samePlace(abs, w.path)) throw combworkError(msg({ id: 'service.workspace.openElsewhere', defaultMessage: '{folder} is already open in another window.', description: 'An error opening a workspace: the folder {folder} is the workspace of another Combwork window.' }), { folder: abs }, { kind: 'conflict' })
+        if (containsPlace(w.path, abs)) throw combworkError(msg({ id: 'service.workspace.insideOpen', defaultMessage: "{folder} is inside the workspace {workspace}, which is open in another window. Close that workspace first, or open this folder's projects from there.", description: 'An error opening a workspace: the folder {folder} is inside {workspace}, the workspace of another Combwork window (a workspace inside another would share its projects).' }), { folder: abs, workspace: w.path }, { kind: 'conflict' })
+        if (containsPlace(abs, w.path)) throw combworkError(msg({ id: 'service.workspace.holdsOpen', defaultMessage: 'The workspace {workspace}, open in another window, is inside {folder}. Close it first to open {name} as a workspace.', description: "An error opening a workspace: another Combwork window's workspace {workspace} is inside the folder {folder} (its name: {name})." }), { folder: abs, workspace: w.path, name: basename(abs) }, { kind: 'conflict' })
       }
       await this.close()
       this.generation++
@@ -502,7 +502,7 @@ export class WorkspaceService {
     const moveOpts = { signal: this.life.signal, stillOurs: () => this.generation === openGen && this.path === abs }
     const fresh = !existsSync(join(abs, CW_DIR))
     await this.ensureWorkspaceStructure()
-    this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}, { holder: this }))
+    this.wsConfig = loadedConfig(await readKeptJson(join(this.combworkDir, 'workspace.json'), {}, { holder: this }))
     // Its open point's commands hold its agents back until they are done (HI-1954): reserved here, before anything hears
     // of the open (the recent list, workspace-changed, onOpened), so no start slips in ahead of them.
     this.openGate = this.wsConfig.commands?.onOpen.run.length && WorkspaceService.runsCommands() ? new OpenGate(this.generation, this.life.signal) : null
@@ -537,7 +537,7 @@ export class WorkspaceService {
       const gen = this.generation
       const life = this.life.signal
       await Promise.all([untilBoardOpenable(abs, life), untilJournalOpenable(this.assistantHome, life)])
-      if (life.aborted || this.generation !== gen || this.path !== abs) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+      if (life.aborted || this.generation !== gen || this.path !== abs) throw combworkError(M.closed, undefined, { kind: 'conflict' })
       done('its board and journal openable') // i18n-ignore: a part of a log line's timing
       // Every project has its id (#508) before the board, lanes and watches are read by it.
       await this.projectIds().catch((e) => log.warn('reading the project ids', e))
@@ -577,7 +577,7 @@ export class WorkspaceService {
         began = performance.now()
         await inWorkspace(this, async () => WorkspaceService.bringItemsUpToDate?.(fresh)).catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
         if (this.generation !== gen || this.path !== abs) return
-        this.watchHive()
+        this.watchCombwork()
         // What the window read of them meanwhile may be older.
         this.emit({ type: 'skills-changed' })
         this.emit({ type: 'modes-changed' })
@@ -637,7 +637,7 @@ export class WorkspaceService {
     this.generation++
     // What was said of the projects' platforms is this workspace's.
     this.platformOffers.clear()
-    const reason = hiveError(M.closed, undefined, { kind: 'conflict' })
+    const reason = combworkError(M.closed, undefined, { kind: 'conflict' })
     this.life.abort(reason)
     const closing = this.path
     const place = this.place ?? undefined
@@ -668,8 +668,8 @@ export class WorkspaceService {
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
     if (closing) closeBoard(closing, place)
     if (closing) closeJournal(join(closing, CW_DIR, ASSISTANT_DIR), place)
-    this.hiveTop?.close()
-    this.hiveTop = null
+    this.combworkTop?.close()
+    this.combworkTop = null
     await this.watcher?.close()
     this.watcher = null
     this.path = null
@@ -699,7 +699,7 @@ export class WorkspaceService {
   }
 
   private async ensureWorkspaceStructure(): Promise<void> {
-    const h = this.hiveDir
+    const h = this.combworkDir
     // The folders, then the files, each all at once (HI-1705: one after another, each waited its turn behind other
     // windows' file work). Each folder is made with those above it.
     await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp')].map((d) => mkdir(d, { recursive: true })))
@@ -719,7 +719,7 @@ export class WorkspaceService {
 
   saveWorkspaceConfig(): Promise<void> {
     // This workspace's file and settings object (another workspace opened meanwhile has its own).
-    const file = join(this.hiveDir, 'workspace.json')
+    const file = join(this.combworkDir, 'workspace.json')
     const data = this.wsConfig
     this.configSaves++
     const run = this.savingConfig.then(() => writeKeptJson(file, data, { holder: this })).finally(() => {
@@ -736,7 +736,7 @@ export class WorkspaceService {
    * renamesApplied) is done again next time.
    */
   saveWorkspaceConfigWith(change: (c: WorkspaceConfig) => Partial<WorkspaceConfig>): Promise<void> {
-    const file = join(this.hiveDir, 'workspace.json')
+    const file = join(this.combworkDir, 'workspace.json')
     const data = this.wsConfig
     this.configSaves++
     let text: string | null = null
@@ -762,18 +762,18 @@ export class WorkspaceService {
    * chokidar stats every entry it lists through Electron's fs, which opens and holds an .asar file (#246). A folder
    * appearing, going or renamed there reads the project list again (a project's own folder changing reports 'change').
    */
-  private watchHive(): void {
+  private watchCombwork(): void {
     if (!this.path || this.watcher) return
     const assistantHome = this.assistantHome.toLowerCase()
     const mcpDir = this.mcpDir.toLowerCase() + sep
-    const hiveDir = this.hiveDir.toLowerCase() + sep
+    const combworkDir = this.combworkDir.toLowerCase() + sep
     // Only the folders whose files are shown (HI-1797): chokidar read .combwork's own listing again, and filtered each entry,
     // on every change at its top, and the board's database files there change with every board write. .combwork itself is
     // watched natively below, for workspace.json and for one of these folders appearing.
     const folders = ['shared', 'skills', 'mcp', MODES_DIR, LEGACY_MODES_DIR, DIALECTS_DIR]
-    const watched = new Set(folders.filter((f) => existsSync(join(this.hiveDir, f))))
+    const watched = new Set(folders.filter((f) => existsSync(join(this.combworkDir, f))))
     this.watcher = chokidar.watch(
-      [...watched].map((f) => join(this.hiveDir, f)),
+      [...watched].map((f) => join(this.combworkDir, f)),
       {
         depth: 5,
         ignoreInitial: true,
@@ -783,7 +783,7 @@ export class WorkspaceService {
         // told by Hive's own writes: neither the database's files nor the cards' old folders and backups are watched.
         ignored: (p: string) => {
           const at = resolve(p).toLowerCase()
-          const top = at.startsWith(hiveDir) ? at.slice(hiveDir.length).split(sep)[0] : ''
+          const top = at.startsWith(combworkDir) ? at.slice(combworkDir.length).split(sep)[0] : ''
           return at === assistantHome || BOARD_FILES.test(top) || (at.startsWith(mcpDir) && (at.slice(mcpDir.length).includes(sep) || !at.endsWith('.json')))
         }
       }
@@ -821,18 +821,18 @@ export class WorkspaceService {
     // workspace.json changed reads the config again; one of the folders above appearing is watched from then on, and
     // tells its change (what is in it is new).
     try {
-      const top = watch(this.hiveDir, (_evt, name) => {
+      const top = watch(this.combworkDir, (_evt, name) => {
         if (this.watcher !== chokidarWatcher || !name) return
         const n = String(name)
         if (n === 'workspace.json') return void this.reloadConfig()
         const f = folders.find((x) => x.toLowerCase() === n.toLowerCase())
-        if (!f || watched.has(f) || !existsSync(join(this.hiveDir, f))) return
+        if (!f || watched.has(f) || !existsSync(join(this.combworkDir, f))) return
         watched.add(f)
-        chokidarWatcher.add(join(this.hiveDir, f))
+        chokidarWatcher.add(join(this.combworkDir, f))
         told(`${CW_DIR}/${f}`)
       })
       top.on('error', (e) => log.warn('watcher error (.combwork)', e))
-      this.hiveTop = top
+      this.combworkTop = top
     } catch (e) {
       log.warn('watching .combwork', e)
     }
@@ -990,7 +990,7 @@ export class WorkspaceService {
   private async reloadConfig(): Promise<void> {
     if (!this.path || this.configSaves) return
     const generation = this.generation
-    const file = join(this.hiveDir, 'workspace.json')
+    const file = join(this.combworkDir, 'workspace.json')
     const text = await readFile(file, 'utf8').catch(() => '')
     // Hive's own save, or a save started meanwhile (its settings are newer), or another workspace opened since.
     if (text === this.configWritten || this.configSaves || generation !== this.generation) return
@@ -1000,7 +1000,7 @@ export class WorkspaceService {
   }
 
   /** An event about this workspace, for its window (and the Agent API's event stream). */
-  emit(event: HiveEvent): void {
+  emit(event: CombworkEvent): void {
     if (this.window) emitTo(this.window, event)
     else emit(event)
   }
@@ -1189,15 +1189,15 @@ export class WorkspaceService {
 
   /** Sets the workspace's own value of an advanced setting a workspace can set (#367), or removes it (null: Hive's again). */
   async setAdvanced(id: string, raw: unknown): Promise<void> {
-    if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+    if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     const def = advancedDef(id)
-    if (!def?.workspace) throw hiveError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Combwork.' }), { setting: def?.text.title ?? id }, { kind: 'invalid' })
+    if (!def?.workspace) throw combworkError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Combwork.' }), { setting: def?.text.title ?? id }, { kind: 'invalid' })
     const own = { ...this.wsConfig.advanced }
     if (raw === null || raw === undefined) delete own[id]
     else {
       const checked = checkAdvanced(def, raw)
       // agent-text: checkAdvanced
-      if ('error' in checked) throw new HiveError(checked.errorText, { kind: 'invalid' })
+      if ('error' in checked) throw new CombworkError(checked.errorText, { kind: 'invalid' })
       own[id] = checked.value
     }
     if (Object.keys(own).length) this.wsConfig.advanced = own
@@ -1222,7 +1222,7 @@ export class WorkspaceService {
   }
 
   assertProject(p: string): string {
-    if (!this.isProjectPath(p)) throw hiveError(msg({ id: 'service.workspace.notProject', defaultMessage: 'Not a project in the open workspace: {path}', description: "An error: {path} isn't one of the open workspace's projects (a folder in it, not hidden)." }), { path: p }, { kind: 'notFound' })
+    if (!this.isProjectPath(p)) throw combworkError(msg({ id: 'service.workspace.notProject', defaultMessage: 'Not a project in the open workspace: {path}', description: "An error: {path} isn't one of the open workspace's projects (a folder in it, not hidden)." }), { path: p }, { kind: 'notFound' })
     return resolve(p)
   }
 
@@ -1230,7 +1230,7 @@ export class WorkspaceService {
   assertRoot(p: string): string {
     if (this.isProjectPath(p)) return resolve(p)
     if (this.roots.has(resolve(p).toLowerCase())) return resolve(p)
-    throw hiveError(msg({ id: 'service.workspace.notRoot', defaultMessage: 'Not a project or agent worktree in the open workspace: {path}', description: "An error: {path} is neither one of the open workspace's projects nor the worktree of one of their agents." }), { path: p }, { kind: 'notFound' })
+    throw combworkError(msg({ id: 'service.workspace.notRoot', defaultMessage: 'Not a project or agent worktree in the open workspace: {path}', description: "An error: {path} is neither one of the open workspace's projects nor the worktree of one of their agents." }), { path: p }, { kind: 'notFound' })
   }
 
   /**
@@ -1333,7 +1333,7 @@ export class WorkspaceService {
     let next: AgentDef | undefined
     await this.mutateProjectConfig(projectPath, (cfg) => {
       const current = projectAgents(cfg).find((a) => a.id === agentId)
-      if (!current) throw hiveError(msg({ id: 'service.workspace.agentGone', defaultMessage: 'That agent no longer exists.', description: "An error changing an agent's settings: it was removed meanwhile." }), undefined, { kind: 'notFound' })
+      if (!current) throw combworkError(msg({ id: 'service.workspace.agentGone', defaultMessage: 'That agent no longer exists.', description: "An error changing an agent's settings: it was removed meanwhile." }), undefined, { kind: 'notFound' })
       check?.(current)
       const def: AgentDef = { ...current, ...patch, id: agentId }
       next = def
@@ -1417,7 +1417,7 @@ export class WorkspaceService {
         const moved = await moveFolders(this.path, { only: projectPath })
         if (moved.late) await this.finishFolderMove()
       } catch (e) {
-        if (!(e instanceof HiveError) || e.kind !== 'conflict') throw e
+        if (!(e instanceof CombworkError) || e.kind !== 'conflict') throw e
         log.warn(`${userText(basename(projectPath))}: its names upgrade waits: ${userText(englishError(e))}`)
       }
     }
@@ -1430,7 +1430,7 @@ export class WorkspaceService {
 
   /** Adds the project's .combwork to the info/exclude of the git repository holding it (its own, or one above), if it isn't (#345). */
   async ensureGitExclude(projectPath: string): Promise<void> {
-    const r = await ensureHiveExcluded(projectPath)
+    const r = await ensureCombworkExcluded(projectPath)
     if (r?.added) log.info(`Excluded .combwork from git in ${userText(r.root)}`)
     // The line is there whatever git can do; git missing only means it couldn't confirm a .gitignore doesn't bring .combwork back (#346).
     if (r?.unconfirmed) log.info(`Git couldn't confirm .combwork is ignored in ${userText(r.root)}${gitProblem() ? ` (${gitProblem()})` : ''}`)
@@ -1761,7 +1761,7 @@ export class WorkspaceService {
       took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
       // Ensured at each refresh, so a repository made later (git init) gets it too (#345). Not for one gone (HI-2564),
       // asked again as each write is made: its project.json may go while this read runs (HR2's round 1).
-      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', hiveVcs(projectPath, { readOnly: () => gone || (this.setUpAt.has(projectPath.toLowerCase()) && !existsSync(join(projectPath, CW_DIR, 'project.json'))) }).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
+      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', combworkVcs(projectPath, { readOnly: () => gone || (this.setUpAt.has(projectPath.toLowerCase()) && !existsSync(join(projectPath, CW_DIR, 'project.json'))) }).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
     ])
     const info: ProjectInfo = {
       name: basename(projectPath),
@@ -1776,7 +1776,7 @@ export class WorkspaceService {
       ...(folders?.length ? { folders } : {}),
       unmanagedMcp,
       removedData: removed,
-      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: vcs, platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) })
+      ...(this.isAssistantHome(projectPath) ? {} : { combworkVcs: vcs, platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) })
     }
     const ms = performance.now() - started
     if (ms > SLOW_PROJECT_READ_MS) log.info(`reading ${userText(basename(projectPath))} for the window took ${Math.round(ms)} ms: ${parts.map(([w, t]) => `${w} ${Math.round(t)} ms`).join(', ')}`)
@@ -1827,10 +1827,10 @@ export class WorkspaceService {
   private refreshReported = 0
 
   async refresh(): Promise<WorkspaceInfo> {
-    if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+    if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     // Closing: its generation is already the next one's, so the lifetime says it (#1341).
     const life = this.life.signal
-    if (life.aborted) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    if (life.aborted) throw combworkError(M.closed, undefined, { kind: 'conflict' })
     const gen = this.generation
     const seq = ++this.refreshes
     // Before the folders are listed: a project the listing misses was gone by then.
@@ -1844,13 +1844,13 @@ export class WorkspaceService {
     // The projects and the Assistant's home read at once, in the listing's order (HI-1705: one after another, each read's
     // file and git calls queued behind other windows' work, an open took seconds under load).
     const paths = await this.listProjectPaths()
-    if (closed()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    if (closed()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
     const [read, assistant] = await whenAll([
       whenAll(paths.map((p) => this.projectInfo(p, gen, scope))),
       this.projectInfo(this.assistantHome, gen, scope).catch((e) => (log.warn('the Assistant', e), null))
     ])
     projects.push(...read)
-    if (closed()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    if (closed()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
     // A refresh begun after this one has reported already (#731): this one read the projects earlier, so what it found
     // is older and changes nothing (it put back an agent list from before a change, and said a shared name twice).
     if (seq < this.refreshReported && this.cached) return this.cached
@@ -1922,20 +1922,20 @@ export class WorkspaceService {
   }
 
   async createProject(name: string): Promise<WorkspaceInfo> {
-    if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+    if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     const clean = name.trim()
     if (!clean || /[<>:"/\\|?*\x00-\x1f]/.test(clean) || clean.startsWith('.') || /[. ]$/.test(clean)) {
-      throw hiveError(msg({ id: 'service.workspace.badName', defaultMessage: 'Project names cannot start with "." or contain {chars}', description: "An error making a project: a project's name (its folder's) can't start with a dot or hold the characters {chars}, which Windows doesn't allow in a folder's name." }), { chars: '< > : " / \\ | ? *' }, { kind: 'invalid' })
+      throw combworkError(msg({ id: 'service.workspace.badName', defaultMessage: 'Project names cannot start with "." or contain {chars}', description: "An error making a project: a project's name (its folder's) can't start with a dot or hold the characters {chars}, which Windows doesn't allow in a folder's name." }), { chars: '< > : " / \\ | ? *' }, { kind: 'invalid' })
     }
     const p = join(this.path, clean)
-    if (existsSync(p)) throw hiveError(msg({ id: 'service.workspace.folderExists', defaultMessage: 'A folder named "{name}" already exists', description: 'An error making a project: the workspace already has a folder called {name}.' }), { name: clean })
+    if (existsSync(p)) throw combworkError(msg({ id: 'service.workspace.folderExists', defaultMessage: 'A folder named "{name}" already exists', description: 'An error making a project: the workspace already has a folder called {name}.' }), { name: clean })
     // The workspace it is made in: after each wait, still the one open (HR5, HI-1760 round 1). These calls act on what
     // the service has open then, so a close, or another workspace opened meanwhile (the same one again too), would have
     // them read and answer with that one's projects: refused as closed instead.
     const gen = this.generation
     const life = this.life.signal
     const still = (): void => {
-      if (gen !== this.generation || life.aborted) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+      if (gen !== this.generation || life.aborted) throw combworkError(M.closed, undefined, { kind: 'conflict' })
     }
     await mkdir(p)
     await this.ensureProject(p)

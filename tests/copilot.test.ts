@@ -95,7 +95,7 @@ describe('Copilot footer and modes', () => {
 
 describe('Copilot launch', () => {
   it('starts a new session under the id Combwork chose, with its hooks, MCP servers and modes', () => {
-    const ctx = context({ model: 'claude-sonnet-5.5', effort: 'high', trustedHiveTools: ['cw_list_tasks', 'cw_read_task'], initialPrompt: 'Fix the bug' })
+    const ctx = context({ model: 'claude-sonnet-5.5', effort: 'high', trustedCombworkTools: ['cw_list_tasks', 'cw_read_task'], initialPrompt: 'Fix the bug' })
     const { file, args, env } = copilot.buildCommand(ctx.executable, ctx)
     expect(file).toBe('C:\\bin\\copilot.exe')
     expect(args.slice(0, 4)).toEqual(['--session-id', ctx.sessionId, '--name', 'Agent 1'])
@@ -125,8 +125,8 @@ describe('Copilot launch', () => {
     const allow = (over: Partial<LaunchContext>) => copilot.buildCommand('x.exe', context(over)).args.filter((a) => a.startsWith('--allow-tool='))
     expect(allow({})).toEqual(['--allow-tool=combwork'])
     expect(allow({ permissionMode: 'plan' })).toEqual(['--allow-tool=combwork'])
-    expect(allow({ trustedHiveTools: [] })).toEqual([])
-    expect(allow({ trustedHiveTools: ['cw_read_task'] })).toEqual(['--allow-tool=combwork(cw_read_task)'])
+    expect(allow({ trustedCombworkTools: [] })).toEqual([])
+    expect(allow({ trustedCombworkTools: ['cw_read_task'] })).toEqual(['--allow-tool=combwork(cw_read_task)'])
     // No hive server, nothing to approve.
     expect(allow({ mcpServers: {} })).toEqual([])
   })

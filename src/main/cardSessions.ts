@@ -6,7 +6,7 @@ import { agentDoingCards, agentReviewCards } from '../shared/tasks'
 import type { LiveSessionState, StoredText, TaskCard } from '../shared/types'
 import { coalesced } from './coalesce'
 import { createLogger } from './logger'
-import { allTasks, commentAsHive, liveCardHeads } from './tasks'
+import { allTasks, commentAsCombwork, liveCardHeads } from './tasks'
 import { workspaceFor, type WorkspaceService } from './workspace'
 
 const log = createLogger('cards')
@@ -67,6 +67,6 @@ export async function commentOnDoingCards(ws: WorkspaceService, projectPath: str
   const project = basename(projectPath)
   const out: number[] = []
   // Each checked again under its lock: moved, reassigned or taken to another project meanwhile, it isn't the agent's now.
-  for (const c of agentDoingCards(await allTasks(ws, { archived: false }), project, agentId)) if (await commentAsHive(c.number, said, ws, (card) => agentDoingCards([card], project, agentId).length === 1)) out.push(c.number)
+  for (const c of agentDoingCards(await allTasks(ws, { archived: false }), project, agentId)) if (await commentAsCombwork(c.number, said, ws, (card) => agentDoingCards([card], project, agentId).length === 1)) out.push(c.number)
   return out
 }

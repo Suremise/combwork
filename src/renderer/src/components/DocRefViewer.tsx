@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { parseDocRef } from '@shared/docRefs'
-import type { HiveRequests } from '@shared/api'
+import type { CombworkRequests } from '@shared/api'
 import type { ContextProblem } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -9,7 +9,7 @@ import { get, set, showView, useLanguage } from '../store'
 import { Markdown, Modal } from './ui'
 import { CW_DIR } from '@shared/defaults'
 
-type Section = Awaited<ReturnType<HiveRequests['docs:section']>>
+type Section = Awaited<ReturnType<CombworkRequests['docs:section']>>
 
 const M = {
   open: msg({ id: 'board.context.open', defaultMessage: 'Open in Files', description: "Button in the doc section viewer (a card's Read first reference, #818): opens the project's file in the Files tab, at the section." }),

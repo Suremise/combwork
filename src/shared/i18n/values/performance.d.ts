@@ -1,6 +1,6 @@
 // Generated from locales/en/performance.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'performance.appWide': { inFlight: number; refused: number; connections: number; events: number; size: string | number }
   'performance.card.data': undefined
   'performance.card.dataSub': { size: string | number }

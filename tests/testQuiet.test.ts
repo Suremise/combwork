@@ -53,7 +53,7 @@ describe('quiet test copies', () => {
       expect(testQuiet()).toBe(false)
       process.env.CW_TEST_QUIET = '0'
       expect(testQuiet()).toBe(false)
-      // The packaged suites' copies: hiveEnv sets it.
+      // The packaged suites' copies: combworkEnv sets it.
       process.env.CW_TEST_QUIET = '1'
       expect(testQuiet()).toBe(true)
     } finally {

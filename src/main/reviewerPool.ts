@@ -37,7 +37,7 @@ import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { advanced } from './advanced'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { onLanesWritten, rawLanes } from './lanes'
 import { readyFor } from './readiness'
 import { createLogger, userText } from './logger'
@@ -411,7 +411,7 @@ export function startReviewerPool(): void {
   }
   // An agent's state as the pass reads it, by agent: a status event that changes none of it (a refused line's own, HI-2333) asks no pass.
   const seen = new Map<string, string>()
-  const offEvents = onHiveEvent((e) => {
+  const offEvents = onCombworkEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'workspace-changed' || e.type === 'team-pause-changed') later()
     else if (e.type === 'session-status') {
       const key = `${e.state.projectPath.toLowerCase()}#${e.state.agentId}`

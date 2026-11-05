@@ -4,7 +4,7 @@ import { join } from 'path'
 import { ADVANCED_DEFS } from '../src/shared/advanced'
 import { FLIGHT_PATTERN_OFF, knownIds, unknownIn } from '../src/shared/flightRecorder'
 import { parseRecording } from '../src/shared/consoleFixtures.mts'
-import { sessionSourceId, hiveSourceId } from '../src/shared/devConsole'
+import { sessionSourceId, combworkSourceId } from '../src/shared/devConsole'
 import { setLanguage } from '../src/shared/i18n'
 
 // The developer console's flight recorder (#698): the events and fields each CLI is known to send (advanced values; every
@@ -109,7 +109,7 @@ describe('the events and fields each CLI is known to send', () => {
 describe("the console's flight mode", async () => {
   const { DevConsole, FLIGHT_MAX_SOURCES, FLIGHT_RING_EVENTS } = await import('../src/main/devConsole')
   const a = sessionSourceId('C:\\ws\\alpha', 'a1')
-  const hive = hiveSourceId('C:\\ws')
+  const hive = combworkSourceId('C:\\ws')
   const ev = (n: number) => () => ({ kind: 'hook' as const, name: `Hook ${n}`, summary: `hook ${n}`, raw: { prompt: 'secret words', token: SECRET } })
 
   it('keeps the sources it is given whether watched or not, redacted, bounded, and nothing once off', () => {

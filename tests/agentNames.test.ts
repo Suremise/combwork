@@ -9,7 +9,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { duplicateAgentNames, nameTaken, projectPrefix, suggestAgentName } from '../src/shared/agentNames'
-import type { AgentDef, HiveEvent } from '../src/shared/types'
+import type { AgentDef, CombworkEvent } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-agentnames-')
@@ -20,7 +20,7 @@ const templates = await import('../src/main/templates')
 const { config } = await import('../src/main/config')
 const { providerService } = await import('../src/main/providerService')
 const { addAgent, updateAgent } = await import('../src/main/projectAgents')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { withAgentNames } = await import('../src/main/agentNames')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
@@ -216,7 +216,7 @@ describe('Combwork keeps agent names unique across the workspace', () => {
 
   it('names two projects shared from before are flagged once, with a rename to make, while they last', async () => {
     const toasts: string[] = []
-    const off = onHiveEvent((e: HiveEvent) => void (e.type === 'toast' && toasts.push(`${e.toast.title} | ${e.toast.message} | ${e.toast.actions?.[0]?.label}`)))
+    const off = onCombworkEvent((e: CombworkEvent) => void (e.type === 'toast' && toasts.push(`${e.toast.title} | ${e.toast.message} | ${e.toast.actions?.[0]?.label}`)))
     try {
       await run(() => w.mutateProjectConfig(beta, (c) => ({ agents: [...c.agents, { id: 'dup', name: 'R1', provider: 'claude-code' }] })))
       await run(() => w.refresh())
@@ -237,7 +237,7 @@ describe('Combwork keeps agent names unique across the workspace', () => {
 
   it('a refresh begun before a newer one that has reported changes nothing: no agent list from before, no name said twice (#731)', async () => {
     const toasts: string[] = []
-    const off = onHiveEvent((e: HiveEvent) => void (e.type === 'toast' && toasts.push(e.toast.title)))
+    const off = onCombworkEvent((e: CombworkEvent) => void (e.type === 'toast' && toasts.push(e.toast.title)))
     // The older refresh is held once it has read beta, as one begun just before a change and slow to end. Only the test's
     // own: it runs in a context of its own, which a refresh the watcher schedules meanwhile doesn't have.
     const service = w as unknown as { projectInfo: (p: string) => Promise<{ path: string }> }

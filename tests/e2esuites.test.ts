@@ -1960,8 +1960,8 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     CARRIED: string[]
     baseEnv: (parent?: Env) => Env
     childEnv: (vars?: Env, parent?: Env) => Env
-    hiveEnv: (vars?: Env, parent?: Env) => Env
-    isHiveEnv: (env: unknown) => boolean
+    combworkEnv: (vars?: Env, parent?: Env) => Env
+    isCombworkEnv: (env: unknown) => boolean
     suiteEnv: (o: { name: string; port?: number | null; work?: string | null; runDir: string; cliLog?: string | null }, parent?: Env) => Env
     TEST_GIT_IDENTITY: { name: string; email: string }
     gitConfig: (parent?: Env) => string
@@ -2000,7 +2000,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
   }
   const has = (env: Env, k: string) => Object.keys(env).some((x) => x.toUpperCase() === k.toUpperCase())
 
-  it('no suite, runner or harness builds a child environment from process.env: they use lib.hiveEnv, lib.childEnv or runContext', () => {
+  it('no suite, runner or harness builds a child environment from process.env: they use lib.combworkEnv, lib.childEnv or runContext', () => {
     // The fake CLIs are left out: they stand for Claude Code and Codex, which start their MCP servers from their own
     // environment (a test Combwork's session's, already the run context's).
     const exempt = ['runContext.cjs', 'fake-bridge.cjs']
@@ -2035,12 +2035,12 @@ describe('the run context: what a test starts gets only the allowlist and its ow
 
   it("every test copy of Hive deletes into its suite's trash folder, never the user's Recycle Bin (#414)", () => {
     const suite = ctx.suiteEnv({ name: 'board', port: 47961, work: 'C:\\lanes\\1\\board', runDir: 'C:\\lanes\\1\\board' }, parent)
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, suite).CW_TEST_TRASH_DIR).toBe('C:\\lanes\\1\\board\\trash')
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, suite).CW_TEST_TRASH_DIR).toBe('C:\\lanes\\1\\board\\trash')
     // A suite run on its own: the work folder's.
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, parent).CW_TEST_TRASH_DIR).toBe(join(ctx.WORK, 'trash'))
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, parent).CW_TEST_TRASH_DIR).toBe(join(ctx.WORK, 'trash'))
     // Not a child that isn't Combwork, and not from the shell the run was started from.
     expect(has(ctx.childEnv({}, suite), 'CW_TEST_TRASH_DIR')).toBe(false)
-    expect(ctx.hiveEnv({}, { ...suite, CW_TEST_TRASH_DIR: 'C:\\elsewhere' }).CW_TEST_TRASH_DIR).toBe('C:\\lanes\\1\\board\\trash')
+    expect(ctx.combworkEnv({}, { ...suite, CW_TEST_TRASH_DIR: 'C:\\elsewhere' }).CW_TEST_TRASH_DIR).toBe('C:\\lanes\\1\\board\\trash')
     // The runner counts the Recycle Bin, read only, before and after.
     const runner = readFileSync(join(root, 'tests', 'e2e', 'run.mjs'), 'utf8')
     expect(runner).toMatch(/recycleBinCount\(\)[\s\S]*recycleBinLine\(binBefore, recycleBinCount\(\)\)/)
@@ -2051,12 +2051,12 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     const suite = ctx.suiteEnv({ name: 'board', port: 47961, work: 'C:\\lanes\\1\\board', runDir: 'C:\\lanes\\1\\board' }, parent)
     // By default, empty folders of the suite's own; whatever the shell the run was started from had.
     const shell = { ...suite, CLAUDE_CONFIG_DIR: 'C:\\Users\\t\\.claude', CODEX_HOME: 'C:\\Users\\t\\.codex' }
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, shell)).toMatchObject({ CLAUDE_CONFIG_DIR: 'C:\\lanes\\1\\board\\cli-homes\\claude', CODEX_HOME: 'C:\\lanes\\1\\board\\cli-homes\\codex' })
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, parent)).toMatchObject({ CLAUDE_CONFIG_DIR: join(ctx.WORK, 'cli-homes', 'claude'), CODEX_HOME: join(ctx.WORK, 'cli-homes', 'codex') })
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, shell)).toMatchObject({ CLAUDE_CONFIG_DIR: 'C:\\lanes\\1\\board\\cli-homes\\claude', CODEX_HOME: 'C:\\lanes\\1\\board\\cli-homes\\codex' })
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, parent)).toMatchObject({ CLAUDE_CONFIG_DIR: join(ctx.WORK, 'cli-homes', 'claude'), CODEX_HOME: join(ctx.WORK, 'cli-homes', 'codex') })
     // Copilot's home and the GitHub CLI's config (Copilot falls back to gh's login): empty folders too, whatever the shell had.
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, { ...shell, COPILOT_HOME: 'C:\\Users\\t\\.copilot', GH_CONFIG_DIR: 'C:\\Users\\t\\AppData\\Roaming\\GitHub CLI' })).toMatchObject({ COPILOT_HOME: 'C:\\lanes\\1\\board\\cli-homes\\copilot', GH_CONFIG_DIR: 'C:\\lanes\\1\\board\\cli-homes\\gh' })
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, { ...shell, COPILOT_HOME: 'C:\\Users\\t\\.copilot', GH_CONFIG_DIR: 'C:\\Users\\t\\AppData\\Roaming\\GitHub CLI' })).toMatchObject({ COPILOT_HOME: 'C:\\lanes\\1\\board\\cli-homes\\copilot', GH_CONFIG_DIR: 'C:\\lanes\\1\\board\\cli-homes\\gh' })
     // A suite gives a test home instead (the fake Claude Code's, its own, the Codex test home).
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p', CLAUDE_CONFIG_DIR: 'C:\\fake-home', CODEX_HOME: 'C:\\codex-test' }, suite)).toMatchObject({ CLAUDE_CONFIG_DIR: 'C:\\fake-home', CODEX_HOME: 'C:\\codex-test' })
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p', CLAUDE_CONFIG_DIR: 'C:\\fake-home', CODEX_HOME: 'C:\\codex-test' }, suite)).toMatchObject({ CLAUDE_CONFIG_DIR: 'C:\\fake-home', CODEX_HOME: 'C:\\codex-test' })
     // Not for a child that isn't Combwork.
     for (const k of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR']) expect(has(ctx.childEnv({}, suite), k), k).toBe(false)
     // The user's homes, however spelled; not a folder beside or inside them.
@@ -2071,10 +2071,10 @@ describe('the run context: what a test starts gets only the allowlist and its ow
   it("every test copy of Hive's git, and its suite's on the fixtures, has the suite's config alone: a test identity, explicit line endings, no user or system config (#1466)", () => {
     const suite = ctx.suiteEnv({ name: 'gitview', port: 47961, work: 'C:\\lanes\\1\\gitview', runDir: 'C:\\lanes\\1\\gitview' }, parent)
     // The suite's, whatever the shell had, and no system config; a suite may give its own global one.
-    const fromShell = ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '0' })
+    const fromShell = ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '0' })
     expect(fromShell).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, parent).GIT_CONFIG_GLOBAL).toBe(join(ctx.WORK, 'gitconfig'))
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p', GIT_CONFIG_GLOBAL: 'C:\\w\\empty.gitconfig' }, suite).GIT_CONFIG_GLOBAL).toBe('C:\\w\\empty.gitconfig')
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, parent).GIT_CONFIG_GLOBAL).toBe(join(ctx.WORK, 'gitconfig'))
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p', GIT_CONFIG_GLOBAL: 'C:\\w\\empty.gitconfig' }, suite).GIT_CONFIG_GLOBAL).toBe('C:\\w\\empty.gitconfig')
     // The suite's own git on its fixtures gets the same; a child that isn't git, and the runners' git on the checkout
     // under test (baseEnv, checked out with the machine's settings), get neither.
     expect(ctx.gitEnv({}, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig' })).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
@@ -2083,11 +2083,11 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     // The user's own, however spelled.
     for (const f of ['C:\\Users\\t\\.gitconfig', 'c:/users/T/.gitconfig', 'C:\\Users\\t\\.config\\git\\config']) expect(ctx.isUserGitConfig(f, parent), f).toBe(true)
     expect(ctx.isUserGitConfig('C:\\lanes\\1\\gitview\\gitconfig', parent)).toBe(false)
-    // What git reads with them (run with hiveEnv's and gitEnv's environments, outside any repository): the test identity,
+    // What git reads with them (run with combworkEnv's and gitEnv's environments, outside any repository): the test identity,
     // autocrlf false, from the suite's file alone.
     const work = tempDir('hive-gitconfig-')
     const shell = { ...process.env, CW_E2E_DIR: work }
-    for (const env of [ctx.hiveEnv({ CW_USER_DATA: join(work, 'profile') }, shell), ctx.gitEnv({}, shell)]) {
+    for (const env of [ctx.combworkEnv({ CW_USER_DATA: join(work, 'profile') }, shell), ctx.gitEnv({}, shell)]) {
       ctx.writeGitConfig(env.GIT_CONFIG_GLOBAL!)
       const read = (...a: string[]) => execFileSync('git', ['config', ...a], { cwd: work, env: env as NodeJS.ProcessEnv, encoding: 'utf8' }).trim()
       expect([read('--global', 'user.name'), read('--global', 'user.email'), read('core.autocrlf')]).toEqual([ctx.TEST_GIT_IDENTITY.name, ctx.TEST_GIT_IDENTITY.email, 'false'])
@@ -2099,7 +2099,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     const lib = readFileSync(join(root, 'tests', 'e2e', 'lib.cjs'), 'utf8')
     expect(lib).toMatch(/if \(!env\.GIT_CONFIG_GLOBAL\) throw[\s\S]*?if \(isUserGitConfig\(env\.GIT_CONFIG_GLOBAL\)\) throw[\s\S]*?writeGitConfig\(env\.GIT_CONFIG_GLOBAL\)/)
     // Every git a suite starts on its fixtures has gitEnv (lib.git does): not the shell's, the allowlist's or none. The
-    // exceptions: evidence's on the checkout under test, and isolation's inside its test Combwork (which has hiveEnv's).
+    // exceptions: evidence's on the checkout under test, and isolation's inside its test Combwork (which has combworkEnv's).
     const suiteFiles = [...readdirSync(dir).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, f)), ...readdirSync(join(dir, 'i18nshots')).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, 'i18nshots', f))]
     const plain: string[] = []
     for (const f of suiteFiles)
@@ -2116,7 +2116,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     // The runner gives each suite a log in its folder, and the suite's test copies of Combwork inherit it (CARRIED).
     const suite = ctx.suiteEnv({ name: 'codex', port: 47961, work: 'C:\\lanes\\1\\codex', runDir: 'C:\\lanes\\1\\codex', cliLog: 'C:\\lanes\\1\\codex\\hive-clis.jsonl' }, parent)
     expect(suite.CW_TEST_CLI_LOG).toBe('C:\\lanes\\1\\codex\\hive-clis.jsonl')
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, suite).CW_TEST_CLI_LOG).toBe('C:\\lanes\\1\\codex\\hive-clis.jsonl')
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, suite).CW_TEST_CLI_LOG).toBe('C:\\lanes\\1\\codex\\hive-clis.jsonl')
     expect(has(ctx.childEnv({}, suite), 'CW_TEST_CLI_LOG')).toBe(false)
     expect(has(ctx.suiteEnv({ name: 'x', runDir: 'C:\\w' }, { ...parent, CW_TEST_CLI_LOG: 'C:\\elsewhere' }), 'CW_TEST_CLI_LOG')).toBe(false)
     // The record's versions are what the suites' Combwork selected, in the CLI homes the suites gave it: the runner never
@@ -2149,9 +2149,9 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     for (const s of claudeSuites) {
       expect(['own', 'test'], s.name).toContain(s.claudeHome)
       const src = readFileSync(join(root, 'tests', 'e2e', `${s.name}.cjs`), 'utf8')
-      // Its Combwork (every hiveEnv or lib.launch call) gets the home: lib's helper for it, CLAUDE_CONFIG_DIR given directly,
+      // Its Combwork (every combworkEnv or lib.launch call) gets the home: lib's helper for it, CLAUDE_CONFIG_DIR given directly,
       // or the suite's `homes`.
-      const launches = [...src.matchAll(/(?:hiveEnv|lib\.launch)\(\{[^\n]*\}\)/g)].map((m) => m[0])
+      const launches = [...src.matchAll(/(?:combworkEnv|lib\.launch)\(\{[^\n]*\}\)/g)].map((m) => m[0])
       expect(launches.length, s.name).toBeGreaterThan(0)
       for (const l of launches) expect(/CLAUDE_CONFIG_DIR|ownClaudeHome|claudeHome\.env|env: homes/.test(l), `${s.name}: ${l}`).toBe(true)
       if (s.claudeHome === 'test') expect(src, s.name).toMatch(/CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME/)
@@ -2174,7 +2174,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     expect(sessionVars).toEqual(expect.arrayContaining(['CW_PROGRESS_WRAPPED', 'CW_PROGRESS_RUN_AS_NODE', 'CW_PROGRESS_DATA', 'CW_HOOK_TOKEN', 'CW_PROJECT']))
     const everywhere = Object.fromEntries(sessionVars.map((n) => [n, 'set']))
     const suite = ctx.suiteEnv({ name: 'x', runDir: 'C:\\w' }, everywhere)
-    const hive = ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, everywhere)
+    const hive = ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, everywhere)
     const child = ctx.childEnv({}, everywhere)
     const contextSets = ['CW_USER_DATA', 'CW_TEST_QUIET', 'CW_TEST_TIPS', 'CW_API_PORT', 'CW_E2E_DIR', 'CW_E2E_PORT']
     for (const n of sessionVars.filter((x) => !contextSets.includes(x))) {
@@ -2187,19 +2187,19 @@ describe('the run context: what a test starts gets only the allowlist and its ow
   })
 
   it("a test Hive's environment: quiet, tips off, the suite's port and the carried run variables, then the suite's own", () => {
-    const env = ctx.hiveEnv({ CW_USER_DATA: 'C:\\profile', CLAUDE_CONFIG_DIR: 'C:\\test-claude', CW_TEST_SLOW_IPC: undefined }, parent)
+    const env = ctx.combworkEnv({ CW_USER_DATA: 'C:\\profile', CLAUDE_CONFIG_DIR: 'C:\\test-claude', CW_TEST_SLOW_IPC: undefined }, parent)
     expect(env).toMatchObject({ CW_USER_DATA: 'C:\\profile', CW_TEST_QUIET: '1', CW_TEST_TIPS: 'off', CW_API_PORT: '47950', E2E_RUN_SUITE: 'progressreport', E2E_RUN_DIR: 'C:\\lanes\\0', E2E_RUN_PORT: '47950', CLAUDE_CONFIG_DIR: 'C:\\test-claude', Path: parent.Path })
     for (const k of ['NO_COLOR', 'ELECTRON_RUN_AS_NODE', 'CW_API_TOKEN', 'CW_PROGRESS_WRAPPED', 'CW_TEST_SLOW_IPC', 'CW_E2E_NATIVE', 'CW_TEST_CODEX_HOME', 'ANTHROPIC_API_KEY']) expect(has(env, k), k).toBe(false)
     // CW_TEST_QUIET=0 for the run shows the copies; a suite's own setting wins.
-    expect(ctx.hiveEnv({}, { ...parent, CW_TEST_QUIET: '0' }).CW_TEST_QUIET).toBe('0')
-    expect(ctx.hiveEnv({ CW_TEST_QUIET: '0' }, parent).CW_TEST_QUIET).toBe('0')
+    expect(ctx.combworkEnv({}, { ...parent, CW_TEST_QUIET: '0' }).CW_TEST_QUIET).toBe('0')
+    expect(ctx.combworkEnv({ CW_TEST_QUIET: '0' }, parent).CW_TEST_QUIET).toBe('0')
     // A suite's variable replaces the allowlisted one in another case, rather than adding a second.
-    const path = ctx.hiveEnv({ PATH: 'C:\\only' }, parent)
+    const path = ctx.combworkEnv({ PATH: 'C:\\only' }, parent)
     expect(Object.keys(path).filter((k) => k.toUpperCase() === 'PATH')).toEqual(['PATH'])
-    // Only what hiveEnv built starts a test Combwork (lib.cjs's _electron.launch): not a copy, not process.env.
-    expect(ctx.isHiveEnv(env)).toBe(true)
-    expect(ctx.isHiveEnv({ ...env })).toBe(false)
-    expect(ctx.isHiveEnv(process.env)).toBe(false)
+    // Only what combworkEnv built starts a test Combwork (lib.cjs's _electron.launch): not a copy, not process.env.
+    expect(ctx.isCombworkEnv(env)).toBe(true)
+    expect(ctx.isCombworkEnv({ ...env })).toBe(false)
+    expect(ctx.isCombworkEnv(process.env)).toBe(false)
   })
 
   it("a child that is part of Hive gets the allowlist and what it is given; nothing is passed that wasn't allowed", () => {
@@ -2210,7 +2210,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
 
   it("no child gets the user's Hives' hive-progress shims on its PATH: they run the installed Hive.exe (#1253)", () => {
     const shell = { APPDATA: 'C:\\Users\\x\\AppData\\Roaming', Path: 'C:\\Windows;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin;C:\\tools;c:\\users\\x\\appdata\\roaming\\hive-dev\\bin\\;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin-other' }
-    for (const env of [ctx.baseEnv(shell), ctx.childEnv({}, shell), ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, shell)]) {
+    for (const env of [ctx.baseEnv(shell), ctx.childEnv({}, shell), ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, shell)]) {
       expect(env.Path).toBe('C:\\Windows;C:\\tools;C:\\Users\\x\\AppData\\Roaming\\Hive\\bin-other')
     }
   })

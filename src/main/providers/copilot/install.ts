@@ -183,11 +183,11 @@ async function checkSignIn(env: Record<string, string>): Promise<CopilotSignIn> 
   return copilotSignIn(env, cliConfig, gh.stdout.trim() ? parseGhStatus(gh.stdout) : null)
 }
 
-export function copilotReadiness(info: AgentInstallInfo, hiveEnv: NodeJS.ProcessEnv = process.env): ReadinessIssue[] {
+export function copilotReadiness(info: AgentInstallInfo, combworkEnv: NodeJS.ProcessEnv = process.env): ReadinessIssue[] {
   if (!info.found) return [notInstalledIssue(NAME)]
   const out: ReadinessIssue[] = []
   if (info.loggedIn === false) {
-    const ignored = ignoredTokens(hiveEnv)
+    const ignored = ignoredTokens(combworkEnv)
     out.push(
       signedOutIssue(NAME, [
         msg({ id: 'providers.copilot.signIn.runs', defaultMessage: '**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Combwork never signs in for you.', description: "Provider Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command." }),

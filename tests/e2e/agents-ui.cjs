@@ -23,7 +23,7 @@ let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 ;(async () => {
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ CW_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // Merge dialog
   const t = p.agents.find((a) => a.name === 'Tester')
   fs.writeFileSync(path.join(t.worktree.path, 'b.txt'), 'b\n')
-  await page.evaluate(([project, agentId]) => window.__hiveSet?.({ mergeFor: { project, agentId } }), [proj, t.id])
+  await page.evaluate(([project, agentId]) => window.__cwSet?.({ mergeFor: { project, agentId } }), [proj, t.id])
   await lib.agentMenu(page, 'Tester')
   await page.locator('.menu-item', { hasText: 'Merge…' }).click(); await lib.until(async () => (await page.locator('.dialog', { hasText: "1 file in the worktree isn't committed" }).count()) === 1, 10000)
   await page.screenshot({ path: path.join(scratch, 'ui-3-merge.png') })

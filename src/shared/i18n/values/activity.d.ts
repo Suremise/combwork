@@ -1,6 +1,6 @@
 // Generated from locales/en/activity.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'activity.agents': { n: number }
   'activity.all': undefined
   'activity.block.asked': { other: string; file: string | number; holder: string | number }

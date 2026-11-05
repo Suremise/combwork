@@ -32,7 +32,7 @@ import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { PROVIDERS, dangerModes, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
-import { EMPTY_HIVE, EMPTY_WORKSPACE, resolvePoint } from './commands'
+import { EMPTY_CW, EMPTY_WORKSPACE, resolvePoint } from './commands'
 
 /** Where a setting lives: Hive's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
 export type SettingScope = 'app' | 'provider' | 'workspace' | 'project'
@@ -1138,7 +1138,7 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
 
 /** The user's commands as the settings tools read them (HI-1954): the lists' names, each point's names in order. */
 function commandsSettingValue(id: string, settings: AppSettings, ws?: Pick<WorkspaceConfig, 'commands'> | null): string[] | undefined {
-  const hive = settings.commands ?? EMPTY_HIVE
+  const hive = settings.commands ?? EMPTY_CW
   const own = ws?.commands ?? EMPTY_WORKSPACE
   const names = (point: CommandPoint, workspace?: CustomCommand[]): string[] => resolvePoint(point, { hive: hive.list, workspace }).map((r) => r.command?.name ?? '(deleted)') // i18n-ignore: the tools' text
   if (id === 'general.commands') return hive.list.map((c) => c.name)
@@ -1214,10 +1214,10 @@ const AGENT = {
   offValue: agentMsg({ id: 'settings.agent.value.off', text: '0 ({off})', note: 'A number setting at 0, which turns it off. {off} is what 0 stands for (Never).' }),
   empty: agentMsg({ id: 'settings.agent.value.empty', text: '(empty)', note: 'A text setting with no text.' }),
   size: agentMsg({ id: 'settings.agent.value.size', text: '({n} {kind, select, list {entries} other {keys}})', note: "A table's size in a listing: {n} is a number as written (the word stays plural, as the tools always said it); kind is list or object." }),
-  hiveList: agentMsg({ id: 'settings.agent.value.combworkList', text: "(Combwork's list)", note: "A fallback list left empty: Combwork's own list applies." }),
+  combworkList: agentMsg({ id: 'settings.agent.value.combworkList', text: "(Combwork's list)", note: "A fallback list left empty: Combwork's own list applies." }),
   none: agentMsg({ id: 'settings.agent.value.none', text: '(none)', note: 'A table with nothing in it, or an entry one side of a change has not got.' }),
   removed: agentMsg({ id: 'settings.agent.value.removed', text: 'removed', note: "A change to a provider's prices: a shipped model removed from its table." }),
-  hivePrice: agentMsg({ id: 'settings.agent.value.combworkPrice', text: "Combwork's price", note: "A change to a provider's prices: a shipped model at Combwork's own price (not removed)." }),
+  combworkPrice: agentMsg({ id: 'settings.agent.value.combworkPrice', text: "Combwork's price", note: "A change to a provider's prices: a shipped model at Combwork's own price (not removed)." }),
   older: agentMsg({ id: 'settings.agent.value.older', text: '{label} (older)', note: "A model fallback list's entry marked older, in a change: {label} is its label." })
 }
 
@@ -1465,7 +1465,7 @@ export function settingValueText(e: SettingEntry, v: unknown, full = false): str
   if (typeof v === 'string') return v === '' ? say(AGENT.empty) : v
   if (!full) {
     const n = Array.isArray(v) ? v.length : Object.keys(v as object).length
-    return n ? say(AGENT.size, { n: String(n), kind: Array.isArray(v) ? 'list' : 'object' }) : Array.isArray(v) ? say(AGENT.hiveList) : say(AGENT.none)
+    return n ? say(AGENT.size, { n: String(n), kind: Array.isArray(v) ? 'list' : 'object' }) : Array.isArray(v) ? say(AGENT.combworkList) : say(AGENT.none)
   }
   const json = JSON.stringify(v)
   return json.length > 3000 ? `${json.slice(0, 2999)}…` : json
@@ -1483,7 +1483,7 @@ export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, 
     const shown = (prices: unknown, gone: string[], other: string[]): Record<string, unknown> => {
       const own = isObject(prices) ? prices : {}
       const out: Record<string, unknown> = { ...own }
-      for (const m of other) if (!(m in own) && !gone.includes(m)) out[m] = say(AGENT.hivePrice)
+      for (const m of other) if (!(m in own) && !gone.includes(m)) out[m] = say(AGENT.combworkPrice)
       for (const m of gone) if (!(m in own)) out[m] = say(AGENT.removed)
       return out
     }
@@ -1492,7 +1492,7 @@ export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, 
   const cut = (s: string): string => (s.length > 200 ? `${s.slice(0, 199)}…` : s)
   if (Array.isArray(old) || Array.isArray(now)) {
     const valueOf = (x: unknown): string => (isObject(x) && typeof x.value === 'string' ? x.value : JSON.stringify(x))
-    const values = (v: unknown): string => (Array.isArray(v) && v.length ? v.map(valueOf).join(', ') : say(AGENT.hiveList))
+    const values = (v: unknown): string => (Array.isArray(v) && v.length ? v.map(valueOf).join(', ') : say(AGENT.combworkList))
     const a = Array.isArray(old) ? old : []
     const b = Array.isArray(now) ? now : []
     // From or back to Hive's list: the whole list. Otherwise the entries that changed, by value, as an object's are

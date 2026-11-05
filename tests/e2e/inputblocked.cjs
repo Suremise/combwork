@@ -89,12 +89,12 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
      * "x" in "inbox"), left out.
      */
     const probes = (from) => [...b1Reads(from).filter((r) => !r.data.includes('\x1b[200~')).map((r) => r.data).join('')].filter((k) => k === 'x').length
-    const hiveLog = () => {
+    const combworkLog = () => {
       const f = path.join(userData, 'logs', 'combwork.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
     }
     let tb1 = null
-    const placements = (n) => (hiveLog().match(new RegExp(`Giving ⁨?B1⁩? #${n} in`, 'g')) ?? []).length
+    const placements = (n) => (combworkLog().match(new RegExp(`Giving ⁨?B1⁩? #${n} in`, 'g')) ?? []).length
     /** B1's deliveries called off (cancelled) so far. */
     const cancelled = async () => {
       const r = await fetch(`http://127.0.0.1:${PORT}/v1/projects/alpha/agents/B1/deliveries?limit=200`, { headers: { Authorization: `Bearer ${tb1}` } })
@@ -191,7 +191,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check('no delivery was called off after it was blocked', (await cancelled()) === cancelledAt, JSON.stringify([cancelledAt, await cancelled()]))
     check("the lane watch was told once that B1 waits for the user", waitLine().length === 1, JSON.stringify(waitLine()))
     check('Combwork never answered the dialog', JSON.stringify(jsonl('fake-envsetup.jsonl').filter((r) => r.agent === 'B1').map((r) => r.answer)) === '["later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
-    check('the log says when it was blocked and freed', /took no key in 3 clears in a row/.test(hiveLog()) && /its input takes keys again \(Try again: its input took the key\)/.test(hiveLog()))
+    check('the log says when it was blocked and freed', /took no key in 3 clears in a row/.test(combworkLog()) && /its input takes keys again \(Try again: its input took the key\)/.test(combworkLog()))
   } catch (e) {
     check('the suite ran to the end', false, e?.stack ?? String(e))
   } finally {

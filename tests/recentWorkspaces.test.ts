@@ -4,7 +4,7 @@ import { rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { config } from '../src/main/config'
-import { onHiveEvent } from '../src/main/events'
+import { onCombworkEvent } from '../src/main/events'
 import { clearRecent, recentFor, removeRecent } from '../src/main/recentWorkspaces'
 import { tempDir } from './tempDir'
 
@@ -19,7 +19,7 @@ describe('recent workspaces (#144)', () => {
     expect(list.map((r) => [r.path, r.exists])).toEqual([[here, true], [gone, false], ['C:\\Work\\Alpha', false]])
     expect(list.some((r) => r.openElsewhere)).toBe(false)
     const events: string[] = []
-    const off = onHiveEvent((e) => events.push(e.type))
+    const off = onCombworkEvent((e) => events.push(e.type))
     try {
       removeRecent('c:/work/ALPHA')
       expect(config.get().recentWorkspaces).toEqual([here, gone])

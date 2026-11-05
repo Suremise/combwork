@@ -71,7 +71,7 @@ async function shots(page, name) {
   // the old command over the new one.
   // The saving step held while this file exists (CW_TEST_HOLD_DRAIN), as a slow save would keep it.
   const holdDrain = path.join(marks, 'hold-drain')
-  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47792), CW_TEST_RUN_ON_CLOSE: '1', CW_TEST_SLOW_IPC: 'commands:setWorkspace=1500*2,commands:setHive=1500*2', CW_TEST_HOLD_DRAIN: holdDrain } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47792), CW_TEST_RUN_ON_CLOSE: '1', CW_TEST_SLOW_IPC: 'commands:setWorkspace=1500*2,commands:setCombwork=1500*2', CW_TEST_HOLD_DRAIN: holdDrain } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, wsA)
 
@@ -107,7 +107,7 @@ async function shots(page, name) {
     check(`${section}: a command added, picked for its points (each from its own control) and the box ticked at once: all saved, in order`, !!landed, JSON.stringify(await saved()))
     check('…and the rows still show them once the saves are in', (await page.locator(`[data-setting="${section}.commands"] .commands-row`, { hasText: `typed ${section}` }).count()) === 1 && (await row.locator('.close-command-update').isChecked()))
   }
-  await inv('commands:setHive', quitList(command('global', 'quick', '-')))
+  await inv('commands:setCombwork', quitList(command('global', 'quick', '-')))
 
   // --- 1. A switch: the panel while it runs, Don't wait, the next workspace opens, the command finishes by itself.
   const goA = path.join(marks, 'go-a')

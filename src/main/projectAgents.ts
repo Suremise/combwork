@@ -26,7 +26,7 @@ import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
 import { listOf, shownText, withValues, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
-import { capturedText, HiveError, hiveError, shownError } from './combworkError'
+import { capturedText, CombworkError, combworkError, shownError } from './combworkError'
 import { providerService } from './providerService'
 import { accountById, allConnections, firstUsableAccount, assertConnectionHere, connectionProblem, firstAccountHere, getConnection } from './accounts'
 import { ensureMigrated, saveConnections } from './connectionMoves'
@@ -41,7 +41,7 @@ import { legacySetupPending } from '../shared/agentFolders'
 const log = createLogger('agents')
 
 /**
- * A project's agents' refusals (#848, E10d of #677) are HiveErrors: the window reads them in its language, agents (the
+ * A project's agents' refusals (#848, E10d of #677) are CombworkErrors: the window reads them in its language, agents (the
  * Agent API's add and change agent) in English, as before. Why an unused worktree isn't reused is text as data: English
  * for the Agent API (`notReused`), the window's language for the window (`notReusedText`, the Add Agent dialog's look).
  */
@@ -79,11 +79,11 @@ function connectionFor(projectPath: string, cli: ProviderId, named: string | nul
 
 /**
  * A shared helper's text for the window (`agentLimitText`, `mergeBlocked`, given the `tr` capturedText passes), as a
- * HiveError: a refusal by the project's state (its agents per project, an agent at work), so the Agent API answers 409,
+ * CombworkError: a refusal by the project's state (its agents per project, an agent at work), so the Agent API answers 409,
  * never 500 (HI-1952).
  */
 // agent-text: agentLimitText, mergeBlocked
-const helperError = (fn: Parameters<typeof capturedText>[0]): HiveError => new HiveError(capturedText(fn)!, { kind: 'conflict' })
+const helperError = (fn: Parameters<typeof capturedText>[0]): CombworkError => new CombworkError(capturedText(fn)!, { kind: 'conflict' })
 
 /** Branches and worktrees for the Add Agent dialog. */
 export async function gitInfo(projectPath: string): Promise<ProjectGitInfo> {
@@ -121,7 +121,7 @@ const worktreeKey = placeKey
 export function reserveForRemoval(path: string): () => void {
   const key = worktreeKey(path)
   const was = removals.get(key)
-  if (was && was.end === undefined) throw hiveError(msg({ id: 'worktrees.agent.removing', defaultMessage: 'That worktree is already being removed or merged.', description: 'An error: the worktree is being removed or merged by another action right now.' }))
+  if (was && was.end === undefined) throw combworkError(msg({ id: 'worktrees.agent.removing', defaultMessage: 'That worktree is already being removed or merged.', description: 'An error: the worktree is being removed or merged by another action right now.' }))
   const entry: { start: number; end?: number } = { start: ++removalClock }
   removals.delete(key)
   removals.set(key, entry)
@@ -169,9 +169,9 @@ export function agentMax(projectPath: string, cfg?: Pick<ProjectConfig, 'workflo
 export type AddedBy = 'user' | 'agent'
 
 /** Why `by` can't add another agent to a project that has `count` (`max`: its Maximum agents), or null when it can. */
-function noRoom(count: number, max: number, by: AddedBy): HiveError | null {
+function noRoom(count: number, max: number, by: AddedBy): CombworkError | null {
   if (count >= AGENT_LIMIT_MAX) return helperError((t) => agentLimitText(t))
-  if (count >= max) return by === 'agent' ? new HiveError({ lines: [agentMaxText(max)] }, { kind: 'conflict' }) : helperError((t) => agentLimitText(t, max))
+  if (count >= max) return by === 'agent' ? new CombworkError({ lines: [agentMaxText(max)] }, { kind: 'conflict' }) : helperError((t) => agentLimitText(t, max))
   return null
 }
 
@@ -198,7 +198,7 @@ export async function addAgent(projectPath: string, opts: AddAgentOptions, by: A
         // Maximum agents as it is now: the workflow may have lowered it since the check above.
         const room = noRoom(list.length, agentMax(projectPath, now), by)
         if (room) throw room
-        if (list.some((a) => sameAgentName(a.name, name))) throw hiveError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name }, { kind: 'conflict' })
+        if (list.some((a) => sameAgentName(a.name, name))) throw combworkError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name }, { kind: 'conflict' })
         // Its connection as it is now (HI-1769): turned off or removed while it was being prepared, it isn't added.
         if (def.connection) assertConnectionHere(getConnection(def.connection)?.account ?? def.connection, def.provider!, projectPath, name)
         // The caller's own last check, with the write (HI-2328: the Assistant's Control and session, after the waits above).
@@ -352,7 +352,7 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   // 1.0 (#1451): an agent isn't pinned to a worktree (slots are lent per card or lane), so a worktree of its own, new or
   // existing, is refused, never silently ignored (`reuseWorktree` alone asks for none: the window's dialog still sends it
   // until #1442).
-  if ((opts.location && opts.location !== 'project') || opts.worktreePath || opts.branch || opts.base) throw hiveError(M.notPinned, undefined, { kind: 'invalid' })
+  if ((opts.location && opts.location !== 'project') || opts.worktreePath || opts.branch || opts.base) throw combworkError(M.notPinned, undefined, { kind: 'invalid' })
   void others
   void reads
   // Never reused: sessions of a removed agent keep its id and must not attach to a new one.
@@ -370,7 +370,7 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   if (!opts.provider && !opts.connection) await providerService.settle()
   const first = opts.provider || opts.connection ? null : firstUsableAccount(ws.path ? ws.config : null)
   const provider = opts.provider || accountById(named?.account ?? opts.connection)?.provider || first?.provider || autoProvider(config.settings)
-  if (!isKnownProvider(provider)) throw hiveError(M.unknownProvider, { provider }, { kind: 'invalid' })
+  if (!isKnownProvider(provider)) throw combworkError(M.unknownProvider, { provider }, { kind: 'invalid' })
   const def: AgentDef = { id, name, provider }
   const role = cleanRole(opts.role)
   if (role) def.role = role
@@ -392,14 +392,14 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
 export function cleanRole(role: unknown): string {
   if (typeof role !== 'string') return ''
   const r = role.replace(/\s+/g, ' ').trim()
-  if (r.length > ROLE_MAX) throw hiveError(msg({ id: 'worktrees.agent.roleTooLong', defaultMessage: 'A role is at most {max} characters.', description: "An error: an agent's role (what it does, in a few words) is longer than it may be ({max}, a number)." }), { max: ROLE_MAX }, { kind: 'invalid' })
+  if (r.length > ROLE_MAX) throw combworkError(msg({ id: 'worktrees.agent.roleTooLong', defaultMessage: 'A role is at most {max} characters.', description: "An error: an agent's role (what it does, in a few words) is longer than it may be ({max}, a number)." }), { max: ROLE_MAX }, { kind: 'invalid' })
   return r
 }
 
 /** A workflow role as saved (#1430): builder, reviewer, either or generalist (HI-686), else refused. */
 export function cleanWorkflowRole(role: unknown): WorkflowRole {
   if (isWorkflowRole(role)) return role
-  throw hiveError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either or generalist.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English." }), undefined, { kind: 'invalid' })
+  throw combworkError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either or generalist.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English." }), undefined, { kind: 'invalid' })
 }
 
 /**
@@ -424,7 +424,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const cfg = await workspace.projectConfig(projectPath)
   if (patch.name !== undefined) {
     patch.name = patch.name.trim()
-    if (!patch.name) throw hiveError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }), undefined, { kind: 'invalid' })
+    if (!patch.name) throw combworkError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }), undefined, { kind: 'invalid' })
   }
   // Its CLI follows the connection named (HI-2108): another CLI's is a change of CLI, made only while it is stopped.
   const namedCli = accountById(getConnection(patch.connection)?.account)?.provider
@@ -451,9 +451,9 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   }
   const before = projectAgents(cfgNow).find((a) => a.id === agentId)
   if (patch.provider !== undefined) {
-    if (!isKnownProvider(patch.provider)) throw hiveError(M.unknownProvider, { provider: patch.provider }, { kind: 'invalid' })
+    if (!isKnownProvider(patch.provider)) throw combworkError(M.unknownProvider, { provider: patch.provider }, { kind: 'invalid' })
     if (before && agentProvider(before, config.settings) !== patch.provider) {
-      if (sessions.liveFor(projectPath, agentId)) throw hiveError(M.stopForProvider, undefined, { kind: 'conflict' })
+      if (sessions.liveFor(projectPath, agentId)) throw combworkError(M.stopForProvider, undefined, { kind: 'conflict' })
       // Its conversations can't be resumed by the new one.
       clean.lastSessionId = undefined
     }
@@ -487,15 +487,15 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     opts.check?.(current)
     const was = agentProvider(current, config.settings)
     // A change of CLI only while it is stopped, as it is now: one started while this write waited keeps everything.
-    if (patch.provider !== undefined && patch.provider !== was && sessions.liveFor(projectPath, agentId)) throw hiveError(M.stopForProvider, undefined, { kind: 'conflict' })
-    if (patch.provider !== undefined && beforeCli !== null && was !== beforeCli) throw hiveError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: current.name }, { kind: 'conflict' })
+    if (patch.provider !== undefined && patch.provider !== was && sessions.liveFor(projectPath, agentId)) throw combworkError(M.stopForProvider, undefined, { kind: 'conflict' })
+    if (patch.provider !== undefined && beforeCli !== null && was !== beforeCli) throw combworkError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: current.name }, { kind: 'conflict' })
     const cli = clean.provider ?? was
     const kept = clean.connection === current.connection && cli === was
     // Its connection's account (HI-2106), as it is now.
     const account = getConnection(clean.connection)?.account ?? clean.connection
     if (account && !(kept && connectionProblem(account, cli, projectPath) === 'off')) assertConnectionHere(account, cli, projectPath, current.name)
     // Changed meanwhile (another save, the migration): this one was worked out from what it was before.
-    if (touches && current.connection !== before?.connection && clean.connection !== current.connection) throw hiveError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: current.name }, { kind: 'conflict' })
+    if (touches && current.connection !== before?.connection && clean.connection !== current.connection) throw combworkError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: current.name }, { kind: 'conflict' })
     // The user's own choice (HI-2195), counted under the lock with its write: a usage move waiting for the agent's safe
     // point is dropped, and none moves it for the rest of that period.
     if (connection !== undefined) noteManualChoice(projectPath, current)
@@ -522,7 +522,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
  */
 export async function removeAgent(projectPath: string, agentId: string, opts: { deleteWorktree: boolean | 'merged-clean'; mergedInto?: string | null; releaseCards?: boolean }): Promise<RemovedAgent> {
   projectPath = workspace.assertProject(projectPath)
-  if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.agent.stopToRemove', defaultMessage: 'Stop the agent before removing it.', description: "An error: a running agent can't be removed." }), undefined, { kind: 'conflict' })
+  if (sessions.liveFor(projectPath, agentId)) throw combworkError(msg({ id: 'worktrees.agent.stopToRemove', defaultMessage: 'Stop the agent before removing it.', description: "An error: a running agent can't be removed." }), undefined, { kind: 'conflict' })
   const cfg = await workspace.projectConfig(projectPath)
   const def = cfg.agents.find((a) => a.id === agentId)
   if (!def) return {}
@@ -589,10 +589,10 @@ export async function worktreeChecks(projectPath: string): Promise<({ agentId: s
 /** Moves an agent to `index` in the project's order (its position afterwards); returns the agents' ids in the new order. */
 export async function moveAgent(projectPath: string, agentId: string, index: number): Promise<string[]> {
   projectPath = workspace.assertProject(projectPath)
-  if (!Number.isFinite(index)) throw hiveError(msg({ id: 'worktrees.agent.chooseMove', defaultMessage: 'Choose where to move the agent.', description: "An error: an agent was to be moved in the project's order, with no place given." }))
+  if (!Number.isFinite(index)) throw combworkError(msg({ id: 'worktrees.agent.chooseMove', defaultMessage: 'Choose where to move the agent.', description: "An error: an agent was to be moved in the project's order, with no place given." }))
   const next = await workspace.mutateProjectConfig(projectPath, (now) => {
     const list = projectAgents(now)
-    if (!list.some((a) => a.id === agentId)) throw hiveError(M.noAgent, undefined, { kind: 'notFound' })
+    if (!list.some((a) => a.id === agentId)) throw combworkError(M.noAgent, undefined, { kind: 'notFound' })
     return { agents: moveAgentTo(list, agentId, index) }
   })
   await workspaceOf(projectPath).refresh()
@@ -607,7 +607,7 @@ export async function swapAgents(projectPath: string, agentId: string, otherId: 
   projectPath = workspace.assertProject(projectPath)
   const next = await workspace.mutateProjectConfig(projectPath, (now) => {
     const list = projectAgents(now)
-    if (!list.some((a) => a.id === agentId) || !list.some((a) => a.id === otherId)) throw hiveError(M.noAgent, undefined, { kind: 'notFound' })
+    if (!list.some((a) => a.id === agentId) || !list.some((a) => a.id === otherId)) throw combworkError(M.noAgent, undefined, { kind: 'notFound' })
     return { agents: swapAgentsIn(list, agentId, otherId) }
   })
   await workspaceOf(projectPath).refresh()
@@ -622,11 +622,11 @@ export async function swapAgents(projectPath: string, agentId: string, otherId: 
  */
 export async function placePanes(projectPath: string, layout: SessionLayout, cells: (string | null)[]): Promise<(string | null)[]> {
   projectPath = workspace.assertProject(projectPath)
-  if (layout === 'single' || !SESSION_LAYOUTS.some((l) => l.value === layout)) throw hiveError(M.badLayout)
-  if (!Array.isArray(cells) || cells.length > 48 || cells.some((c) => c !== null && (typeof c !== 'string' || c.length > 200))) throw hiveError(M.badLayout)
+  if (layout === 'single' || !SESSION_LAYOUTS.some((l) => l.value === layout)) throw combworkError(M.badLayout)
+  if (!Array.isArray(cells) || cells.length > 48 || cells.some((c) => c !== null && (typeof c !== 'string' || c.length > 200))) throw combworkError(M.badLayout)
   // An agent in one cell only.
   const named = cells.filter((c): c is string => c !== null)
-  if (new Set(named).size !== named.length) throw hiveError(M.badLayout)
+  if (new Set(named).size !== named.length) throw combworkError(M.badLayout)
   let saved: (string | null)[] = []
   await workspace.mutateProjectConfig(projectPath, (now) => {
     // Agents gone meanwhile leave their cell empty; agents added meanwhile take one, as on any change of agents.
@@ -640,7 +640,7 @@ export async function placePanes(projectPath: string, layout: SessionLayout, cel
 async function worktreeOf(projectPath: string, agentId: string) {
   const def = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === agentId)
   const worktree = legacyWorktree(def)
-  if (!def || !worktree) throw hiveError(msg({ id: 'worktrees.agent.noTree', defaultMessage: 'This agent works in the project folder, not a worktree.', description: "An error: something only a worktree agent has (its branch's state, a merge) was asked of an agent working in the project folder." }))
+  if (!def || !worktree) throw combworkError(msg({ id: 'worktrees.agent.noTree', defaultMessage: 'This agent works in the project folder, not a worktree.', description: "An error: something only a worktree agent has (its branch's state, a merge) was asked of an agent working in the project folder." }))
   return { def, worktree }
 }
 
@@ -674,7 +674,7 @@ export async function mergeInProject(projectPath: string, worktree: wt.WorktreeR
 export async function merge(projectPath: string, agentId: string, opts: { squash: boolean; message: string; cleanup: boolean; moveBranch?: boolean }): Promise<MergeResult> {
   projectPath = workspace.assertProject(projectPath)
   const { def, worktree } = await worktreeOf(projectPath, agentId)
-  if (opts.cleanup && sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.agent.stopToMerge', defaultMessage: 'Stop {agent} before merging and removing its worktree.', description: 'An error: a merge that also removes the worktree needs the agent {agent} (its name) stopped first.' }), { agent: def.name })
+  if (opts.cleanup && sessions.liveFor(projectPath, agentId)) throw combworkError(msg({ id: 'worktrees.agent.stopToMerge', defaultMessage: 'Stop {agent} before merging and removing its worktree.', description: 'An error: a merge that also removes the worktree needs the agent {agent} (its name) stopped first.' }), { agent: def.name })
   // Its branch is merged as committed: not while it may still commit to it, in the middle of a task.
   const status = sessions.liveFor(projectPath, agentId)?.status
   if (mergeBlocked(def.name, status)) throw helperError((t) => mergeBlocked(def.name, status, t))

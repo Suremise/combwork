@@ -11,7 +11,7 @@ const { execFileSync, execSync } = require('child_process')
 const { _electron } = require('playwright-core')
 
 // The run context (runContext.cjs): the environments of everything a suite starts, its folders and the CLI test homes.
-const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, hiveEnv, childEnv, baseEnv, isHiveEnv, isUserCliHome, trashDir, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv: contextGitEnv, isUserGitConfig } = require('./runContext.cjs')
+const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, combworkEnv, childEnv, baseEnv, isCombworkEnv, isUserCliHome, trashDir, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv: contextGitEnv, isUserGitConfig } = require('./runContext.cjs')
 
 const ROOT = path.resolve(__dirname, '..', '..')
 // A suite run alone refuses, as the runners do, while the test area's move (HI-2590) is to do or unfinished.
@@ -216,7 +216,7 @@ function enableProviders(userData, providers = ['claude-code']) {
  * prompt with no sign-in, and never in the user's ~/.claude. The key is valid for nothing: a suite using it sends no
  * prompt, and no tokens are spent (one that sends prompts uses the signed-in CLAUDE_TEST_HOME, claudeHome: 'test', as
  * assistantresume does). Said in the log, so the run shows the home. Returns { home, env }: env ({ CLAUDE_CONFIG_DIR,
- * ANTHROPIC_API_KEY }) goes into hiveEnv.
+ * ANTHROPIC_API_KEY }) goes into combworkEnv.
  */
 function ownClaudeHome(name) {
   const home = path.join(WORK, `${name}-claude-home`)
@@ -303,7 +303,7 @@ async function launch({ userData, env = {}, viewport = { width: 1400, height: 85
   if (exe && !launch.said) console.log(`Combwork: ${exe} (CW_EXE), not the dev build`)
   launch.said = !!exe
   // The run context's environment (quiet, tips off, the suite's port) with the profile and the suite's own variables.
-  const app = await _electron.launch({ executablePath: exe || ELECTRON, args: exe ? [] : [ROOT], cwd: ROOT, env: hiveEnv({ CW_USER_DATA: userData, ...env }) }).catch((e) => {
+  const app = await _electron.launch({ executablePath: exe || ELECTRON, args: exe ? [] : [ROOT], cwd: ROOT, env: combworkEnv({ CW_USER_DATA: userData, ...env }) }).catch((e) => {
     // Electron that failed to start (0xc0000142 under heavy load, #599): its exit code said with what it means.
     const said = windowsCodesIn(e?.message)
     if (said.length && e instanceof Error) e.message = `${e.message}\nWindows: ${said.join('; ')}`
@@ -634,22 +634,22 @@ function transcriptText(file) {
 
 // Every Combwork a suite starts, whether through launch() or Playwright's _electron.launch directly (most suites do that):
 // require('playwright-core') is one module, so suites get this _electron. cliStep reads their sessions. Each must have
-// the run context's environment (hiveEnv): without one, Playwright would pass on the suite's own.
+// the run context's environment (combworkEnv): without one, Playwright would pass on the suite's own.
 const apps = new Set()
 const launchElectron = _electron.launch.bind(_electron)
 _electron.launch = async (...args) => {
   const env = args[0]?.env
-  if (!isHiveEnv(env)) throw new Error("Start a test Combwork with lib.hiveEnv({ CW_USER_DATA, … }) as its env (tests/e2e/runContext.cjs), never the suite's own environment")
+  if (!isCombworkEnv(env)) throw new Error("Start a test Combwork with lib.combworkEnv({ CW_USER_DATA, … }) as its env (tests/e2e/runContext.cjs), never the suite's own environment")
   // The CLI homes, test folders (#382, #452): Combwork looks for the CLIs when it starts, and their sign-in checks read these.
   for (const k of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR']) {
-    if (!env[k]) throw new Error(`A test Combwork needs ${k} (hiveEnv gives an empty one of the suite's; a suite may give a test home, never none): without it the CLI reads the user's own home (#382)`)
+    if (!env[k]) throw new Error(`A test Combwork needs ${k} (combworkEnv gives an empty one of the suite's; a suite may give a test home, never none): without it the CLI reads the user's own home (#382)`)
     if (isUserCliHome(env[k])) throw new Error(`A test Combwork's ${k} is the user's own home (${env[k]}): give it a test home (#382)`)
     // The suite's empty one is made here (Codex refuses a CODEX_HOME that doesn't exist).
     fs.mkdirSync(env[k], { recursive: true })
   }
   // Its git's global config, the suite's (#1466): without one its git reads the user's ~/.gitconfig, and the user's name
   // and email show in its screens. The work folder's is written here, with the test identity.
-  if (!env.GIT_CONFIG_GLOBAL) throw new Error("A test Combwork needs GIT_CONFIG_GLOBAL (hiveEnv gives the suite's, with a test identity): without it its git reads the user's ~/.gitconfig (#1466)")
+  if (!env.GIT_CONFIG_GLOBAL) throw new Error("A test Combwork needs GIT_CONFIG_GLOBAL (combworkEnv gives the suite's, with a test identity): without it its git reads the user's ~/.gitconfig (#1466)")
   if (isUserGitConfig(env.GIT_CONFIG_GLOBAL)) throw new Error(`A test Combwork's GIT_CONFIG_GLOBAL is the user's own (${env.GIT_CONFIG_GLOBAL}): give it the suite's (#1466)`)
   if (env.GIT_CONFIG_GLOBAL === gitConfig()) writeGitConfig(env.GIT_CONFIG_GLOBAL)
   const packaged = testExecutable(args[0].executablePath ?? ELECTRON) === 'packaged'
@@ -717,7 +717,7 @@ const COMMIT_BURST_LIMIT = 50
  * as it is watched (one said before the listener was there isn't said again); the suite's, the largest of them, null
  * while no window has reported (no watch there, which isn't a burst of 0). onFirst: once, when the first window
  * reports; onReach(n): once, when the suite's first reaches the limit. Never throws into the suite: only a record.
- * marker and read: the count's console marker and its field in the page's `__hiveCommitBurst()` (the chain's: HI-1865).
+ * marker and read: the count's console marker and its field in the page's `__cwCommitBurst()` (the chain's: HI-1865).
  */
 function burstWatcher({ onFirst = () => {}, onReach = () => {}, marker = COMMIT_BURST_MARKER, read = 'max' } = {}) {
   const perWindow = new Map()
@@ -752,7 +752,7 @@ function burstWatcher({ onFirst = () => {}, onReach = () => {}, marker = COMMIT_
     }
     // What the page reached before the listener was there: its own count, read once.
     try {
-      Promise.resolve(page.evaluate((field) => window.__hiveCommitBurst?.()[field], read)).then(
+      Promise.resolve(page.evaluate((field) => window.__cwCommitBurst?.()[field], read)).then(
         (n) => {
           if (typeof n === 'number') note(page, n)
         },
@@ -878,7 +878,7 @@ function unmaximized(profile) {
 
 /**
  * A packaged test Combwork never checks GitHub for updates (#1332): each check fetches the release's latest.yml, which
- * GitHub counts as a download. 1.0 doesn't for CW_TEST_QUIET=1 (hiveEnv); a released build (0.9) can't be changed, so
+ * GitHub counts as a download. 1.0 doesn't for CW_TEST_QUIET=1 (combworkEnv); a released build (0.9) can't be changed, so
  * its first check, 30 s after it starts, is put off as far as a timer goes (about 24.8 days: CW_UPDATE_DELAY, which
  * every build reads), and a profile it has saved has automatic checks off, so it schedules no 6-hourly check either.
  */
@@ -941,8 +941,8 @@ function keepPackagedQuiet(electron) {
   const proto = BrowserWindow.prototype
   const showInactive = proto.showInactive
   const quiet = (win) => {
-    if (win.isDestroyed() || win.hiveTestQuiet) return
-    win.hiveTestQuiet = true
+    if (win.isDestroyed() || win.combworkTestQuiet) return
+    win.combworkTestQuiet = true
     const away = () => {
       if (win.isDestroyed()) return
       const b = win.getBounds()
@@ -1099,7 +1099,7 @@ const pasteOn = (raw) => raw.lastIndexOf('\x1b[?2004h') > raw.lastIndexOf('\x1b[
  *   when this attempt's text was drawn, the next attempt is Enter alone (typed again, the prompt would follow that new
  *   line); when it wasn't (dropped while the CLI drew), or on the last attempt, it is typed again.
  * ready(), if given, is waited for (within waitMs) before the first attempt: the CLI able to take a prompt
- * (hiveToolsConnected); not ready by then, it is typed anyway and said. Up to `tries` times; returns the attempt that
+ * (combworkToolsConnected); not ready by then, it is typed anyway and said. Up to `tries` times; returns the attempt that
  * worked (1 = the first), or 0.
  */
 async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, waitMs = 20000 } = {}) {
@@ -1136,18 +1136,18 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
 
 /**
  * Whether Combwork's log in a test profile (CW_USER_DATA) says an agent's Combwork tools connected (#865), at or after
- * `since` (a line count from hiveLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
- * just-started Claude Code, as Combwork itself types nothing before it (sessions.hiveToolsSettled). A build from before
+ * `since` (a line count from combworkLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
+ * just-started Claude Code, as Combwork itself types nothing before it (sessions.combworkToolsSettled). A build from before
  * HI-2584 (a packaged suite's older build) logged it as "hive tools": both are read.
  */
-const hiveLogLines = (userData) => {
+const combworkLogLines = (userData) => {
   try {
     return fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n')
   } catch {
     return []
   }
 }
-const hiveToolsConnected = (userData, agentId, since = 0) => hiveLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s Combwork tools connected`) || l.includes(`⁨${agentId}⁩'s hive tools connected`))
+const combworkToolsConnected = (userData, agentId, since = 0) => combworkLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s Combwork tools connected`) || l.includes(`⁨${agentId}⁩'s hive tools connected`))
 
 /**
  * The longest a fake Claude Code's prompt waits to be taken, or its turn to end: a bound for a hung run, never how long
@@ -1533,7 +1533,7 @@ const codexSignedIn = () => fs.existsSync(path.join(CODEX_HOME, 'auth.json'))
 
 /**
  * The run context's PATH without the Microsoft Store's app aliases (%LOCALAPPDATA%\Microsoft\WindowsApps), for a test
- * Combwork whose agents run the real Codex (#584): give it as PATH in hiveEnv. Codex runs its commands in PowerShell 7 where
+ * Combwork whose agents run the real Codex (#584): give it as PATH in combworkEnv. Codex runs its commands in PowerShell 7 where
  * it finds one, and its sandbox can't start the Store's while any other process of that package runs on the machine
  * (#499: a test Combwork's terminal, an agent's command), while Windows PowerShell is never refused. leftovers-codex keeps
  * the Store's on purpose, and codex-storepwsh checks the refusal itself.
@@ -1773,4 +1773,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

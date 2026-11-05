@@ -1,6 +1,6 @@
 // Generated from locales/en/board.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'board.agent.folded': { agent: string | number; status: string | number }
   'board.agent.notRunning': undefined
   'board.agent.removed': { agent: string | number }

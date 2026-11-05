@@ -13,7 +13,7 @@ import type { RunningAgent } from '../shared/unexpectedClose'
 import { advanced } from './advanced'
 import { assistantHome } from './assistantControl'
 import { createDelivery, leaveDelivery, roundOf } from './deliveries'
-import { onHiveEvent, toast } from './events'
+import { onCombworkEvent, toast } from './events'
 import { dropOfferActions, resolveOffer } from './notify'
 import { OUTCOME } from './outcomes'
 import { placeKey, samePlace } from './fsutil'
@@ -306,7 +306,7 @@ export async function startRestartRecovery(): Promise<void> {
   if (offer.length) tellOffer()
   await save()
   // A team resuming (HI-2081): what waited for it is decided now.
-  onHiveEvent((ev) => {
+  onCombworkEvent((ev) => {
     if (ev.type === 'team-pause-changed' && !ev.pause) pump()
   })
   pump()
@@ -508,7 +508,7 @@ let following = false
 function followWorkspaces(): void {
   if (following) return
   following = true
-  onHiveEvent((ev) => {
+  onCombworkEvent((ev) => {
     if (ev.type === 'workspace-changed' || (ev.type === 'session-exit' && stuckRun)) pump()
   })
 }
@@ -592,7 +592,7 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   // this launch only (its runId): a session the user started meanwhile is never counted, waited for or stopped as it.
   let runId: string | null = null
   let took = false
-  const off = onHiveEvent((ev) => {
+  const off = onCombworkEvent((ev) => {
     if (ev.type === 'session-status' && runId !== null && ev.state.runId === runId && TOOK_NOTE.has(ev.state.status)) took = true
   })
   const mine = (): LiveSessionState | null => {

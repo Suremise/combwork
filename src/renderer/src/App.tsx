@@ -3,7 +3,7 @@ import { NewProjectsNotice } from './components/PresetStep'
 import { fmt, msg, tr } from '@shared/i18n'
 import { useAntivirusOffer } from './components/Antivirus'
 import { useEffect, useRef, useState } from 'react'
-import type { HiveEvent } from '@shared/types'
+import type { CombworkEvent } from '@shared/types'
 import { call } from './api'
 import { playChime } from './chime'
 import { matchKeybinding, runCommand, runCommandAsync } from './commands'
@@ -92,11 +92,11 @@ let lastChimeAt: number | null = null
 /** The run each agent terminal's epoch was made for (HI-2213). */
 const epochBook = sessionEpochBook()
 let chimesPlayed = 0
-;(window as unknown as { __hiveChimes?: () => number }).__hiveChimes = () => chimesPlayed
+;(window as unknown as { __cwChimes?: () => number }).__cwChimes = () => chimesPlayed
 // The bell's list as the tests read it (HI-2320): each entry, whether it was quiet (no pop-up), its buttons and what it says once resolved.
-;(window as unknown as { __hiveBell?: () => unknown[] }).__hiveBell = () => get().notifications.map((t) => ({ id: t.id, title: t.title, kind: t.kind ?? null, level: t.level, quiet: !!t.quiet, resolved: t.resolved ?? null, actions: t.actions?.map((x) => x.label) ?? [], target: t.target?.kind ?? null }))
+;(window as unknown as { __cwBell?: () => unknown[] }).__cwBell = () => get().notifications.map((t) => ({ id: t.id, title: t.title, kind: t.kind ?? null, level: t.level, quiet: !!t.quiet, resolved: t.resolved ?? null, actions: t.actions?.map((x) => x.label) ?? [], target: t.target?.kind ?? null }))
 
-function handleEvent(e: HiveEvent): void {
+function handleEvent(e: CombworkEvent): void {
   switch (e.type) {
     case 'workspace-progress':
       setLoaded({ openProgress: e.progress })

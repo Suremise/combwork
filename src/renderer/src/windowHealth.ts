@@ -99,7 +99,7 @@ export function startWindowHealth(): void {
   if (started) return
   started = true
   // A test copy's probes read the marks too (unlimited, where combwork.log's lines are rate-limited).
-  if (bridge()?.commitWatch) (window as unknown as { __hivePageMarks?: typeof marksBetween }).__hivePageMarks = marksBetween
+  if (bridge()?.commitWatch) (window as unknown as { __cwPageMarks?: typeof marksBetween }).__cwPageMarks = marksBetween
   // Where it is: its view, project, tab and panels as they change (a dialog says so itself).
   useStore.subscribe((s, was) => {
     if (s.activity !== was.activity || s.selectedProject !== was.selectedProject || s.projectTabs !== was.projectTabs || s.assistantOpen !== was.assistantOpen || s.inboxOpen !== was.inboxOpen || s.paletteOpen !== was.paletteOpen || s.workspace !== was.workspace) whereChanged()

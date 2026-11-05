@@ -24,7 +24,7 @@ import { boardRead, cardKeys } from './boardStore'
 import { cardFolder, cardHost, type CleanupFile } from './cardAttachments'
 import { fileIdentity, ownFolder } from './cardCleanupFs'
 import { createLogger, userText } from './logger'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { msg } from '../shared/i18n'
 import * as tasks from './tasks'
 import { openWorkspaces, workspace, type WorkspaceService } from './workspace'
@@ -345,7 +345,7 @@ const STALE = msg({ id: 'service.cardCleanup.stale', defaultMessage: 'This list 
 export async function applyCleanupPlan(projectPath: string, id: string, ws: WorkspaceService = workspace, now?: number): Promise<CardCleanupResult> {
   const p = plans.get(id)
   plans.delete(id)
-  if (!p || p.until < Date.now() || !alive(p.life) || p.life.ws !== ws || p.projectPath.toLowerCase() !== projectPath.toLowerCase()) throw hiveError(STALE, undefined, { kind: 'conflict' })
+  if (!p || p.until < Date.now() || !alive(p.life) || p.life.ws !== ws || p.projectPath.toLowerCase() !== projectPath.toLowerCase()) throw combworkError(STALE, undefined, { kind: 'conflict' })
   const out = noneDone()
   for (const c of p.cards) {
     if (!alive(p.life)) return { ...out, stopped: true }

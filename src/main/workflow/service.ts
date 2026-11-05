@@ -16,7 +16,7 @@ import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
 import { boardSavepoint, boardWrite } from '../boardStore'
 import { samePlace } from '../fsutil'
-import { hiveError } from '../combworkError'
+import { combworkError } from '../combworkError'
 import { observer } from '../platform/observe'
 import { detect } from '../platform/registry'
 import { isUnknown } from '../platform/types'
@@ -128,11 +128,11 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   const wsPath = ws.path
   const life = ws.lifetime
   const open = (): boolean => !!wsPath && !life.aborted && ws.lifetime === life && ws.path === wsPath
-  if (!wsPath || !open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  if (!wsPath || !open()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   const project = projectOf(ws, projectPath)
   if (!project) return null
   const resolved = await resolve(ws, project)
-  if (!open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  if (!open()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   let byProject = instances.get(ws)
   if (!byProject) instances.set(ws, (byProject = new Map()))
   const key = keyOf(project.path)
@@ -148,7 +148,7 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   inst.wf.none.setExcluded(resolved.options.excluded)
   if (resolved.options.platform === 'none') {
     await syncHashes(inst, project.path)
-    if (!open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    if (!open()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   }
   return inst.wf
 }
@@ -238,7 +238,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // write a part of it undone on its own if it throws (#1265: a batch's other cards, the caller's change, go on). The
     // requests for the user it writes (`notify`) are noted on their cards in it too: their durable notice (#1266).
     locked: (fn) => {
-      if (!alive()) return Promise.reject(hiveError(M.closed, undefined, { kind: 'conflict' }))
+      if (!alive()) return Promise.reject(combworkError(M.closed, undefined, { kind: 'conflict' }))
       return boardWrite(
         ws,
         () =>

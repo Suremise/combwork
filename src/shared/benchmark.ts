@@ -98,7 +98,7 @@ const M = {
   // Why a file isn't imported.
   tooLarge: msg({ id: 'performance.compare.error.tooLarge', defaultMessage: 'It is over {mb, number} MB.', description: 'Why a file is not imported to Performance → Compare: it is larger than {mb} MB.' }),
   notJson: msg({ id: 'performance.compare.error.notJson', defaultMessage: 'It isn’t JSON.', description: 'Why a file is not imported to Performance → Compare.' }),
-  notHive: msg({ id: 'performance.compare.error.notCombwork', defaultMessage: 'It isn’t a Combwork benchmark or Performance export.', description: 'Why a file is not imported to Performance → Compare.' }),
+  notCombwork: msg({ id: 'performance.compare.error.notCombwork', defaultMessage: 'It isn’t a Combwork benchmark or Performance export.', description: 'Why a file is not imported to Performance → Compare.' }),
   benchmarkOnProject: msg({ id: 'performance.compare.error.benchmarkOnProject', defaultMessage: 'A scenario benchmark is its own test workspace’s, not one of your projects: compare it in the Performance view (activity bar), with the whole workspace selected.', description: "Why a scenario benchmark (a test run's measurements) is not imported on a project's Performance page." }),
   benchmarkOnOwn: msg({ id: 'performance.compare.error.benchmarkOnOwn', defaultMessage: 'A scenario benchmark is its whole test workspace’s, not the workspace’s own work: compare it with the whole workspace selected.', description: 'Why a scenario benchmark is not imported to Performance → Compare with "Workspace\'s own work" selected.' }),
   invalidBenchmark: msg({ id: 'performance.compare.error.invalidBenchmark', defaultMessage: 'It isn’t a valid scenario benchmark (no run, fixtures version or scenarios).', description: 'Why a file is not imported to Performance → Compare.' }),
@@ -758,7 +758,7 @@ export function parseArtifact(textValue: string, scope: CompareScope, opts: { us
   } catch {
     return refuse(M.notJson)
   }
-  if (!data) return refuse(M.notHive)
+  if (!data) return refuse(M.notCombwork)
   const app = obj(data.app)
   if (data.schema === BENCHMARK_SCHEMA) {
     if (scope.kind === 'project') return refuse(M.benchmarkOnProject)

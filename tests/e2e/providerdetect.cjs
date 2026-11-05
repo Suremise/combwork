@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
 
   /** Combwork started without lib.launch, whose appReady waits for every provider to be found: what these hold back. */
   const launchHeld = async (more) => {
-    const a = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData, ...env, ...more }) })
+    const a = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, ...env, ...more }) })
     const p = await a.firstWindow()
     p.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(a, p, { width: 1400, height: 850 })

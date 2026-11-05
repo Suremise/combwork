@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useState } from 'react'
-import type { CommandPoint, CommandRef, CommandsHive, CommandsWorkspace, CustomCommand } from '@shared/types'
-import { EMPTY_HIVE, EMPTY_WORKSPACE, fillCommand, MAX_COMMAND, MAX_FOLDER, MAX_NAME, newCommandId, type CommandValues } from '@shared/commands'
+import type { CommandPoint, CommandRef, CommandsCombwork, CommandsWorkspace, CustomCommand } from '@shared/types'
+import { EMPTY_CW, EMPTY_WORKSPACE, fillCommand, MAX_COMMAND, MAX_FOLDER, MAX_NAME, newCommandId, type CommandValues } from '@shared/commands'
 import { msg, tr } from '@shared/i18n'
 import * as actions from '../actions'
 import { call } from '../api'
@@ -48,7 +48,7 @@ const M = {
   pointEmpty: msg({ id: 'settings.commands.pointEmpty', defaultMessage: 'Nothing runs.', description: 'A point such as "When this workspace opens, run" (HI-1954) with no command picked.' }),
   pointAdd: msg({ id: 'settings.commands.pointAdd', defaultMessage: 'Add a command to run here…', description: 'A drop-down under a point such as "When this workspace opens, run" (HI-1954): picks one of the commands to run there, after those already picked.' }),
   pointRemove: msg({ id: 'settings.commands.pointRemove', defaultMessage: "Don't run it here", description: 'A button beside a command a point runs (HI-1954): takes it off that point; the command itself stays.' }),
-  hiveBadge: msg({ id: 'settings.commands.combworkBadge', defaultMessage: 'Combwork', description: "A short tag beside a command in a workspace's point (HI-1954): one of Combwork's own commands (Settings → General → Commands), not the workspace's." }),
+  combworkBadge: msg({ id: 'settings.commands.combworkBadge', defaultMessage: 'Combwork', description: "A short tag beside a command in a workspace's point (HI-1954): one of Combwork's own commands (Settings → General → Commands), not the workspace's." }),
   gone: msg({ id: 'settings.commands.gone', defaultMessage: '(deleted)', description: 'A command a point still names but which was deleted (HI-1954): it is skipped.' }),
   cantFill: msg({ id: 'settings.commands.cantFill', defaultMessage: "{placeholders} can't be filled here: it won't run", description: "A warning beside a command a point runs (HI-1954): placeholders in it have no value at that point (for example {workspace} as Combwork quits), so Combwork won't run it there. {placeholders} lists them as written." }),
   onUpdate: msg({ id: 'settings.closeCommand.onUpdate', defaultMessage: 'Also when Combwork restarts to install an update', description: 'A checkbox under the close command (Settings → Workspace → When this workspace closes, run, and Settings → General → When Combwork quits, run): run it too when Combwork restarts to install an update (by default it is skipped then).' })
@@ -213,7 +213,7 @@ function PointPicker({ point, lists, values, update, onChange }: { point: Comman
   const find = (r: CommandRef): CustomCommand | undefined => (r.scope === 'combwork' ? lists.hive : (lists.workspace ?? [])).find((c) => c.id === r.id)
   const picked = (r: CommandRef): boolean => point.run.some((x) => x.scope === r.scope && x.id === r.id)
   const choices: CommandRef[] = [...(lists.workspace ?? []).map((c) => ({ scope: 'workspace' as const, id: c.id })), ...lists.hive.map((c) => ({ scope: 'combwork' as const, id: c.id }))].filter((r) => !picked(r))
-  const label = (r: CommandRef): string => `${find(r)?.name ?? tr(M.gone)}${r.scope === 'combwork' && lists.workspace ? ` (${tr(M.hiveBadge)})` : ''}`
+  const label = (r: CommandRef): string => `${find(r)?.name ?? tr(M.gone)}${r.scope === 'combwork' && lists.workspace ? ` (${tr(M.combworkBadge)})` : ''}`
   return (
     <div className="close-command-settings">
       {!point.run.length && <div className="muted">{tr(M.pointEmpty)}</div>}
@@ -262,10 +262,10 @@ function PointPicker({ point, lists, values, update, onChange }: { point: Comman
 const runIt = (ref: CommandRef): void => void actions.attempt(tr(M.runFailed), () => call('commands:run', ref))
 
 /** Hive's commands, as saved (settings.commands), and its edit. */
-function useHive(): [CommandsHive, (change: (current: CommandsHive) => CommandsHive) => void] {
-  const value = useStore((s) => s.settings?.commands ?? EMPTY_HIVE)
+function useCombwork(): [CommandsCombwork, (change: (current: CommandsCombwork) => CommandsCombwork) => void] {
+  const value = useStore((s) => s.settings?.commands ?? EMPTY_CW)
   // Every window gets settings-changed with what was saved.
-  return useScope('combwork', value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setHive', next)))
+  return useScope('combwork', value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setCombwork', next)))
 }
 
 /** The workspace's commands, as saved (workspace.json), and its edit: saved to that workspace, whatever the window shows by then. */
@@ -277,8 +277,8 @@ function useWorkspace(): [CommandsWorkspace, (change: (current: CommandsWorkspac
 }
 
 /** Settings → General → Commands: Hive's own commands. Deleting one takes it off When Hive quits too. */
-export function HiveCommands() {
-  const [hive, save] = useHive()
+export function CombworkCommands() {
+  const [hive, save] = useCombwork()
   const values = useValues('manual')
   return (
     <CommandList
@@ -292,7 +292,7 @@ export function HiveCommands() {
 
 /** Settings → General → When Hive quits, run: Hive's commands, in order. */
 export function QuitPoint() {
-  const [hive, save] = useHive()
+  const [hive, save] = useCombwork()
   return <PointPicker point={hive.onQuit} lists={{ hive: hive.list }} values={{ reason: 'quit' }} update onChange={(onQuit) => save((cur) => ({ ...cur, onQuit }))} /> // i18n-ignore: {reason}'s value, as main fills it in
 }
 
@@ -309,7 +309,7 @@ export function WorkspaceCommands() {
 /** Settings → Workspace → When this workspace opens, run, and When this workspace closes, run. */
 export function WorkspacePoint({ which }: { which: 'onOpen' | 'onClose' }) {
   const path = useStore((s) => s.workspace?.path ?? null)
-  const hive = useStore((s) => s.settings?.commands ?? EMPTY_HIVE)
+  const hive = useStore((s) => s.settings?.commands ?? EMPTY_CW)
   const [ws, save] = useWorkspace()
   const values = useValues(which === 'onOpen' ? 'open' : 'window') // i18n-ignore: {reason}'s values, as main fills them in
   if (!path) return <div className="muted">{tr(M.noWorkspace)}</div>

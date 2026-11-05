@@ -144,7 +144,7 @@ function suspendExactly(targets, resume = false) {
   if (process.platform !== 'win32' || !targets.length) return out
   const fn = resume ? 'NtResumeProcess' : 'NtSuspendProcess'
   const list = targets.map((t) => `${Number(t.pid)}:${Number(t.started)}`).join(',')
-  const ps = `Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class HiveSuspend{[DllImport("ntdll.dll")]public static extern int ${fn}(IntPtr h);}'; foreach ($t in '${list}'.Split(',')) { $id, $at = $t.Split(':'); try { $p = [Diagnostics.Process]::GetProcessById([int]$id); $h = $p.Handle; if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - [long]$at) -le 1) { $s = [HiveSuspend]::${fn}($h); if ($s -eq 0) { "ok $id" } else { "fail $id 0x{0:X8}" -f $s } } else { "fail $id another-process" } } catch { "fail $id gone" } }`
+  const ps = `Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class CombworkSuspend{[DllImport("ntdll.dll")]public static extern int ${fn}(IntPtr h);}'; foreach ($t in '${list}'.Split(',')) { $id, $at = $t.Split(':'); try { $p = [Diagnostics.Process]::GetProcessById([int]$id); $h = $p.Handle; if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - [long]$at) -le 1) { $s = [CombworkSuspend]::${fn}($h); if ($s -eq 0) { "ok $id" } else { "fail $id 0x{0:X8}" -f $s } } else { "fail $id another-process" } } catch { "fail $id gone" } }`
   let text = ''
   try {
     text = execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { encoding: 'utf8', env: baseEnv(), windowsHide: true })

@@ -6,13 +6,13 @@ import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole } from '../shared/workflow/roles'
 import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
-import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
+import type { CombworkErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { agentMsg, inDefaultDialect, inDialectOf, say } from '../shared/agentText'
-import { HiveError } from './combworkError'
-import { onHiveEvent } from './events'
+import { CombworkError } from './combworkError'
+import { onCombworkEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
@@ -52,16 +52,16 @@ const log = createLogger('lanes')
  */
 
 /** The lanes' file before #1018 (moved in at the first open, then kept as a backup); its path is also the lanes' lock. */
-const fileOf = (ws: WorkspaceService): string => join(ws.hiveDir, 'lanes.json')
+const fileOf = (ws: WorkspaceService): string => join(ws.combworkDir, 'lanes.json')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
-const KINDS: Record<number, HiveErrorKind> = { 400: 'invalid', 403: 'forbidden', 404: 'notFound', 409: 'conflict' }
+const KINDS: Record<number, CombworkErrorKind> = { 400: 'invalid', 403: 'forbidden', 404: 'notFound', 409: 'conflict' }
 
 /**
  * A lane change Hive refuses (status: the HTTP status the Agent API answers with). Most come only from agents (cw_lane),
  * in English; one the window can meet too (Progress → Lanes: ending a lane) is text, in its language there (#850).
  */
-export class LaneError extends HiveError {
+export class LaneError extends CombworkError {
   constructor(
     readonly status: number,
     message: string | Text
@@ -792,7 +792,7 @@ interface EndedLane {
 
 /**
  * The verified lane-end event (#1270): once per lane, as it ends with its cards Done, with what each brought in. Code
- * that follows lanes listens for it (onHiveEvent); the Agent API's event stream carries it.
+ * that follows lanes listens for it (onCombworkEvent); the Agent API's event stream carries it.
  */
 function tellEnded(ws: WorkspaceService, ended: readonly EndedLane[]): void {
   if (!ws.path) return
@@ -1658,7 +1658,7 @@ let started = false
 export function startLanes(): void {
   if (started) return
   started = true
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     // The workspace's projects read again (their version control recorded as a window opens it): the lanes' old rules
     // marks and stages need their projects' rulesets now, which a first look before that couldn't read (#1421).
     if (e.type === 'workspace-changed') {

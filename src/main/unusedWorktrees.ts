@@ -43,7 +43,7 @@ const contains = containsPlace
  * queue's folder (named as the queue names them, beside the slots), else null. Branches & remotes lists them as Hive's,
  * never as unused worktrees.
  */
-export function hiveWorktreeOf(projectPath: string, path: string): 'copy' | 'queue' | null {
+export function combworkWorktreeOf(projectPath: string, path: string): 'copy' | 'queue' | null {
   const ws = workspaceOf(projectPath)
   if (!ws.path) return null
   const root = join(ws.worktreesRoot, basename(projectPath))
@@ -351,10 +351,10 @@ async function unreferencedCommits(path: string, except?: string): Promise<numbe
  * Who made an unused worktree (#476): the Hive agent whose session last ran in it (sessions.json keeps each session's
  * folder and its agent's name), else Hive when it is in Hive's worktrees folder for the project, else not Hive.
  */
-export function worktreeOrigin(path: string, sessions: readonly Pick<SessionRecord, 'cwd' | 'agentName' | 'agentId' | 'lastActiveAt'>[], hiveFolder: string | null): UnusedWorktreeOrigin {
+export function worktreeOrigin(path: string, sessions: readonly Pick<SessionRecord, 'cwd' | 'agentName' | 'agentId' | 'lastActiveAt'>[], combworkFolder: string | null): UnusedWorktreeOrigin {
   const ran = sessions.filter((s) => s.cwd && key(s.cwd) === key(path) && (s.agentId || s.agentName)).sort((a, b) => (a.lastActiveAt < b.lastActiveAt ? 1 : -1))[0]
   if (ran) return ran.agentName ? { madeBy: 'combwork', agentName: ran.agentName } : { madeBy: 'combwork' }
-  return hiveFolder && contains(hiveFolder, path) ? { madeBy: 'combwork' } : { madeBy: 'other' }
+  return combworkFolder && contains(combworkFolder, path) ? { madeBy: 'combwork' } : { madeBy: 'other' }
 }
 
 async function describe(projectPath: string, w: Candidate, origin: UnusedWorktreeOrigin, reads: wt.RepoReads, pool: SlotPool | null): Promise<UnusedWorktree> {
@@ -403,8 +403,8 @@ export async function unusedWorktrees(projectPath: string): Promise<UnusedWorktr
   // Without them each worktree is only "made by Hive" or not, never by whom: said in the log rather than hidden (#1149).
   const sessions = (await workspace.sessionsFile(projectPath).catch((e) => void log.warn(`reading ${userText(basename(projectPath))}'s session records for its unused worktrees`, e)))?.sessions ?? []
   // Where Hive makes the project's agent worktrees (projectAgents.ts).
-  const hiveFolder = ws.path ? join(ws.worktreesRoot, basename(projectPath)) : null
-  for (const w of listed) worktrees.push(await describe(projectPath, w, worktreeOrigin(w.path, sessions, hiveFolder), reads, places?.pool ?? null))
+  const combworkFolder = ws.path ? join(ws.worktreesRoot, basename(projectPath)) : null
+  for (const w of listed) worktrees.push(await describe(projectPath, w, worktreeOrigin(w.path, sessions, combworkFolder), reads, places?.pool ?? null))
   // The Changes tab may read these (and only these) now (#400).
   workspaceOf(projectPath).noteUnusedWorktrees(projectPath, worktrees.map((w) => w.path))
   return { worktrees }

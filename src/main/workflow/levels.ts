@@ -7,7 +7,7 @@
 // change is refused, never written over (#1418's base).
 
 import { basename } from 'path'
-import { HiveError } from '../combworkError'
+import { CombworkError } from '../combworkError'
 import { listLanes } from '../lanes'
 import { createLogger } from '../logger'
 import { config } from '../config'
@@ -27,7 +27,7 @@ const PLATFORMS: readonly PlatformId[] = ['git', 'none']
 
 /** Checks a level and a platform from the window or the API. */
 function levelArgs(level: unknown, platform: unknown): { level: WorkflowLevel; platform: PlatformId } {
-  if ((level !== 'global' && level !== 'workspace') || !PLATFORMS.includes(platform as PlatformId)) throw new HiveError({ lines: ['A workflow level is global or workspace, for git or none'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if ((level !== 'global' && level !== 'workspace') || !PLATFORMS.includes(platform as PlatformId)) throw new CombworkError({ lines: ['A workflow level is global or workspace, for git or none'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return { level, platform: platform as PlatformId }
 }
 
@@ -99,7 +99,7 @@ async function inheritors(ws: WorkspaceService, level: WorkflowLevel, platform: 
 function shapeOf(raw: unknown): WorkflowChange {
   const c = raw as Partial<WorkflowChange> | null
   const isOptions = (v: unknown): v is Partial<WorkflowOptions> => !!v && typeof v === 'object' && !Array.isArray(v)
-  if (!c || typeof c !== 'object' || !isOptions(c.options) || (c.base !== undefined && (!c.base || !isOptions(c.base.options)))) throw new HiveError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!c || typeof c !== 'object' || !isOptions(c.options) || (c.base !== undefined && (!c.base || !isOptions(c.base.options)))) throw new CombworkError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   const options = Object.fromEntries(Object.entries(keptNames(c.options)).filter(([k, v]) => k !== 'platform' && v !== undefined)) as Partial<WorkflowOptions>
   return { preset: null, options, ...(c.base ? { base: { preset: null, options: c.base.options } } : {}) }
 }

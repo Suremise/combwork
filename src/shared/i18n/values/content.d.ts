@@ -1,6 +1,6 @@
 // Generated from locales/en/content.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'content.mcp.badArgs': undefined
   'content.mcp.badCommand': undefined
   'content.mcp.badCwd': undefined

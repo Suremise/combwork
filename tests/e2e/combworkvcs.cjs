@@ -39,7 +39,7 @@ const excludeOf = (p) => {
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1300, height: 800 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
-  const state = async (p) => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.hiveVcs
+  const state = async (p) => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.combworkVcs
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `combworkvcs-${name}.png`) })
 
   // --- A repository from the start: excluded at once, and no notice.
@@ -66,7 +66,7 @@ const excludeOf = (p) => {
   check('Project Settings still shows it', !!(await lib.until(async () => (await page.locator('.settings .hive-vcs-notice').count()) === 1, 5000)))
   await shot('settings')
   // Exclude refuses where no git repository holds the project.
-  const refused = await inv('project:excludeHive', plain).then(() => null, (e) => String(e?.message ?? e))
+  const refused = await inv('project:excludeCombwork', plain).then(() => null, (e) => String(e?.message ?? e))
   check('Exclude refuses with no repository, saying what to do', !!refused && refused.includes('No git repository holds this project'), refused ?? 'no error')
 
   // --- git init later: excluded at the next refresh, and the notice goes.
@@ -74,7 +74,7 @@ const excludeOf = (p) => {
   check('after git init, the next refresh excludes it', (await state(plain))?.state === 'excluded' && /^\/\.combwork\/$/m.test(excludeOf(plain)), excludeOf(plain))
   check('…and Project Settings no longer shows the notice', !!(await lib.until(async () => (await page.locator('.settings .hive-vcs-notice').count()) === 0, 5000)))
   // Exclude on a repository: nothing to add, nothing repeated.
-  await inv('project:excludeHive', plain)
+  await inv('project:excludeCombwork', plain)
   check('Exclude on an excluded repository adds nothing more', (excludeOf(plain).match(/\/\.combwork\//g) ?? []).length === 1, excludeOf(plain))
 
   // --- Committed before it was excluded (#364).

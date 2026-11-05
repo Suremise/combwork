@@ -32,7 +32,7 @@ const env = (codexHome = home) => lib.childEnv({ CODEX_HOME: codexHome, PATH: li
 const toml = (s) => JSON.stringify(s)
 
 /** Combwork's form of a hook (-c hooks.<event>=[{ matcher, hooks = [{ type, command, timeout }] }]). */
-const hiveHook = (event, matcher) => ['-c', `hooks.${event}=[{ ${matcher ? `matcher = ${toml(matcher)}, ` : ''}hooks = [{ type = "command", command = ${toml(`echo hive-${event}`)}, timeout = 5 }] }]`]
+const combworkHook = (event, matcher) => ['-c', `hooks.${event}=[{ ${matcher ? `matcher = ${toml(matcher)}, ` : ''}hooks = [{ type = "command", command = ${toml(`echo hive-${event}`)}, timeout = 5 }] }]`]
 
 /** Codex's app server's hooks/list for the project, given `args` (in `codexHome`): its hooks, each with its source, command and trust. */
 function hooksList(args, codexHome = home) {
@@ -78,7 +78,7 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
   fs.mkdirSync(proj, { recursive: true })
   const config = path.join(home, 'config.toml')
   fs.writeFileSync(config, ['[[hooks.Stop]]', '[[hooks.Stop.hooks]]', 'type = "command"', 'command = "echo user-Stop"', '[[hooks.PreToolUse]]', 'matcher = "*"', '[[hooks.PreToolUse.hooks]]', 'type = "command"', 'command = "echo user-PreToolUse"', ''].join('\n'))
-  const hive = [...hiveHook('Stop'), ...hiveHook('PreToolUse', '*')]
+  const hive = [...combworkHook('Stop'), ...combworkHook('PreToolUse', '*')]
   const user = (r) => (r.hooks ?? []).filter((h) => h.source === 'user')
   const ours = (r) => (r.hooks ?? []).filter((h) => h.source === 'sessionFlags')
 

@@ -24,7 +24,7 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
 
 ;(async () => {
   const claude = lib.fakeClaude(userData, claudeHome, [path.join(ws, 'demo')])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({
     executablePath: lib.ELECTRON,
     args: [lib.ROOT],

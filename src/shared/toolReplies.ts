@@ -115,7 +115,7 @@ const R = {
   attachmentFile: agentMsg({ id: 'reply.attachment.file', text: '{name}: {kind, select, binary {not text} pdf {a PDF} other {an image}} ({size}). Open it with your own file reading: {path}', note: "cw_read_attachment (HI-1751) for an image, a PDF or a binary file: its path, for the CLI's own reading." }),
   attachmentRange: agentMsg({ id: 'reply.attachment.range', text: 'bytes {from, number}–{to, number} of {size}', note: 'cw_read_attachment: which bytes of the file this page is.' }),
   attachmentText: agentMsg({ id: 'reply.attachment.text', text: '{name} ({where}{hasNext, select, yes {; more from offset {next}} other {}})', note: 'cw_read_attachment: which bytes this is, and the byte offset the next page starts at (to pass back as offset); the text follows as it is.' }),
-  levelHive: agentMsg({ id: 'reply.skill.level.cw', text: 'Combwork', note: "Where a skill comes from in cw_list_skills: Combwork's own." }),
+  levelCombwork: agentMsg({ id: 'reply.skill.level.cw', text: 'Combwork', note: "Where a skill comes from in cw_list_skills: Combwork's own." }),
   levelMachine: agentMsg({ id: 'reply.skill.level.machine', text: 'user', note: "Where a skill comes from: the user's own, on this machine." }),
   levelPlugin: agentMsg({ id: 'reply.skill.level.plugin', text: 'plugin', note: 'Where a skill comes from: a plugin.' }),
   levelLocal: agentMsg({ id: 'reply.skill.level.local', text: 'local', note: "Where a skill comes from: the project's own." }),
@@ -171,10 +171,10 @@ const R = {
   journalNone: agentMsg({ id: 'reply.journal.none', text: 'No entries.', note: 'cw_journal_recall with no entries.' }),
   markEssential: agentMsg({ id: 'reply.journal.mark.essential', text: 'essential', note: "A journal entry's mark: importance 3." }),
   markImportant: agentMsg({ id: 'reply.journal.mark.important', text: 'important', note: "A journal entry's mark: importance 2." }),
-  markByHive: agentMsg({ id: 'reply.journal.mark.byCombwork', text: 'by Combwork', note: "A journal entry's mark: Combwork recorded it." }),
+  markByCombwork: agentMsg({ id: 'reply.journal.mark.byCombwork', text: 'by Combwork', note: "A journal entry's mark: Combwork recorded it." }),
   markDetail: agentMsg({ id: 'reply.journal.mark.detail', text: 'detail', note: "A journal entry's mark: it has detail (hive_journal_get reads it)." }),
   markSuperseded: agentMsg({ id: 'reply.journal.mark.superseded', text: 'superseded by #{id}', note: "A journal entry's mark: the entry that superseded it." }),
-  journalHead: agentMsg({ id: 'reply.journal.head', text: '#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byHive, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}', note: "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed." }),
+  journalHead: agentMsg({ id: 'reply.journal.head', text: '#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byCombwork, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}', note: "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed." }),
   journalWhy: agentMsg({ id: 'reply.journal.why', text: 'Why: {why}', note: "A journal entry's why." }),
   journalDigest: agentMsg({ id: 'reply.journal.digest', text: 'Digest of {of}.', note: 'A journal entry that digests others.' }),
   journalLinks: agentMsg({ id: 'reply.journal.links', text: 'Links: {links}', note: "A journal entry's links (type and ref)." }),
@@ -224,7 +224,7 @@ const R = {
   teamPaused: agentMsg({ id: 'reply.team.paused', text: 'The team is paused (by {by}), not parked yet: {n} still running or unchecked.', note: 'cw_team: paused, not parked yet.' }),
   theUser: agentMsg({ id: 'reply.team.theUser', text: 'the user', note: 'Who paused the team, where none is named.' }),
   teamSafe: agentMsg({ id: 'reply.team.safe', text: 'Safe to install: {safe, select, yes {yes} other {no}}.', note: 'cw_team: whether it is safe to install an update now.' }),
-  teamHive: agentMsg({ id: 'reply.team.cw', text: 'Combwork', note: "What still runs that isn't an agent's: Combwork's own." }),
+  teamCombwork: agentMsg({ id: 'reply.team.cw', text: 'Combwork', note: "What still runs that isn't an agent's: Combwork's own." }),
   teamUnchecked: agentMsg({ id: 'reply.team.unchecked', text: "(can't be checked)", note: 'cw_team: what still runs whose state is unknown.' }),
   teamMore: agentMsg({ id: 'reply.team.more', text: '…and {n} more.', note: 'cw_team cut at 200 rows.' }),
   releaseNone: agentMsg({ id: 'reply.release.none', text: 'Nothing to release in {project}: no slot is kept for an agent, and no ended run holds one.', note: 'cw_release_slot list (#1561) with nothing to release.' }),
@@ -950,7 +950,7 @@ export interface SkillRow {
   problem?: string
 }
 
-const SKILL_LEVEL: Record<SkillRow['level'], AgentMsg> = { combwork: R.levelHive, machine: R.levelMachine, plugin: R.levelPlugin, local: R.levelLocal }
+const SKILL_LEVEL: Record<SkillRow['level'], AgentMsg> = { combwork: R.levelCombwork, machine: R.levelMachine, plugin: R.levelPlugin, local: R.levelLocal }
 
 /** "work-on-card (Hive, for agents): Carry a card…", a line per skill. */
 export function skillListText(rows: SkillRow[]): string {
@@ -1141,7 +1141,7 @@ export function journalRecallText(rows: JournalRow[], query?: string): string {
   if (!rows.length) return query ? say(R.journalNoMatch, { query }) : say(R.journalNone)
   return rows
     .map((r) => {
-      const marks = [r.importance >= 3 ? say(R.markEssential) : r.importance === 2 ? say(R.markImportant) : '', r.source === 'combwork' ? say(R.markByHive) : '', r.hasDetail ? say(R.markDetail) : '', r.supersededBy ? say(R.markSuperseded, { id: r.supersededBy }) : ''].filter(Boolean)
+      const marks = [r.importance >= 3 ? say(R.markEssential) : r.importance === 2 ? say(R.markImportant) : '', r.source === 'combwork' ? say(R.markByCombwork) : '', r.hasDetail ? say(R.markDetail) : '', r.supersededBy ? say(R.markSuperseded, { id: r.supersededBy }) : ''].filter(Boolean)
       return `#${r.id} ${r.at.slice(0, 10)} ${r.kind}${r.project ? ` · ${r.project}` : ''}: ${r.summary}${marks.length ? ` [${marks.join(', ')}]` : ''}`
     })
     .join('\n')
@@ -1160,7 +1160,7 @@ export interface JournalEntryDetail extends JournalRow {
 
 export function journalEntryText(e: JournalEntryDetail): string {
   return [
-    say(R.journalHead, { id: e.id, kind: e.kind, hasProject: yn(e.project), project: e.project ?? '', at: e.at, byHive: yn(e.source === 'combwork'), importance: e.importance, changed: yn(e.updatedAt), updatedAt: e.updatedAt ?? '' }),
+    say(R.journalHead, { id: e.id, kind: e.kind, hasProject: yn(e.project), project: e.project ?? '', at: e.at, byCombwork: yn(e.source === 'combwork'), importance: e.importance, changed: yn(e.updatedAt), updatedAt: e.updatedAt ?? '' }),
     e.summary,
     e.why ? say(R.journalWhy, { why: e.why }) : '',
     e.detail ?? '',
@@ -1331,7 +1331,7 @@ export function teamText(t: TeamPublic): string {
   const by = t.pausedBy ?? say(R.theUser)
   const head = !t.paused ? say(R.teamNotPaused) : t.parked ? say(R.teamParked, { by }) : say(R.teamPaused, { by, n: t.running.length })
   const install = t.paused ? ` ${say(R.teamSafe, { safe: yn(t.safeToInstall) })}` : ''
-  const rows = t.running.slice(0, MAX_ROWS).map((r) => `- ${r.project ? `${r.project}/` : ''}${r.agent || say(R.teamHive)}: ${r.what}${r.state === 'unknown' ? ` ${say(R.teamUnchecked)}` : ''}`)
+  const rows = t.running.slice(0, MAX_ROWS).map((r) => `- ${r.project ? `${r.project}/` : ''}${r.agent || say(R.teamCombwork)}: ${r.what}${r.state === 'unknown' ? ` ${say(R.teamUnchecked)}` : ''}`)
   const more = t.running.length > MAX_ROWS ? [say(R.teamMore, { n: t.running.length - MAX_ROWS })] : []
   return [head + install, ...rows, ...more, ...t.others].join('\n')
 }

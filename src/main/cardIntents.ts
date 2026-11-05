@@ -9,7 +9,7 @@ import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/run
 import { refusal } from '../shared/workflow/refusals'
 import { workflowFor } from './workflow/service'
 import { workspace, type WorkspaceService } from './workspace'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { msg } from '../shared/i18n'
 import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
 import { projectPreferences } from './workflow/preferences'
@@ -85,7 +85,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   const ws = workspace
   const before = await readTask(ref.n, actor)
   const wf = ws.path && before.project ? await workflowFor(ws, join(ws.path, before.project)) : null
-  if (!wf) throw hiveError(M.noWorkflow, { card: cardRef(ref.n) }, { kind: 'conflict' })
+  if (!wf) throw combworkError(M.noWorkflow, { card: cardRef(ref.n) }, { kind: 'conflict' })
   const who = actorOf(actor)
   // How long a design waits for its check (#1382): the project's workflow option Design check wait (HI-1766), read
   // before the write; a step already waiting keeps the until it recorded.
@@ -102,7 +102,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   // An agent's plain number is refused, naming this card's own forms (S48, §16.12); a key or #N, and anyone else's number, aren't.
   if (ref.plain && self) throw new WorkflowRefusedError(refusal('card.plainNumber', { key: before.key ?? `#${ref.n}` }, null))
   const named = `#${ref.n}`
-  if ((intent.kind === 'removeFromQueue' || intent.kind === 'retryMerge') && who !== 'user' && who !== 'assistant') throw hiveError(M.queueNotAgents, undefined, { kind: 'forbidden' })
+  if ((intent.kind === 'removeFromQueue' || intent.kind === 'retryMerge') && who !== 'user' && who !== 'assistant') throw combworkError(M.queueNotAgents, undefined, { kind: 'forbidden' })
   const by = who === 'assistant' ? 'assistant' : 'user'
   const call = (w: Workflow): Promise<Reply> => {
     switch (intent.kind) {

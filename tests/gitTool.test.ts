@@ -11,7 +11,7 @@ import { checkGit, gitExe, gitOnPath, gitProblem, gitTool, realGit, realGitBehin
 import { git, gitStatus } from '../src/main/git'
 import { withLauncherEnv } from '../src/main/gitWorker'
 import { branchStatus, createWorktree, removeCheckedWorktree, worktreeCheck } from '../src/main/worktrees'
-import { ensureHiveExcluded } from '../src/main/combworkVcs'
+import { ensureCombworkExcluded } from '../src/main/combworkVcs'
 import { tempDir, tempRoot } from './tempDir'
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -122,7 +122,7 @@ describe('git missing', () => {
   it('.combwork is still excluded by the line Combwork writes, marked unconfirmed', async () => {
     const { p } = await project()
     hideGit()
-    expect(await ensureHiveExcluded(p)).toMatchObject({ excluded: true, unconfirmed: true })
+    expect(await ensureCombworkExcluded(p)).toMatchObject({ excluded: true, unconfirmed: true })
   })
 
   it('a git call that runs again clears it', async () => {

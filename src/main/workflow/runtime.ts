@@ -2012,7 +2012,7 @@ export class Workflow {
   }
 
   /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Hive merges it. */
-  async refuseHiveMerge(ref: unknown, actor: Actor, move: string): Promise<Refusal | null> {
+  async refuseCombworkMerge(ref: unknown, actor: Actor, move: string): Promise<Refusal | null> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return null
     const g = this.combworkMergesRefusal(card)

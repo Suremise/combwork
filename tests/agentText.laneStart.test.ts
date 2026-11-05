@@ -52,7 +52,7 @@ const NOTES: { name: string; note: Note; values: string[] }[] = [
   { name: 'fresh, deferred', note: { started: [{ agentId: 'b', name: 'B1', role: 'builder', how: 'fresh' }, { agentId: 'r', name: 'R1', role: 'reviewer', how: 'deferred' }], running: [] } as Note, values: ['B1', 'R1'] },
   { name: 'failed one', note: { started: [{ agentId: 'b', name: 'B1', role: 'builder', how: 'failed', why: 'no CLI' }], running: [] } as Note, values: ['B1', 'no CLI'] },
   { name: 'failed two', note: { started: [{ agentId: 'b', name: 'B1', role: 'builder', how: 'failed' }, { agentId: 'r', name: 'R1', role: 'reviewer', how: 'failed', why: 'x' }], running: [] } as Note, values: ['B1', 'R1', 'x'] },
-  { name: 'by Combwork, tell one', note: { started: [], running: ['B1', 'R1'], builder: 'B1', firstCardByHive: true } as Note, values: ['B1', 'R1'] },
+  { name: 'by Combwork, tell one', note: { started: [], running: ['B1', 'R1'], builder: 'B1', firstCardByCombwork: true } as Note, values: ['B1', 'R1'] },
   { name: 'tell two', note: { started: [], running: ['B1', 'R1'], builder: 'B1' } as Note, values: ['B1', 'R1'] },
   { name: 'no slot', note: { started: [], waitingForSlot: 'all 3 lent', running: ['R1'] } as Note, values: ['R1', 'all 3 lent'] }
 ]

@@ -12,7 +12,7 @@ const base = tempDir('opengate-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { OpenGate, onGateSettled } = await import('../src/main/openGate')
 const { createWorkspaceService, disposeWorkspaceService, WorkspaceService } = await import('../src/main/workspace')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { sessions } = await import('../src/main/sessions')
 
 type WS = ReturnType<typeof createWorkspaceService>
@@ -64,7 +64,7 @@ describe('the open gate', () => {
     open.push(ws)
     // The first thing anyone hears of the open: the gate is there, held.
     const seen: (boolean | undefined)[] = []
-    const stop = onHiveEvent(() => void seen.push(ws.openGate?.held))
+    const stop = onCombworkEvent(() => void seen.push(ws.openGate?.held))
     await ws.open(at)
     stop()
     expect(seen.length).toBeGreaterThan(0)

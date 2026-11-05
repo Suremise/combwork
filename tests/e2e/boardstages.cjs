@@ -44,7 +44,7 @@ const nothingToArchive = (dialog) => {
   fs.mkdirSync(path.join(notes, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(notes, 'plan.md'), '# Plan\n')
   fs.writeFileSync(path.join(notes, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: null, options: {} } }))
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   try {
     const { page, inv } = h
     page.on('pageerror', (e) => check('no page errors', false, e.message))

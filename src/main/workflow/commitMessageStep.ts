@@ -31,7 +31,7 @@ const log = createLogger('workflow')
 export const COMMIT_MESSAGE_STEP = 'workflow.commitMessageDefault'
 
 /** Git options without a stored Hive's commit message; null when they have none. */
-function withoutHive(options: Partial<WorkflowOptions> | undefined): Partial<WorkflowOptions> | null {
+function withoutCombwork(options: Partial<WorkflowOptions> | undefined): Partial<WorkflowOptions> | null {
   if (!options || options.commitMessage !== 'combwork') return null
   const { commitMessage: _hive, ...rest } = options
   return rest
@@ -43,9 +43,9 @@ function withoutHive(options: Partial<WorkflowOptions> | undefined): Partial<Wor
  */
 export function settledCommitMessage(wf: ProjectWorkflow | null | undefined, chosen: boolean): ProjectWorkflow | null {
   if (!wf || chosen || wf.commitMessageChosen) return null
-  const own = wf.platform === 'git' ? withoutHive(wf.options) : null
+  const own = wf.platform === 'git' ? withoutCombwork(wf.options) : null
   const keptGit = wf.kept?.git
-  const kept = keptGit ? withoutHive(keptGit.options) : null
+  const kept = keptGit ? withoutCombwork(keptGit.options) : null
   if (!own && !kept) return null
   const written = own ? writeWorkflow(wf, { platform: wf.platform, preset: wf.preset, options: own }) : wf
   return kept ? { ...written, kept: { ...written.kept, git: { ...keptGit!, options: kept } } } : written
@@ -65,7 +65,7 @@ export function keptAnswered(wf: ProjectWorkflow | null | undefined): ProjectWor
 
 /** Workflow defaults (Hive's or a workspace's) without a stored Hive's commit message for Git; null when they have none. */
 export function settledDefaults(levels: WorkflowDefaults | null | undefined): WorkflowDefaults | null {
-  const git = withoutHive(levels?.git)
+  const git = withoutCombwork(levels?.git)
   return git ? { ...levels, git } : null
 }
 

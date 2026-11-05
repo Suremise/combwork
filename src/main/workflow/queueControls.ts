@@ -15,7 +15,7 @@ import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { git } from '../git'
 import type { TaskActor } from '../tasks'
 import type { TaskCard } from '../../shared/types'
@@ -94,7 +94,7 @@ const VIEWS_KEPT_MS = 5000
 
 /** Bumped as a project's workflow is written (its options: which queues show, and its target). */
 let optionsWritten = 0
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type === 'workflow-changed' || e.type === 'workspace-changed') optionsWritten++
 })
 

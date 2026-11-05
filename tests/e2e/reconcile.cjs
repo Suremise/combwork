@@ -33,7 +33,7 @@ const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
   fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder', provider: 'claude-code', worktree: { path: wt, branch: 'card', base: 'main' } }] }))
   lib.enableProviders(userData)
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47930) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47930) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

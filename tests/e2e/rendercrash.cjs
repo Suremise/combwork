@@ -46,7 +46,7 @@ process.on('uncaughtException', (e) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47901), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47901), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
@@ -102,7 +102,7 @@ process.on('uncaughtException', (e) => {
   check('a note says it was reloaded and the agents kept running', !!(await until(async () => /Your agents kept running/.test(await toastText()), 10000)))
   check('no question was asked', (await boxes()).length === 0)
   check('the agent is still running', (await liveMain())?.status === 'finished')
-  check("its terminal shows what it printed before", !!(await until(() => js(`window.__hiveTerminalTextAt?.(${JSON.stringify(key)}, 'remember this line') ?? null`), 10000)))
+  check("its terminal shows what it printed before", !!(await until(() => js(`window.__cwTerminalTextAt?.(${JSON.stringify(key)}, 'remember this line') ?? null`), 10000)))
   await shot('rendercrash-1-reloaded.png')
 
   // --- Again within a minute: it asks instead of reloading in a loop.

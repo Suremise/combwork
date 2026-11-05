@@ -31,7 +31,7 @@ import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
 import { checkGit } from './gitTool'
-import { handoverSession, hiveInstructions, withLatestHandover, wrapsLongCommands } from '../shared/combworkGuidance'
+import { handoverSession, combworkInstructions, withLatestHandover, wrapsLongCommands } from '../shared/combworkGuidance'
 import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
@@ -52,7 +52,7 @@ import { closeConsoleWindows, sendToConsoles } from './consoleWindow'
 import { allTasks, archiveOldDone, endExitedReviews } from './tasks'
 import { queueCleanupEverywhere } from './cardAttachmentCleanup'
 import { agentCardText } from '../shared/agentTable'
-import { emit, emitTo, onHiveEvent, toast } from './events'
+import { emit, emitTo, onCombworkEvent, toast } from './events'
 import { advanced, bindAdvancedSettings, mcpAdvancedEnv } from './advanced'
 import { GPU_SWITCH, advancedAtStart, relaunchArgs, startGpu } from './gpu'
 import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT, CW_GUIDANCE } from '../shared/advanced'
@@ -117,7 +117,7 @@ import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorks
 import { closeWithCommand, quitCommandPlanned, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
 import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
-import { hiveWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type HiveWindow } from './windows'
+import { combworkWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type CombworkWindow } from './windows'
 import { abandonWindowStorage } from './storage'
 import { agentTokenFile } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
@@ -262,7 +262,7 @@ function unpackedScript(name: string): string {
   return app.isPackaged ? p.replace(`app.asar${sep}`, `app.asar.unpacked${sep}`) : p
 }
 
-function hiveMcpScript(): string {
+function combworkMcpScript(): string {
   return unpackedScript('cw-mcp.js')
 }
 
@@ -296,7 +296,7 @@ const WINDOW_MIN = { width: 900, height: 560 }
  * Opens a Hive window, with its own workspace service. `workspacePath` opens that workspace in it;
  * `bounds` places it (a restored window), else it goes over the last focused one, offset like VS Code's.
  */
-function createWindow(opts: { workspacePath?: string | null; bounds?: WindowState; hidden?: boolean } = {}): HiveWindow {
+function createWindow(opts: { workspacePath?: string | null; bounds?: WindowState; hidden?: boolean } = {}): CombworkWindow {
   const from = lastFocused()
   let b: WindowState = opts.bounds ?? config.get().window
   if (!opts.bounds && from && !from.win.isDestroyed()) {
@@ -350,7 +350,7 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
     })
   }
   const entry = registerWindow(win, createWorkspaceService())
-  emit({ type: 'windows-changed', count: hiveWindows().length })
+  emit({ type: 'windows-changed', count: combworkWindows().length })
   // A page that crashes or hangs is reloaded (or the user asked); agents run here and keep going.
   watchRenderer(entry, { quitting: () => quitting, openLogs: () => void shell.openPath(logsDir()), quit: () => void quitNow(true) })
 
@@ -376,7 +376,7 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
   const sendState = (): void => emitTo(win, { type: 'window-state', maximized: win.isMaximized(), focused: win.isFocused(), alwaysOnTop: win.isAlwaysOnTop() })
   // Always on Top goes with the workspace the window shows (pin.ts): set when one opens in it, off on the welcome page.
   const followPin = pinFollower(win)
-  const stopPin = onHiveEvent((e) => {
+  const stopPin = onCombworkEvent((e) => {
     if (e.type === 'workspace-changed' && followPin(entry.ws.path)) sendState()
   })
   win.on('maximize', sendState)
@@ -391,7 +391,7 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
     if (quitting || entry.closing) return
     e.preventDefault()
     // The last window: the tray keeps Hive running, or closing it quits (as before there were several).
-    if (hiveWindows().length <= 1) {
+    if (combworkWindows().length <= 1) {
       if (config.settings.general.closeToTray) win.hide()
       else void requestQuit()
       return
@@ -410,7 +410,7 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
     unregisterWindow(entry)
     void disposeWorkspaceService(entry.ws)
     if (!quitting) saveWindows()
-    emit({ type: 'windows-changed', count: hiveWindows().length })
+    emit({ type: 'windows-changed', count: combworkWindows().length })
   })
 
   // Links open in the user's browser, never inside Hive.
@@ -441,7 +441,7 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
 // ---------------------------------------------------------------------------
 
 function saveWindows(): void {
-  const list = hiveWindows().map((e) => {
+  const list = combworkWindows().map((e) => {
     const maximized = e.win.isMaximized()
     const r = e.win.getNormalBounds()
     return { workspace: e.ws.path, x: r.x, y: r.y, width: r.width, height: r.height, maximized }
@@ -536,7 +536,7 @@ async function withCards(list: QuitSession[]): Promise<QuitSession[]> {
 const workingCount = (): number => sessions.liveStates().filter((s) => s.status === 'working' || s.status === 'background' || !!watchKeepsQuitWaiting(s)).length
 
 /** Shows the quit (or close) dialog in a window and waits for the answer. */
-function ask(e: HiveWindow, req: { sessions: QuitSession[]; unsaved: string[]; scope: QuitScope }): Promise<QuitChoice> {
+function ask(e: CombworkWindow, req: { sessions: QuitSession[]; unsaved: string[]; scope: QuitScope }): Promise<QuitChoice> {
   showWindow(e.win)
   return new Promise<QuitChoice>((answer) => {
     // Held at once, so a second request finds it; shown once the agents' cards are read (#572).
@@ -567,7 +567,7 @@ async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart
   if (quitting) return
   // Already waiting to quit: asking again means "now", after the final look at unsaved files (HI-2336).
   if (pendingQuit) return finishPendingQuit()
-  const asking = hiveWindows().find((e) => e.question)
+  const asking = combworkWindows().find((e) => e.question)
   if (asking) {
     // A dialog is already open: just bring it forward. Its answer is about what it asked: this request's install or
     // restart is dropped, never kept for a later quit (HI-2427); its notice keeps Restart and Update.
@@ -580,7 +580,7 @@ async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart
   relaunchOnQuit = false
   const live = sessions.liveStates()
   const mode = config.settings.general.confirmOnQuit
-  const unsavedIn = hiveWindows().filter((e) => e.unsaved.length > 0)
+  const unsavedIn = combworkWindows().filter((e) => e.unsaved.length > 0)
   const askSessions = !opts.force && live.length > 0 && (mode === 'always' || (mode === 'working' && sessions.busyStates().length > 0))
   const target = unsavedIn.find((e) => e === lastFocused()) ?? unsavedIn[0] ?? lastFocused()
   if ((askSessions || unsavedIn.length > 0) && target) {
@@ -618,7 +618,7 @@ function askBeforeStopping(mine: QuitSession[]): boolean {
  * closing the window does. False when the user cancels. Unsaved files were already dealt with by the page.
  */
 async function stopWorkspaceAgents(from: BrowserWindow, scope: 'workspace' | 'switch'): Promise<boolean> {
-  const e = hiveWindows().find((x) => x.win === from)
+  const e = combworkWindows().find((x) => x.win === from)
   if (!e) return false
   if (e.question) {
     showWindow(e.win)
@@ -643,7 +643,7 @@ type AlreadyAsked = { sessions?: boolean; unsaved?: boolean }
  * Closing a window (not the last): its workspace's agents are stopped, after asking as quitting does, about what the
  * quit dialog hasn't already (`done`).
  */
-async function requestCloseWindow(e: HiveWindow, done: AlreadyAsked = {}): Promise<void> {
+async function requestCloseWindow(e: CombworkWindow, done: AlreadyAsked = {}): Promise<void> {
   if (e.question) return showWindow(e.win)
   const mine = quitSessions(e.ws)
   const askSessions = !done.sessions && askBeforeStopping(mine)
@@ -668,8 +668,8 @@ async function requestCloseWindow(e: HiveWindow, done: AlreadyAsked = {}): Promi
  * The quit dialog's Close this window only (shown only with several windows open). Were it the last window by now,
  * it closes as the last window's X does: to the tray, or quitting.
  */
-function closeWindowOnly(e: HiveWindow, done: AlreadyAsked): Promise<void> {
-  if (hiveWindows().length > 1) return requestCloseWindow(e, done)
+function closeWindowOnly(e: CombworkWindow, done: AlreadyAsked): Promise<void> {
+  if (combworkWindows().length > 1) return requestCloseWindow(e, done)
   if (config.settings.general.closeToTray) {
     e.win.hide()
     return Promise.resolve()
@@ -678,8 +678,8 @@ function closeWindowOnly(e: HiveWindow, done: AlreadyAsked): Promise<void> {
 }
 
 /** Remembers the windows as they will be once this one has closed. */
-function saveWindowsWithout(e: HiveWindow): void {
-  const others = hiveWindows().filter((x) => x !== e)
+function saveWindowsWithout(e: CombworkWindow): void {
+  const others = combworkWindows().filter((x) => x !== e)
   if (!others.length) return
   config.update((c) => {
     c.windows = (c.windows ?? []).filter((w) => w.workspace?.toLowerCase() !== e.ws.path?.toLowerCase() || !e.ws.path)
@@ -690,7 +690,7 @@ function startPendingQuit(): void {
   pendingQuit = true
   setTrayPendingQuit(true)
   emit({ type: 'quit-pending', pending: true, working: workingCount() })
-  for (const e of hiveWindows()) e.win.hide()
+  for (const e of combworkWindows()) e.win.hide()
   checkPendingQuit()
 }
 
@@ -720,14 +720,14 @@ let finishingPendingQuit: Promise<void> | null = null
  */
 function finishPendingQuit(): Promise<void> {
   if (finishingPendingQuit) {
-    const asking = hiveWindows().find((e) => e.question)
+    const asking = combworkWindows().find((e) => e.question)
     if (asking) showWindow(asking.win)
     log.info('Pending quit: its final look at unsaved files is already asking; brought forward, not asked again')
     return finishingPendingQuit
   }
   finishingPendingQuit = (async () => {
     try {
-      for (const e of hiveWindows().filter((x) => x.unsaved.length > 0)) {
+      for (const e of combworkWindows().filter((x) => x.unsaved.length > 0)) {
         if (!pendingQuit || quitting) return
         const choice = await ask(e, { sessions: [], unsaved: e.unsaved, scope: 'app' })
         if (choice === 'cancel') return cancelPendingQuit()
@@ -799,7 +799,7 @@ async function quitNow(tellUser: boolean): Promise<void> {
  * failed, or the user didn't wait for one to finish saving (its Don't wait, the only way past a saving step).
  */
 async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
-  const entries = hiveWindows()
+  const entries = combworkWindows()
   const global = config.settings.commands
   if (!quitRunsAny(entries.map((e) => e.ws), global)) return
   // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
@@ -832,7 +832,7 @@ async function quitLeftovers(): Promise<void> {
   if (left.length) {
     let end = config.settings.agents.leftoverProcesses === 'end'
     // A quiet test copy asks only when its suite says so: a native dialog no suite answers would hold its quit.
-    const shown = !testQuiet() || process.env.CW_TEST_ASK_LEFTOVERS === '1' ? hiveWindows().find((e) => e.win.isVisible()) : undefined
+    const shown = !testQuiet() || process.env.CW_TEST_ASK_LEFTOVERS === '1' ? combworkWindows().find((e) => e.win.isVisible()) : undefined
     const asking = !end && !!shown && !installOnQuit
     if (asking && shown) {
       const n = left.reduce((sum, l) => sum + l.processes.length + l.more, 0)
@@ -914,7 +914,7 @@ function wireSettingsEffects(): void {
     }
     if (s.appearance.theme !== prev.appearance.theme) {
       nativeTheme.themeSource = s.appearance.theme
-      for (const e of hiveWindows()) {
+      for (const e of combworkWindows()) {
         setTitleBarColors(e.win, titleBarColors())
       }
     }
@@ -1085,7 +1085,7 @@ app.whenReady().then(async () => {
   })
   /** Tests only (development builds): where the hive MCP servers log the calls they ran (tests/scenarios). */
   const testMcpLog = (): Record<string, string> => (!app.isPackaged && process.env.CW_TEST_MCP_LOG ? { CW_TEST_MCP_LOG: process.env.CW_TEST_MCP_LOG } : {})
-  sessions.hiveMcp = (projectPath, agentId): McpServerDef | null => {
+  sessions.combworkMcp = (projectPath, agentId): McpServerDef | null => {
     const s = config.settings.agentApi
     // The Hive Assistant always has Hive's tools, with its own token and its control level (Settings → Assistant).
     if (workspace.isAssistantHome(projectPath)) {
@@ -1094,7 +1094,7 @@ app.whenReady().then(async () => {
       if (!url || !ws) return null
       return {
         command: process.execPath,
-        args: [hiveMcpScript()],
+        args: [combworkMcpScript()],
         env: {
           ELECTRON_RUN_AS_NODE: '1',
           CW_API_URL: url,
@@ -1120,7 +1120,7 @@ app.whenReady().then(async () => {
     if (!s.enabled || !s.provideCombworkMcp || !url) return null
     return {
       command: process.execPath,
-      args: [hiveMcpScript()],
+      args: [combworkMcpScript()],
       env: {
         ELECTRON_RUN_AS_NODE: '1',
         CW_API_URL: url,
@@ -1160,12 +1160,12 @@ app.whenReady().then(async () => {
   initAssistantModes()
   // A watcher stops keeping a pending quit waiting when the card it waits on leaves another agent's work (no wake comes).
   onWatchedCardsMoved(() => checkPendingQuit())
-  sessions.hiveGuidance = (projectPath) =>
+  sessions.combworkGuidance = (projectPath) =>
     inWorkspace(workspaceOf(projectPath), async () => {
-      if (!sessions.hiveMcp(projectPath)) return ''
+      if (!sessions.combworkMcp(projectPath)) return ''
       if (workspace.isAssistantHome(projectPath)) {
         const journal = journalSettingsOf(workspaceOf(projectPath))
-        return hiveInstructions('', 'assistant', true, undefined, journal.enabled ? journal.scope : null)
+        return combworkInstructions('', 'assistant', true, undefined, journal.enabled ? journal.scope : null)
       }
       // Hive's tools without its guidance (#1285, #966 row 13): the Assistant above always has its own.
       if (!advanced.get<boolean>(CW_GUIDANCE)) return ''
@@ -1173,7 +1173,7 @@ app.whenReady().then(async () => {
       const latest = (await handoversFor(workspace, project))[0]
       // Naming only the skills its agents get (#1431).
       const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames((await workspace.projectConfig(projectPath)).skillDelivery)])
-      return withLatestHandover(hiveInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), latest?.relPath)
+      return withLatestHandover(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), latest?.relPath)
     })
   // The Assistant's state view at each start and after each compaction, while its journal is on (#1032).
   sessions.startContext = async (state, source) => {
@@ -1212,7 +1212,7 @@ app.whenReady().then(async () => {
   // what is told; with none, the one showing the entry's workspace (or a source path's), else the last focused.
   setNotifyHost({
     focused: () => {
-      const e = hiveWindows().find((x) => !x.win.isDestroyed() && x.win.isVisible() && !x.win.isMinimized() && x.win.isFocused())
+      const e = combworkWindows().find((x) => !x.win.isDestroyed() && x.win.isVisible() && !x.win.isMinimized() && x.win.isFocused())
       return e ? { win: e.win, workspacePath: e.ws.path, projectPath: e.showing } : null
     },
     fallback: (projectPath, source) => (projectPath ? windowForPath(projectPath) : null)?.win ?? (source && /[\\/]/.test(source) ? windowForPath(source)?.win : null) ?? lastFocused()?.win ?? null,
@@ -1315,17 +1315,17 @@ app.whenReady().then(async () => {
     quit: () => void requestQuit(),
     restart: () => void requestQuit({ intent: 'restart' }),
     decide: (from, choice, dontAskAgain) => {
-      const e = hiveWindows().find((x) => x.win === from)
+      const e = combworkWindows().find((x) => x.win === from)
       if (dontAskAgain && (choice === 'now' || choice === 'wait') && e?.question?.scope === 'app') config.updateSettings({ general: { confirmOnQuit: 'never' } })
       e?.question?.answer(choice)
     },
     cancelPending: cancelPendingQuit,
     state: (from) => {
-      const q = hiveWindows().find((x) => x.win === from)?.question
+      const q = combworkWindows().find((x) => x.win === from)?.question
       return { request: q?.request ?? null, unsaved: q?.unsaved ?? [], scope: q?.scope ?? 'app', pending: pendingQuit, working: pendingQuit ? workingCount() : 0 }
     },
     setUnsaved: (from, paths) => {
-      const e = hiveWindows().find((x) => x.win === from)
+      const e = combworkWindows().find((x) => x.win === from)
       if (e) e.unsaved = paths
     },
     stopWorkspaceAgents,
@@ -1357,7 +1357,7 @@ app.whenReady().then(async () => {
   // they show doesn't wait for it. A workspace opened later starts it once it shows agents (below).
   if (restore.some((w) => w.workspacePath)) warmProcessTracking()
   // The last restored window is on top: it counts as focused first.
-  const first = hiveWindows()[0]
+  const first = combworkWindows()[0]
   first?.win.webContents.once('did-finish-load', () => {
     // Give the page a moment to subscribe to events.
     setTimeout(() => {
@@ -1381,7 +1381,7 @@ app.whenReady().then(async () => {
     quitNow: () => void (pendingQuit ? finishPendingQuit() : quitNow(true)),
     cancelPendingQuit
   })
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'session-status' || e.type === 'session-exit') checkPendingQuit()
     // A window opened or closed its workspace: remember it for the next start.
     if (e.type === 'workspace-changed') saveWindowsSoon()

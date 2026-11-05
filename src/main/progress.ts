@@ -104,7 +104,7 @@ const COPY_NAME = /^copy-\d{1,4}$/
  * Hive's own run's stored name and default name: a slot's; a copy's, credited to the agent whose lease held it
  * (HI-1710), else the copies'; else the merge queue's.
  */
-const hiveName = (slot: string | null | undefined, copy: string | null | undefined, holder?: CopyHolder | null): Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'> =>
+const combworkName = (slot: string | null | undefined, copy: string | null | undefined, holder?: CopyHolder | null): Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'> =>
   slot ? { agentName: slotRunsName(slot), defaultName: 'slot', slot } : copy ? (holder ? { agentName: holder.agentName, copy } : { agentName: COPIES_RUNS, defaultName: 'copy', copy }) : { agentName: CW_RUNS, defaultName: 'mergeQueue' }
 /** A slot's name as a kept run may hold it (slots.ts names them so). */
 const SLOT_NAME = /^[\w.-]{1,60}$/
@@ -164,11 +164,11 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       workspacePath,
       projectPath: source === 'agent' || source === 'combwork' ? keptText(r.projectPath, 1000) : null,
       agentId: source === 'agent' ? keptText(r.agentId, 200) : (holder?.agentId ?? null),
-      agentName: source === 'combwork' ? hiveName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
+      agentName: source === 'combwork' ? combworkName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
       // A script's name is always Hive's (scripts don't name themselves, start()), as is the merge queue's; an agent's
       // only when it has none, or when Hive's "Agent" was saved with its mark (a nameless run kept before: this file is
       // read again after a save).
-      ...(source === 'combwork' ? hiveName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
+      ...(source === 'combwork' ? combworkName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
       provider: source !== 'combwork' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
       source,
       title,
@@ -394,8 +394,8 @@ export class ProgressStore {
       workspacePath: caller.workspacePath,
       projectPath: caller.source === 'agent' || caller.source === 'combwork' ? caller.projectPath : null,
       agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'combwork' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
-      agentName: caller.source === 'api' ? 'Script' : caller.source === 'combwork' ? hiveName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
-      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'combwork' ? hiveName(caller.slot, caller.copy, caller.reviewer) : {}),
+      agentName: caller.source === 'api' ? 'Script' : caller.source === 'combwork' ? combworkName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
+      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'combwork' ? combworkName(caller.slot, caller.copy, caller.reviewer) : {}),
       provider: caller.source === 'api' || caller.source === 'combwork' ? null : caller.provider,
       source: caller.source as ProgressSource,
       title,

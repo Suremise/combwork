@@ -347,8 +347,8 @@ describe('the e2e build follows the translations', () => {
 
 describe('tests run in English', () => {
   it('a test Combwork is pinned to English unless a suite says otherwise', () => {
-    const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { hiveEnv: (vars?: Record<string, string>, parent?: Record<string, string>) => Record<string, string> }
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p' }, { CW_LANG: 'pl' }).CW_LANG).toBe('en')
-    expect(ctx.hiveEnv({ CW_USER_DATA: 'C:\\p', CW_LANG: 'en-XA' }, {}).CW_LANG).toBe('en-XA')
+    const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { combworkEnv: (vars?: Record<string, string>, parent?: Record<string, string>) => Record<string, string> }
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, { CW_LANG: 'pl' }).CW_LANG).toBe('en')
+    expect(ctx.combworkEnv({ CW_USER_DATA: 'C:\\p', CW_LANG: 'en-XA' }, {}).CW_LANG).toBe('en-XA')
   })
 })

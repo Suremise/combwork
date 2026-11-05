@@ -6,7 +6,7 @@ import { app, safeStorage } from 'electron'
 import { msg } from '../shared/i18n'
 import { config } from './config'
 import { writeJsonAtomic } from './fsutil'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { addWindows, fingerprint, maskingState, MOD, setMasking, type MatchSecret, type Window } from './keyMatcher'
 import { createLogger } from './logger'
 
@@ -168,10 +168,10 @@ async function writeStored(s: Stored): Promise<void> {
  */
 export async function addKeyFingerprint(conn: string, key: string): Promise<void> {
   await loadCoverage()
-  if (maskingState().state === 'unavailable') throw hiveError(UNREADABLE, undefined, { kind: 'conflict' })
+  if (maskingState().state === 'unavailable') throw combworkError(UNREADABLE, undefined, { kind: 'conflict' })
   const base = stored ?? newStored()
   const windows = fingerprint(secretOf(base), key)
-  if (total + windows.length > maxWindows) throw hiveError(FULL, undefined, { kind: 'conflict' })
+  if (total + windows.length > maxWindows) throw combworkError(FULL, undefined, { kind: 'conflict' })
   await writeMarks({ ever: true })
   const next: Stored = { ...base, keys: [...base.keys, { at: new Date().toISOString(), conn, windows }] }
   await writeStored(next)
@@ -192,7 +192,7 @@ export async function resetCoverage(keys: { conn: string; key: string }[]): Prom
   const secret = secretOf(s)
   for (const k of keys) s.keys.push({ at: new Date().toISOString(), conn: k.conn, windows: fingerprint(secret, k.key) })
   const n = s.keys.reduce((a, k) => a + k.windows.length, 0)
-  if (n > maxWindows) throw hiveError(FULL, undefined, { kind: 'conflict' })
+  if (n > maxWindows) throw combworkError(FULL, undefined, { kind: 'conflict' })
   await writeMarks({ ever: true, gap: true, gapSince: new Date().toISOString() })
   await writeStored(s)
   stored = s
@@ -205,7 +205,7 @@ export async function resetCoverage(keys: { conn: string; key: string }[]): Prom
 /** Before an export, Copy Diagnostics or a recording is written: refused while the fingerprints can't be read. */
 export async function requireMasking(): Promise<void> {
   await loadCoverage()
-  if (maskingState().state === 'unavailable') throw hiveError(UNREADABLE, undefined, { kind: 'conflict' })
+  if (maskingState().state === 'unavailable') throw combworkError(UNREADABLE, undefined, { kind: 'conflict' })
 }
 
 /** How many windows are kept, all keys together. */

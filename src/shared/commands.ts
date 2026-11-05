@@ -1,4 +1,4 @@
-import type { CloseReason, CommandPoint, CommandRef, CommandsHive, CommandsWorkspace, CustomCommand } from './types'
+import type { CloseReason, CommandPoint, CommandRef, CommandsCombwork, CommandsWorkspace, CustomCommand } from './types'
 import { msg } from './i18n'
 
 // HI-1954: custom commands (JetBrains' External Tools), named once at Hive's level or a workspace's and picked for the
@@ -84,11 +84,11 @@ export function cleanPoint(v: unknown, scopes: readonly CommandRef['scope'][], u
   return { run, ...(update && p.onUpdate === true ? { onUpdate: true } : {}) }
 }
 
-export const EMPTY_HIVE: CommandsHive = { list: [], onQuit: { run: [] } }
+export const EMPTY_CW: CommandsCombwork = { list: [], onQuit: { run: [] } }
 export const EMPTY_WORKSPACE: CommandsWorkspace = { list: [], onOpen: { run: [] }, onClose: { run: [] } }
 
 /** Hive's commands as saved (settings.commands). */
-export function cleanHive(v: unknown): CommandsHive {
+export function cleanCombwork(v: unknown): CommandsCombwork {
   const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
   return { list: cleanList(c.list), onQuit: cleanPoint(c.onQuit, ['combwork'], true) }
 }
@@ -128,8 +128,8 @@ export function migrateWorkspaceCommands(raw: { commands?: unknown; onClose?: un
 }
 
 /** Hive's commands from what settings hold, HI-1368's `general.onQuit` adopted. */
-export function migrateHiveCommands(raw: { commands?: unknown; onQuit?: unknown }, name: string): CommandsHive {
-  const now = cleanHive(raw.commands)
+export function migrateCombworkCommands(raw: { commands?: unknown; onQuit?: unknown }, name: string): CommandsCombwork {
+  const now = cleanCombwork(raw.commands)
   const { commands, point } = adopt(now, now.onQuit, raw.onQuit, 'onQuit', name, 'combwork')
   return { ...commands, onQuit: point }
 }
@@ -140,7 +140,7 @@ export function resolvePoint(point: CommandPoint, lists: { hive: readonly Custom
 }
 
 /** A scope's version: a hash of its commands and points, for a change proposed against them (HI-1954/s21). */
-export const commandsVersion = (c: CommandsHive | CommandsWorkspace): string => shortHash(JSON.stringify(c))
+export const commandsVersion = (c: CommandsCombwork | CommandsWorkspace): string => shortHash(JSON.stringify(c))
 
 /** What a command's placeholders stand for. `projects`: each project's path by its name (lower-cased). */
 export interface CommandValues {

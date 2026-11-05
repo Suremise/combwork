@@ -234,7 +234,7 @@ async function statusBar(ctx) {
 }
 
 /** The .combwork notice in Project Settings: a file in .combwork committed to git. */
-async function hiveNotice(ctx) {
+async function combworkNotice(ctx) {
   const { page, inv, project } = ctx
   await page.mouse.move(5, 5)
   fs.mkdirSync(path.join(project, '.combwork'), { recursive: true })
@@ -272,7 +272,7 @@ module.exports = {
     { name: 'add-remote-form', open: addRemote, close: cancelDialog },
     { name: 'identity-form', open: identityForm, close: cancelDialog },
     { name: 'status-bar', open: statusBar },
-    { name: 'hive-notice', open: hiveNotice },
+    { name: 'hive-notice', open: combworkNotice },
     { name: 'untrack-dialog', open: untrackDialog, close: closeLast }
   ]
 }

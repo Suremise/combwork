@@ -28,7 +28,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(alpha, '.combwork', 'attachments', id, '2026-10-05_10-00-00.png'), lib.samplePng(400, 200))
   fs.writeFileSync(path.join(alpha, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id, agent: 'claude-code', name: 'Pictures', createdAt: '', lastActiveAt: '', archived: false }] }))
   const claude = lib.fakeClaude(userData, path.join(lib.WORK, 'dialogs-claude-home'), [alpha])
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47933), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47933), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

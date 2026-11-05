@@ -1,6 +1,6 @@
 // Generated from locales/en/tasks.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'tasks.by.assistant': undefined
   'tasks.by.repair': undefined
   'tasks.by.you': undefined

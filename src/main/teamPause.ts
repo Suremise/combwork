@@ -49,9 +49,9 @@ const resumed = new Map<string, number>()
 /** Each workspace's lock: pause, resume and the gates' admission checks go one at a time. */
 const locks = new Map<string, Promise<unknown>>()
 
-/** A workspace's .combwork folder, from its path (the same as its hiveDir, which a stand-in for one may not have). */
-const hiveOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', CW_DIR)
-const keyOf = (ws: Pick<WorkspaceService, 'path'>): string => hiveOf(ws).toLowerCase()
+/** A workspace's .combwork folder, from its path (the same as its combworkDir, which a stand-in for one may not have). */
+const combworkOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', CW_DIR)
+const keyOf = (ws: Pick<WorkspaceService, 'path'>): string => combworkOf(ws).toLowerCase()
 
 /** The user's pause of every open workspace, while it lasts. */
 export const appPause = (): TeamPause | null => all
@@ -70,7 +70,7 @@ export function teamPauseOf(ws: WorkspaceService | null | undefined): TeamPause 
   const k = keyOf(ws)
   if (!cleared.has(k)) {
     cleared.add(k)
-    void rm(join(hiveOf(ws), OLD_FILE), { force: true }).catch((e) => log.warn('Removing a team pause an earlier Hive saved', e))
+    void rm(join(combworkOf(ws), OLD_FILE), { force: true }).catch((e) => log.warn('Removing a team pause an earlier Hive saved', e))
   }
   const p = known.get(k)
   if (p) return p

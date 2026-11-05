@@ -94,7 +94,7 @@ export interface LaunchContext {
    */
   overrides?: Readonly<Record<string, boolean>>
   /** Tools of the hive MCP server this launch may use without asking, for providers that can pre-approve tools. */
-  trustedHiveTools?: string[]
+  trustedCombworkTools?: string[]
   /** The first task, given on the command line so the CLI starts on it (e.g. from the Hive Assistant). */
   initialPrompt?: string
   env: Record<string, string>
@@ -398,7 +398,7 @@ export interface SkillRoots {
    */
   local: string[]
   /** Hive's own copies inside `local`, which aren't the project's skills (folder name prefix). */
-  hiveCopyPrefix: string | null
+  combworkCopyPrefix: string | null
 }
 
 /**

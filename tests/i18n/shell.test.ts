@@ -130,7 +130,7 @@ describe('round 1 of review (#795)', () => {
   })
 
   it('the palette is made again when the language changes', () => {
-    expect(readFileSync(join(ROOT, 'src/renderer/src/components/Overlays.tsx'), 'utf8')).toContain('}, [q, projects, open, mode, shownLanguage, tasks, keys, moved, hiveCommands, wsCommands])')
+    expect(readFileSync(join(ROOT, 'src/renderer/src/components/Overlays.tsx'), 'utf8')).toContain('}, [q, projects, open, mode, shownLanguage, tasks, keys, moved, combworkCommands, wsCommands])')
   })
 
   it("an agent's background tasks are whole sentences with the count, which a language words by the count", () => {

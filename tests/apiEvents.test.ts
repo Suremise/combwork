@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'path'
 import { API_EVENTS, COMMAND_TITLE, apiEventFor, publicRun, publicSessionState } from '../src/main/apiEvents'
-import type { HiveEvent, LiveSessionState, MergeSlotInfo, ProgressRun } from '../src/shared/types'
+import type { CombworkEvent, LiveSessionState, MergeSlotInfo, ProgressRun } from '../src/shared/types'
 
 // What the Agent API's event stream sends of Combwork's events, and to whom (#620): every listed event to the workspace
 // token and viewers, a project agent its own project's, and nothing private (no notice body, no prompt the Assistant
@@ -14,12 +14,12 @@ const agent = { workspace: ws, projectPath: alpha }
 
 const run = (projectPath: string | null, id: string): ProgressRun => ({ id, workspacePath: ws, projectPath, agentId: projectPath ? 'a1' : null, agentName: projectPath ? 'B1' : 'Script', provider: null, source: projectPath ? 'agent' : 'api', title: 'unit tests', command: null, total: null, step: null, stepName: null, estimateMs: null, startedAt: 1, updatedAt: 1, finishedAt: null, state: 'running', staleReason: null, stopReason: null, waiting: null, waitingSince: null, heldEstimateMs: null, pid: null, summary: null, dismissed: false, seenAt: null, expectedMs: null, exitCode: null, logPath: null })
 const slot = (project: string): MergeSlotInfo => ({ project, branch: 'main', holder: { id: 'h', kind: 'agent', agentId: 'a1', name: 'B1', cards: [12], since: 1, until: 2, taken: true }, waiting: [] })
-const status = (projectPath: string) => ({ type: 'session-status', state: { projectPath, agentId: 'a1' } as LiveSessionState }) as HiveEvent
+const status = (projectPath: string) => ({ type: 'session-status', state: { projectPath, agentId: 'a1' } as LiveSessionState }) as CombworkEvent
 
 describe('apiEventFor', () => {
   it('sends the events Apiary needs, and none of the windows\' own', () => {
     expect(API_EVENTS).toEqual(expect.arrayContaining(['progress-changed', 'merge-slots-changed', 'notice', 'notice-resolved', 'assistant-activity', 'agent-added']))
-    for (const e of [{ type: 'toast', toast: { id: 't', level: 'info', title: 'x', timestamp: '' } }, { type: 'settings-changed', settings: {} }, { type: 'chime', projectPath: alpha }, { type: 'files-changed', projectPath: alpha, dirs: [] }, { type: 'assistant-questions', projectPath: alpha, questions: [] }] as HiveEvent[]) {
+    for (const e of [{ type: 'toast', toast: { id: 't', level: 'info', title: 'x', timestamp: '' } }, { type: 'settings-changed', settings: {} }, { type: 'chime', projectPath: alpha }, { type: 'files-changed', projectPath: alpha, dirs: [] }, { type: 'assistant-questions', projectPath: alpha, questions: [] }] as CombworkEvent[]) {
       expect(apiEventFor(e, null), e.type).toBeNull()
     }
   })
@@ -28,10 +28,10 @@ describe('apiEventFor', () => {
     expect(apiEventFor(status(beta), null)).not.toBeNull()
     expect(apiEventFor(status(beta), agent)).toBeNull()
     expect(apiEventFor(status(alpha), agent)).not.toBeNull()
-    for (const e of [{ type: 'agent-added', projectPath: beta, agentId: 'a2' }, { type: 'notice-resolved', projectPath: beta, agentId: 'a2' }, { type: 'session-exit', projectPath: beta, agentId: 'a2', sessionId: 's', exitCode: 0 }] as HiveEvent[]) {
+    for (const e of [{ type: 'agent-added', projectPath: beta, agentId: 'a2' }, { type: 'notice-resolved', projectPath: beta, agentId: 'a2' }, { type: 'session-exit', projectPath: beta, agentId: 'a2', sessionId: 's', exitCode: 0 }] as CombworkEvent[]) {
       expect(apiEventFor(e, null), e.type).toEqual(e)
       expect(apiEventFor(e, agent), e.type).toBeNull()
-      expect(apiEventFor({ ...e, projectPath: alpha } as HiveEvent, agent), e.type).not.toBeNull()
+      expect(apiEventFor({ ...e, projectPath: alpha } as CombworkEvent, agent), e.type).not.toBeNull()
     }
   })
 

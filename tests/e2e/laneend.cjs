@@ -61,7 +61,7 @@ const transcripts = () => {
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 250)
-    const log = () => lib.hiveLogLines(userData)
+    const log = () => lib.combworkLogLines(userData)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool', commands: {} } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })

@@ -12,7 +12,7 @@ import { DISPLAY_LIMIT, toolForDisplay } from '../src/main/transcriptDisplay'
 
 const require = createRequire(import.meta.url)
 const { observeTranscript, tokenSightings } = require('./scenarios/harness.cjs') as {
-  observeTranscript: (items: unknown[], skills: string[]) => { skillsRead: string[]; hiveMentions: string[]; finalReply: string }
+  observeTranscript: (items: unknown[], skills: string[]) => { skillsRead: string[]; combworkMentions: string[]; finalReply: string }
   tokenSightings: (known: { kind: string; token: string }[], seen: { tools?: { name: string; result: string }[]; scripts?: { name: string; result: string }[]; replies?: string[] }) => { kind: string; in: string; at: number; name?: string; excerpt: string }[]
 }
 const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; testRunsIn: (commands: string[]) => unknown[]; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null; head: string | null; where: string | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null; commandsOf: (t: unknown) => string[] } }
@@ -138,7 +138,7 @@ describe('Combwork tools named in a transcript are mentions, not calls', () => {
       [tool('mcp__combwork__cw_update_task', { number: 3 }), tool('combwork · cw_reorder_tasks', 'column: todo'), tool('Script', 'if (false) { await tools.mcp__combwork__cw_wait_for_agents({}); }')],
       SKILLS
     )
-    expect(o.hiveMentions).toEqual(['cw_update_task', 'cw_reorder_tasks', 'cw_wait_for_agents'])
+    expect(o.combworkMentions).toEqual(['cw_update_task', 'cw_reorder_tasks', 'cw_wait_for_agents'])
     expect('hiveCalls' in o).toBe(false)
   })
 })
@@ -159,7 +159,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
   }
   // A script as Combwork gives one whose calls aren't known (a Codex that records none): one tool, Script, no `calls`.
   const script = (id: string, code: string, result = '') => ({ kind: 'tool', tool: { toolUseId: id, name: 'Script', summary: '', input: code, result, isError: false, images: [] } })
-  type Seen = { tools: { name: string; input: string; result: string; isError: boolean }[]; skillsRead: string[]; hiveMentions: string[] }
+  type Seen = { tools: { name: string; input: string; result: string; isError: boolean }[]; skillsRead: string[]; combworkMentions: string[] }
   const observeItems = (items: unknown[]) => observeTranscript(withScriptCalls(items).items, SKILLS) as unknown as Seen
   const observe = (text: string) => observeItems(parsed(text))
 
@@ -169,13 +169,13 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
     const o = observe(text)
     // The reply it got counts though the script printed nothing; a call written in it that never ran isn't a call, only a mention.
     expect(o.tools).toEqual([expect.objectContaining({ name: 'combwork · cw_read_task', input: expect.stringContaining('"AL-1"'), result: expect.stringContaining('ACCEPT-ZEBRA-42'), isError: false })])
-    expect(o.hiveMentions).toEqual(['cw_read_task', 'cw_read_task', 'cw_wait_for_agents'])
+    expect(o.combworkMentions).toEqual(['cw_read_task', 'cw_read_task', 'cw_wait_for_agents'])
     expect(withScriptCalls(parsed(text))).toMatchObject({ scripts: 1, calls: 1, unknown: 0 })
   })
 
   it("passes card-detail's, list-compact's and raw-api's reply checks on what Codex got back, and fails them on what it didn't", () => {
     const scenario = (id: string) => SCENARIOS.find((s) => s.id === id)!
-    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], hiveMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
+    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
     const read = 'text(await tools.mcp__combwork__cw_read_task({number:"AL-1"}))'
     const got = observe(rollout(call('c1', read), mcp('exec-1', 'cw_read_task', { number: 'AL-1' }, 'Acceptance: ACCEPT-ZEBRA-42'), output('c1', '…')))
     const refused = observe(rollout(call('c1', read), mcp('exec-1', 'cw_read_task', { number: 'AL-1' }, 'Combwork error: no such card', true), output('c1', '…')))
@@ -197,7 +197,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
 
   it("credits nothing from a script whose calls aren't known (a Codex that records none): neither its code nor what it printed (HR1 round 1)", () => {
     const scenario = (id: string) => SCENARIOS.find((s) => s.id === id)!
-    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], hiveMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
+    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
     const ctx = { read: (f: string) => (f === 'scripts/cards.ps1' ? 'Get-Content $env:CW_API_TOKEN_FILE' : null) }
     // HR1's case: a command never run, then text that looks like its output, which the script printed.
     const printed = 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project'
@@ -218,7 +218,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
       expect(helpers.testRunsIn(o.tools.flatMap(helpers.commandsOf)), what).toEqual([])
       expect(o.skillsRead, what).toEqual([])
       // Still mentions, and counted as unobservable for the run's report.
-      expect(o.hiveMentions, what).toEqual(['cw_read_task'])
+      expect(o.combworkMentions, what).toEqual(['cw_read_task'])
       expect(withScriptCalls(seen), what).toMatchObject({ scripts: 0, calls: 0, unknown: 1 })
     }
     // A Codex that records calls (its user's message an item): a script that made none is known to have made none.
@@ -237,7 +237,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
     const inCopy = 'read or ran its checks in the review copy'
     const review = SCENARIOS.find((s) => s.id === 'review-in-copy')!
     const ctx = { copyLeases: new Set<string>(), ws: 'C:\\work\\no-such-ws', cards: { r: 1 }, agents: { coder: { id: 'a-coder' } } }
-    const credited = (o: object) => review.expect({ skillsRead: [], hiveCalls: [], hiveMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], facts: {}, gitStatus: '', tokenLeak: false, ...o }, ctx).find(([n]) => n === inCopy)?.[1]
+    const credited = (o: object) => review.expect({ skillsRead: [], hiveCalls: [], combworkMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], facts: {}, gitStatus: '', tokenLeak: false, ...o }, ctx).find(([n]) => n === inCopy)?.[1]
     // As df1676127's trials had it: the copy named in cw_start_review's reply, the check run by a script whose command
     // gives the copy only as its workdir (its text never names it).
     const started = mcp('exec-0', 'cw_start_review', { card: 'AL-1' }, `Review in ${copy} at abc1234: read its code there.`)
@@ -596,7 +596,7 @@ describe("the card read and update checks count the card by its number or its ow
 
 describe("the checks follow what the current skills say (HI-2222): the right behaviour passes, the old or a wrong one doesn't", () => {
   const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
-  const hiveTool = (name: string, input: unknown, result: string) => ({ name: `mcp__combwork__${name}`, input: JSON.stringify(input), result, isError: false })
+  const combworkTool = (name: string, input: unknown, result: string) => ({ name: `mcp__combwork__${name}`, input: JSON.stringify(input), result, isError: false })
   const run = (id: string, o: Record<string, unknown>, c: Record<string, unknown>) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
     return Object.fromEntries(sc.expect({ hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', ...o }, c).map(([name, ok]) => [name, ok]))
@@ -636,7 +636,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     type Start = { call: unknown; tool: unknown }
     const start = (builder: string, reviewer: string, laneCards: unknown[], reply: string, brief = 'Use card-loop as the builder.', ok = true): Start => {
       const args = { action: 'start', project: 'alpha', builder, reviewer, cards: laneCards, brief }
-      return { call: call('cw_lane', args, ok), tool: { ...hiveTool('cw_lane', `action: start\nbuilder: ${builder}`, reply), isError: !ok } }
+      return { call: call('cw_lane', args, ok), tool: { ...combworkTool('cw_lane', `action: start\nbuilder: ${builder}`, reply), isError: !ok } }
     }
     const lanes = (starts: Start[], hiveCalls: unknown[] = []) => run('coordinator-team-lanes', { tools: starts.map((s) => s.tool), hiveCalls: [...starts.map((s) => s.call), ...hiveCalls], allCards: board, cards: {} }, { cards, agents })
     const STARTED = (who: string) => `Lane started: ${who} (alpha) L: active. Its brief is delivered to the builder now. Started ${who.replace(' / ', ' and ')} with the lane's brief.`
@@ -692,24 +692,24 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
   describe("assistant-new-lane: cw_lane start, Coder left to Combwork's start as the reply says", () => {
     const LEFT = "left Coder to Combwork's start as the reply said (no prompt where Combwork gives it the card; a new conversation where it said to tell it)"
     const STARTED = "started Coder's lane with cw_lane start, which worked: its card, rounds 3, wait 60 minutes"
-    const byHive = "Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it."
+    const byCombwork = "Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it."
     const tellIt = 'Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: tell it about the lane.'
     const lane = { builder: { name: 'Coder' }, cards: [{ number: 1 }], rounds: 3, waitMinutes: 60 }
     const newLane = (reply: string, hiveCalls: unknown[] = [], lanes = [lane]) =>
-      run('assistant-new-lane', { tools: [hiveTool('cw_lane', 'action: start\nbuilder: Coder', reply)], hiveCalls: [call('cw_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...hiveCalls], lanes }, { cards: { n: 1 }, agents })
+      run('assistant-new-lane', { tools: [combworkTool('cw_lane', 'action: start\nbuilder: Coder', reply)], hiveCalls: [call('cw_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...hiveCalls], lanes }, { cards: { n: 1 }, agents })
     const prompt = call('cw_prompt_agent', { project: 'alpha', agent: 'Coder', text: 'Use card-loop as the builder of lane L.', newConversation: true })
 
     it('passes the lane start with no prompt where Combwork gives Coder the card, and the one prompt where its reply says to tell it', () => {
-      expect(newLane(byHive)[STARTED]).toBe(true)
-      expect(newLane(byHive)[LEFT]).toBe(true)
+      expect(newLane(byCombwork)[STARTED]).toBe(true)
+      expect(newLane(byCombwork)[LEFT]).toBe(true)
       expect(newLane(tellIt, [prompt])[LEFT]).toBe(true)
     })
 
     it("fails the old cw_prompt_agent alone, a prompt racing Combwork's start, and a lane with other rounds or wait", () => {
       expect(run('assistant-new-lane', { hiveCalls: [prompt], lanes: [] }, { cards: { n: 1 }, agents })[STARTED]).toBe(false)
-      expect(newLane(byHive, [prompt])[LEFT]).toBe(false)
+      expect(newLane(byCombwork, [prompt])[LEFT]).toBe(false)
       expect(newLane(tellIt)[LEFT]).toBe(false)
-      expect(newLane(byHive, [], [{ ...lane, rounds: 10, waitMinutes: 360 }])[STARTED]).toBe(false)
+      expect(newLane(byCombwork, [], [{ ...lane, rounds: 10, waitMinutes: 360 }])[STARTED]).toBe(false)
     })
   })
 
@@ -1193,7 +1193,7 @@ describe('the HI-2261 check fixes', () => {
     const flagged = 'AL-1: active → done. [CW] AL-1 has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.'
     const o = {
       hiveCalls: [call('cw_start_card', '2026-10-31T21:50:39.345Z', 'AL-1: todo → active.'), call('cw_submit', '2026-10-31T21:50:56.255Z', flagged)],
-      // The transcript's calls, where a check reads replies (hiveReplies), as the trial recorded them.
+      // The transcript's calls, where a check reads replies (combworkReplies), as the trial recorded them.
       tools: [{ name: 'combwork · cw_start_card', result: 'AL-1: todo → active.' }, { name: 'combwork · cw_submit', result: flagged }],
       skillsRead: ['work-on-card'],
       cards: { a: { number: 1, key: 'AL-1', column: 'done', history: [{ at: decided, what: 'Recorded a decision: "Show each error under its own field, not in a banner at the top."' }, { at: '2026-10-31T21:50:56.249Z', what: 'Moved to Done' }] } },
@@ -1644,7 +1644,7 @@ describe('the fixtures fail when nothing was done', () => {
     })
   })
 
-  const base = { skillsRead: [] as string[], hiveCalls: [] as unknown[], hiveMentions: [], tools: [] as { name: string; input: string; result: string; isError: boolean }[], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], gitStatus: '', live: [], tokenLeak: false }
+  const base = { skillsRead: [] as string[], hiveCalls: [] as unknown[], combworkMentions: [], tools: [] as { name: string; input: string; result: string; isError: boolean }[], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], gitStatus: '', live: [], tokenLeak: false }
   // The merge slot as Combwork's slot log records it (#374): a line per change to the slots, and a line per claim or release
   // as Combwork resolved it (the branch it was for, what it did), written just after the change it made.
   const slotEntry = (at: number, branch: string, holder: string | null, waiting: string[] = [], taken = true) => ({ at: new Date(at).toISOString(), slots: holder || waiting.length ? [{ project: 'C:\\ws\\alpha', branch, holder: holder ? { agentId: holder, name: holder, cards: [], taken } : null, waiting }] : [] })
@@ -1734,7 +1734,7 @@ describe('the fixtures fail when nothing was done', () => {
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {
     const ctx = { read: () => null, cards: { i: 7 }, agents: { coder: { id: 'a-coder' } } }
     const waited ='then followed it with a wait or a watch (cw_wait_for_agents, or cw_wait_for_tasks on its card), which worked'
-    const run = (hiveCalls: unknown[], cards = { i: { column: 'todo' } }) => failed(scenario('assistant-dispatch').expect({ ...base, skillsRead: ['coordinate-agents'], hiveMentions: ['cw_start_task', 'cw_wait_for_agents'], hiveCalls, cards }, ctx))
+    const run = (hiveCalls: unknown[], cards = { i: { column: 'todo' } }) => failed(scenario('assistant-dispatch').expect({ ...base, skillsRead: ['coordinate-agents'], combworkMentions: ['cw_start_task', 'cw_wait_for_agents'], hiveCalls, cards }, ctx))
     expect(run([])).toEqual(expect.arrayContaining(['started the card with cw_start_task, which worked', waited, 'the agent did it: the card handed on (in Review, or past it by its submission) and the file is there']))
     expect(run([{ tool: 'cw_start_task', ok: false }, { tool: 'cw_wait_for_agents', ok: true }])).toContain('started the card with cw_start_task, which worked')
     expect(run([{ tool: 'cw_wait_for_agents', ok: true }, { tool: 'cw_start_task', ok: true }])).toContain(waited)

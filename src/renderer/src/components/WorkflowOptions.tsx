@@ -153,7 +153,7 @@ export interface FormSource {
 
 /** The JSON Copy as JSON gives: the version control, the preset and every option in force. */
 interface CopiedOptions {
-  hiveWorkflow: 1
+  combworkWorkflow: 1
   platform: WorkflowOptions['platform']
   preset: PresetId | null
   options: Partial<WorkflowOptions>
@@ -404,7 +404,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   }
   const copy = (): void => {
     const { platform: p, ...options } = effective
-    const out: CopiedOptions = { hiveWorkflow: 1, platform: p, preset: draft.preset, options }
+    const out: CopiedOptions = { combworkWorkflow: 1, platform: p, preset: draft.preset, options }
     void navigator.clipboard.writeText(JSON.stringify(out, null, 2)).then(() => notify('success', tr(T.copied)))
   }
   const paste = async (): Promise<void> => {
@@ -422,7 +422,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         } catch {
           v = null
         }
-        if (!v || v.hiveWorkflow !== 1 || !v.options || typeof v.options !== 'object') throw new Error(tr(T.pasteBad))
+        if (!v || v.combworkWorkflow !== 1 || !v.options || typeof v.options !== 'object') throw new Error(tr(T.pasteBad))
         if (v.platform !== platform) throw new Error(tr(T.pastePlatform))
         const change: WorkflowChange = { preset: v.preset ?? null, options: v.options }
         // Checked as a save would check it (OP-5): refused with its reasons, else it fills the form, to save.

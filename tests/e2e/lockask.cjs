@@ -41,7 +41,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   // What Asker does once it has read the go-ahead (its inbox, after Combwork's doorbell): the edit again, as Codex does.
   fs.writeFileSync(path.join(codexHome, 'fake-wakes-Asker.txt'), 'patch x.txt\n')
 
-  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -89,8 +89,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 
     // --- Allow, after the blocked turn's end: the go-ahead is typed, Asker reads it and edits the file.
     await allow.first().click()
-    const hiveLog = () => (fs.existsSync(path.join(userData, 'logs', 'combwork.log')) ? fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8') : '')
-    check('Allow is answered: Asker is allowed to edit x.txt', !!(await until(() => /Lock: .*Asker.* allowed to edit .*x\.txt/.test(hiveLog()))), JSON.stringify({ log: hiveLog().match(/.*Lock: .*/g), toasts: await page.locator('.toast').allInnerTexts() }))
+    const combworkLog = () => (fs.existsSync(path.join(userData, 'logs', 'combwork.log')) ? fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8') : '')
+    check('Allow is answered: Asker is allowed to edit x.txt', !!(await until(() => /Lock: .*Asker.* allowed to edit .*x\.txt/.test(combworkLog()))), JSON.stringify({ log: combworkLog().match(/.*Lock: .*/g), toasts: await page.locator('.toast').allInnerTexts() }))
     const wakes = () => lines(path.join(codexHome, 'fake-wakes.jsonl')).filter((w) => w.agent === 'Asker')
     check('the go-ahead is typed into Asker, which reads it in its inbox', !!(await until(() => wakes().some((w) => /allowed you to edit x\.txt/.test(w.text)))), JSON.stringify(wakes()))
     check("…and Asker's retry edits x.txt", !!(await until(() => edits('Asker').some((e) => e.allowed))) && /edited by Asker/.test(fs.readFileSync(path.join(alpha, 'x.txt'), 'utf8')), JSON.stringify(edits('Asker')))

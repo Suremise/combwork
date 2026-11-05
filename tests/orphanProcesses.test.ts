@@ -7,7 +7,7 @@ import type { Lineage, Orphan } from '../src/main/orphanProcesses'
 const switchOn = vi.hoisted(() => ({ on: true }))
 vi.mock('../src/main/advanced', () => ({ advanced: { get: () => switchOn.on } }))
 const toasts = vi.hoisted(() => ({ list: [] as unknown[][] }))
-vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: (...a: unknown[]) => void toasts.list.push(a), onHiveEvent: () => () => undefined }))
+vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: (...a: unknown[]) => void toasts.list.push(a), onCombworkEvent: () => () => undefined }))
 // The launches running now (r1 unless a test stops it), the host's lineage of each and their listed processes.
 const host = vi.hoisted(() => ({ ids: ['r1'], lineage: null as Record<string, unknown> | null, processes: async (): Promise<unknown[] | null> => null }))
 vi.mock('../src/main/agentProcesses', () => ({

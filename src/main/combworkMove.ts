@@ -10,7 +10,7 @@ import { toast } from './events'
 import { readKeptJson, realPath, writeKeptJson, writeTextAtomic } from './fsutil'
 import { ifAbsent, lstatOrNullAsync, present } from './fsPresence'
 import { git } from './git'
-import { HiveError, errorText, hiveError } from './combworkError'
+import { CombworkError, errorText, combworkError } from './combworkError'
 import { excludeLine, gitDirOf, vcsOf } from './combworkVcs'
 import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
@@ -345,12 +345,12 @@ async function warnRecreated(hosts: Looked[]): Promise<void> {
   for (const h of hosts) if (h.marked && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
 }
 
-const lockBusy = (h: { profile: string }): HiveError => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' })
+const lockBusy = (h: { profile: string }): CombworkError => combworkError(M.busy, { profile: h.profile }, { kind: 'conflict' })
 
 /**
  * Moves a workspace's folders, before anything reads them (WorkspaceService's open, inside its claim): every host with
  * our `.hive` alone, then the early phases when the map isn't the one they last finished for. `only`: a single host (a
- * project that came into the open workspace later, ensureProject). Throws a HiveError (translated, naming the folder)
+ * project that came into the open workspace later, ensureProject). Throws a CombworkError (translated, naming the folder)
  * when it can't, nothing of that host changed.
  */
 export function moveFolders(ws: string, o: MoveOptions & { only?: string } = {}): Promise<MoveOutcome> {
@@ -379,7 +379,7 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
   // under the lock, after the other processes' refusal.
   const namesDue = o.only ? !(await projectNamesDone(o.only)) : await workspaceNeeds(ws)
   const stop = (): void => {
-    if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   }
   if (!planned && !namesDue) {
     const moves = await movesOf(ws, all)
@@ -439,7 +439,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
   // presence refuses it before anything is written (HR2's round 3: the lock file's exclude line too).
   for (const dir of [legacy(ws), current(ws)]) {
     const others = othersPresentByProcess(dir)
-    if (others.length) throw hiveError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
+    if (others.length) throw combworkError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
   }
   await excludeMoveLock(ws)
   const id = randomUUID()
@@ -456,7 +456,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       try {
         await renameFolder(legacy(h.host), current(h.host))
       } catch (e) {
-        if (isLocked(e)) throw hiveError(M.locked, { folder: legacy(h.host) }, { kind: 'conflict' })
+        if (isLocked(e)) throw combworkError(M.locked, { folder: legacy(h.host) }, { kind: 'conflict' })
         throw e
       }
       moved++
@@ -478,7 +478,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       await runEarly(ws, moves, phase)
     } catch (e) {
       log.warn(`the folder move's ${phase}`, e)
-      throw hiveError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
+      throw combworkError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
     }
     await moveTestHooks.after?.(`phase:${phase}`)
   }
@@ -623,7 +623,7 @@ export interface LateServices {
 export function finishMove(ws: string, svc: LateServices, o: MoveOptions = {}): Promise<void> {
   return inTurn(ws, () => {
     const stop = (): void => {
-      if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+      if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw combworkError(M.closed, undefined, { kind: 'conflict' })
     }
     return withNamedLock(ws, MOVE_LOCK_FILE, () => finishUnderLock(resolve(ws), svc, stop), { waitMs: 0, busy: lockBusy })
   })
@@ -649,7 +649,7 @@ async function finishUnderLock(ws: string, svc: LateServices, stop: () => void):
       }
     } catch (e) {
       log.warn(`the folder move's ${phase}`, e)
-      throw e instanceof HiveError ? e : hiveError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
+      throw e instanceof CombworkError ? e : combworkError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
     }
     await moveTestHooks.after?.(`phase:${phase}`)
   }

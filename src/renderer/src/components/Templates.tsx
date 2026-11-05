@@ -78,7 +78,7 @@ const M = {
   importedDetail: msg({ id: 'assistant.templates.importedDetail', defaultMessage: '"{name}", in {scope, select, workspace {the workspace} other {{project}}}.{hasUnknown, select, yes { {unknown}} other {}}', description: "Under Template imported: the template and where it is kept; {unknown} says when its coding agents aren't known here." }),
   workspace: msg({ id: 'assistant.templates.workspace', defaultMessage: 'Workspace', description: "A badge, a group and a filter: the workspace's templates (for every project)." }),
   hive: msg({ id: 'assistant.templates.cw', defaultMessage: 'Combwork', description: "A badge, a group and a filter: Combwork's own templates (#1436, shipped with Combwork, read-only)." }),
-  hiveSummary: msg({ id: 'assistant.templates.combworkSummary', defaultMessage: "{count, plural, one {# agent} other {# agents}}, {layout}. One of Combwork's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.", description: 'Over one of Combwork\'s own templates\' agents: how many, its layout ("two columns layout"). <b> is bold; Duplicate… is the button.' }),
+  combworkSummary: msg({ id: 'assistant.templates.combworkSummary', defaultMessage: "{count, plural, one {# agent} other {# agents}}, {layout}. One of Combwork's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.", description: 'Over one of Combwork\'s own templates\' agents: how many, its layout ("two columns layout"). <b> is bold; Duplicate… is the button.' }),
   suggests: msg({ id: 'assistant.templates.suggests', defaultMessage: 'Suggests the {preset} preset: loading it offers to switch the project’s workflow options to it.{pool, select, yes { Its reviewers are a pool shared by every builder.} other {}}', description: "Over a template's agents: the workflow preset it suggests ({preset}: Solo, Pair, Team); pool when its reviewers are shared by all builders rather than one per lane. Glossary: preset, workflow, reviewer, builder, lane." }),
   pairedWith: msg({ id: 'assistant.templates.pairedWith', defaultMessage: 'paired: {name}', description: "A template's table, under an agent's role: the agent it is paired with ({name}). Lower case. The name after a colon (glossary §1 rule 4)." }),
   unsavedTip: msg({ id: 'assistant.templates.unsavedTip', defaultMessage: 'It is open in the editor with changes not saved yet', description: 'Tooltip on Not saved, beside a template.' }),
@@ -152,7 +152,7 @@ const M = {
   noWorkspaceTemplates: msg({ id: 'assistant.templates.noWorkspaceTemplates', defaultMessage: 'No workspace templates.', description: "Under Workspace, when the workspace has no templates." }),
   noneOfItsOwn: msg({ id: 'assistant.templates.noneOfItsOwn', defaultMessage: 'No templates of its own.', description: "The Templates view, under a project with no templates." }),
   panelHint: msg({ id: 'assistant.templates.panelHint', defaultMessage: "Save a project's agents as a template from its Session tab (<b>Save Template…</b>). Export one to share it; Import brings one in.", description: "Under the Templates view's list. <b> is bold; Save Template… is the Session tab's button." }),
-  noneHive: msg({ id: 'assistant.templates.noneCombwork', defaultMessage: "Combwork's own templates couldn't be listed.", description: "The Templates view, under Combwork, when none of Combwork's own templates is listed (shouldn't happen)." }),
+  noneCombwork: msg({ id: 'assistant.templates.noneCombwork', defaultMessage: "Combwork's own templates couldn't be listed.", description: "The Templates view, under Combwork, when none of Combwork's own templates is listed (shouldn't happen)." }),
   gone: msg({ id: 'assistant.templates.gone', defaultMessage: 'That template is no longer there.', description: 'The Templates view: the selected template was deleted or moved.' }),
   selectOne: msg({ id: 'assistant.templates.selectOne', defaultMessage: 'Select a template to see its agents and layout, load it into a project, or export it to share.', description: "The Templates view's main area with no template selected." }),
   thisProject: msg({ id: 'assistant.templates.thisProject', defaultMessage: 'This project', description: "A project's Templates tab: the group of its own templates." }),
@@ -679,7 +679,7 @@ export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: Tem
             {description && <p className="template-description">{description}</p>}
             <p className="muted">
               {readOnly
-                ? Children.toArray(tRich<React.ReactNode>(M.hiveSummary, { count: t.agents.length, layout: layoutPhrase(t.layout), b: bold }))
+                ? Children.toArray(tRich<React.ReactNode>(M.combworkSummary, { count: t.agents.length, layout: layoutPhrase(t.layout), b: bold }))
                 : Children.toArray(tRich<React.ReactNode>(M.summary, { count: t.agents.length, layout: layoutPhrase(t.layout), hasSaved: t.savedAt ? 'yes' : 'no', when: t.savedAt ? timeAgo(t.savedAt) : '', ...placeOf(t), b: bold }))}
             </p>
             {/* A suggestion only where it has no workflow of its own (HI-1910: its sections say more). */}
@@ -793,7 +793,7 @@ export function TemplatesPanel() {
               <div className="skill-group">
                 {g.title} <span className="count">{g.items.length}</span>
               </div>
-              {g.items.length === 0 && <div className="pane-empty">{tr(g.key === HIVE ? M.noneHive : g.key === WORKSPACE ? M.noWorkspaceTemplates : M.noneOfItsOwn)}</div>}
+              {g.items.length === 0 && <div className="pane-empty">{tr(g.key === HIVE ? M.noneCombwork : g.key === WORKSPACE ? M.noWorkspaceTemplates : M.noneOfItsOwn)}</div>}
               {g.items.map((t) => (
                 <TemplateRow key={templateKey(t)} t={t} selected={selected === templateKey(t)} onSelect={() => set({ selectedTemplate: templateKey(t) })} />
               ))}

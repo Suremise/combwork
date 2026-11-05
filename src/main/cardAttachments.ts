@@ -26,7 +26,7 @@ import { advanced } from './advanced'
 import { attachmentName, freeName, ownAttachmentsFolder } from './attachmentsFolder'
 import { afterBoardWrite, boardChanged, boardRead, boardWrite, boardWriteOp, cardKeys, onBoardUndone } from './boardStore'
 import { insideReal, realPath } from './fsutil'
-import { hiveError } from './combworkError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { trash } from './trash'
 import { fileIdentity, ownFolder, sameFile, type FileIdentity } from './cardCleanupFs'
@@ -65,7 +65,7 @@ const plainName = (n: string): boolean => !!n && n !== '.' && n !== '..' && !/[\
  */
 export function cardHost(ws: WorkspaceService, project: string | null | undefined): string {
   if (!project) return ws.path!
-  if (!plainName(project)) throw hiveError(M.noProject, { project }, { kind: 'invalid' })
+  if (!plainName(project)) throw combworkError(M.noProject, { project }, { kind: 'invalid' })
   return join(ws.path!, project)
 }
 /** A host's cards folder, `<host>\.combwork\attachments\cards`. */
@@ -81,7 +81,7 @@ async function ownCardsFolder(host: string, ...names: string[]): Promise<string>
     p = join(p, n)
     if (!(await lstat(p).catch(() => null))) await mkdir(p).catch((e: NodeJS.ErrnoException) => (e.code === 'EEXIST' ? undefined : Promise.reject(e)))
     const st = await lstat(p).catch(() => null)
-    if (!st || st.isSymbolicLink() || !st.isDirectory() || !insideReal(p, [host])) throw hiveError(M.notOwn, { folder: p })
+    if (!st || st.isSymbolicLink() || !st.isDirectory() || !insideReal(p, [host])) throw combworkError(M.notOwn, { folder: p })
   }
   return p
 }
@@ -115,9 +115,9 @@ export async function previewCardAttachment(ws: WorkspaceService, card: number, 
     const r = c && (db.prepare('SELECT file FROM card_attachments WHERE card = ? AND id = ?').get(card, id) as { file: string } | undefined) // i18n-ignore: SQL
     return c && r ? { project: c.project, file: r.file } : null
   })
-  if (!found) throw hiveError(M.noAttachment, undefined, { kind: 'notFound' })
+  if (!found) throw combworkError(M.noAttachment, undefined, { kind: 'notFound' })
   const r = await readCardAttachment(ws, { number: card, project: found.project }, found.file, null, max)
-  if ('problem' in r) throw hiveError(M.noAttachment, undefined, { kind: 'notFound' })
+  if ('problem' in r) throw combworkError(M.noAttachment, undefined, { kind: 'notFound' })
   if (r.kind !== 'text') return { kind: 'binary', text: '' }
   return r.next !== undefined ? { kind: 'too-large', text: '' } : { kind: 'text', text: r.content }
 }
@@ -177,7 +177,7 @@ const allProjects = async (ws: WorkspaceService): Promise<string[]> => [...(awai
  * The innermost `.combwork` folder in a real path (a host's own: the Assistant's home is inside the workspace's), and what
  * follows it: only `attachments` (a session's or a card's files) may be read through one.
  */
-function throughHive(real: string): { hive: string; next: string | undefined } | null {
+function throughCombwork(real: string): { hive: string; next: string | undefined } | null {
   const parts = real.split(sep)
   const i = parts.map((x) => x.toLowerCase()).lastIndexOf(CW_DIR)
   return i < 0 ? null : { hive: parts.slice(0, i + 1).join(sep), next: parts[i + 1]?.toLowerCase() }
@@ -212,8 +212,8 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
   const temp = attachTestHooks.temp ?? tmpdir()
   const more = caller.kind === 'agent' || caller.kind === 'workspace' ? extraFolders(ws) : []
   const refuse = (): never => {
-    if (caller.kind === 'agent' || caller.kind === 'workspace') throw hiveError(M.refusedFrom, { path, caller: caller.kind, temp, more: more.length ? 'yes' : 'no', folders: more.join('; ') }, { kind: 'invalid' })
-    throw hiveError(M.refused, { path }, { kind: 'invalid' })
+    if (caller.kind === 'agent' || caller.kind === 'workspace') throw combworkError(M.refusedFrom, { path, caller: caller.kind, temp, more: more.length ? 'yes' : 'no', folders: more.join('; ') }, { kind: 'invalid' })
+    throw combworkError(M.refused, { path }, { kind: 'invalid' })
   }
   if (typeof path !== 'string' || !path || !/^[a-zA-Z]:[\\/]|^\\\\/.test(path)) refuse()
   const st = await lstat(path).catch(() => null)
@@ -226,7 +226,7 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
     return real
   }
   const projects = await allProjects(ws)
-  const hive = throughHive(real)
+  const hive = throughCombwork(real)
   if (caller.kind === 'agent') {
     const own = projects.find((p) => basename(p).toLowerCase() === caller.project.toLowerCase())
     if (!own) refuse()
@@ -290,14 +290,14 @@ const limits = (): { file: number; total: number } => ({ file: advanced.get<numb
 /** Checks a call's count and, where known up front, sizes (a paste's bytes), before anything is read or copied. */
 export function checkBatch(sources: { size?: number; name?: string | null }[]): void {
   const { file, total } = limits()
-  if (sources.length > ATTACH_MAX_FILES) throw hiveError(M.tooMuch, { files: ATTACH_MAX_FILES, total: formatBytes(total) }, { kind: 'invalid' })
+  if (sources.length > ATTACH_MAX_FILES) throw combworkError(M.tooMuch, { files: ATTACH_MAX_FILES, total: formatBytes(total) }, { kind: 'invalid' })
   let sum = 0
   for (const s of sources) {
     if (s.size === undefined) continue
-    if (s.size > file) throw hiveError(M.tooLarge, { name: s.name ?? '', max: formatBytes(file) }, { kind: 'invalid' })
+    if (s.size > file) throw combworkError(M.tooLarge, { name: s.name ?? '', max: formatBytes(file) }, { kind: 'invalid' })
     sum += s.size
   }
-  if (sum > total) throw hiveError(M.tooMuch, { files: ATTACH_MAX_FILES, total: formatBytes(total) }, { kind: 'invalid' })
+  if (sum > total) throw combworkError(M.tooMuch, { files: ATTACH_MAX_FILES, total: formatBytes(total) }, { kind: 'invalid' })
 }
 
 /**
@@ -336,8 +336,8 @@ export async function stage(host: string, card: number | null, sources: AttachSo
         transform(chunk: Buffer, _enc, done) {
           size += chunk.length
           sum += chunk.length
-          if (size > file) return done(hiveError(M.tooLarge, { name, max: formatBytes(file) }, { kind: 'invalid' }))
-          if (sum > total) return done(hiveError(M.tooMuch, { files: ATTACH_MAX_FILES, total: formatBytes(total) }, { kind: 'invalid' }))
+          if (size > file) return done(combworkError(M.tooLarge, { name, max: formatBytes(file) }, { kind: 'invalid' }))
+          if (sum > total) return done(combworkError(M.tooMuch, { files: ATTACH_MAX_FILES, total: formatBytes(total) }, { kind: 'invalid' }))
           hash.update(chunk)
           done(null, chunk)
         }
@@ -345,8 +345,8 @@ export async function stage(host: string, card: number | null, sources: AttachSo
       if ('data' in s) {
         size = s.data.byteLength
         sum += size
-        if (size > file) throw hiveError(M.tooLarge, { name, max: formatBytes(file) }, { kind: 'invalid' })
-        if (sum > total) throw hiveError(M.tooMuch, { files: ATTACH_MAX_FILES, total: formatBytes(total) }, { kind: 'invalid' })
+        if (size > file) throw combworkError(M.tooLarge, { name, max: formatBytes(file) }, { kind: 'invalid' })
+        if (sum > total) throw combworkError(M.tooMuch, { files: ATTACH_MAX_FILES, total: formatBytes(total) }, { kind: 'invalid' })
         hash.update(s.data)
         await writeFile(tmp, s.data)
       } else await pipeline(createReadStream(s.path), counter, createWriteStream(tmp))
@@ -366,14 +366,14 @@ export async function stage(host: string, card: number | null, sources: AttachSo
  */
 export async function stageDrafts(ws: WorkspaceService, drafts: CardDrafts | undefined | null, project: string | null | undefined): Promise<{ staging: Staging; drafts: string[] } | null> {
   if (!drafts?.files?.length) return null
-  if (!Array.isArray(drafts.keys) || drafts.keys.length !== drafts.files.length || drafts.keys.some((k) => !/^draft-\d{1,4}$/.test(k))) throw hiveError(M.refused, { path: '' }, { kind: 'invalid' })
+  if (!Array.isArray(drafts.keys) || drafts.keys.length !== drafts.files.length || drafts.keys.some((k) => !/^draft-\d{1,4}$/.test(k))) throw combworkError(M.refused, { path: '' }, { kind: 'invalid' })
   checkBatch(drafts.files.map((f) => ('data' in f ? { size: f.data?.byteLength ?? 0, name: f.name } : { name: basename(String(f.path)) })))
   // A project of the workspace, before anything is copied (a new card's names one the window was given).
-  if (project && !(await allProjects(ws)).some((p) => basename(p).toLowerCase() === project.toLowerCase())) throw hiveError(M.noProject, { project }, { kind: 'invalid' })
+  if (project && !(await allProjects(ws)).some((p) => basename(p).toLowerCase() === project.toLowerCase())) throw combworkError(M.noProject, { project }, { kind: 'invalid' })
   const sources: AttachSource[] = []
   for (const f of drafts.files) {
     if ('data' in f) {
-      if (!(f.data instanceof Uint8Array)) throw hiveError(M.refused, { path: f.name ?? '' }, { kind: 'invalid' })
+      if (!(f.data instanceof Uint8Array)) throw combworkError(M.refused, { path: f.name ?? '' }, { kind: 'invalid' })
       sources.push({ data: f.data, name: typeof f.name === 'string' ? f.name : null })
     } else sources.push({ path: await attachableSource(ws, { kind: 'user' }, f.path), name: basename(f.path) })
   }
@@ -398,9 +398,9 @@ export interface Published {
  */
 export async function publish(ws: WorkspaceService, card: number, staging: Staging, by: string, comment: string | null): Promise<Published> {
   const c = boardWriteOp(ws, (db) => db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string | null } | undefined) // i18n-ignore: SQL
-  if (!c) throw hiveError(M.noCard, undefined, { kind: 'notFound' })
+  if (!c) throw combworkError(M.noCard, undefined, { kind: 'notFound' })
   const host = cardHost(ws, c.project)
-  if (host.toLowerCase() !== staging.host.toLowerCase()) throw hiveError(M.moved, undefined, { kind: 'conflict' })
+  if (host.toLowerCase() !== staging.host.toLowerCase()) throw combworkError(M.moved, undefined, { kind: 'conflict' })
   const out: Published = { attachments: [], added: [] }
   if (!staging.files.length) return out
   const dir = await ownCardsFolder(host, String(card))
@@ -432,7 +432,7 @@ export async function publish(ws: WorkspaceService, card: number, staging: Stagi
  */
 export async function attachToCard(ws: WorkspaceService, card: number, sources: AttachSource[], by: string, comment: string | null = null): Promise<Published> {
   const project = boardRead(ws, (db) => db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string | null } | undefined) // i18n-ignore: SQL
-  if (!project) throw hiveError(M.noCard, undefined, { kind: 'notFound' })
+  if (!project) throw combworkError(M.noCard, undefined, { kind: 'notFound' })
   const staging = await stage(cardHost(ws, project.project), card, sources)
   try {
     return await boardWrite(ws, async () => {
@@ -484,7 +484,7 @@ export async function removeCardAttachment(ws: WorkspaceService, card: number, i
       const r = c && (db.prepare(`SELECT ${COLUMNS} FROM card_attachments WHERE card = ? AND id = ?`).get(card, id) as Row | undefined) // i18n-ignore: SQL
       return c && r ? { host: cardHost(ws, c.project), row: r } : null
     })
-    if (!found) throw hiveError(M.noAttachment, undefined, { kind: 'notFound' })
+    if (!found) throw combworkError(M.noAttachment, undefined, { kind: 'notFound' })
     const from = join(cardFolder(found.host, card), found.row.file)
     if (await exists(from)) {
       const dir = await ownCardsFolder(found.host, TRASH, randomBytes(6).toString('hex'))
@@ -608,7 +608,7 @@ export async function moveCardFolder(ws: WorkspaceService, card: number, from: s
   } catch (e) {
     for (const p of placed) await unlink(p).catch(() => undefined)
     if (staging) await rm(staging, { recursive: true, force: true }).catch(() => undefined)
-    throw hiveError(M.moveFailed, { project: to ?? '', why: e instanceof Error ? e.message : String(e) }, { kind: 'conflict', cause: e })
+    throw combworkError(M.moveFailed, { project: to ?? '', why: e instanceof Error ? e.message : String(e) }, { kind: 'conflict', cause: e })
   }
   await rm(staging, { recursive: true, force: true }).catch(() => undefined)
   onBoardUndone(ws, async () => {
