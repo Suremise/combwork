@@ -42,6 +42,12 @@ function workspace(kind: '1.0' | 'rc2'): { ws: string; alpha: string; slot: stri
   const alpha = join(ws, 'alpha')
   write(join(alpha, tree, 'project.json'), '{}')
   git(ws, 'init', '-q', alpha)
+  // A submission's pin and a test merge's ref under Hive's prefix (HI-2593's handoff), at a commit of the project's.
+  write(join(alpha, 'src.txt'), 'code')
+  git(alpha, 'add', 'src.txt')
+  git(alpha, 'commit', '-q', '-m', 'one')
+  git(alpha, 'update-ref', 'refs/hive/cards/AL-1/1', 'HEAD')
+  git(alpha, 'update-ref', 'refs/hive/queue/AL-1-e1', 'HEAD')
   write(join(alpha, '.git', 'info', 'exclude'), OLD_EXCLUDE)
   write(join(alpha, '.agents', 'skills', 'cw-handover', 'SKILL.md'), '# h')
   write(join(alpha, '.agents', 'skills', 'cw-handover', '.hive-copy'), '{"source":"s","hash":"h1"}')
@@ -77,6 +83,8 @@ function expectUpgraded(w: { ws: string; alpha: string; slot: string }): void {
   const exclude = readFileSync(join(w.alpha, '.git', 'info', 'exclude'), 'utf8')
   expect(exclude).not.toMatch(/Hive/)
   expect(exclude).toContain('# Combwork project metadata (added by Combwork)')
+  const head = git(w.alpha, 'rev-parse', 'HEAD').trim()
+  expect(git(w.alpha, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/hive', 'refs/cw').trim().split('\n').sort()).toEqual([`refs/cw/cards/AL-1/1 ${head}`, `refs/cw/queue/AL-1-e1 ${head}`])
   expect(JSON.parse(readFileSync(join(dir, NAMES_DONE_FILE), 'utf8')).version).toBe(1)
 }
 
@@ -114,6 +122,13 @@ describe('the names upgrade at the open', () => {
     boardMoveTestHooks.after = undefined
     expect(existsSync(join(w.ws, '.combwork', NAMES_DONE_FILE))).toBe(false)
     expect(existsSync(join(w.ws, '.combwork', 'combwork.db'))).toBe(true)
+    await open(w.ws)
+    expectUpgraded(w)
+  })
+
+  it('a ref already made under refs/cw (a run stopped between its two writes): the old one goes, the new one kept', async () => {
+    const w = workspace('rc2')
+    git(w.alpha, 'update-ref', 'refs/cw/cards/AL-1/1', 'HEAD')
     await open(w.ws)
     expectUpgraded(w)
   })

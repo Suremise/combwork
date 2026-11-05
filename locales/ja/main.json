@@ -237,7 +237,7 @@
   "main.nameUpgrade.boardLeftTitle": "{file} はそのままにしました",
   "main.nameUpgrade.what.board": "ボードのファイル",
   "main.nameUpgrade.what.files": "ワークスペースの .gitignore、README、MCP 定義",
-  "main.nameUpgrade.what.projects": "プロジェクトのスキルのコピーと git の除外行",
+  "main.nameUpgrade.what.projects": "プロジェクトのスキルのコピー、git の除外行と ref",
   "main.notify.answered": "応答済み",
   "main.notify.sessionEnded": "セッションは終了しました",
   "main.outage.gaveUpBody": "{n, plural, other {過去1時間に#回再開されました}}が、再び停止したため、Combworkはこれ以上自動では再開しません。このPCのネットワークが回復していない可能性があります。ネットワークアダプターのアドレスの更新（ipconfig /renew）、DNSのフラッシュ（ipconfig /flushdns）、またはPCの再起動を試してから、再開してください。",

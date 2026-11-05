@@ -2,8 +2,8 @@ import { existsSync } from 'original-fs'
 import { readdir, readFile, rename } from 'original-fs/promises'
 import { join } from 'path'
 import { EXCLUDE_COMMENT } from '../shared/hiveFolderMove'
-import { COPY_MARKER } from './fsutil'
-import { writeTextAtomic } from './fsutil'
+import { COPY_MARKER, writeTextAtomic } from './fsutil'
+import { git } from './git'
 import { gitDirOf, vcsOf } from './hiveVcs'
 
 /**
@@ -13,9 +13,37 @@ import { gitDirOf, vcsOf } from './hiveVcs'
  * - **Skill copies' marker** (`.hive-copy` → `.combwork-copy`, fsutil COPY_MARKER): in each copy Combwork made in a
  *   folder's `.agents/skills`, the marker is renamed, its JSON as it was, so the copy stays Combwork's own. The folders
  *   are the project's and every folder the board's `skill_copies` records name (slots, worktrees, copies).
+ * - **git's refs** under Hive's prefix (HI-2593's handoff): `refs/hive/cards/…` and `refs/hive/queue/…` → `refs/cw/…` (moveRefs).
  * - **git's exclude comments** (HI-2575, HI-2580): Hive's comment lines above Combwork's own entries in the repository's
  *   `info/exclude` become Combwork's, whole lines only; every other line stays as it was.
  */
+
+/**
+ * The refs Combwork keeps in a repository under Hive's prefix (HI-2593's handoff, its design HI-2593/s11): a card's
+ * submission pins (`refs/hive/cards/…`) and the merge queue's test merges (`refs/hive/queue/…`). Each is made again
+ * under `refs/cw/` at the same commit, unless one is there already, then the old one is deleted at that commit only:
+ * one ref at a time, so a run stopped halfway leaves each ref under one name or both, and the next run finishes it.
+ * Nothing reads them back by name (they keep commits alive), so order doesn't matter. Branches (`hive/…`) are left.
+ */
+const OLD_REFS = ['refs/hive/cards/', 'refs/hive/queue/']
+
+async function moveRefs(root: string): Promise<void> {
+  const listed = await git(root, ['for-each-ref', '--format=%(refname) %(objectname)', ...OLD_REFS.map((r) => r.slice(0, -1))])
+  if (!listed.ok) throw new Error(listed.err || 'git for-each-ref failed') // i18n-ignore: the error's detail, for the step's message
+  for (const line of listed.out.split(/\r?\n/).filter(Boolean)) {
+    const [ref, sha] = line.split(' ')
+    if (!OLD_REFS.some((p) => ref.startsWith(p)) || !/^[0-9a-f]{40,64}$/.test(sha)) continue
+    const now = `refs/cw/${ref.slice('refs/hive/'.length)}`
+    const there = await git(root, ['rev-parse', '--verify', '--quiet', now])
+    if (!there.ok) {
+      // Made only where none is: the empty old value refuses one made meanwhile.
+      const made = await git(root, ['update-ref', now, sha, ''])
+      if (!made.ok) throw new Error(made.err || `git update-ref ${now} failed`) // i18n-ignore: the error's detail, for the step's message
+    }
+    const gone = await git(root, ['update-ref', '-d', ref, sha])
+    if (!gone.ok) throw new Error(gone.err || `git update-ref -d ${ref} failed`) // i18n-ignore: the error's detail, for the step's message
+  }
+}
 
 /** The marker's old name, read only here. */
 export const OLD_COPY_MARKER = '.hive-copy'
@@ -68,4 +96,6 @@ export async function upgradeProject(host: string | null, folders: readonly stri
   const text = ex ? await readFile(ex, 'utf8').catch(() => null) : null
   const now = text === null ? null : upgradedExclude(text)
   if (ex && now !== null) await writeTextAtomic(ex, now)
+  const found = vcsOf(host)
+  if (found?.kind === 'git') await moveRefs(found.root)
 }

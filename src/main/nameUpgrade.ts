@@ -41,7 +41,7 @@ const M = {
   what: {
     board: msg({ id: 'main.nameUpgrade.what.board', defaultMessage: "the board's file", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, hive.db to combwork.db." }),
     files: msg({ id: 'main.nameUpgrade.what.files', defaultMessage: "the workspace's .gitignore, README and MCP definitions", description: 'What the names upgrade was renaming when it failed (service.nameUpgrade.failed): files in the workspace\'s .combwork folder. Keep .gitignore, README and MCP as they are.' }),
-    projects: msg({ id: 'main.nameUpgrade.what.projects', defaultMessage: "the projects' skill copies and git exclude lines", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): markers in Combwork's copies of skills in projects, and comment lines in git's exclude files." })
+    projects: msg({ id: 'main.nameUpgrade.what.projects', defaultMessage: "the projects' skill copies, git exclude lines and refs", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…)." })
   } satisfies Record<WorkspaceStep, Msg<string>>
 }
 

@@ -370,8 +370,8 @@
     "audience": "both"
   },
   "main.nameUpgrade.what.projects": {
-    "text": "the projects' skill copies and git exclude lines",
-    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): markers in Combwork's copies of skills in projects, and comment lines in git's exclude files.",
+    "text": "the projects' skill copies, git exclude lines and refs",
+    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…).",
     "audience": "both"
   },
   "main.outage.gaveUpBody": {

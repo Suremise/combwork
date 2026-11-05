@@ -237,7 +237,7 @@
   "main.nameUpgrade.boardLeftTitle": "{file} was left as it is",
   "main.nameUpgrade.what.board": "the board's file",
   "main.nameUpgrade.what.files": "the workspace's .gitignore, README and MCP definitions",
-  "main.nameUpgrade.what.projects": "the projects' skill copies and git exclude lines",
+  "main.nameUpgrade.what.projects": "the projects' skill copies, git exclude lines and refs",
   "main.notify.answered": "Answered",
   "main.notify.sessionEnded": "Its session ended",
   "main.outage.gaveUpBody": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Combwork won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
