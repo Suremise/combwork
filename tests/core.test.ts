@@ -890,7 +890,7 @@ describe('keyboard shortcuts', () => {
 
 describe('writeJsonAtomic and withFileLock', () => {
   it('never leaves a corrupt file when writes overlap', async () => {
-    const dir = tempDir('hive-test-')
+    const dir = tempDir('combwork-test-')
     const file = join(dir, 'sessions.json')
     const big = { sessions: Array.from({ length: 400 }, (_, k) => ({ id: `a${k}` })) }
     for (let i = 0; i < 50; i++) {
@@ -902,7 +902,7 @@ describe('writeJsonAtomic and withFileLock', () => {
   })
 
   it('keeps every change when read-modify-writes overlap', async () => {
-    const dir = tempDir('hive-test-')
+    const dir = tempDir('combwork-test-')
     const file = join(dir, 'list.json')
     await writeJsonAtomic(file, { ids: [] })
     const add = (id: number) =>

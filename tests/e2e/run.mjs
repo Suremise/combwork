@@ -26,7 +26,7 @@
 //   --build         build first (npx electron-vite build), only if the build isn't from this source (build.mjs).
 //   --packaged      include the installer's suites (need npm run dist); --no-progress: don't report to Combwork.
 //   --no-wait       a heavy run (more than 5 suites, or --repeat) fails at once when every test slot on this machine is
-//                   taken, instead of waiting for one (slots.mjs; heavySlots and sideSlots in hive-test\config.json); and
+//                   taken, instead of waiting for one (slots.mjs; heavySlots and sideSlots in combwork-test\config.json); and
 //                   any run fails at once when every test lane (10) is taken, instead of waiting for one (lanes.mjs, #707).
 //   --pre-merge     a heavy run checking a merge goes first in the queue for a test slot (#558). Not needed in the
 //                   session of an agent holding the merge slot: such a run goes first anyway (slots.mjs holdsMergeSlot).
@@ -100,7 +100,7 @@ if (!evidence.ok) {
   console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set CW_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
   process.exit(2)
 }
-// The run's own temp folder in hive-test\tmp (HI-2102): its suites, Playwright's playwright-artifacts-* folders, the
+// The run's own temp folder in combwork-test\tmp (HI-2102): its suites, Playwright's playwright-artifacts-* folders, the
 // test copies of Combwork and the CLIs they start get it as TEMP (runContext.cjs ALLOW), not %TEMP%. It goes as the runner
 // exits, unless the run is recorded for review (kept, as its logs are, until a run's start a day later removes it,
 // while no open card cites it). A run's start removes what stopped runs left, by the same evidence rules.
@@ -599,7 +599,7 @@ await pruneRunDirsReleasing(logsRoot, undefined, runs.map((r) => r.logDir), unde
   release: (d) => releaseKept(d, evidence, { hold: (k) => holdLane(runContext.LANES_DIR, k) })
 })
 if (keptAfterPass.length) console.log(`\nKept the folders of ${keptAfterPass.length} passed suite${keptAfterPass.length === 1 ? '' : 's'}: ${keptAfterPass.slice(0, 3).join('; ')}${keptAfterPass.length > 3 ? '; …' : ''}`)
-// What tests left in hive-test that is no longer needed (clean.mjs), this lane's included: it is let go first. Not from
+// What tests left in combwork-test that is no longer needed (clean.mjs), this lane's included: it is let go first. Not from
 // a runner inside a suite (its parent's does it).
 if (lane) {
   lane.release()

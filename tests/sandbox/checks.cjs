@@ -20,7 +20,7 @@
  * tests\sandbox\inside and the e2e fake CLIs) and its playwright-core are mapped read-only too; Node is this one's folder.
  * --server (or WSB_SERVER) is the server's server.js; by default the copy Combwork installed from the MCP catalogue in the
  * workspace holding <hive> (<workspace>\.combwork\mcp\windows-sandbox), else a hive-mcp checkout beside <hive>
- * (<hive>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\hive-test\sandbox.
+ * (<hive>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\combwork-test\sandbox.
  * --git: the clean install's git project (scenario 9) needs Git, which a fresh Windows hasn't got: this machine's Git for
  * Windows is mapped read-only at C:\tools\git (by default the folder of the git.exe on the PATH).
  * Exit code: 0 all checks passed, 1 a check failed (or a Sandbox's cleanup wasn't confirmed), 2 not run (also when the
@@ -52,9 +52,9 @@ function appNames() {
 /** This checkout: its tests folder and playwright-core are mapped into the Sandbox. */
 const REPO = path.resolve(__dirname, '..', '..')
 /** Where the server keeps its run folders (config, out): the tests' own area, whatever the server's default. */
-const SANDBOX_ROOT = path.join(process.env.LOCALAPPDATA || os.homedir(), 'hive-test', 'sandbox')
-/** Where the scripts that run inside the Sandbox (tests\sandbox\inside) are there: this checkout's tests folder is mapped at C:\tools\hive-tests. */
-const INSIDE = 'C:\\tools\\hive-tests\\sandbox\\inside'
+const SANDBOX_ROOT = path.join(process.env.LOCALAPPDATA || os.homedir(), 'combwork-test', 'sandbox')
+/** Where the scripts that run inside the Sandbox (tests\sandbox\inside) are there: this checkout's tests folder is mapped at C:\tools\combwork-tests. */
+const INSIDE = 'C:\\tools\\combwork-tests\\sandbox\\inside'
 /** Where the windows-sandbox server.js is looked for without --server or WSB_SERVER: the workspace's installed copy, a hive-mcp checkout beside the repo. */
 function serverCandidates(hive) {
   return [path.join(hive, '..', '.combwork', 'mcp', 'windows-sandbox', 'server.js'), path.join(hive, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
@@ -193,7 +193,7 @@ function plan(argv) {
     previousRc: fromRc ? previousRc : null,
     guestPreviousRc: fromRc ? guest(previousRc) : null,
     guestShort: short ? guest(short) : null,
-    report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'hive-test', 'sandbox-reports', stamp))),
+    report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'combwork-test', 'sandbox-reports', stamp))),
     waitMin: Number(opt('--wait-min', 0)),
     sacOff: sac === 'off',
     git: ran.includes('clean') ? gitRoot(opt('--git')) : null
@@ -330,14 +330,14 @@ async function main(argv) {
       WSB_MCP_ENABLED: '1',
       WSB_ALLOWED_ROOTS: '', // the build folder comes as an MCP root (inSandbox), not from the config
       WSB_ROOTS_FROM_CWD: '',
-      WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(REPO, 'node_modules', 'playwright-core')}`, `hive-tests=${path.join(REPO, 'tests')}`, ...(p.git ? [`git=${p.git}`] : [])].join(';'),
+      WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(REPO, 'node_modules', 'playwright-core')}`, `combwork-tests=${path.join(REPO, 'tests')}`, ...(p.git ? [`git=${p.git}`] : [])].join(';'),
       WSB_SANDBOX_ROOT: process.env.CW_SANDBOX_CHECKS_ROOT || SANDBOX_ROOT,
       WSB_STUB: process.env.WSB_STUB,
       WSB_STUB_STATE: process.env.WSB_STUB_STATE
     })
   }
   const ctx = { report: p.report, files: {}, shots: [], steps: [], timings: {}, leftRunning: [], notRun: {}, sac: null, sacOff: p.sacOff }
-  const start = { build: p.root, network: false, session: true, tools: ['node', 'playwright', 'hive-tests'], maxMinutes: 30, ...(p.sacOff ? { smartAppControl: 'off' } : {}) }
+  const start = { build: p.root, network: false, session: true, tools: ['node', 'playwright', 'combwork-tests'], maxMinutes: 30, ...(p.sacOff ? { smartAppControl: 'off' } : {}) }
   const time = async (k, fn) => { const t = Date.now(); const r = await fn(); ctx.timings[k] = `${((Date.now() - t) / 1000).toFixed(1)} s`; return r }
   const overPrevious = async (srv, n, pre, args, from = { installer: p.guestPrevious, exe: '%LOCALAPPDATA%\\Programs\\Hive\\Hive.exe' }) => {
     const s = steps(srv, ctx)
@@ -472,6 +472,7 @@ async function main(argv) {
 }
 
 if (require.main === module) {
+  require('../testArea.cjs').assertReady() // not before the test area's move (HI-2590)
   main(process.argv.slice(2)).then(code => { process.exitCode = code }, e => { log('ERROR:', e.stack || e); process.exitCode = 2 })
 }
 // For tests.

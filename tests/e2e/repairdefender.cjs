@@ -29,7 +29,7 @@ fs.mkdirSync(base, { recursive: true })
 const root = fs.realpathSync.native(base)
 const at = (name) => ({ ws: path.join(root, name), trees: path.join(root, `${name}.worktrees`) })
 const [scratch, tools, third, fourth] = ['Scratch', 'Tools', 'Third', 'Fourth'].map(at)
-const tests = fs.realpathSync.native(path.join(process.env.LOCALAPPDATA, 'hive-test'))
+const tests = fs.realpathSync.native(path.join(process.env.LOCALAPPDATA, 'combwork-test'))
 
 const drive = path.parse(root).root[0].toUpperCase()
 const DEFENDER_ON = 397568

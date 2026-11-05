@@ -5,7 +5,7 @@ import { globsUncached } from './tests/globCacheKey.mts'
 import { progressWanted, VitestProgress } from './tests/progressReport.mts'
 import { startRunTemp } from './tests/runTemp.mts'
 
-// The run's temp folder is the tests' own, in hive-test\tmp (tests/runTemp.mts, #992), not %TEMP%: Vitest's copies of the
+// The run's temp folder is the tests' own, in combwork-test\tmp (tests/runTemp.mts, #992), not %TEMP%: Vitest's copies of the
 // modules it serves the workers (about 600 files a run, which it leaves behind), the temp files of Hive's code under test
 // and of the programs tests start (git) go there too, where Hive's Antivirus scanning setting covers them. Set before
 // Vitest starts its workers, which inherit it (TEMP, TMP and TMPDIR). It is the run's own folder, which tests/tempRun.ts

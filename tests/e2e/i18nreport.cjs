@@ -85,10 +85,10 @@ section { margin: 8px; }
   <pre>npm run e2e -- --lang en-XA,pl --build --keep-files and a long line of code that scrolls</pre>
   <div class="list"><div>Pierwszy</div><div>Drugi</div><div>Trzeci</div></div>
   <span>Nie działa</span> <span>Bob (usunięty)</span> <span>OK</span> <span>To do</span>
-  <div style="width: 120px; overflow-wrap: anywhere">C:\\Users\\Someone\\AppData\\Local\\hive-test\\e2e\\lanes</div>
+  <div style="width: 120px; overflow-wrap: anywhere">C:\\Users\\Someone\\AppData\\Local\\combwork-test\\e2e\\lanes</div>
   <div style="width: 120px">Kliknij prawym-przyciskiem-myszy-tutaj</div>
   <div class="menu-detail" style="width: 150px">Opis umiejętności, który jest długi i celowo skrócony do jednej linii w liście, bo cały tekst widać po wybraniu wiersza.</div>
-  <div class="menu-detail" style="width: 150px">C:\\Users\\Someone\\AppData\\Local\\hive-test\\e2e\\lanes\\0</div>
+  <div class="menu-detail" style="width: 150px">C:\\Users\\Someone\\AppData\\Local\\combwork-test\\e2e\\lanes\\0</div>
   <div style="width: 60px; overflow-wrap: anywhere">session.applyPermissionModes</div>
   <div class="popup-wrap"><span>Etykieta paska</span><div class="popup">Menu nad paskiem</div></div>
   <div class="sticky-wrap"><div class="sticky-head">Nagłówek</div><div>Wiersz pierwszy</div><div>Wiersz drugi</div></div>
@@ -153,7 +153,7 @@ app.whenReady().then(() => {
     check("English left: Combwork's own status, untranslated, fitting a placeholder message (the positive control)", englishAt('Waiting for the agents', /span\.status/), said())
     check("English left: not a template's name the user gave, equal to a message (HI-1915: \"Pair\")", !issues.some((i) => i.kind === 'english' && /template-row|template-detail-title/.test(i.where)), said())
     check("English left: not a blocked reason the user gave, fitting a placeholder message (HI-1915: \"Waiting for {what}\")", !issues.some((i) => i.kind === 'english' && /task-blocked/.test(i.where)), said())
-    const clean = ['To jest zwykły', 'Ustawienia', 'Zapisz', 'Nowy', 'npm run', 'Pierwszy', 'Drugi', 'Trzeci', 'Nie działa', 'Bob (usunięty)', 'OK', 'To do', 'hive-test', 'Users', 'przyciskiem', 'Nagłówek', 'Wiersz', 'Okno dialogowe', 'Tylko dla', 'Opis umiejętności', 'Someone', 'applyPermissionModes', 'Etykieta paska', 'Menu nad', 'エージェント', '报告', 'Notes de version']
+    const clean = ['To jest zwykły', 'Ustawienia', 'Zapisz', 'Nowy', 'npm run', 'Pierwszy', 'Drugi', 'Trzeci', 'Nie działa', 'Bob (usunięty)', 'OK', 'To do', 'combwork-test', 'Users', 'przyciskiem', 'Nagłówek', 'Wiersz', 'Okno dialogowe', 'Tylko dla', 'Opis umiejętności', 'Someone', 'applyPermissionModes', 'Etykieta paska', 'Menu nad', 'エージェント', '报告', 'Notes de version']
     const wrong = issues.filter((i) => clean.some((c) => i.text.includes(c)) || /markdown|kb-id/.test(i.where))
     check('nothing reported in the clean part', !wrong.length, layout.summarize({ pl: { page: { image: '', issues: wrong } } }))
     // The report's lines name the screen, the language and the screenshot to open.

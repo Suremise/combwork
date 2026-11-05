@@ -11,9 +11,9 @@ const line = (o: unknown): string => JSON.stringify(o)
 
 describe('Codex hook trust', () => {
   it("hashes hooks the way Codex does (values from Codex 0.159's hooks/list)", () => {
-    expect(hookHash('session_start', undefined, 'echo hive-test', 5)).toBe('sha256:9304855a6bdb130c5107b4f69e530cbf6f7cb00c82e7bcd218d8bb4f071a8c7a')
-    expect(hookHash('pre_tool_use', '*', 'echo hive-test', 10)).toBe('sha256:fc3016d3b175c2e0d43538eff55ae4adb352fc1d3bb47acc3ac9d651e7b68024')
-    expect(hookHash('session_end', undefined, 'echo hive-test', 3)).toBe('sha256:22b9953958a5515d3eda16a1a8ce24cd1a55b3685b278840eed401bf0d7e1573')
+    expect(hookHash('session_start', undefined, 'echo hive-test', 5)).toBe('sha256:9304855a6bdb130c5107b4f69e530cbf6f7cb00c82e7bcd218d8bb4f071a8c7a') // Codex's own values: the command as recorded (HI-2590)
+    expect(hookHash('pre_tool_use', '*', 'echo hive-test', 10)).toBe('sha256:fc3016d3b175c2e0d43538eff55ae4adb352fc1d3bb47acc3ac9d651e7b68024') // Codex's own values: the command as recorded (HI-2590)
+    expect(hookHash('session_end', undefined, 'echo hive-test', 3)).toBe('sha256:22b9953958a5515d3eda16a1a8ce24cd1a55b3685b278840eed401bf0d7e1573') // Codex's own values: the command as recorded (HI-2590)
   })
 })
 

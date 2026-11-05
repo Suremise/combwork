@@ -1,6 +1,6 @@
 // Heavy test runs, machine-wide (#204). Several agents checking their cards at once on one machine (full e2e sets,
 // repeats, scenario runs) slowed each other until tests timed out: the flakes were the load, not the code. So at most
-// a few heavy runs go at once across every worktree (heavySlots in hive-test\config.json, default 2, #589); a heavy run started while
+// a few heavy runs go at once across every worktree (heavySlots in combwork-test\config.json, default 2, #589); a heavy run started while
 // they are all taken waits for one, in the order the runs asked, saying who holds them (and in Combwork's Progress panel).
 // A pre-merge run goes first (#558): one started by the agent holding its project's merge slot (holdsMergeSlot), or
 // with --pre-merge. It takes the next free slot before runs that asked earlier for other reasons (a merge shouldn't wait

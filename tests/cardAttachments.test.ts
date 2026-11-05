@@ -409,10 +409,10 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
   })
 
   it('a list of folders round-trips exactly: parsed and written with ";", spaces around each trimmed (HI-2538)', () => {
-    const two = ['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\hive-test\\scratch']
-    for (const typed of ['%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch', '%LOCALAPPDATA%\\combwork-cli; %LOCALAPPDATA%\\hive-test\\scratch', ' %LOCALAPPDATA%\\combwork-cli ;  %LOCALAPPDATA%\\hive-test\\scratch ;'])
+    const two = ['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\combwork-test\\scratch']
+    for (const typed of ['%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\combwork-test\\scratch', '%LOCALAPPDATA%\\combwork-cli; %LOCALAPPDATA%\\combwork-test\\scratch', ' %LOCALAPPDATA%\\combwork-cli ;  %LOCALAPPDATA%\\combwork-test\\scratch ;'])
       expect(folderList(typed), typed).toEqual(two)
-    expect(foldersText(two)).toBe('%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch')
+    expect(foldersText(two)).toBe('%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\combwork-test\\scratch')
     expect(folderList(foldersText(two))).toEqual(two)
     const def = advancedDef(CARD_ATTACHMENT_FOLDERS_ID)!
     // What the tools and Settings show is what was typed with ";": never a comma, never a space added.

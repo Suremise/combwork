@@ -22,7 +22,7 @@
 // as soon as a trial reports no cost (the spend can't be checked then; --allow-unknown-cost goes on anyway); --only runs
 // some; --keep leaves each scenario's profile and workspace; --repeat N runs each N times (samples, for spread);
 // --save-baseline NAME keeps this run's benchmark as a named baseline (an older one of that name is kept, not
-// overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 fake runs and, counted apart,
+// overwritten). Results go to %LOCALAPPDATA%\combwork-test\scenarios\results (the newest 30 fake runs and, counted apart,
 // the newest 30 model trials are kept, besides those a card cites and those a run still writes into: runner.json,
 // HI-2234, HI-2236): results.json
 // (every scenario's checks, skills read, hive calls, versions, usage, measures), benchmark.json (combwork-benchmark/1: the
@@ -34,7 +34,7 @@
 //
 // Runs at the same time (from different worktrees, or the same one) don't share folders or ports: each run claims a
 // lane, from the same pool as the e2e runner (tests/e2e/lanes.mjs), and keeps its scenarios' profiles and workspaces in
-// %LOCALAPPDATA%\hive-test\scenarios\lanes\<k> (--keep leaves them there) with the lane's first port as their Agent API
+// %LOCALAPPDATA%\combwork-test\scenarios\lanes\<k> (--keep leaves them there) with the lane's first port as their Agent API
 // port (#183, #184). Results and baselines stay shared: Performance → Compare reads them.
 import { createRequire } from 'module'
 import { readFileSync, writeFileSync } from 'fs'
@@ -57,7 +57,7 @@ if (!evidence.ok) {
   console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set CW_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
   process.exit(2)
 }
-// The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Combwork and the CLIs its scenarios start get it
+// The run's own temp folder in combwork-test\tmp (HI-2102): the test copies of Combwork and the CLIs its scenarios start get it
 // as TEMP (e2e/runContext.cjs ALLOW), not %TEMP%. It goes as the runner exits; its start removes what stopped runs
 // left, as the evidence rules allow. Before lib.cjs loads: Playwright, which the harness runs in this process, takes
 // the temp folder for its playwright-artifacts-* folders as it loads.
@@ -380,7 +380,7 @@ const hardFailures = fake ? results.filter((r) => r.error || r.checks?.some((c) 
 const failedTrials = results.filter((r) => r.error || r.checks?.some((c) => c.ok === false)).length
 await progress.finish(!hardFailures, `${results.length - failedTrials - results.filter((r) => r.skipped).length} ok, ${failedTrials} failed${results.some((r) => r.skipped) ? `, ${results.filter((r) => r.skipped).length} skipped` : ''}`, join(out, 'summary.md'))
 codexLease?.release()
-// What tests left in hive-test that is no longer needed (tests/e2e/clean.mjs), this lane's included: let go first.
+// What tests left in combwork-test that is no longer needed (tests/e2e/clean.mjs), this lane's included: let go first.
 lane.release()
 await autoClean({ root: lib.ROOT, ev: evidence })
 process.exit(hardFailures ? 1 : 0)

@@ -81,7 +81,7 @@ export function builtOnce({ builds, stamp, inputs, at, since }) {
 }
 
 /** Where the build locks are, one folder per worktree. */
-export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'build-locks')
+export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'build-locks')
 /** A lock held longer than this is from a runner stuck far beyond any build (its process may still be there). */
 const LOCK_MAX_MS = 60 * 60_000
 /** How long a runner waits for another's build before giving up. */

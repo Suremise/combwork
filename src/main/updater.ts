@@ -63,10 +63,10 @@ export function updateState(): UpdateState {
  * CW_UPDATE_FEED at a local server.
  */
 const testFeed = (): string | undefined => (app.isPackaged ? undefined : process.env.CW_UPDATE_FEED)
-/** The test download cache's folder in %LOCALAPPDATA%: hive-test-updater, or the one CW_UPDATE_CACHE names (an e2e lane's). */
+/** The test download cache's folder in %LOCALAPPDATA%: combwork-test-updater, or the one CW_UPDATE_CACHE names (an e2e lane's). */
 const testCache = (): string => {
   const name = process.env.CW_UPDATE_CACHE ?? ''
-  return /^hive-test-updater-[\w-]+$/.test(name) ? name : 'hive-test-updater'
+  return /^combwork-test-updater-[\w-]+$/.test(name) ? name : 'combwork-test-updater'
 }
 
 /**

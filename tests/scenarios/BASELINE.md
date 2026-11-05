@@ -242,7 +242,7 @@ Darren's scope (24 Oct): each key scenario once on Claude Code and on Codex, wit
 full trials come before the release (#1541). The 40 key scenarios: the intent tools, the inbox, lanes, #1346's five (with
 the other #1346 items 2–4 scenarios), the fresh-workspace set (#1539's model evidence), merge-main-moved and
 merged-to-done.
-- **A clean context**, checked before the run (`hive-test\scratch\1537-trials-20261025-054351\clean-context-before.json`):
+- **A clean context**, checked before the run (`combwork-test\scratch\1537-trials-20261025-054351\clean-context-before.json`):
   no memory files in Claude Code's test home and no CLAUDE.md; Codex's has no AGENTS.md and empty memory tables; each
   scenario runs in a new workspace (no shared notes). Both homes hold skills that aren't Hive's: Claude Code's synced
   from the account, and Codex's system skills (imagegen, openai-docs, review-agent, skill-creator, skill-installer).
@@ -1374,7 +1374,7 @@ Under fixtures v1, two Codex runs failed and passed when repeated:
 
 ## Claude Code: not yet run under fixtures v2
 
-The trials now run Claude Code only in its own test home (`%LOCALAPPDATA%\hive-test\claude`, never the user's
+The trials now run Claude Code only in its own test home (`%LOCALAPPDATA%\combwork-test\claude`, never the user's
 `~/.claude`). That home isn't signed in yet, so `--provider claude-code` prints a skip. Signing in is a one-time step
 by hand (README.md).
 

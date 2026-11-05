@@ -31,7 +31,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(2)
   }
   const check = process.argv.includes('--check')
-  const dir = check ? mkdtempSync(join(process.env.LOCALAPPDATA ?? '', 'hive-test', 'tmp', 'installer-')) : process.argv[2]
+  const dir = check ? mkdtempSync(join(process.env.LOCALAPPDATA ?? '', 'combwork-test', 'tmp', 'installer-')) : process.argv[2]
   if (!dir) {
     console.error('Usage: node tests/installer/build.mjs <out folder> | --check')
     process.exit(2)

@@ -78,7 +78,7 @@ describe('test tooling starts nothing through the shell (#599)', () => {
     const allowed: Record<string, string[]> = {
       'tests/sandbox/checks.cjs': ["await s.run(1, '1. open Installed apps', 'start \"\" ms-settings:appsfeatures', { timeoutSec: 30 })"],
       'tests/sandboxChecks.test.ts': [
-        "const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error: An Applic \\r\\nation Control policy has blocked this file.\\r\\nAt C:\\\\tools\\\\hive-tests\\\\sandbox\\\\inside\\\\install.ps1:17 char:6'",
+        "const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error: An Applic \\r\\nation Control policy has blocked this file.\\r\\nAt C:\\\\tools\\\\combwork-tests\\\\sandbox\\\\inside\\\\install.ps1:17 char:6'",
         "const { r, json } = runChecks('install-fails', [{ match: 'install\\\\.ps1', exit: 1, stderr: 'Start-Process : The system cannot find the file specified.' }], ['--only', 'fresh'])"
       ],
       'tests/e2e/affected.mjs': ["{ test: 'tests/windowsExits.test.ts', paths: ['tests/', 'scripts/'], lines: ['start-process', 'invoke-item', 'shell\\\\.open(path|external)', '\\\\bstart\\\\b'] },"]

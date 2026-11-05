@@ -19,7 +19,7 @@ const probe = (over: Record<string, unknown> = {}) => ({
 const folders: { path: string; kind: AvPathKind; unsafe?: string }[] = [
   { path: 'D:\\Development\\HIVE', kind: 'workspace' },
   { path: 'D:\\Development\\HIVE.worktrees', kind: 'worktrees' },
-  { path: 'C:\\Users\\Dev\\AppData\\Local\\hive-test', kind: 'tests' }
+  { path: 'C:\\Users\\Dev\\AppData\\Local\\combwork-test', kind: 'tests' }
 ]
 const now = new Date('2026-10-06T18:00:00Z')
 type Admin = { at: string; exclusions: string[]; devDrives?: Record<string, 'trusted' | 'untrusted' | 'no'> }
@@ -52,7 +52,7 @@ describe('antivirus (#316)', () => {
     expect(covered('D:\\Development\\HIVE.worktrees', ['D:\\Development\\HIVE'])).toBe(false)
     expect(covered('D:/Development/HIVE', ['D:\\Development\\HIVE'])).toBe(true)
     // The 6 Oct manual entry kept "$env:LOCALAPPDATA" literally: it matches nothing.
-    expect(covered('C:\\Users\\Dev\\AppData\\Local\\hive-test', ['$env:LOCALAPPDATA\\hive-test', '%LOCALAPPDATA%\\hive-test'])).toBe(false)
+    expect(covered('C:\\Users\\Dev\\AppData\\Local\\combwork-test', ['$env:LOCALAPPDATA\\combwork-test', '%LOCALAPPDATA%\\combwork-test'])).toBe(false)
     expect(normPath('D:\\A\\B\\')).toBe('d:\\a\\b')
   })
 
@@ -68,7 +68,7 @@ describe('antivirus (#316)', () => {
     expect(unsafeFolder('relative\\path', GUARDED)).toMatch(/absolute/)
     // Inside the home folder is fine: a workspace, or the test area under %LOCALAPPDATA%.
     expect(unsafeFolder('C:\\Users\\Dev\\work', GUARDED)).toBeNull()
-    expect(unsafeFolder('C:\\Users\\Dev\\AppData\\Local\\hive-test', GUARDED)).toBeNull()
+    expect(unsafeFolder('C:\\Users\\Dev\\AppData\\Local\\combwork-test', GUARDED)).toBeNull()
   })
 
   it('the folder set: resolved paths, duplicates dropped, unsafe ones marked, an unresolved root failing closed', () => {
@@ -88,7 +88,7 @@ describe('antivirus (#316)', () => {
     const s = status(probe())
     expect([s.scan, s.realTime, s.exclusionsFrom, s.slowed]).toEqual(['defender', true, null, true])
     expect(s.paths.map((p) => [p.kind, p.state, p.devDrive])).toEqual([['workspace', 'unknown', 'no'], ['worktrees', 'unknown', 'no'], ['tests', 'unknown', 'no']])
-    expect(s.offerKey).toBe('c:\\users\\dev\\appdata\\local\\hive-test|d:\\development\\hive|d:\\development\\hive.worktrees')
+    expect(s.offerKey).toBe('c:\\users\\dev\\appdata\\local\\combwork-test|d:\\development\\hive|d:\\development\\hive.worktrees')
   })
 
   it('an unsafe folder is listed but never offered or counted', () => {
@@ -99,7 +99,7 @@ describe('antivirus (#316)', () => {
   it('a visible list says which folders are excluded; all of them excluded is not slowed', () => {
     const some = status(probe({ exclusions: ['D:\\Development\\HIVE'] }))
     expect([some.exclusionsFrom, some.paths.map((p) => p.state), some.slowed]).toEqual(['live', ['excluded', 'not-excluded', 'not-excluded'], true])
-    const all = status(probe({ exclusions: ['D:\\Development', 'C:\\Users\\Dev\\AppData\\Local\\hive-test'] }))
+    const all = status(probe({ exclusions: ['D:\\Development', 'C:\\Users\\Dev\\AppData\\Local\\combwork-test'] }))
     expect([all.paths.every((p) => p.state === 'excluded'), all.slowed, all.offerKey]).toEqual([true, false, ''])
   })
 

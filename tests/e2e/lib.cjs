@@ -14,6 +14,8 @@ const { _electron } = require('playwright-core')
 const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, hiveEnv, childEnv, baseEnv, isHiveEnv, isUserCliHome, trashDir, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv: contextGitEnv, isUserGitConfig } = require('./runContext.cjs')
 
 const ROOT = path.resolve(__dirname, '..', '..')
+// A suite run alone refuses, as the runners do, while the test area's move (HI-2590) is to do or unfinished.
+require('../testArea.cjs').assertReady()
 /** Electron's executable (the electron package resolves to its path in plain Node). */
 const ELECTRON = require('electron')
 const { windowsCodesIn } = require('./windowsExits.cjs')
@@ -25,7 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /**
  * A new folder for a probe of your own (a Playwright script's profile, workspace and screenshots; #304), in
- * hive-test\scratch, named for it and the time: `scratch\<name>-<yyyymmdd-hhmmss>-<random>`. Every run gets a new one,
+ * combwork-test\scratch, named for it and the time: `scratch\<name>-<yyyymmdd-hhmmss>-<random>`. Every run gets a new one,
  * so nothing needs deleting first (never `rm -rf` a computed path: Claude Code asks, and unattended it denies). The
  * clean-up prunes them after a few days (`npm run test:clean`), unless a card that isn't Done cites one.
  */
@@ -654,7 +656,7 @@ _electron.launch = async (...args) => {
   // Its profile on its command line (#614), which Combwork ignores: the runner stops what names a suite's folder once the
   // suite ends, and a test Combwork's own line names only the checkout, so a suite killed before closing its Combwork (HB1's,
   // 10 Oct) left it running for a day. Chromium's own processes already name it (--user-data-dir).
-  if (env.CW_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--hive-test-profile=${env.CW_USER_DATA}`] }
+  if (env.CW_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--combwork-test-profile=${env.CW_USER_DATA}`] }
   if (packaged) {
     args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS], env: { ...env, ...NO_UPDATE_CHECK } }
     unmaximized(env.CW_USER_DATA)

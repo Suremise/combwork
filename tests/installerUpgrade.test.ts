@@ -1,7 +1,7 @@
 // The Combwork installer's upgrade from Hive Desktop (HI-2460, build/hiveUpgrade.ps1, run by installer.nsh's
 // customInit): closing and checking what runs, removing Hive Desktop through its own uninstaller, its Launch at login,
 // and moving the profile folders with the installer's record (HI-2461's contract). Against stand-ins only: a registry key
-// of the test's own under HKCU\Software\hive-test, a fake uninstaller (a copy of Node running a script), stand-in apps
+// of the test's own under HKCU\Software\combwork-test, a fake uninstaller (a copy of Node running a script), stand-in apps
 // (Node named Combwork.exe), and profile folders in the test's temp folder. Nothing real is read or changed.
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
@@ -16,7 +16,7 @@ const SCRIPT = join(__dirname, '..', 'build', 'hiveUpgrade.ps1')
 const root = join(process.env.SystemRoot ?? 'C:\\Windows')
 const ps = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const psEnv = powershellEnv()
-const KEY = `HKCU:\\Software\\hive-test\\installer-upgrade-${randomUUID()}`
+const KEY = `HKCU:\\Software\\combwork-test\\installer-upgrade-${randomUUID()}`
 
 /** A PowerShell command, run to its end: its output. */
 const pwsh = (command: string): string => spawnSync(ps, ['-NoProfile', '-NonInteractive', '-Command', command], { env: psEnv, windowsHide: true, timeout: HUNG_MS, encoding: 'utf8' }).stdout

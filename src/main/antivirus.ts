@@ -215,7 +215,7 @@ async function guardedFolders(): Promise<string[]> {
 
 /**
  * The workspace's folders to exclude, as resolved absolute paths: its root, its worktrees folder once it exists, and
- * Hive's test area (%LOCALAPPDATA%\hive-test) only for people developing Hive and once it exists. Each is resolved
+ * Hive's test area (%LOCALAPPDATA%\combwork-test) only for people developing Hive and once it exists. Each is resolved
  * (links followed) and checked after resolving: one that is, or holds, a drive, a share, the home folder, the profile
  * or a system folder is never offered, nor one whose real location can't be established.
  */
@@ -225,7 +225,7 @@ export async function workspaceFolders(w: WorkspaceService): Promise<{ path: str
   const rootReal = await resolved(root)
   const trees = worktreesRoot(root)
   const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
-  const tests = join(local, 'hive-test')
+  const tests = join(local, 'combwork-test')
   const wantTests = testsEligible({ packaged: app.isPackaged, holdsHive: app.isPackaged ? await holdsHive(w) : false }) && (await exists(tests))
   return folderPlan(
     {

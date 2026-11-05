@@ -15,7 +15,7 @@ const { advanced } = await import('../src/main/advanced')
 const { hookStep } = await import('../src/main/hookStatus')
 const writer = await import('../src/main/lineWriter')
 
-const project = 'C:/hive-test/input-blocked'
+const project = 'C:/combwork-test/input-blocked'
 const id = 'b1'
 const key = `${project.toLowerCase()}#${id}`
 /** Its terminal's key (agentPtyKey), as the user's typing is noted by. */

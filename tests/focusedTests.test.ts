@@ -75,8 +75,8 @@ describe("each test's result", () => {
   })
 
   it("a suite's from the run record: passed, failed, skipped for the environment, not run, or missing", () => {
-    const out = 'board            pass 12s\n(Saved as C:\\hive-test\\e2e\\logs\\run-20261028-101500\\run-record.md)\n'
-    expect(recordPathFrom(out)).toBe(join('C:\\hive-test\\e2e\\logs\\run-20261028-101500', 'run-record.json'))
+    const out = 'board            pass 12s\n(Saved as C:\\combwork-test\\e2e\\logs\\run-20261028-101500\\run-record.md)\n'
+    expect(recordPathFrom(out)).toBe(join('C:\\combwork-test\\e2e\\logs\\run-20261028-101500', 'run-record.json'))
     expect(recordPathFrom('No suite to run.')).toBeNull()
     const record = {
       valid: true,

@@ -30,7 +30,7 @@ const { NEWLINE_TRIED } = await import('../src/main/providers/codex/adapter')
 const CLEARED = ['x', '\x7f']
 
 describe('a prompt Combwork puts into a CLI (#597)', () => {
-  const p = 'C:/hive-test/pasted-prompt'
+  const p = 'C:/combwork-test/pasted-prompt'
   const id = 'b1'
   const s = sessions as unknown as { live: Map<string, unknown> }
   const liveKey = `${p.toLowerCase()}#${id}`

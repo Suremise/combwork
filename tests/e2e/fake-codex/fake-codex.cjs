@@ -345,7 +345,7 @@ const bash = (command) => ({ tool_name: 'Bash', tool_input: { command } })
 let busy = false
 
 /** A long command, the kind that used to fill an agent's header while under review. */
-const LONG = bash("$env:CW_E2E_DIR = 'C:\\Users\\someone\\AppData\\Local\\hive-test\\e2e'; npm.cmd run e2e -- icons bell resumeall --reporter verbose")
+const LONG = bash("$env:CW_E2E_DIR = 'C:\\Users\\someone\\AppData\\Local\\combwork-test\\e2e'; npm.cmd run e2e -- icons bell resumeall --reporter verbose")
 
 /** A permission request its auto-reviewer answers: nobody is asked, and the title doesn't change. */
 async function review(allow, call = CURL, ms = 1500) {

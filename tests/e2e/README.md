@@ -107,7 +107,7 @@ home) and the installer's run last, alone.
 **Several runners at once** (agents in different worktrees each checking their card). Each runner claims a **lane**
 when it starts (`lanes.mjs`): a range of ten Agent API ports (lane *k*'s first slot is 47940 + 20*k*, the CLI lane the
 port below) and a folder of its own for its suites' profiles, workspaces and screenshots (`lanes\<k>` in the work
-folder, a folder per suite in it, below). Claims are files in `%LOCALAPPDATA%\hive-test\e2e-lanes`
+folder, a folder per suite in it, below). Claims are files in `%LOCALAPPDATA%\combwork-test\e2e-lanes`
 (`lane-<k>.json`, with the runner's process id), taken under a short lock and released when the runner ends; a crashed
 runner's claim expires (its process is gone, or it is a day old). A lane is only taken when nothing is listening on
 its ports, so anything else holding them (an older runner without lanes, another app) moves the runner to the next
@@ -120,7 +120,7 @@ A runner started inside a suite claims no lane: it takes ports 1000 above its pa
 `runner.mjs`) and its suites' folders in `nested` inside the parent's (`E2E_RUN_DIR`). Logs stay in one place for every
 lane (`logs/` below), so `.active` there shows every run still going. Suites keep their test projects outside the
 repository, so its `CLAUDE.md` (which imports `AGENTS.md`) never applies to their Claude Code sessions: Claude Code
-would ask each session whether to allow the import. `update` keeps its download cache per lane too (`%LOCALAPPDATA%\hive-test-updater-<k>`, through
+would ask each session whether to allow the import. `update` keeps its download cache per lane too (`%LOCALAPPDATA%\combwork-test-updater-<k>`, through
 `CW_UPDATE_CACHE`). The Codex test home stays shared: it holds the one sign-in, and copies of it would share a
 refresh token. Real Codex suites take a machine-wide lock on that home's real path for their whole suite (#478):
 two runners starting sandbox commands through the PowerShell alias together could leave one launch refused with
@@ -175,8 +175,8 @@ for the build), and the e2e runner, `lib.cjs` and the scenario harness all take 
   fake Claude Code's, `lib.ownClaudeHome`, the Codex test home). `lib.cjs` refuses to start a test Combwork with one missing
   or pointing at your own `~/.claude`, `~/.codex`, `~/.copilot` or `%APPDATA%\GitHub CLI` (however the path is spelled),
   and makes the empty ones. **Its git has the suite's config alone** (#1466): `GIT_CONFIG_GLOBAL` is
-  `<suite folder>\gitconfig` (`runContext.gitConfig`), which `lib.cjs` writes with the test identity (`Hive Test`,
-  `hive-test@example.invalid`, `lib.TEST_GIT_IDENTITY`) and `core.autocrlf = false`, and `GIT_CONFIG_NOSYSTEM=1`, so
+  `<suite folder>\gitconfig` (`runContext.gitConfig`), which `lib.cjs` writes with the test identity (`Combwork Test`,
+  `combwork-test@example.invalid`, `lib.TEST_GIT_IDENTITY`) and `core.autocrlf = false`, and `GIT_CONFIG_NOSYSTEM=1`, so
   your name and email never show in its screens or commits and the machine's git settings don't apply. **A suite's own
   git on its fixtures gets the same** (`lib.gitEnv()`, which `lib.git` uses): Git for Windows' system
   `core.autocrlf=true` for the suite's checkouts and not for its Combwork made Combwork take them for uncommitted changes. A
@@ -185,7 +185,7 @@ for the build), and the e2e runner, `lib.cjs` and the scenario harness all take 
   suite that needs no identity, or another, gives its Combwork and its git a `GIT_CONFIG_GLOBAL` of its own (`gitinit`,
   `gitview`, `p5scenarios`); `lib.cjs` refuses one missing or pointing at your own `~/.gitconfig`.
 - **The build, once per worktree** (`build.mjs`): runners started at the same time in one worktree share its `out/`,
-  so the first that finds it stale takes the worktree's build lock (`%LOCALAPPDATA%\hive-test\build-locks`, a folder
+  so the first that finds it stale takes the worktree's build lock (`%LOCALAPPDATA%\combwork-test\build-locks`, a folder
   per worktree with its holder's process id), looks again, builds once and stamps it; the others wait (`Waited for
   another runner's build`) and find it fresh. A runner that only checks waits too, so it never reads half a build. A
   lock whose runner is gone is broken; a failed build lets go of it. Worktrees don't wait for each other.
@@ -201,13 +201,13 @@ an e2e run and a scenario run wait for a lane of a pool of their own (`CW_TEST_L
 added: both must build and test the changed source, and the record name it (#735); meanwhile it holds machine lanes 0 and 1 with a suite folder in each, which their housekeeping as they end must leave (#1133). Run it after changing the runner,
 `lib.cjs`, `runContext.cjs`, `lanes.mjs`, `build.mjs` or the scenario harness. Two checkers can run at once, from two
 worktrees (#207): each keeps what it makes (its worktrees, decoy, heavy-run pool) in a folder of its own,
-`%LOCALAPPDATA%\hive-test\concurrency\run-<pid>-<time>` (`tempWorktrees.mjs`), and removes only that. A setup that
+`%LOCALAPPDATA%\combwork-test\concurrency\run-<pid>-<time>` (`tempWorktrees.mjs`), and removes only that. A setup that
 fails part way removes its own worktree; the folder of a checker that crashed is removed by the next one, unless it
 was kept with `--keep`. Two started from the same worktree share its build, so its "built once" checks may fail.
 
 **Heavy runs queue** (`slots.mjs`, #204). Several agents each running full sets on one machine slowed each other until
 tests that pass alone timed out. So at most **two heavy runs** go at once across every worktree
-(`heavySlots` in `%LOCALAPPDATA%\hive-test\config.json` changes it: "How many heavy runs at once", below): an e2e run of more than five suites (`--all`, `--real`, a big `--affected`) or
+(`heavySlots` in `%LOCALAPPDATA%\combwork-test\config.json` changes it: "How many heavy runs at once", below): an e2e run of more than five suites (`--all`, `--real`, a big `--affected`) or
 any `--repeat`, a scenario run of more than five scenarios or with `--repeat`, and a **full unit run** (`npm test`, a
 `vitest run` of the whole set: `tests/unitSlot.ts`, `isFullUnitRun`, #599; its workers and what its tests start, beside
 e2e runs, were what ran Windows short of desktop heap: 0xc0000142, below). A run of a few suites, a single
@@ -250,7 +250,7 @@ outside an agent's session). It takes the next free slot before runs that asked 
 pre-merge runs that asked before it, and says `…, pre-merge, next in line: held by …`; it never stops a run that holds a
 slot, and no slot is kept back for it. So a merge, which every other merge waits behind, doesn't wait behind flake-proof
 repeats. The merge-ready skill claims the merge slot before its checks, so its runs need no flag. Slots are files in
-`%LOCALAPPDATA%\hive-test\heavy-slots` (`slot-<k>.json` held, `wait-<pid>.json` waiting, each with its runner's
+`%LOCALAPPDATA%\combwork-test\heavy-slots` (`slot-<k>.json` held, `wait-<pid>.json` waiting, each with its runner's
 process id, and `first` for a pre-merge run, under the same claims lock as lanes); a crashed or killed run's slot, or
 place in the queue, expires at once (its process is gone).
 **A run left over** (#1008): a run started in an agent's session that ended since (Combwork closed under it, the agent
@@ -270,7 +270,7 @@ place.
 
 **How many heavy runs at once** (#544, #589). The default is two (`DEFAULT_SLOTS` in `slots.mjs`). A machine with more
 cores and memory, or with nothing else running, may take more; a slower one fewer. To change it, write the number into
-the shared test folder's settings file, `%LOCALAPPDATA%\hive-test\config.json`: `{ "heavySlots": 3 }`, a whole number,
+the shared test folder's settings file, `%LOCALAPPDATA%\combwork-test\config.json`: `{ "heavySlots": 3 }`, a whole number,
 1 or more. It is machine-wide, as the slots are: every worktree's runs, an agent's or a terminal's, read the same file,
 so they all count the same slots. It is read each time a run asks for a slot, so an edit counts from the next run, with
 no restart of Combwork or a terminal. A missing or unreadable file, or a value that isn't a whole number from 1, means two,
@@ -361,7 +361,7 @@ suite, so an e2e suite or scenario must never load a `.ts` helper from `tests/` 
 
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in
-`%LOCALAPPDATA%\hive-test\progress-timings.json`). `npm test` does the same, a step per test file. It reports to the
+`%LOCALAPPDATA%\combwork-test\progress-timings.json`). `npm test` does the same, a step per test file. It reports to the
 Combwork that launched the agent, never to the test copies the suites start (the session's `CW_*` variables aren't
 passed to them), and it never changes the output or the results. Turn it off with `--no-progress` (e2e) or
 `CW_PROGRESS=0` (both). The reporting is all in `tests/progressReport.mts`.
@@ -459,7 +459,7 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the
   release-combwork skill), with the verdict and report folder commented on the release card.
 - **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --hive "<the main checkout>"
-  --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
+  --report "$env:LOCALAPPDATA\combwork-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
   upgrade start; `--hive` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
   <a 1.1 release candidate's installer>` adds scenario 10, the upgrade from that RC, so the names upgrade, HI-2587, is
   checked from 1.0.0 and from an RC alike: pass it for 1.1's release candidates). It drives the
@@ -467,7 +467,7 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   it needs no MCP registration: `--server <its server.js>` (or `WSB_SERVER`), else the copy Combwork installed from the MCP
   catalogue in the workspace holding `--hive` (`<workspace>\.combwork\mcp\windows-sandbox`), else a hive-mcp checkout
   beside it (`<hive>\..\mcp\servers\windows-sandbox`). The server keeps its run folders in
-  `%LOCALAPPDATA%\hive-test\sandbox`.
+  `%LOCALAPPDATA%\combwork-test\sandbox`.
 - **What's where:** the runner (`checks.cjs`) maps this checkout's `tests` folder and `playwright-core` read-only into
   the Sandbox, so the scripts that run inside (`tests/sandbox/inside`: the installer runs, the install record and the
   window driver `drive.cjs`) and the e2e fake CLIs are this checkout's. A change to what `drive.cjs` drives (Provider
@@ -546,10 +546,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   folder, missing): what Combwork's compaction reader and its launch read of a user's `--settings` assume. Run it after a
   Claude Code update; a failure means `providers/claude/autoCompact.ts` no longer matches the CLI.
 - **`assistantresume`** (#334) sends prompts (five short ones, with Haiku), so it runs in the **Claude Code test home**
-  (`claudeHome: 'test'` in `suites.mjs`: `CLAUDE_TEST_HOME`, `%LOCALAPPDATA%\hive-test\claude`), never your own
+  (`claudeHome: 'test'` in `suites.mjs`: `CLAUDE_TEST_HOME`, `%LOCALAPPDATA%\combwork-test\claude`), never your own
   `~/.claude`. Sign in to it once by hand (as for the model trials, tests/scenarios/README.md), then `/exit`:
   ```powershell
-  New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\hive-test\claude" | Out-Null; $env:CLAUDE_CONFIG_DIR="$env:LOCALAPPDATA\hive-test\claude"; claude
+  New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\combwork-test\claude" | Out-Null; $env:CLAUDE_CONFIG_DIR="$env:LOCALAPPDATA\combwork-test\claude"; claude
   ```
   `CW_TEST_CLAUDE_HOME` points it at another test home. Without that sign-in the suite is skipped for the
   environment, and never falls back to your own home. It checks that a resumed Assistant answers from its current mode's instructions (a
@@ -566,10 +566,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   the copy is never asked about. It checks each reviewer's process has `--add-dir` the copies folder and no CLI's own
   settings name it. A reviewer whose CLI isn't signed in is skipped and said; without Copilot the suite is skipped.
   The fake tier's `reviewcopies` covers the leases, waits and returns.
-- **Codex** for the `codex*` suites, signed in to the **test home** `%LOCALAPPDATA%\hive-test\codex` (never your
+- **Codex** for the `codex*` suites, signed in to the **test home** `%LOCALAPPDATA%\combwork-test\codex` (never your
   own `~/.codex`). Sign in once:
   ```powershell
-  New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\hive-test\codex" | Out-Null; $env:CODEX_HOME="$env:LOCALAPPDATA\hive-test\codex"; codex login
+  New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\combwork-test\codex" | Out-Null; $env:CODEX_HOME="$env:LOCALAPPDATA\combwork-test\codex"; codex login
   ```
   The suites add their folders to that home's trusted projects and use its non-admin Windows sandbox. They send a
   few short prompts to a small model. Without a sign-in they are skipped.
@@ -596,7 +596,7 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
 
 ## Where they work
 
-Everything goes in `%LOCALAPPDATA%\hive-test\e2e` (override with `CW_E2E_DIR`). In it:
+Everything goes in `%LOCALAPPDATA%\combwork-test\e2e` (override with `CW_E2E_DIR`). In it:
 
 - `lanes\<k>\<suite>`: the profiles (`CW_USER_DATA`), workspaces and screenshots of each suite a runner in lane *k*
   runs (above). The runner gives each suite a folder of its own in its lane's as `CW_E2E_DIR`, which `lib.WORK`
@@ -670,7 +670,7 @@ profile flag naming the lane's folder) with no record (a record not made before 
 before records) is listed in the run's output with its pid and command line, for you to look at, and left running.
 `harnessleftovers` checks all of it with real copies.
 
-What the tests leave in `%LOCALAPPDATA%\hive-test` is removed once it is no longer needed (`clean.mjs`, #253). The e2e
+What the tests leave in `%LOCALAPPDATA%\combwork-test` is removed once it is no longer needed (`clean.mjs`, #253). The e2e
 runner and the scenario runner do it when they finish (at most a minute; what is left goes next time), and
 **`npm run test:clean`** does it on demand and prints each area's size (`--dry-run` lists what would go, and what is
 kept and why, without removing anything; `--days N` sets the age, default 3).
@@ -679,7 +679,7 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   anything left from before suites had folders of their own; in scenario lanes, numbered copies (`<scenario>-2`…) and
   folders older than the age; in `e2e`, anything but `lanes` and `logs` older than the age (suites run on their own,
   probes); in `tmp` (the unit tests' temp folders: tests/README.md, #992), anything older than a day (or `--days`, if
-  less); and anything else in `hive-test` older than the age (one-off folders and files).
+  less); and anything else in `combwork-test` older than the age (one-off folders and files).
 - **In the Codex test home** (`codex`, #404), which otherwise only grows (1.8 GB by 8 Oct 2026): its rollouts older
   than the age (`sessions\YYYY\MM\DD`; a folder whose rollouts are all that old goes whole), package copies Codex no
   longer runs (`packages\<name>\releases\<version>` that is neither its `current` link's target nor the version
@@ -701,7 +701,7 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   scenario results and older baselines) and listed as `kept: … (cited by #n)`. A card cites a path by writing it: the
   thing itself (`e2e\review158-dark.png`), a path inside a folder (`evidence\x.png` keeps `evidence`;
   `lanes\0\board\board.png` keeps that suite's folder, not the rest of the lane), or a folder as a whole
-  (`hive-test\evidence`, `lanes\0\board\`). A name alone isn't a citation, nor an area: `hive-test\e2e`, `scratch`, and
+  (`combwork-test\evidence`, `lanes\0\board\`). A name alone isn't a citation, nor an area: `combwork-test\e2e`, `scratch`, and
   **a lane** (`e2e\lanes\0`), which is where runs keep their suites' folders, not evidence (#285: cards naming lane 0
   kept every folder every later run made there, 2,078 of them, 23 GB in six hours). The cards are read from the
   workspace's board, found up from this repository's main checkout, afresh for every deletion (a card that cites
@@ -725,10 +725,10 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
 
 **Probes** (a reviewer's or builder's screenshots, scripts and profiles outside a suite) take **a new folder each run**,
 so nothing needs deleting before a rerun (#304): `require('./tests/e2e/lib.cjs').probeDir('<what>')` makes
-`hive-test\scratch\<what>-<date>-<time>-<random>`, which the clean-up prunes by age; or a new folder of your own in your
+`combwork-test\scratch\<what>-<date>-<time>-<random>`, which the clean-up prunes by age; or a new folder of your own in your
 scratchpad (Claude Code's session scratchpad, or `%TEMP%`). Never in the lanes or logs. A folder that has to be reused
 is emptied from Node with `npm run e2e -- --clear-dir <folder>` (`clearDir` in `evidence.cjs`): only inside a Claude
-Code scratchpad, a `cw…` folder in `%TEMP%`, or `hive-test\scratch` or `e2e` outside the lanes and logs; never an area
+Code scratchpad, a `cw…` folder in `%TEMP%`, or `combwork-test\scratch` or `e2e` outside the lanes and logs; never an area
 itself, a CLI test home, a link or what a card cites. Cite evidence a card needs by its full path: it stays until the
 card is Done.
 
@@ -790,7 +790,7 @@ terminals with the real Codex (one short prompt).
 
 **Copilot offline** (`fake-copilot-api.cjs`, #453): no fake CLI, the real one. `startFakeCopilotApi()` starts a scripted stand-in for Copilot's model, an OpenAI-compatible chat completions API on a port of its own; `copilotTestEnv(api, dir)` gives a test Combwork the environment for it: Copilot offline in its BYOK mode (`COPILOT_OFFLINE`, `COPILOT_PROVIDER_BASE_URL`, `COPILOT_MODEL=gpt-4.1`), its own `COPILOT_HOME`, a fake profile folder, and the GitHub CLI's login hidden (`GH_CONFIG_DIR` empty, `gh` off PATH: with no stored login Copilot signs in with `gh auth token`). The "model" does a prompt's steps, separated by ` then `, one per request: `skill NAME`, `cw TOOL {json}`, `boardmove`/`boardreview`/`boardcomment`, `work N`, `edit PATH OLD NEW`, `write PATH TEXT`, `shell COMMAND`, `question` (Copilot's ask_user) and `say TEXT` (the last reply). Copilot then runs its own tools, hooks, MCP servers and transcript as it would for a real model; each request is logged with the tools it offered. Never run `copilot login` or `logout` for a test: its sign-in is in Windows Credential Manager, per account, not in `COPILOT_HOME`. `copilot` and `copilotsize` use it; so does `npm run scenarios -- --provider fake-copilot`.
 
-**Copilot's skills from folders above** (#1308, Copilot 1.0.100, checked with `copilot skill list` and marker skills): besides its project's `.github/skills`, `.agents/skills` and `.claude/skills`, Copilot takes as "inherited" skills those of every folder above its working folder, up to the git root inside a repository, otherwise up to its profile folder (`USERPROFILE`/`HOME`, not included) or the drive's root. A test folder is under the user's profile (`%LOCALAPPDATA%\hive-test`) while the test's profile is elsewhere, so a Copilot working outside a repository (the Assistant's home, `<workspace>\.combwork\assistant`) walked up to the user's own `~\.claude\skills`. So `copilotTestEnv(api, dir, { above })` makes `above`, a folder above every folder the test's Copilot works in (the suite's `lib.WORK`, a scenario's run folder), its profile folder, where the walk stops; it's required. Combwork's own Copilot sessions do the same as Copilot run by hand: a project in a git repository stops at its root; the Assistant's home, or a project outside a repository, under the user's profile takes the user's `~\.claude\skills` too.
+**Copilot's skills from folders above** (#1308, Copilot 1.0.100, checked with `copilot skill list` and marker skills): besides its project's `.github/skills`, `.agents/skills` and `.claude/skills`, Copilot takes as "inherited" skills those of every folder above its working folder, up to the git root inside a repository, otherwise up to its profile folder (`USERPROFILE`/`HOME`, not included) or the drive's root. A test folder is under the user's profile (`%LOCALAPPDATA%\combwork-test`) while the test's profile is elsewhere, so a Copilot working outside a repository (the Assistant's home, `<workspace>\.combwork\assistant`) walked up to the user's own `~\.claude\skills`. So `copilotTestEnv(api, dir, { above })` makes `above`, a folder above every folder the test's Copilot works in (the suite's `lib.WORK`, a scenario's run folder), its profile folder, where the walk stops; it's required. Combwork's own Copilot sessions do the same as Copilot run by hand: a project in a git repository stops at its root; the Assistant's home, or a project outside a repository, under the user's profile takes the user's `~\.claude\skills` too.
 
 **A fake Codex** (`fake-codex/fake-codex.cmd`) does the same for Codex: set it as `settings.providers.codex.executablePath` and start Combwork with `CODEX_HOME` pointing at a test folder (with `[windows] sandbox = "unelevated"` in its `config.toml`, so nothing is left to set up). It reports itself as Codex 0.160.0 (`FAKE_CODEX_VERSION` changes it) and sends Codex's hooks and terminal titles for a few prompts: `review allow` / `review deny` (its auto-reviewer answers a permission request), `approve` (an approval prompt: `y` approves, Esc rejects) and `question` (an async question it works on beside: `a` answers it). Each prompt is a turn with its own id in its hooks (`turn_id`) and its rollout (`task_started`, and `task_complete` after its Stop), as Codex 0.162.1 has them; for the turn ledger (#648), `latetool` sends a command's PostToolUse after the turn's Stop, `loststop` sends no Stop (the rollout still records the end) and `silent` neither. `attention`, `turnledger` and `flightrecorder` use it, and so do `skilldelivery` and `dialectlaunch` (with the fake Claude Code); each launch is recorded in `fake-launches.jsonl` in `CODEX_HOME` (its folder and arguments).
 

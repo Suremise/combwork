@@ -17,7 +17,7 @@
 // - Folders: the work folder (WORK: the lane's, which the runner gives each suite as CW_E2E_DIR) and the CLI test
 //   homes (CODEX_HOME, CLAUDE_TEST_HOME). What a test copy of Combwork deletes goes to its trash folder in the suite's
 //   (CW_TEST_TRASH_DIR, `<work>	rash`, #414), never the user's Recycle Bin, and goes with the suite's folder.
-// - The temp folder (TEMP, TMP, TMPDIR in ALLOW): the run's own in hive-test\tmp, which the runner sets before it
+// - The temp folder (TEMP, TMP, TMPDIR in ALLOW): the run's own in combwork-test\tmp, which the runner sets before it
 //   starts anything (tests/tempDir.ts startRunTemp, HI-2102), never %TEMP%.
 // - Ports and lane folders: lanes.mjs (each runner claims a lane); each suite's port is CW_E2E_PORT, from its runner.
 // - The build: build.mjs, under a lock per worktree, so runners started together build it once.
@@ -28,7 +28,7 @@ const path = require('path')
 
 const LOCAL = process.env.LOCALAPPDATA || os.tmpdir()
 /** Everything the tests keep on this machine. */
-const TEST_ROOT = path.join(LOCAL, 'hive-test')
+const TEST_ROOT = path.join(LOCAL, 'combwork-test')
 /**
  * Where runners claim their lanes (lanes.mjs): e2e and scenario runs take them from the same pool. CW_TEST_LANES_DIR
  * gives a pool of its own, for checking a run that waits for a lane (concurrency.mjs, #735) without holding real runs'.
@@ -162,7 +162,7 @@ function cliHomes(parent = process.env) {
  * (the Version Control tab's Commit identity, the Initialise dialog's "will commit as") and its commits never show the
  * machine's. A suite that needs none, or another, gives its Combwork a GIT_CONFIG_GLOBAL of its own (gitinit, p5scenarios).
  */
-const TEST_GIT_IDENTITY = { name: 'Hive Test', email: 'hive-test@example.invalid' }
+const TEST_GIT_IDENTITY = { name: 'Combwork Test', email: 'combwork-test@example.invalid' }
 
 /** A suite's global git config (#1466): its work folder's `gitconfig`, which lib.cjs writes (writeGitConfig). */
 const gitConfig = (parent = process.env) => path.join(parent.CW_E2E_DIR || WORK, 'gitconfig')

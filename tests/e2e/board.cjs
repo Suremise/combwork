@@ -324,7 +324,7 @@ const check = (name, ok, extra = '') => {
   // three lines, all of it on hover and in the card's dialog (a field that wraps, where Enter adds no line break); a long
   // label ends in "…"; nothing on the card reaches past its edge, in both themes.
   const HASH = 'CC70E25605DD72A71E72C689318'.repeat(5).slice(0, 120)
-  const reason = `DOCS ACCEPTED at ${HASH}, record in C:\\Users\\Someone\\AppData\\Local\\hive-test\\e2e\\logs\\run-20261007-123453\\progress\\progress-shots\\light-recent-all.png`
+  const reason = `DOCS ACCEPTED at ${HASH}, record in C:\\Users\\Someone\\AppData\\Local\\combwork-test\\e2e\\logs\\run-20261007-123453\\progress\\progress-shots\\light-recent-all.png`
   const long = await inv('tasks:create', { title: 'Docs accepted', project: '', labels: [`label-${HASH.slice(0, 60)}`, 'ui'] })
   await inv('tasks:update', long.number, { blocked: reason })
   await until(async () => (await tile(long.number).locator('.task-blocked').count()) === 1, 5000)

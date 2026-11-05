@@ -7,7 +7,14 @@ tests run git with no global config, as CI does), `cliHomes.ts` (each test file 
 Copilot homes, never the user's, whatever the shell sets: HI-1703), `loggerListeners.ts` (takes off the process
 listeners a test's fresh load of the logger added: HI-1728), and `electron-stub.ts` standing in for `electron`.
 
-Test runs' temp folders are in the test area, `%LOCALAPPDATA%\hive-test\tmp` (#992), not `%TEMP%`: Combwork's Antivirus
+**The test area** is `%LOCALAPPDATA%\combwork-test` (`testArea.cjs`): the test profiles, the signed-in Claude Code and
+Codex test homes, the scenario baselines and results, the e2e lanes and logs, the Sandbox reports and the runs' temp
+folders. Before 1.1 it had the old name: `npm run test:move-area` (`moveTestArea.mjs`, HI-2590) moves it once, one way,
+at a time no test runs, keeping the sign-ins and rewriting the trust entries that name it; `-- --dry-run` says what it
+would do. Until then, and while a move is unfinished (run it again: it resumes), every test run refuses to start. It
+ends by printing the Defender lines that exclude the new folder and drop the old one (PowerShell, as administrator).
+
+Test runs' temp folders are in the test area, `%LOCALAPPDATA%\combwork-test\tmp` (#992), not `%TEMP%`: Combwork's Antivirus
 scanning setting covers the test area, and thousands of folders made and removed in `%TEMP%` kept Defender busy.
 `tempDir()` makes them there, and `vitest.config.ts` makes it the run's temp folder (`TEMP`, `TMP`, `TMPDIR`) too, so
 Vitest's own copies of the modules, Combwork's code under test and the programs tests start (git) put theirs there. The e2e
@@ -45,23 +52,23 @@ Tests never assume they're alone on the machine or inherit their shell.
 - After changing the runner, `lib.cjs`, the run context or the scenario harness, run `npm run e2e:concurrency` (and
   `-- --heavy` after changing `slots.mjs`).
 - At most two heavy runs (a full or `--repeat` e2e run, more than five scenarios, a full unit run) go at once on the
-  machine (`heavySlots` in `%LOCALAPPDATA%\hive-test\config.json` changes it, for the whole machine: e2e/README.md): a
+  machine (`heavySlots` in `%LOCALAPPDATA%\combwork-test\config.json` changes it, for the whole machine: e2e/README.md): a
   third waits, not hung, printing who holds the slots ("e2e: waiting for a test slot" in Progress; `--no-wait` fails at
   once).
-- Temp folders come from `tempDir()`, by long, real paths, in `%LOCALAPPDATA%\hive-test\tmp`, never under
+- Temp folders come from `tempDir()`, by long, real paths, in `%LOCALAPPDATA%\combwork-test\tmp`, never under
   `os.tmpdir()` (a unit test fails): CI's is the 8.3 form `C:\Users\RUNNER~1\…` and Combwork compares real paths, so such
   tests failed on CI only. Another name for a folder comes from `pathAliases.ts`: `junction()` works on any machine,
   `shortPath()` only where the volume makes 8.3 names.
 - Unit tests run git with none of the shell's `GIT_*` variables (`cleanGitEnv.ts`) and no global config, as CI does
   (`noGlobalGit.ts`): a test whose Combwork code commits or merges sets its repository's own `user.name` and `user.email`.
-- e2e suites use `lib.cjs` and work under `%LOCALAPPDATA%\hive-test\e2e` (each runner's suites in its lane's
+- e2e suites use `lib.cjs` and work under `%LOCALAPPDATA%\combwork-test\e2e` (each runner's suites in its lane's
   `lanes\<k>\<suite>`, so runners in different worktrees don't collide), never the real clipboard, profile or
   `~/.codex`.
 - Probes of your own (scripts, screenshots, profiles outside a suite) and redirected output take a new folder each run,
-  from `lib.probeDir()` (in `hive-test\scratch`) or your scratchpad, never in the lanes or logs, the project, a worktree
+  from `lib.probeDir()` (in `combwork-test\scratch`) or your scratchpad, never in the lanes or logs, the project, a worktree
   or beside one (the worktrees' parent folder), or a project's `.codex`, `.claude` or `.agents` (a stray `.codex` with a
   reviewer's probe stopped every Codex agent's commands, #509; logs left beside worktrees outlived them). The runners
-  prune what tests leave in `hive-test`, keeping what an open card cites by path (`npm run test:clean`, e2e/README.md
+  prune what tests leave in `combwork-test`, keeping what an open card cites by path (`npm run test:clean`, e2e/README.md
   Housekeeping).
 
 ## Tests wait for conditions, never for time
@@ -97,7 +104,7 @@ Anyone who clones the repository must get the same results, on any machine and u
   `tests/folderProcesses.test.ts` fails on a `process.kill` of a pid or a `taskkill` in the tests or scripts.
 - **Tests pass under load.** The full suites run beside other runs (up to two heavy runs on a machine by default, the
   e2e runner's test slots, which a full unit run takes too, and focused unit runs beside them). Before calling a test done, run it under that load, not only
-  alone. A machine can be set to take more or fewer heavy runs in `%LOCALAPPDATA%\hive-test\config.json` (`heavySlots`;
+  alone. A machine can be set to take more or fewer heavy runs in `%LOCALAPPDATA%\combwork-test\config.json` (`heavySlots`;
   [e2e](e2e/README.md), "How many heavy runs at once"); a test must pass with any number of them.
 
 A sleep that is the point of the test is fine: checking that something does *not* happen within a period, pacing

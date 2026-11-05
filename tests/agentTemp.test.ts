@@ -40,7 +40,7 @@ describe('the setting', () => {
   })
   it('takes one full path or a leading %VARIABLE%, and refuses two, a relative path, or text', () => {
     expect(checkAdvanced(def, 'D:\\agent-tmp')).toEqual({ value: ['D:\\agent-tmp'] })
-    expect(checkAdvanced(def, '%LOCALAPPDATA%\\hive-test\\agent-tmp')).toEqual({ value: ['%LOCALAPPDATA%\\hive-test\\agent-tmp'] })
+    expect(checkAdvanced(def, '%LOCALAPPDATA%\\combwork-test\\agent-tmp')).toEqual({ value: ['%LOCALAPPDATA%\\combwork-test\\agent-tmp'] })
     expect(checkAdvanced(def, [])).toEqual({ value: [] })
     for (const bad of ['D:\\a; E:\\b', 'agent-tmp', 'tmp\\x', 42]) expect('error' in checkAdvanced(def, bad), String(bad)).toBe(true)
     expect((checkAdvanced(def, 'agent-tmp') as { error: string }).error).toMatch(/one folder's full path/)

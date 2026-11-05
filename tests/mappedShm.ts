@@ -45,7 +45,7 @@ export async function whileMapped(dir: string, shm: string, body: (release: () =
   writeFileSync(ps1, [
     'param([string]$File, [string]$Release)',
     "$fs = [System.IO.File]::Open($File, 'Open', 'ReadWrite', 'ReadWrite, Delete')",
-    "$mm = [System.IO.MemoryMappedFiles.MemoryMappedFile]::CreateFromFile($fs, ('hive-test-' + [guid]::NewGuid()), 0, 'ReadWrite', 'None', $true)",
+    "$mm = [System.IO.MemoryMappedFiles.MemoryMappedFile]::CreateFromFile($fs, ('combwork-test-' + [guid]::NewGuid()), 0, 'ReadWrite', 'None', $true)",
     '$view = $mm.CreateViewAccessor()',
     '$fs.Dispose()',
     "[Console]::Out.WriteLine('mapped')",
