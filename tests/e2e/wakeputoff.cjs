@@ -76,7 +76,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const wakes = (a) => lines(path.join(homeOf(a), 'fake-wakes.jsonl')).filter((w) => w.agent === a.name && w.doorbell).map((w) => w.doorbell)
     const setSwitch = (which, value) => inv('advanced:set', `cw.inbox.${which}`, value)
     const hiveLog = () => {
-      const f = path.join(userData, 'logs', 'hive.log')
+      const f = path.join(userData, 'logs', 'combwork.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
     }
     const logCount = (re) => hiveLog().split('\n').filter((l) => re.test(l)).length

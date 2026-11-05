@@ -1,4 +1,4 @@
-// Archived cards' attachments cleaned up (HI-1842, Darren's decisions of 27 Oct 2026), on the real board (a temp hive.db):
+// Archived cards' attachments cleaned up (HI-1842, Darren's decisions of 27 Oct 2026), on the real board (a temp combwork.db):
 // only archived cards, the project's days after archiving (30 by default, Never keeps them); open and Done cards keep theirs,
 // as do cards brought back from the archive, or archived with their hidden or removed project. Round 2 (HR5's review): a
 // plan and an apply that checks it again in each card's change: only planned files
@@ -135,7 +135,7 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     const said = after.comments.at(-1)!
     expect(said.by).toBe('Combwork')
     expect(said.text).toMatch(/^Removed 2 attachments \(.*shot\.png.*\): this project removes archived cards' attachments 30 days after archiving \(Project Settings → Storage\)\. They are in the Recycle Bin\.$/)
-    expect(said.hiveText).toBeTruthy()
+    expect(said.appText).toBeTruthy()
     expect([rows(w, open.n), rows(w, done.n)]).toEqual([2, 2])
     expect([...open.paths, ...done.paths].every((f) => existsSync(f))).toBe(true)
     // Used once: its Move again is refused, and the automatic run finds nothing more.

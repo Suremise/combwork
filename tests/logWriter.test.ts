@@ -1,4 +1,4 @@
-// The log's writer thread (HI-1730): hive.log's and hooks.log's lines are queued on main and written by a thread of
+// The log's writer thread (HI-1730): combwork.log's and hooks.log's lines are queued on main and written by a thread of
 // their own, so a disk that holds writes up (a System Restore point freezing the profile's drive) holds that thread, not
 // main. Here, with the writer built and each of its writes held: logging returns at once, every line arrives once and in
 // order, the process's exit (flushLogs) writes what the writer hadn't, a writer that won't keep up has lines dropped and
@@ -20,7 +20,7 @@ const logger = await import('../src/main/logger')
 const { BUSY, LOG_STATE_SLOTS, STOP, WRITTEN, writeBatch } = await import('../src/main/logWriter')
 const bundle = join(base, 'log-writer.cjs')
 const hooks = join(base, 'profile', 'logs', 'hooks.log')
-const hive = join(base, 'profile', 'logs', 'hive.log')
+const hive = join(base, 'profile', 'logs', 'combwork.log')
 const lines = (f: string): string[] => (existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean) : [])
 
 beforeAll(async () => {
@@ -56,7 +56,7 @@ describe("the log's writer thread (HI-1730)", () => {
     expect(lines(hooks).at(-1)).toMatch(/after the exit$/)
   })
 
-  it("a writer that won't keep up: lines past the bound are dropped, and hive.log says how many", async () => {
+  it("a writer that won't keep up: lines past the bound are dropped, and combwork.log says how many", async () => {
     await logger.useLogWriter(bundle, 300)
     const was = logger.logLimits.waitingBytes
     logger.logLimits.waitingBytes = 2000

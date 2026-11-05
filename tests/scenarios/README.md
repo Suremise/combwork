@@ -263,7 +263,7 @@ Bump `FIXTURES_VERSION` in `scenarios.cjs` when a scenario's setup or checks cha
 
 ## Benchmarks: before and after a change
 
-Each run also writes `benchmark.json` (schema `hive-benchmark/1`, `benchmark.cjs`): for every scenario and sample, whether
+Each run also writes `benchmark.json` (schema `combwork-benchmark/1`, `benchmark.cjs`): for every scenario and sample, whether
 it passed its checks and what Combwork's own parts cost in it. Combwork's performance metrics are read before the launch and after
 the turn (`GET /v1/metrics` of the run's own workspace), and the difference is the scenario's:
 - **Context Combwork gave the session**: launch guidance in parts (core, project, the Assistant's role and mode, the skills' catalog), the

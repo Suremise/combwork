@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
 
 /** Writes to the workspace's board from outside Combwork, as the upgrade would have (its marks). */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.prepare(sql).run(...args)
   } finally {

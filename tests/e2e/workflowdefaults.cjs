@@ -68,7 +68,7 @@ const check = (name, ok, extra = '') => {
     const before = await startCard('Before the default')
     check('a card started before the change has its ruleset', !!before)
     // A running lane of alpha's, as the card-loop skill registers one (lanes.ts reads its table each time).
-    const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
     try {
       const at = new Date().toISOString()
       const next = await inv('tasks:create', { title: 'Next in the lane', project: 'alpha' })

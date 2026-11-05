@@ -56,7 +56,7 @@ export interface KeptJob extends SessionMeta {
 export type IngestResult = { status: 'written' | 'unchanged' | 'missing' | 'kept' | 'busy' | 'failed'; requests?: number }
 
 export type WorkerRequest = { id: number } & (
-  | { type: 'config'; advanced: Record<string, unknown>; providers: AppSettings['providers']; hiveVersion: string; cacheSize?: number }
+  | { type: 'config'; advanced: Record<string, unknown>; providers: AppSettings['providers']; appVersion: string; cacheSize?: number }
   | { type: 'ingest'; file: string; job: IngestJob }
   | { type: 'kept'; file: string; job: KeptJob }
   | { type: 'sessions'; file: string; scopes: string[] | null }
@@ -94,14 +94,14 @@ const CHUNK = 4 * 1024 * 1024
 const STATE_EVERY_MS = 10 * 60_000
 
 let providers: AppSettings['providers'] | null = null
-let hiveVersion = '0.0.0'
+let appVersion = '0.0.0'
 const dbs = new Map<string, Db>()
 
 function dbOf(file: string): Db {
   const key = file.toLowerCase()
   let db = dbs.get(key)
   if (!db) {
-    db = openDb(file, { migrations: USAGE_MIGRATIONS, hiveVersion, backupDir: join(dirname(file), 'backups'), backupFamily: 'usage' })
+    db = openDb(file, { migrations: USAGE_MIGRATIONS, appVersion, backupDir: join(dirname(file), 'backups'), backupFamily: 'usage' })
     dbs.set(key, db)
   }
   return db
@@ -301,7 +301,7 @@ function inTurn<T>(path: string, fn: () => Promise<T>): Promise<T> {
  * A compressed backup (#1110) is finished and read whole: no state for it.
  */
 async function takeUp(cur: ReturnType<typeof cursorOf>, path: string, size: number, provider: ProviderId, session: string): Promise<{ parser: RawUsageParser; from: number } | null> {
-  if (isGz(path) || !cur?.state || !cur.path || cur.path.toLowerCase() !== path.toLowerCase() || cur.stateOffset === null || cur.stateOffset > size || cur.stateVersion !== hiveVersion || !cur.stateShape) return null
+  if (isGz(path) || !cur?.state || !cur.path || cur.path.toLowerCase() !== path.toLowerCase() || cur.stateOffset === null || cur.stateOffset > size || cur.stateVersion !== appVersion || !cur.stateShape) return null
   if (cur.stateCheck !== (await bytesBefore(path, cur.stateOffset))) return null
   const parser = restoreParser(provider, session, cur.state, cur.stateShape)
   return parser ? { parser, from: cur.stateOffset } : null
@@ -481,7 +481,7 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
     size: st.size,
     mtime: st.mtimeMs,
     offset,
-    state: due ? { data: saveParser(parser), offset, shape: parserShape(parser), version: hiveVersion, check: (await bytesBefore(job.path, offset)) ?? '' } : from === 0 ? 'clear' : null,
+    state: due ? { data: saveParser(parser), offset, shape: parserShape(parser), version: appVersion, check: (await bytesBefore(job.path, offset)) ?? '' } : from === 0 ? 'clear' : null,
     summary: summaryOf(raw),
     timeline: raw.timeline ?? null,
     rows,
@@ -643,7 +643,7 @@ export async function handleRequest(m: WorkerRequest): Promise<unknown> {
     case 'config':
       readAdvancedFrom(valuesReader(m.advanced))
       providers = m.providers
-      hiveVersion = m.hiveVersion
+      appVersion = m.appVersion
       if (m.cacheSize) cacheSize = m.cacheSize
       return true
     case 'ingest':

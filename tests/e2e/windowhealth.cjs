@@ -1,4 +1,4 @@
-// A window's freeze names itself in hive.log (HI-1775): a deliberately slow render (the page busy for half a second)
+// A window's freeze names itself in combwork.log (HI-1775): a deliberately slow render (the page busy for half a second)
 // logs a long-task line naming the view it ran on, though the window has moved to another before the report goes; a
 // hang (Electron's unresponsive, as rendercrash raises it) logs its start as it begins, with the view, the window's last
 // input and its last long tasks (each where it ran), and its recovery with how long it was out; one over before the

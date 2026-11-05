@@ -321,7 +321,7 @@ export async function exportSessions(place: SessionsPlace): Promise<number> {
     const count = await withStoreLock(place.workspace, 'sessions', place.scope, async (db) => {
       // One write transaction from the read to the delete, the file written inside it (review round 2): no writer, in this
       // process or another (another Hive, a script on the database), commits between them; a failure undoes it all.
-      timedStep('db begin hive.db', () => db.exec('BEGIN IMMEDIATE'))
+      timedStep('db begin combwork.db', () => db.exec('BEGIN IMMEDIATE'))
       try {
         const f = fromTables(db, place.scope)
         const deleted = f.deleted

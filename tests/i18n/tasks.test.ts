@@ -457,7 +457,7 @@ describe('lines and a comment Combwork writes from outside the board service (#8
     const comment = (await run(() => tasks.getTask(c.number))).comments.at(-1)!
     expect(comment.text).toBe(englishOf(said))
     expect(comment.text).toMatch(/^\*\*Agent 1, after a safeguard stop:\*\* A safety classifier stopped a response at \d\d:\d\d\. It now runs on b instead of a \(since \d\d:\d\d\)\.$/)
-    expect(comment.hiveText).toEqual(said)
+    expect(comment.appText).toEqual(said)
   })
 
   it("gives Archive All's reasons for leaving a card in the window's language", async () => {

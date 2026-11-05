@@ -33,7 +33,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 const projectJson = (p = fx.alpha) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
 /** Changes the workspace's board from outside Combwork, as another process would. */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.prepare(sql).run(...args)
   } finally {

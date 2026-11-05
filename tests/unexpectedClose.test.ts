@@ -11,7 +11,7 @@ import { groupProgressRuns, progressRunTitle, progressRunsIn, type AgentProcess 
 const agent = (name: string, project: string, extra: Partial<RunningAgent> = {}): RunningAgent => ({ workspace: 'D:/ws', projectPath: `D:/ws/${project}`, project, agentId: name.toLowerCase(), agentName: name, provider: 'claude-code', sessionId: `s-${name}`, ...extra })
 const lastSeen = '2026-10-17T03:02:56.000Z'
 const HUNG_MS = 10_000
-const marker = (over: Record<string, unknown> = {}): string => JSON.stringify({ version: 1, pid: 42, startedAt: '2026-10-17T01:00:00.000Z', lastSeen: '2026-10-17T03:02:56.000Z', hive: '0.9.0', workspaces: ['D:/ws'], agents: [agent('B1', 'hive'), agent('R1', 'ambrosia')], ...over })
+const marker = (over: Record<string, unknown> = {}): string => JSON.stringify({ version: 1, pid: 42, startedAt: '2026-10-17T01:00:00.000Z', lastSeen: '2026-10-17T03:02:56.000Z', app: '0.9.0', workspaces: ['D:/ws'], agents: [agent('B1', 'hive'), agent('R1', 'ambrosia')], ...over })
 
 describe('the running marker (#984)', () => {
   it('reads back what a running Combwork wrote', () => {

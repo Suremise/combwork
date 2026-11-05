@@ -14,7 +14,7 @@ const HUNG_MS = 20000
 
 const userData = path.join(lib.WORK, 'crashdumps-profile')
 const reports = path.join(userData, 'Crashpad', 'reports')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 const heapDir = path.join(userData, 'heap')
 // The main process's heap in the out-of-memory test: small, so it fills (and its snapshot is written) in seconds.
 const SMALL_HEAP_MB = 256

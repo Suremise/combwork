@@ -2,7 +2,7 @@
 // case-insensitive), the 1.0 step (an existing card keeps its number in its project, HI-1061; every old #N still resolves),
 // new cards numbered per project, a key changed (the old one an alias), a card moved to another project (its old key an
 // alias, its number there again when it comes back), a counter after a change undone part way, and references for the
-// Agent API (`HI-12`, `hi-12`, `#12`, 12). CW_KEYS_LIVE_DB=<a hive.db> runs the step on a copy of that board.
+// Agent API (`HI-12`, `hi-12`, `#12`, 12). CW_KEYS_LIVE_DB=<a combwork.db> runs the step on a copy of that board.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
@@ -511,13 +511,13 @@ describe('the 1.0 step: keys for a 0.9 board', () => {
 })
 
 const live = process.env.CW_KEYS_LIVE_DB
-describe.skipIf(!live)("the keys step on a copy of a live board's hive.db (CW_KEYS_LIVE_DB)", () => {
+describe.skipIf(!live)("the keys step on a copy of a live board's combwork.db (CW_KEYS_LIVE_DB)", () => {
   it('gives each project with cards a key, and every card that has a project its own number there: every old #N resolves', () => {
     const copy = join(base, `live-${++n}.db`)
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     // The board's 1.0 group as the upgrade runs it (the cards step before the keys step), on the copy.
-    const opened2 = openDb(copy, { migrations: store.BOARD_MIGRATIONS, hiveVersion: '1.0.0-test', approve: () => true })
+    const opened2 = openDb(copy, { migrations: store.BOARD_MIGRATIONS, appVersion: '1.0.0-test', approve: () => true })
     try {
       const r = opened2.reader
       const cards = r.prepare('SELECT number, project_id, project_number FROM cards').all() as { number: number; project_id: string | null; project_number: number | null }[]

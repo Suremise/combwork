@@ -105,9 +105,13 @@ function findBoard(root) {
   }
   for (;;) {
     // Its folder is .combwork from 1.1 (HI-2462), .hive in a workspace no 1.1 has opened yet (the installed 1.0's).
+    // Its file is combwork.db once a build with the names upgrade (HI-2587) has opened it, hive.db before (the installed
+    // Combwork's, which the developer's own workspace may still be on).
     for (const folder of ['.combwork', '.hive']) {
-      const db = path.join(dir, folder, 'hive.db')
-      if (fs.existsSync(db)) return db
+      for (const name of ['combwork.db', 'hive.db']) {
+        const db = path.join(dir, folder, name)
+        if (fs.existsSync(db)) return db
+      }
     }
     for (const folder of ['.combwork', '.hive']) {
       const tasks = path.join(dir, folder, 'tasks')

@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { mkdirSync } from 'original-fs'
+import { existsSync, mkdirSync, renameSync } from 'original-fs'
 import { basename, join } from 'path'
 import { isMainThread, Worker } from 'worker_threads'
 import { maskKeys } from './keyMatcher'
@@ -16,15 +16,41 @@ export function logsDir(): string {
   return join(app.getPath('userData'), 'logs')
 }
 
+/** The app's own log, `combwork.log` (HI-2587: `hive.log` before), kept to MAX_BYTES and one older copy. */
+export const LOG_FILE = 'combwork.log'
+
+let logsMoved = false
+
 function file(name: string): string {
   let f = logFiles.get(name)
   if (!f) {
     const dir = logsDir()
     mkdirSync(dir, { recursive: true })
+    // Before the first line (HI-2587): the old log's files take the new name, once (moveOldLogs).
+    if (!logsMoved) {
+      logsMoved = true
+      moveOldLogs(dir)
+    }
     f = join(dir, name)
     logFiles.set(name, f)
   }
   return f
+}
+
+/**
+ * The log's files from before 1.1 renamed (HI-2587, the names upgrade, nameUpgrade.ts): `hive.log` → `combwork.log` and
+ * `hive.1.log` → `combwork.1.log`, each only while its new name isn't there. One that can't be renamed (held by another
+ * program), or whose new name is there already, stays where it is, never read: Help → Open Logs Folder shows it, and the
+ * next start tries again while the new name is free. Never throws: a log mustn't.
+ */
+export function moveOldLogs(dir: string): void {
+  for (const [from, to] of [['hive.log', LOG_FILE], ['hive.1.log', LOG_FILE.replace(/\.log$/, '.1.log')]]) {
+    try {
+      if (existsSync(join(dir, from)) && !existsSync(join(dir, to))) renameSync(join(dir, from), join(dir, to))
+    } catch {
+      // Left as it is: said nowhere, as nothing is logged yet.
+    }
+  }
 }
 
 /** A log write this slow, made here, is noted as a step (HI-1692), so a stall it caused names it. */
@@ -87,7 +113,7 @@ function writerThread(): Worker | null {
       // Nothing writes there now: what it hadn't written is written here, and every line after.
       Atomics.store(shared, BUSY, 0)
       flushLogs()
-      appendHere(file('hive.log'), `${new Date().toISOString()} [WARN] [logger] The log's writer thread ended: lines are written on the main thread from now\n`) // i18n-ignore: a line of hive.log
+      appendHere(file(LOG_FILE), `${new Date().toISOString()} [WARN] [logger] The log's writer thread ended: lines are written on the main thread from now\n`) // i18n-ignore: a line of combwork.log
     }
     w.on('error', gone)
     w.on('exit', gone)
@@ -131,10 +157,10 @@ function appendHere(f: string, line: string): void {
   if (stallClock.mono() - start >= SLOW_WRITE_MS) noteStep(`log write ${basename(f)}`, start)
 }
 
-/** The lines dropped meanwhile, said in hive.log as the next line there. */
+/** The lines dropped meanwhile, said in combwork.log as the next line there. */
 function droppedLine(): string | null {
   if (!dropped) return null
-  const line = `${new Date().toISOString()} [WARN] [logger] ${dropped} log line(s) weren't written: the logs' drive held writes up for too long\n` // i18n-ignore: a line of hive.log
+  const line = `${new Date().toISOString()} [WARN] [logger] ${dropped} log line(s) weren't written: the logs' drive held writes up for too long\n` // i18n-ignore: a line of combwork.log
   dropped = 0
   return line
 }
@@ -146,7 +172,7 @@ function post(): void {
   if (!w || here) return
   const note = droppedLine()
   if (note) {
-    const f = file('hive.log')
+    const f = file(LOG_FILE)
     queued.set(f, [note, ...(queued.get(f) ?? [])])
   }
   for (const [f, lines] of queued) {
@@ -177,7 +203,7 @@ export function flushLogs(): void {
   for (const b of sent.splice(0)) if (b.seq > written) appendLog(b.file, b.text, b.maxBytes)
   sentBytes = 0
   const note = droppedLine()
-  if (note) appendLog(file('hive.log'), note, MAX_BYTES)
+  if (note) appendLog(file(LOG_FILE), note, MAX_BYTES)
   for (const [f, lines] of queued) appendLog(f, lines.join(''), MAX_BYTES)
   queued.clear()
   queuedBytes = 0
@@ -221,8 +247,8 @@ function consoleFailed(where: 'stdout' | 'stderr', e: unknown): void {
   toConsole = false
   if (closed && !wasOn) return
   const at = new Date().toISOString()
-  if (closed) append('hive.log', `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`) // i18n-ignore: a line of hive.log
-  else append('hive.log', `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`) // i18n-ignore: a line of hive.log
+  if (closed) append(LOG_FILE, `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`) // i18n-ignore: a line of combwork.log
+  else append(LOG_FILE, `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`) // i18n-ignore: a line of combwork.log
 }
 if (toConsole) {
   process.stdout?.on?.('error', (e: unknown) => consoleFailed('stdout', e))
@@ -230,7 +256,7 @@ if (toConsole) {
 }
 
 /**
- * A line of hive.log as written: its data serialised, then a server connection's key in use masked in it (HI-1772), in
+ * A line of combwork.log as written: its data serialised, then a server connection's key in use masked in it (HI-1772), in
  * any form the serialising wrote it (keyMatcher.ts's forms), before the log or the console get it.
  */
 export function logLine(level: Level, scope: string, message: string, extra?: unknown): string {
@@ -250,13 +276,13 @@ function write(level: Level, scope: string, message: string, extra?: unknown): v
       consoleFailed(where, e)
     }
   }
-  append('hive.log', line)
+  append(LOG_FILE, line)
 }
 
 /**
  * A line of the hook journal (logs/hooks.log, #648): each hook an agent's CLI sent, with its launch, ids and receive
  * order, and the status before and after, so a status that went wrong can be traced afterwards (#642's couldn't be).
- * Apart from hive.log, which it would crowd out. Ids, event names and statuses only: never the user's text.
+ * Apart from combwork.log, which it would crowd out. Ids, event names and statuses only: never the user's text.
  */
 export function hookJournal(line: string): void {
   append('hooks.log', `${new Date().toISOString()} ${line}\n`)

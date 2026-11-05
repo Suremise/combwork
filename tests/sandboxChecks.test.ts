@@ -64,12 +64,12 @@ test('build folder: the common folder of both installers; different drives and t
   assert.throws(() => buildRoot('D:\\Hive-Setup-0.6.0.exe', null), /drive root/)
 })
 
-test('--only: anything but fresh, upgrade, manual, edges or clean is refused before anything runs', () => {
-  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade or manual or edges or clean, not "frseh"/)
+test('--only: anything but fresh, upgrade, manual, edges, clean or upgrade-rc is refused before anything runs', () => {
+  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade or manual or edges or clean or upgrade-rc, not "frseh"/)
   const s = scratch('only')
   const r = runner(['--only', 'frseh', '--installer', 'x', '--report', path.join(s.dir, 'report')], s.env())
   assert.strictEqual(r.status, 2)
-  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade or manual or edges or clean/)
+  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade or manual or edges or clean or upgrade-rc/)
   assert.deepStrictEqual(s.read().calls, [], 'wsb or the server was called')
 })
 
@@ -255,6 +255,21 @@ test('the previous installer: a release sorts above its prereleases, so 0.9.0 is
   assert.strictEqual(pick('Hive-Setup-0.9.1-rc.1.exe'), 'Hive-Setup-0.9.0.exe')
   // The newest other than the installer itself, even when that is a prerelease.
   assert.strictEqual(pick('Hive-Setup-0.9.0.exe'), 'Hive-Setup-0.9.1-rc.1.exe')
+})
+
+test('--previous-rc (HI-2587): a 1.1 release candidate adds scenario 10 beside the upgrade from 1.0; --only upgrade-rc needs it', () => {
+  const s = scratch('previous-rc')
+  const hive = path.join(s.dir, 'builds', 'hive')
+  const dist = path.join(hive, 'dist')
+  fs.mkdirSync(dist)
+  for (const v of ['Hive-Setup-1.0.0', 'Combwork-Setup-1.1.0-rc.2', 'Combwork-Setup-1.1.0']) fs.writeFileSync(path.join(dist, `${v}.exe`), 'MZ')
+  const installer = path.join(dist, 'Combwork-Setup-1.1.0.exe')
+  const rc = path.join(dist, 'Combwork-Setup-1.1.0-rc.2.exe')
+  const p = plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--previous-rc', rc, '--hive', hive, '--server', FAKE_SERVER])
+  assert.deepStrictEqual(p.ran, ['fresh', 'upgrade', 'clean', 'upgrade-rc'])
+  assert.strictEqual(p.guestPreviousRc, 'C:\\build\\Combwork-Setup-1.1.0-rc.2.exe')
+  assert.deepStrictEqual(plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--hive', hive, '--server', FAKE_SERVER]).ran, ['fresh', 'upgrade', 'clean'])
+  assert.throws(() => plan(['--only', 'upgrade-rc', '--installer', installer, '--hive', hive, '--server', FAKE_SERVER]), /--only upgrade-rc needs --previous-rc/)
 })
 
 test('--smart-app-control: only "off"; anything else is refused before anything runs', () => {

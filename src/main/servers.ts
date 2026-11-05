@@ -639,7 +639,7 @@ async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
 
 /**
  * A change the Hive Assistant asks for: admitted by the Assistant's change boundary (control level, limit), run, and
- * recorded (its panel's list and hive.log) with `act`, its kind and targets (#763), and what `fn` adds to them once
+ * recorded (its panel's list and combwork.log) with `act`, its kind and targets (#763), and what `fn` adds to them once
  * known (`act`: a new card's number, a new agent). `fn` gets the boundary's guard, to run again as each write is made.
  * Other callers can't make these changes through the API.
  */
@@ -4582,8 +4582,8 @@ export function apiErrorReply(e: unknown): { status: number; body: Record<string
  * A card's history entry or comment: without its id (replies stay lean) or its text as data, its English said in the
  * reader's dialect where its chain overrides the line's message (storedForAgents, dialects HI-2440), else as stored.
  */
-export const entryForAgents = <T extends { id?: string; what?: string; text?: string; whatText?: unknown; hiveText?: unknown }>({ id: _id, whatText, hiveText, ...rest }: T): Omit<T, 'id' | 'whatText' | 'hiveText'> =>
-  ({ ...rest, ...(typeof rest.what === 'string' && whatText ? { what: storedForAgents(rest.what, whatText) } : {}), ...(typeof rest.text === 'string' && hiveText ? { text: storedForAgents(rest.text, hiveText) } : {}) }) as Omit<T, 'id' | 'whatText' | 'hiveText'>
+export const entryForAgents = <T extends { id?: string; what?: string; text?: string; whatText?: unknown; appText?: unknown }>({ id: _id, whatText, appText, ...rest }: T): Omit<T, 'id' | 'whatText' | 'appText'> =>
+  ({ ...rest, ...(typeof rest.what === 'string' && whatText ? { what: storedForAgents(rest.what, whatText) } : {}), ...(typeof rest.text === 'string' && appText ? { text: storedForAgents(rest.text, appText) } : {}) }) as Omit<T, 'id' | 'whatText' | 'appText'>
 /** A metrics report: its lists of what wasn't measured or filtered in English only. */
 /**
  * /v1/metrics in 0.9.3 only (#1084; deprecated, gone in the next release): each guidance series also under its names from before 0.9.3, when the

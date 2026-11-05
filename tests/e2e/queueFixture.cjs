@@ -374,7 +374,7 @@ async function mergesTab(h, project = 'alpha') {
 }
 
 /**
- * Another Combwork's profile on the fixture's workspace (#1358's queuelease: S50, two copies on one hive.db), set up as
+ * Another Combwork's profile on the fixture's workspace (#1358's queuelease: S50, two copies on one combwork.db), set up as
  * prepare sets the fixture's own: the fake Claude Code, quiet, the Agent API on. Returns the fixture with that profile,
  * for startHive.
  */

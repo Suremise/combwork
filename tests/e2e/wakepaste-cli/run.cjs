@@ -96,7 +96,7 @@ module.exports = async function run(provider) {
     const live = async () => (await inv('session:live')).find((s) => s.agentId === id)
     const idle = async () => ['ready', 'finished'].includes((await live())?.status)
     const hiveLog = () => {
-      const f = path.join(userData, 'logs', 'hive.log')
+      const f = path.join(userData, 'logs', 'combwork.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
     }
     /** Combwork's log lines about lines typed into the agent (its wakes' and doorbells' outcomes). */

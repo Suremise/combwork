@@ -114,7 +114,7 @@ function setup(db: DatabaseSync, isNew: boolean): void {
   db.function('journal_week', { deterministic: true }, (at) => isoWeek(new Date(String(at))))
 }
 
-const hiveVersion = (): string => {
+const appVersion = (): string => {
   try {
     return app.getVersion()
   } catch {
@@ -201,7 +201,7 @@ export async function untilJournalOpenable(home: string, signal: AbortSignal): P
 export const journalTestHooks: { openableWait: ((home: string) => void) | null } = { openableWait: null }
 
 /** Opens the journal at `file`, where it really is (its backups beside it). */
-const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(dirname(file), 'backups'), setup, checkpointer: checkpointWhenIdle, onIoRetry: (e, ms) => log.warn(`opening the journal ${userText(file)}: ${userText(e.message)}, tried again in ${ms} ms`) })
+const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_MIGRATIONS, appVersion: appVersion(), backupDir: join(dirname(file), 'backups'), setup, checkpointer: checkpointWhenIdle, onIoRetry: (e, ms) => log.warn(`opening the journal ${userText(file)}: ${userText(e.message)}, tried again in ${ms} ms`) })
 
 /**
  * Closes a home's journal (its workspace closed, or before it is deleted): every connection to it, however it was spelt

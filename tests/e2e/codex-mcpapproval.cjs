@@ -214,7 +214,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       check('Assistant: Codex asks before cw_write_shared_note (outside its Control subset)', typeof asking === 'object' && !!asking && /cw_write_shared_note/.test(asking.statusMessage ?? ''), JSON.stringify(record.assistant.noteAsk))
       check('…and the note is not written while it asks', !fs.existsSync(note))
       // The native server named combwork was read (its folder's Codex config), and Combwork's approvals won over its own.
-      const hiveLog = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+      const hiveLog = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
       check("…with the folder's own Codex config approving every hive tool (read: Combwork's log names it)", /Codex has an MCP server named combwork in .*\.codex[\\/]config\.toml⁩?: Combwork's own server is used instead/.test(hiveLog), hiveLog.split('\n').filter((line) => /named combwork/.test(line)).slice(-2).join(' / '))
       if (typeof asking === 'object' && asking) {
         // Cancel the tool call (Esc, as its question says): the turn ends and nothing is written.

@@ -86,7 +86,7 @@ export interface Env {
   wf: Workflow
   store: FactStore
   project: string
-  /** The workspace folder: its hive.db holds the store (#1215); slots live here too, outside the repository. */
+  /** The workspace folder: its combwork.db holds the store (#1215); slots live here too, outside the repository. */
   home: string
   options: WorkflowOptions
   wakes: { agent: string; card: string; why: string }[]
@@ -94,7 +94,7 @@ export interface Env {
   queue: (cfg?: Partial<QueueConfig>) => MergeQueue
   /** Another Combwork on the same workspace: its own store connection and Workflow (§16.17). */
   another: () => Workflow
-  /** A store on a connection of its own to the workspace's hive.db, as a restarted Combwork opens it (closed with the rest). */
+  /** A store on a connection of its own to the workspace's combwork.db, as a restarted Combwork opens it (closed with the rest). */
   reopen: () => FactStore
   /** Facts of a card, by kind. */
   kinds: (card: number) => FactKind[]
@@ -109,7 +109,7 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
   else mkdirSync(project, { recursive: true })
   if (extra.files) for (const [f, c] of Object.entries(extra.files)) put(project, f, c)
   const o: WorkflowOptions = { ...allOff(options.platform), ...options }
-  // The workspace's hive.db, made through the board's open path (#1215: the project's cards are the board's); the
+  // The workspace's combwork.db, made through the board's open path (#1215: the project's cards are the board's); the
   // runtime, outside any board change, has a connection of its own to it, as another Combwork would.
   const scope = { project: 'project', key: 'AM' }
   // Its window's, as a window opening it would admit it (#1395).

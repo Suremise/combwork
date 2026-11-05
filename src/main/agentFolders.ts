@@ -1,6 +1,6 @@
 // The folder contract in main (#1434, SPEC §16.10.3; the decisions are shared/agentFolders.ts's): what it decides from
-// (a project's slots and leases in hive.db, its migration and its retired homes, #1441's), and the one write that lets a
-// session start in a slot. That write decides again from hive.db as it is then (`claimPlace`): the resume authority
+// (a project's slots and leases in combwork.db, its migration and its retired homes, #1441's), and the one write that lets a
+// session start in a slot. That write decides again from combwork.db as it is then (`claimPlace`): the resume authority
 // (the agent's leases, the slot's), the user's Resume taking a free slot or binding to the agent's own later lease, and
 // the slot's **writer** reserved for the start's run, so nothing else lends, adopts, takes or removes the slot until that
 // run has exited (`releaseWriter`). A session's bound lease (`sessions.lease`) is set when it starts there and changed
@@ -275,7 +275,7 @@ async function headNow(folder: string): Promise<string | null> {
  * home are any agent's, a 0.9 worktree only its agent's (`foreign` otherwise), a slot's only its own agent's.
  *
  * In a slot, its run's token is live from here (before its claim can be seen) and the claim is its pool's tracked work
- * (`done`); then one board write decides again from hive.db as it is then and claims the slot (`claimIn`). Refused with
+ * (`done`); then one board write decides again from combwork.db as it is then and claims the slot (`claimIn`). Refused with
  * ClaimRefused, writing nothing; the token and the tracked work end with the refusal.
  */
 export async function claimPlace(projectPath: string, agent: FolderAgent, existing: (FolderSession & { id: string; agentId?: string }) | null, o: { purpose: FolderPurpose; auto: boolean; run: string }): Promise<Claim> {
@@ -320,7 +320,7 @@ export async function claimPlace(projectPath: string, agent: FolderAgent, existi
   }
 }
 
-/** What `claimIn` decides from, besides hive.db: what was read before its write. */
+/** What `claimIn` decides from, besides combwork.db: what was read before its write. */
 export interface ClaimInput {
   /** The project's facts as read before (its migration and homes; its slots are read again in the write). */
   facts: FolderFacts
@@ -331,7 +331,7 @@ export interface ClaimInput {
   purpose: FolderPurpose
   auto: boolean
   run: string
-  /** Where the project's sessions are kept (their host in hive.db). */
+  /** Where the project's sessions are kept (their host in combwork.db). */
   sessionsHost: string
   /** This Hive, as the writer's holder. */
   me: { pid: number; started: number }
@@ -340,7 +340,7 @@ export interface ClaimInput {
 }
 
 /**
- * `claimPlace`'s write (#1434), on the board's database: decided from hive.db as it is in this write, the slot claimed
+ * `claimPlace`'s write (#1434), on the board's database: decided from combwork.db as it is in this write, the slot claimed
  * for `run` as its writer, with the user's Resume's bind or new lease. Throws ClaimRefused, undoing the write.
  */
 export function claimIn(db: DatabaseSync, store: SlotStore, c: ClaimInput): { lease: string; slot: FolderSlot } {

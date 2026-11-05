@@ -13,7 +13,7 @@ import { agentProvider } from '../shared/providers'
 
 /**
  * The record undo is built on (#1282, SPEC §16.14): each change the Hive Assistant makes, with what it replaced and what
- * it wrote, field by field, in hive.db's `assistant_changes` and `assistant_change_values` (schema/v1_0.ts), grouped by
+ * it wrote, field by field, in combwork.db's `assistant_changes` and `assistant_change_values` (schema/v1_0.ts), grouped by
  * the user's message it came from (assistantControl's turn) and kept KEEP_DAYS days. A change the Assistant makes runs
  * inside `recordingChanges` (servers.ts' assistantChange, its batches): a card it changes is recorded as the card is
  * saved, in the same transaction (tasks.ts' saveCard calls noteCard), one change per card; a lane, an agent's settings,

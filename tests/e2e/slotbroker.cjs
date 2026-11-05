@@ -65,8 +65,8 @@ async function endFromOutside(app, spare = []) {
   return ended > 0 && !!(await lib.until(() => gone, HUNG_MS)) && !!(await lib.until(() => lib.stillSame([{ pid: top.pid, started: top.started }, ...rest]).length === 0, HUNG_MS, 250))
 }
 /**
- * A row of a gone Combwork's hive.db, read once a read succeeds (HI-2316). Windows reports the ended Combwork's exit a moment
- * before its view of hive.db-shm is unmapped: a first connection then can't truncate that file and is refused ("disk
+ * A row of a gone Combwork's combwork.db, read once a read succeeds (HI-2316). Windows reports the ended Combwork's exit a moment
+ * before its view of combwork.db-shm is unmapped: a first connection then can't truncate that file and is refused ("disk
  * I/O error", SQLITE_IOERR_TRUNCATE, 1546), with the keeper still running and holding nothing. So each refusal is
  * noted, with how long after `since`, and the read is tried again until one succeeds. Returns { row, refused }: row
  * null if none succeeded within the bound.
@@ -263,8 +263,8 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
       kept.push(...keeper)
       check(`${part}: …and Combwork is ended from outside, the broker and its keeper left running`, await endFromOutside(h.app, [pid, helperPid]))
       h = null
-      const read = await readGoneHiveDb(path.join(ws, '.combwork', 'hive.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
-      if (read.refused.length) console.log(`INFO ${part}: hive.db refused ${read.refused.length} read(s) before one succeeded, the keeper ${lib.stillSame(keeper).length ? 'running' : 'gone'}: ${read.refused.slice(0, 5).join(' | ')}`)
+      const read = await readGoneHiveDb(path.join(ws, '.combwork', 'combwork.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
+      if (read.refused.length) console.log(`INFO ${part}: combwork.db refused ${read.refused.length} read(s) before one succeeded, the keeper ${lib.stillSame(keeper).length ? 'running' : 'gone'}: ${read.refused.slice(0, 5).join(' | ')}`)
       const row = read.row
       check(`${part}: …slot-a still names its run as writer`, row?.run === run, JSON.stringify(row))
       const receiptFile = path.join(userData, 'keeper', `keeper-${run}.json`)

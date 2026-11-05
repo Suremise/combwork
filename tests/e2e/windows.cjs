@@ -171,7 +171,7 @@ async function waitFor(fn, ms = 15000) {
   // Its own workspace by another name isn't a switch (#455): no question, its agent runs on, and it keeps the name it has.
   // Nor is it closed and opened again (HI-2141: that ended what its passes were writing): counted by the log's "Opened
   // workspace" lines once the switch below has logged its own, which comes after any this open would have written.
-  const openedLines = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => l.includes('Opened workspace')).length
+  const openedLines = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => l.includes('Opened workspace')).length
   const openedBefore = openedLines()
   const same = invA('workspace:open', aliasA)
   const asked = await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0, 4000)

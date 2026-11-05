@@ -20,7 +20,7 @@ function aliased(): { real: string; via: string; short: string | null } {
 }
 
 const ws = join('C:\\', 'fence', 'alpha')
-const db = join(ws, '.combwork', 'hive.db')
+const db = join(ws, '.combwork', 'combwork.db')
 /** What a refused open throws here (the workspace's own message in the app: setFenceReason). */
 setFenceReason(() => new Error('The workspace was closed'))
 
@@ -45,7 +45,7 @@ describe('admission to a workspace’s databases', () => {
   it("admits only its own files: not one beside it, a project's .combwork inside it, a file in no .combwork, or a .combwork under its Assistant's home (HR6)", () => {
     admit(placeKey(ws))
     try {
-      for (const f of [join('C:\\', 'fence', 'beta', '.combwork', 'hive.db'), join('C:\\', 'fence', 'alphabet', '.combwork', 'hive.db'), join(ws, 'proj', '.combwork', 'notes.db'), join(ws, 'notes.db'), join(ws, '.combwork', 'assistant', '.combwork', 'other.db')]) expect({ f, refused: isRefusal(refusal(f)) }).toEqual({ f, refused: true })
+      for (const f of [join('C:\\', 'fence', 'beta', '.combwork', 'combwork.db'), join('C:\\', 'fence', 'alphabet', '.combwork', 'combwork.db'), join(ws, 'proj', '.combwork', 'notes.db'), join(ws, 'notes.db'), join(ws, '.combwork', 'assistant', '.combwork', 'other.db')]) expect({ f, refused: isRefusal(refusal(f)) }).toEqual({ f, refused: true })
       // Only the nearest .combwork owns a file.
       expect(ownerOf(join(ws, '.combwork', 'assistant', '.combwork', 'other.db'))).toBe(placeKey(join(ws, '.combwork', 'assistant')))
       expect(ownerOf(join(ws, '.combwork', 'assistant', 'journal.db'))).toBe(placeKey(ws))
@@ -59,14 +59,14 @@ describe('admission to a workspace’s databases', () => {
     const p = aliased()
     admit(placeKey(p.via))
     try {
-      expect(refusal(join(p.real, '.combwork', 'hive.db'))).toBeNull()
+      expect(refusal(join(p.real, '.combwork', 'combwork.db'))).toBeNull()
       expect(refusal(join(p.via.toUpperCase(), '.combwork', 'not-made-yet', 'journal.db'))).toBeNull()
       if (p.short) expect(refusal(join(p.short, '.combwork', 'usage.db'))).toBeNull()
       expect(isRefusal(refusal(join(p.via, 'proj', 'notes.db')))).toBe(true)
     } finally {
       dismiss(placeKey(p.via))
     }
-    expect(isRefusal(refusal(join(p.real, '.combwork', 'hive.db')))).toBe(true)
+    expect(isRefusal(refusal(join(p.real, '.combwork', 'combwork.db')))).toBe(true)
   })
 
   it('keeps nothing of the workspaces closed: however many open and close, the count is back where it was (#1395)', () => {
@@ -76,6 +76,6 @@ describe('admission to a workspace’s databases', () => {
     expect(admittedCount()).toBe(before + many.length)
     for (const at of many) dismiss(at)
     expect(admittedCount()).toBe(before)
-    for (const at of many) expect(isRefusal(refusal(join(at, '.combwork', 'hive.db')))).toBe(true)
+    for (const at of many) expect(isRefusal(refusal(join(at, '.combwork', 'combwork.db')))).toBe(true)
   })
 })

@@ -182,7 +182,7 @@ const renamable = (dir) => {
     // The passes its start asked for (its own, the lanes' and the board's) are over: no try to lend it a slot for 2 s,
     // so what lends it one from here is what notices the process has gone.
     const lastTry = () => {
-      const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { readOnly: true })
+      const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true })
       try {
         return Date.parse(db.prepare('SELECT MAX(from_at) AS at FROM slot_leases WHERE lane = ?').get(second.lane.id)?.at ?? '') || 0
       } finally {

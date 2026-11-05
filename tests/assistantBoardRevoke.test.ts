@@ -1,4 +1,4 @@
-// The Assistant's card additions and comments revoked while queued (HI-2415), on the real board (a temp hive.db): admitted
+// The Assistant's card additions and comments revoked while queued (HI-2415), on the real board (a temp combwork.db): admitted
 // while Control allowed changes, then waiting behind another board write, the user turns Control down or the Assistant's
 // session ends; the change's `commit` check (assistantChange's guard) runs just before each write, so nothing is saved:
 // no card, no comment, no attachment file or row.

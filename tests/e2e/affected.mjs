@@ -33,7 +33,7 @@ export const EVERYTHING = [
   'src/main/openingFence.ts',
   'src/main/paths.ts',
   'src/main/logger.ts',
-  // Its thread writes every line hive.log and hooks.log get (HI-1730).
+  // Its thread writes every line combwork.log and hooks.log get (HI-1730).
   'src/main/logWriter.ts',
   // Every IPC call, database step and slow log write is marked through it (HI-1692).
   'src/main/stallWork.ts',
@@ -187,7 +187,7 @@ export const AREAS = [
   { paths: ['tests/e2e/unusedslots.cjs'], suites: ['unusedslots'] },
   { paths: ['src/main/branchMerge.ts', 'src/renderer/src/components/BranchMerge.tsx', 'tests/e2e/mergedialogslots.cjs'], suites: ['mergedialogslots'] },
   { paths: ['src/renderer/src/mergeChoice.ts'], suites: ['mergedialogslots', 'agents-ui'] },
-  { paths: ['src/main/combworkMove.ts', 'src/main/hiveFolder.ts', 'src/main/hiveMoveWorker.ts', 'src/shared/hiveFolderMove.ts', 'tests/e2e/hivefolder.cjs'], suites: ['hivefolder', 'hivevcs', 'wsmove'] },
+  { paths: ['src/main/combworkMove.ts', 'src/main/hiveFolder.ts', 'src/main/hiveMoveWorker.ts', 'src/main/boardFileMove.ts', 'src/main/nameUpgrade.ts', 'src/main/nameUpgradeFiles.ts', 'src/main/nameUpgradeProjects.ts', 'src/shared/hiveFolderMove.ts', 'tests/e2e/hivefolder.cjs'], suites: ['hivefolder', 'hivevcs', 'wsmove'] },
   { paths: ['src/main/workspaceMove.ts', 'src/main/viewPrefs.ts', 'src/shared/movePaths.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/main/agentWorktree.ts', 'src/shared/projectIds.ts', 'src/main/beforeIds.ts', 'src/main/leftovers.ts', 'src/main/projectRename.ts', 'src/main/projectNames.ts'], suites: ['wsmove', 'wtrecreate', 'projectrename', 'repairbranches', 'repairdefender'] },
   { paths: ['src/main/bundled.ts', 'src/main/bundledHistory.json', 'src/main/skills.ts', 'src/main/revisions.ts', 'src/renderer/src/components/Skills.tsx', 'src/shared/skillDescriptions.ts', 'src/shared/skillLinks.ts'], suites: ['skills', 'skillaudience', 'skilldelivery'] },
   { paths: ['src/main/guidance.ts', 'src/shared/hiveGuidance.ts', 'src/shared/toolReplies.ts', 'src/shared/hiveToolLoad.ts', 'src/main/mcp/'], suites: ['skilldelivery', 'replysize', 'mcp', 'bridgereport', 'cardloop', 'slotguidance'] },
@@ -345,7 +345,7 @@ export const AREAS = [
   { paths: ['tests/e2e/linecarried.cjs', 'src/main/workflow/lineUpdates.ts', 'src/main/worktrees.ts', 'src/main/laneStart.ts'], suites: ['linecarried'] },
   // The workspace database's small stores (#1018): lanes, card watches and deliveries.
   { paths: ['src/main/storeRows.ts'], suites: ['progresslanes', 'cardloop', 'deliveries', 'agentmessage', 'inbox', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'unexpectedclose'] },
-  { paths: ['src/main/projectKeys.ts', 'src/main/schema/keysStep.ts', 'src/shared/projectKeys.ts', 'tests/e2e/projectkeys.cjs'], suites: ['projectkeys', 'keysui', 'replysize', 'hivetools', 'cardloop', 'boardupgrade'] },
+  { paths: ['src/main/projectKeys.ts', 'src/main/schema/keysStep.ts', 'src/main/schema/namesStep.ts', 'src/shared/projectKeys.ts', 'tests/e2e/projectkeys.cjs'], suites: ['projectkeys', 'keysui', 'replysize', 'hivetools', 'cardloop', 'boardupgrade'] },
   { paths: ['src/renderer/src/components/CardWork.tsx', 'src/renderer/src/cardWork.ts', 'src/shared/workflow/workView.ts', 'src/main/workflow/cardWork.ts', 'tests/e2e/cardwork.cjs'], suites: ['cardwork', 'board', 'carddialog', 'progressgates', 'progresslanes'] },
   { paths: ['src/renderer/src/projectKeys.ts', 'src/shared/cardLinks.ts', 'src/renderer/src/cardLinks.ts', 'tests/e2e/keysui.cjs'], suites: ['keysui', 'cardlinks', 'board', 'boardarchive', 'cardchip', 'progresslanes', 'rail'] },
   { paths: ['src/main/storeTables.ts', 'src/main/storeBackup.ts', 'src/main/schema/storeCodec.ts'], suites: ['progresslanes', 'cardloop', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'performance'] },
@@ -358,7 +358,7 @@ export const AREAS = [
   { paths: ['src/shared/windowHealth.ts', 'src/renderer/src/windowHealth.ts', 'src/renderer/src/pageMarks.ts'], suites: ['windowhealth'] },
   // Why Combwork stopped (#985): crash dumps and a log line for every way out; the updater and install-folder checks end the app through it.
   // Combwork closing unexpectedly (#984): the running marker, the notice, Resume All and the setting; a merge left half done is told in it.
-  { paths: ['src/main/lastRun.ts', 'src/main/listenRetry.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
+  { paths: ['src/main/lastRun.ts', 'src/main/nameUpgradeProfile.ts', 'src/main/listenRetry.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
   { paths: ['src/main/restartResume.ts', 'src/shared/restartResume.ts', 'tests/e2e/restartresume.cjs'], suites: ['restartresume', 'unexpectedclose'] },
   // Resuming after a connection drops (HI-1612): the wait, its status, Progress run and note.
   { paths: ['src/main/outageResume.ts', 'src/main/outageCore.ts', 'src/main/assistantNotes.ts', 'tests/e2e/outage.cjs'], suites: ['outage'] },

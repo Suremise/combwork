@@ -1,4 +1,4 @@
-// The fact store in the workspace's hive.db (#1215, SPEC §16.4): facts, actions and the stage cache written in the board's
+// The fact store in the workspace's combwork.db (#1215, SPEC §16.4): facts, actions and the stage cache written in the board's
 // transaction (a change undone leaves none of them), the actions worker (each action's effect once, also when run
 // again after a crash or at the same time: claimed before it runs, or found delivered, #1266), two Hives observing one transition writing it once, and the runtime's
 // columns of a card kept by the board's own saves while the card's JSON stays as it was.
@@ -63,7 +63,7 @@ describe('the facts step (#1215)', () => {
   })
 })
 
-describe('the fact store in hive.db (#1215)', () => {
+describe('the fact store in combwork.db (#1215)', () => {
   it("writes inside the caller's board change: undone with it, a fact, an action and the stage leave nothing", async () => {
     const { ws, w } = await workspace()
     const facts = FactStore.forBoard(w, scope)

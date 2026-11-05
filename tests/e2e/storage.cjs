@@ -110,7 +110,7 @@ const write = (file, text) => {
   // The open's background work ended first (its "after opening" line): its pass adopting agents' 0.9 worktrees as slots
   // (#1441) among it. Tree's worktree, made while that pass ran, was adopted as slot "tree" instead of staying Tree's
   // worktree as this suite counts it (HI-2209). Bounded as a hung run, never how long it takes: it includes the bundled skills.
-  const logFile = path.join(userData, 'logs', 'hive.log')
+  const logFile = path.join(userData, 'logs', 'combwork.log')
   const opened = await until(() => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '').match(/after opening ⁨?storage-ws⁩?: .*adoption, slots/)?.[0], 30000)
   check("the open's background work has ended, its worktree adoption with it", !!opened)
 

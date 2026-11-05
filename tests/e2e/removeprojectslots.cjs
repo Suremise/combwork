@@ -65,7 +65,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
     const copy = path.join(trees, 'copies', 'copy-1')
     lib.git(beta, ['worktree', 'add', '-q', '--detach', copy])
     const id = JSON.parse(fs.readFileSync(path.join(beta, '.combwork', 'project.json'), 'utf8')).id
-    const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
     try {
       const now = new Date().toISOString()
       db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at) VALUES (?, 'copy-1', ?, 'free', ?, ?)").run(id, copy, now, now)

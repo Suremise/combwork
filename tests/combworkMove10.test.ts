@@ -39,9 +39,26 @@ function atTag(file: string): string | null {
     return null
   }
 }
+/**
+ * The names upgrade's own changes to the schema (HI-2587, SPEC §4.1.2), taken out: its step 25 at the 1.0 group's end,
+ * the version column's rename as a database opens (renameVersionColumn), and the names it renamed (the comments'
+ * `app_text`, the version column's `app_version`, the option and key `appVersion`, the field `appText`, the board's file).
+ * Anything else that differs from 1.0.0 still fails.
+ */
+const before2587 = (s: string): string =>
+  s
+    .replace(/\r\n/g, '\n')
+    .replace(/,\n  \{\n    \/\/ HI-2587, the names upgrade[\s\S]*?\n  \}\n\]/, '\n]')
+    .replace(/\/\*\*\n \* `schema_version`'s column[\s\S]*?\nexport function renameVersionColumn[\s\S]*?\n\}\n/, '')
+    .replace(/^.*\n.*if \(newer === null\) renameVersionColumn\(writer\)\n/m, '')
+    .replace(/\bapp_text\b/g, 'hive_text')
+    .replace(/\bapp_version\b/g, 'hive_version')
+    .replace(/\bappVersion\b/g, 'hiveVersion')
+    .replace(/\bappText\b/g, 'hiveText')
+    .replace(/combwork\.db/g, 'hive.db')
 /** Code without its comments and with the folder's name as 1.0 had it: what makes the schema. */
 const code = (s: string): string =>
-  s
+  before2587(s)
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
     .replace(/\.combwork/g, '.hive')
@@ -106,6 +123,8 @@ describe("a 1.0.0 workspace opened in this build (HR1's finding 6)", () => {
       [join(alpha, '.combwork'), join(alpha, '.hive')]
     ])
       if (existsSync(from)) renameSync(from, to)
+    // And its board's file under 1.0's name (HI-2587).
+    for (const s of ['', '-wal', '-shm']) if (existsSync(join(ws, '.hive', `combwork.db${s}`))) renameSync(join(ws, '.hive', `combwork.db${s}`), join(ws, '.hive', `hive.db${s}`))
     // 1.0 stored the attachment's link by its path, the comment's text and the context reference as written then.
     const db = new DatabaseSync(join(ws, '.hive', 'hive.db'))
     db.prepare('UPDATE cards SET description = ? WHERE number = ?').run(`![shot](${old(shot)})`, card.number)

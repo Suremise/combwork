@@ -97,7 +97,7 @@ describe('recorded versions', () => {
     writeFileSync(join(dir, 'a', 'ref', 'x.md'), 'x')
     writeFileSync(join(dir, 'b', 'ref', 'x.md'), 'x')
     // Combwork's copy marker isn't content.
-    writeFileSync(join(dir, 'b', '.hive-copy'), '{}')
+    writeFileSync(join(dir, 'b', '.combwork-copy'), '{}')
     expect(await contentHash(join(dir, 'a'))).toBe(await contentHash(join(dir, 'b')))
     writeFileSync(join(dir, 'b', 'ref', 'x.md'), 'y')
     expect(await contentHash(join(dir, 'a'))).not.toBe(await contentHash(join(dir, 'b')))
@@ -118,8 +118,8 @@ describe('swapping a folder in', () => {
     mkdirSync(dest, { recursive: true })
     writeFileSync(join(dest, 'SKILL.md'), 'old')
     writeFileSync(join(dest, 'stale.md'), 'gone after')
-    await swapIn(src, dest, { prepare: async (copy) => writeFileSync(join(copy, '.hive-copy'), 'marker') })
-    expect(readdirSync(dest).sort()).toEqual(['.hive-copy', 'SKILL.md', 'references'])
+    await swapIn(src, dest, { prepare: async (copy) => writeFileSync(join(copy, '.combwork-copy'), 'marker') })
+    expect(readdirSync(dest).sort()).toEqual(['.combwork-copy', 'SKILL.md', 'references'])
     expect(readFileSync(join(dest, 'references', 'r.md'), 'utf8')).toBe('new ref')
     expect(readdirSync(join(dir, 'skills'))).toEqual(['a'])
   })
@@ -499,12 +499,12 @@ describe("Codex's copies of a session's skills", () => {
     // A crash after the old copy was renamed aside: its place is empty, the new copy half-made beside it.
     mkdirSync(join(dir, '.cw-example.hive-old-1-1', 'references'), { recursive: true })
     writeFileSync(join(dir, '.cw-example.hive-old-1-1', 'SKILL.md'), 'v1')
-    writeFileSync(join(dir, '.cw-example.hive-old-1-1', '.hive-copy'), JSON.stringify({ hash: 'old' }))
+    writeFileSync(join(dir, '.cw-example.hive-old-1-1', '.combwork-copy'), JSON.stringify({ hash: 'old' }))
     mkdirSync(join(dir, '.cw-example.hive-new-1-1'), { recursive: true })
     // And one for a skill the session no longer gets: it comes back as Combwork's copy, then goes like any such copy (its
     // content still its marker's hash: unchanged since Combwork made it, #1431).
     mkdirSync(join(dir, '.cw-gone.hive-old-1-2'), { recursive: true })
-    writeFileSync(join(dir, '.cw-gone.hive-old-1-2', '.hive-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.cw-gone.hive-old-1-2')) }))
+    writeFileSync(join(dir, '.cw-gone.hive-old-1-2', '.combwork-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.cw-gone.hive-old-1-2')) }))
     const out = await sync(cwd, [{ name: 'example', sourcePath: example }])
     expect(readdirSync(dir).sort()).toEqual(['cw-example'])
     expect(readFileSync(join(dir, 'cw-example', 'SKILL.md'), 'utf8')).toBe('v2')
@@ -591,7 +591,7 @@ describe('links in skills Combwork copies', () => {
     symlinkSync(target, join(theirs, 'references'), 'junction')
     let out = await sync(cwd, [{ name: 'example', sourcePath: src }])
     expect(out.example).toMatchObject({ revision: null, lasting: true })
-    expect(existsSync(join(theirs, '.hive-copy'))).toBe(false)
+    expect(existsSync(join(theirs, '.combwork-copy'))).toBe(false)
     writeFileSync(join(src, 'SKILL.md'), 'skill, changed')
     out = await sync(cwd, [{ name: 'example', sourcePath: src }])
     expect(out.example).toMatchObject({ revision: null, lasting: true })

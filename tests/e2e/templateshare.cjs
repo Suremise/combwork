@@ -133,7 +133,7 @@ const check = (name, ok, extra = '') => {
   check('Load into Project… replaces that project\'s agents and layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BBuilder","BReviewer"]' && projectCfg(beta).layout === 'columns2', 10000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
 
   // Export to a test folder: what the template holds, nothing personal.
-  const exported = path.join(exports_, 'Team.hive-template.json')
+  const exported = path.join(exports_, 'Team.combwork-template.json')
   await saveTo(exported)
   await detail.getByRole('button', { name: 'Export…' }).click()
   check('Export… writes the template file', !!(await lib.until(async () => fs.existsSync(exported), 5000)) && !!(await toast(/Template exported/)))

@@ -106,7 +106,7 @@ describe("HR1's round-1 probes against the derived map", () => {
     json(plan, { owner: 'recreated-data-must-stay' })
     json(`${plan}.bak`, { owner: 'its backup' })
     const kept = [readFileSync(plan, 'utf8'), readFileSync(`${plan}.bak`, 'utf8')]
-    const dbfile = join(ws, '.combwork', 'hive.db')
+    const dbfile = join(ws, '.combwork', 'combwork.db')
     board(dbfile)
     const r = await moveFolders(ws)
     if (r.late) await finishMove(ws, { boardFile: dbfile, relocateFolders: async () => true })
@@ -170,6 +170,8 @@ describe('HI-2510: an ordinary open looks at each host once', () => {
     // The workspace, its Assistant's home and each project.
     const hosts = 2 + projects.length
     json(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'), {})
+    // Its names upgraded (HI-2587): an ordinary open of a 1.1 workspace.
+    json(join(ws, '.combwork', 'combwork-names.json'), { version: 1 })
     for (const fresh of [true, false]) {
       if (!fresh) {
         // As a move leaves them: every host marked, the rewrites finished for the map.
@@ -193,7 +195,7 @@ describe("HR1's round 2: readers use the published map", () => {
     json(join(ws, '.hive', 'workspace.json'), { version: 1 })
     for (const p of ['a', 'b', 'c']) json(join(ws, p, '.hive', 'project.json'), { id: p })
     const r = await moveFolders(ws)
-    if (r.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'hive.db'), relocateFolders: async () => true })
+    if (r.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'combwork.db'), relocateFolders: async () => true })
     moveStats.derives = 0
     for (let i = 0; i < 20; i++) {
       expect(await movedPath(ws, join(ws, 'b', '.hive', `x${i}.png`))).toBe(join(ws, 'b', '.combwork', `x${i}.png`))
@@ -256,7 +258,7 @@ describe("HR1's approval of s65", () => {
     const dbfile = join(ws, '.hive', 'hive.db')
     board(dbfile)
     const first = await moveFolders(ws)
-    if (first.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'hive.db'), relocateFolders: async () => true })
+    if (first.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'combwork.db'), relocateFolders: async () => true })
     const hashBefore = JSON.parse(readFileSync(join(ws, '.combwork', MOVED_FILE), 'utf8')).hash
     json(join(ws, 'late', '.hive', 'project.json'), { id: 'p-late' })
     // The late project contributes nothing to the map until it has moved: the recorded hash still matches the map.
@@ -264,7 +266,7 @@ describe("HR1's approval of s65", () => {
     const r = await moveFolders(ws, { only: join(ws, 'late') })
     expect(r.moved).toBe(1)
     expect(existsSync(join(ws, 'late', '.combwork', 'project.json'))).toBe(true)
-    if (r.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'hive.db'), relocateFolders: async () => true })
+    if (r.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'combwork.db'), relocateFolders: async () => true })
     expect(JSON.parse(readFileSync(join(ws, '.combwork', MOVED_FILE), 'utf8')).hash).not.toBe(hashBefore)
   })
 

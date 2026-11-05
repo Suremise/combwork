@@ -61,7 +61,7 @@ const check = (name, ok, extra = '') => {
     const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split(/\r?\n/) : [])
     for (const l of read(path.join(claudeHome, 'fake-exits.jsonl'))) console.log(`DIAGNOSTIC fake exit: ${l.slice(0, 600)}`)
     for (const l of read(path.join(claudeHome, 'fake-launches.jsonl'))) console.log(`DIAGNOSTIC fake launch: session ${JSON.parse(l).sessionId}`)
-    for (const l of read(path.join(userData, 'logs', 'hive.log')).filter((line) => /\[(pty|assistant|sessions?|agents?|processes)\]|WARN|ERROR/.test(line)).slice(-40)) console.log(`DIAGNOSTIC ${l.slice(0, 400)}`)
+    for (const l of read(path.join(userData, 'logs', 'combwork.log')).filter((line) => /\[(pty|assistant|sessions?|agents?|processes)\]|WARN|ERROR/.test(line)).slice(-40)) console.log(`DIAGNOSTIC ${l.slice(0, 400)}`)
   }
   // The window draws what it's asked for once it has it: the panel lists an action when main's event reaches it, which
   // can be after the turn that made it has ended (#672), and a settings page after its click. So what it shows is waited

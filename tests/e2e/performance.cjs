@@ -263,7 +263,7 @@ const check = (name, ok, extra = '') => {
   await page.locator('.sidebar .row', { hasText: 'Whole workspace' }).click()
   await until(async () => (await requests()) === '47', HUNG_MS)
   const plain = (await exported())?.json
-  check('Export saves the report with its schema, version, units, coverage and trend', plain && plain.schema === 'hive-metrics/1' && plain.app.version && plain.units.bytes && plain.coverage.observedMs > 0 && plain.report.trend.length === 25 && 'alpha' in plain.report.projects, JSON.stringify(plain).slice(0, 200))
+  check('Export saves the report with its schema, version, units, coverage and trend', plain && plain.schema === 'combwork-metrics/1' && plain.app.version && plain.units.bytes && plain.coverage.observedMs > 0 && plain.report.trend.length === 25 && 'alpha' in plain.report.projects, JSON.stringify(plain).slice(0, 200))
   const clean = (await exported(['Shift']))?.text
   check('Shift+Export leaves out project names and the workspace path', clean && !/alpha|beta|performance-ws/.test(clean) && JSON.parse(clean).sanitized === true, clean && clean.slice(0, 200))
 

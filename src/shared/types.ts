@@ -67,7 +67,7 @@ export interface StoredText {
 /** The window's text as data beside an English field (above), by name: what the Agent API leaves out of its replies. */
 export type WindowTextField =
   | 'whatText'
-  | 'hiveText'
+  | 'appText'
   | 'statusText'
   | 'mergeSlotText'
   | 'messageText'
@@ -342,7 +342,7 @@ export interface AssistantSettings {
  */
 export type AssistantControl = 'look' | 'agents' | 'projects'
 
-/** Something the Hive Assistant did (or tried), for the list in its panel and hive.log. */
+/** Something the Hive Assistant did (or tried), for the list in its panel and combwork.log. */
 /** Also its kind and targets (#763, assistantActivity.ts): what the event stream gives viewers instead of the line. */
 /**
  * What kind of change of the Assistant's undo works on (#1282, SPEC §16.14): a card's fields (or a card it made), a lane
@@ -1130,7 +1130,7 @@ export interface TaskComment {
   by: string
   text: string
   /** A comment Hive wrote itself (#845): its text as data, for the window; `text` is its English. */
-  hiveText?: StoredText
+  appText?: StoredText
   /** Unique on the card (#224): what a card watch counts its view of the card by. Comments from before have none. */
   id?: string
 }

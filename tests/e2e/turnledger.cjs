@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     return s?.status === status && (!state || s.turn?.state === state) && s
   }, HUNG_MS)
   const hooksLog = () => fs.readFileSync(path.join(userData, 'logs', 'hooks.log'), 'utf8')
-  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   const journal = (a, re) => until(() => fs.existsSync(path.join(userData, 'logs', 'hooks.log')) && hooksLog().split('\n').some((l) => l.includes(`run=${a.runId} `) && re.test(l)), HUNG_MS)
 
   for (const [a, name] of [[claude, 'Claude Code'], [codex, 'Codex']]) {

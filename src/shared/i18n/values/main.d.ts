@@ -233,6 +233,13 @@ interface HiveMessageValues {
   'main.move.watches': { n: number }
   'main.move.workingMoved': { projects: string | number }
   'main.move.workingRenamed': { n: number; projects: string | number }
+  'main.nameUpgrade.boardBothBody': undefined
+  'main.nameUpgrade.boardBothTitle': { folder: string | number }
+  'main.nameUpgrade.boardLeftBody': undefined
+  'main.nameUpgrade.boardLeftTitle': { file: string | number }
+  'main.nameUpgrade.what.board': undefined
+  'main.nameUpgrade.what.files': undefined
+  'main.nameUpgrade.what.projects': undefined
   'main.notify.answered': undefined
   'main.notify.sessionEnded': undefined
   'main.outage.gaveUpBody': { n: number }

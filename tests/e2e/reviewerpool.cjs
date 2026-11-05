@@ -370,7 +370,7 @@ const commitIn = (dir, files, message, trailer) => {
       await inv('watch:cancel', delta, dr1.id)
       check(`DE-R1 is idle with no watch (${stage})`, !!(await until(async () => ['ready', 'finished'].includes((await live(delta, dr1.id))?.status) && !(await live(delta, dr1.id))?.watch, HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
       check(`…its grace check runs (${stage})`, !!(await until(async () => (await inv('loops:checks', delta, dr1.id)) > before, HUNG_MS)), String(await inv('loops:checks', delta, dr1.id)))
-      check(`…and DE-R1, out of X's loop, isn't flagged as not watching it (${stage}; HI-2321)`, !(await live(delta, dr1.id))?.notWatching && !/DE-R1 isn't watching/.test(fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')), JSON.stringify(await live(delta, dr1.id)))
+      check(`…and DE-R1, out of X's loop, isn't flagged as not watching it (${stage}; HI-2321)`, !(await live(delta, dr1.id))?.notWatching && !/DE-R1 isn't watching/.test(fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')), JSON.stringify(await live(delta, dr1.id)))
     }
     await r1Clear('X in Doing, its revision checked by DE-R2')
     // Built and submitted: the review goes to DE-R2, the design's last answer (its preferred reviewer).
@@ -442,7 +442,7 @@ const commitIn = (dir, files, message, trailer) => {
     // A try or two for each assignment (its design, its revision, its submission): its line refused while its own
     // watch's wake goes first (the revision's comment ends EP-R1's watch) is tried again once its state changes or by
     // the retry pass, never at once: refused lines retried at each status event logged ~20 tries for one (HI-2333).
-    const tellings = (fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').match(new RegExp(`Telling \\S*EP-R1\\S* of #${z} `, 'g')) ?? []).length
+    const tellings = (fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').match(new RegExp(`Telling \\S*EP-R1\\S* of #${z} `, 'g')) ?? []).length
     check('…its three assignments told in at most two tries each (no pass looping on a refused line)', tellings >= 3 && tellings <= 6, String(tellings))
     await idle(epsilon, er1.id)
     check('EP-R1 reviews and passes Z: Done', (await intent(ter, z, 'start-review')).status === 200 && (await intent(ter, z, 'verdict', { pass: true, comment: 'Z: passed' })).status === 200 && !!(await until(async () => (await card(z))?.column === 'done', HUNG_MS)), (await card(z))?.column)

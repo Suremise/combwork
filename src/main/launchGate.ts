@@ -93,7 +93,7 @@ export interface LaunchGate {
 
 /** A gate for this command (Windows): listening on its pipe until the gate has had its word. */
 export function launchGate(file: string, args: string[] | string, env: Record<string, string>): LaunchGate {
-  const name = `hive-gate-${randomBytes(16).toString('hex')}`
+  const name = `combwork-gate-${randomBytes(16).toString('hex')}`
   let socket: Socket | null = null
   let said: string | null = null
   let server: Server | null = createServer((s) => {

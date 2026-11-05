@@ -633,7 +633,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'window:setTitleBarColors': (color, symbolColor) => setTitleBarColors(win(), { color, symbolColor }),
     'window:setBackdrops': (count) => setTitleBarBackdrops(win(), count),
-    // The page's health in hive.log (HI-1775): where it is, and its long tasks.
+    // The page's health in combwork.log (HI-1775): where it is, and its long tasks.
     'window:where': (where) => {
       const wc = senderStore.getStore()
       const entry = wc ? windowOf(wc) : null
@@ -1890,7 +1890,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (delay?.ms) await new Promise((r) => setTimeout(r, delay.ms))
       if (take(failing, channel)) throw new Error(`${channel} failed (CW_TEST_FAIL_IPC)`) // i18n-ignore: test-only
       // Named in a "main process was busy" warning that it overlaps (mainStalls.ts).
-      const done = beginWork(`ipc ${channel}`) // i18n-ignore: a line of hive.log, in English
+      const done = beginWork(`ipc ${channel}`) // i18n-ignore: a line of combwork.log, in English
       // Everything the call does is for that window's workspace (and from that window: the console's subscriptions).
       try {
         const block = take(blocking, channel)
@@ -1898,7 +1898,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => (fn as (...a: unknown[]) => unknown)(...args)))
       } catch (err) {
         // A failure that isn't one of Hive's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
-        // hive.log has it too, so every "Could not …" notification has its line.
+        // combwork.log has it too, so every "Could not …" notification has its line.
         if (!(err instanceof HiveError)) log.warn(`ipc ${channel} failed: ${userText(englishError(err))}${typeof (err as NodeJS.ErrnoException)?.code === 'string' ? ` (${(err as NodeJS.ErrnoException).code})` : ''}`)
         throw windowError(err)
       } finally {

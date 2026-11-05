@@ -247,7 +247,7 @@ describe('saving', () => {
     // No file of their own, nor a .gitignore for one: the database is git-ignored by .combwork's.
     expect(existsSync(join(path, '.combwork', 'metrics', 'metrics.json'))).toBe(false)
     expect(existsSync(join(path, '.combwork', 'metrics', '.gitignore'))).toBe(false)
-    expect(readFileSync(join(path, '.combwork', '.gitignore'), 'utf8')).toMatch(/^hive\.db$/m)
+    expect(readFileSync(join(path, '.combwork', '.gitignore'), 'utf8')).toMatch(/^combwork.db$/m)
     // Only aggregates: no project path, no route asked for.
     expect(savedText(path)).not.toContain(path.replace(/\\/g, '\\\\'))
     await w.open(path)

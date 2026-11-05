@@ -469,7 +469,7 @@ describe('limits', () => {
   it("skillFiles lists a folder's files in order, and says when it stopped short", async () => {
     const s = join(dir, 'skill')
     mkdirSync(join(s, 'a', 'b', 'c'), { recursive: true })
-    for (const f of ['SKILL.md', 'z.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', '.hive-copy']) writeFileSync(join(s, f), '')
+    for (const f of ['SKILL.md', 'z.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', '.combwork-copy']) writeFileSync(join(s, f), '')
     expect(await skillFiles(s)).toEqual({ files: ['SKILL.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', 'z.md'], truncated: false })
     expect(await skillFiles(s, { files: 2, entries: 100, depth: 8 })).toEqual({ files: ['SKILL.md', 'a/1.md'], truncated: true })
     expect(await skillFiles(s, { files: 100, entries: 100, depth: 2 })).toEqual({ files: ['SKILL.md', 'a/1.md', 'z.md'], truncated: true })

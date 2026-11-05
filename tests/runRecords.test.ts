@@ -269,7 +269,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
   describe("a keeper's state (HI-2055)", () => {
     const HIVE = '100:5'
     const keeperFile = (run: string) => join(profile.dir, 'keeper', `keeper-${run}.json`)
-    const state = (run: string, o: Record<string, unknown> = {}) => ({ v: 1, run, helper: '4001:1', hive: HIVE, state: 'ended', observed: 'complete', total: 0, members: [], at: 1, ...o })
+    const state = (run: string, o: Record<string, unknown> = {}) => ({ v: 1, run, helper: '4001:1', app: HIVE, state: 'ended', observed: 'complete', total: 0, members: [], at: 1, ...o })
     const plantState = (run: string, data: unknown) => {
       mkdirSync(join(profile.dir, 'keeper'), { recursive: true })
       writeFileSync(keeperFile(run), typeof data === 'string' ? data : JSON.stringify(data))
@@ -314,7 +314,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       expect(await track(m, 'k-bad')).toBe(true)
       const bad: unknown[] = [
         state('k-bad', { helper: '4999:1' }),
-        state('k-bad', { hive: '100:6' }),
+        state('k-bad', { app: '100:6' }),
         state('k-bad', { run: 'k-other' }),
         state('k-bad', { v: 2 }),
         state('k-bad', { observed: undefined }),

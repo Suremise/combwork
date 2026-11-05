@@ -30,7 +30,7 @@ vi.mock('original-fs/promises', async (original) => {
   }
 })
 
-const marker: RunMarker = { version: 1, pid: 42, startedAt: '2026-10-20T00:00:00.000Z', lastSeen: '2026-10-20T00:01:00.000Z', hive: '1.0.0', workspaces: [], agents: [], processes: [] }
+const marker: RunMarker = { version: 1, pid: 42, startedAt: '2026-10-20T00:00:00.000Z', lastSeen: '2026-10-20T00:01:00.000Z', app: '1.0.0', workspaces: [], agents: [], processes: [] }
 
 describe('the running marker as Combwork quits (HI-2201)', () => {
   it('is never put back once removed, whatever its rename waited on', async () => {

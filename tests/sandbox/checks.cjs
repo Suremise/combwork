@@ -7,8 +7,11 @@
  * to --report. Moved from the hive-mcp repo (servers/windows-sandbox/scenarios/hive-checks.js at c5dee8a, HI-2298).
  *
  *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Combwork repo>]
- *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|clean] [--short <installer>] [--wait-min N]
- *        [--smart-app-control off] [--git <Git for Windows' folder>]
+ *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|clean|upgrade-rc] [--short <installer>] [--wait-min N]
+ *        [--smart-app-control off] [--git <Git for Windows' folder>] [--previous-rc <a 1.1 release candidate's installer>]
+ *
+ * --previous-rc (HI-2587): a 1.1 release candidate (RC2), partly converted to Combwork's names, for scenario 10: the upgrade
+ * from it, run beside 1.0.0's (scenario 4) whenever it is given, so the names upgrade is checked from both.
  *
  * --hive (or CW_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
  * <hive>\dist other than --installer, so pass the main checkout from a worktree. Both installers must sit under one
@@ -119,10 +122,10 @@ let logSink = line => { console.log(line); if (logFile) fs.appendFileSync(logFil
 const log = (...a) => { try { logSink(`[${new Date().toISOString().slice(11, 19)}] ${a.join(' ')}`) } catch { /* the run goes on; the report is written at the end */ } }
 
 /** The one folder, below a drive root, holding both installers (mapped read-only at C:\build). Throws why there is none. */
-function buildRoot(installer, previous) {
+function buildRoot(installer, ...previous) {
   let root = path.dirname(path.resolve(installer))
-  if (previous) {
-    const prev = path.resolve(previous)
+  for (const p of previous.filter(Boolean)) {
+    const prev = path.resolve(p)
     if (path.parse(root).root.toLowerCase() !== path.parse(prev).root.toLowerCase()) throw new Error(`The installers are on different drives (${path.parse(root).root} and ${path.parse(prev).root}): put both under one folder.`)
     while (!isInside(prev, root)) {
       const up = path.dirname(root)
@@ -152,7 +155,11 @@ function plan(argv) {
   if (!installer || !fs.existsSync(installer) || !versionOf(installer)) throw new Error('--installer must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
   // By default the release checks' three kinds (the clean install's since HI-2592); the install by hand over the previous release (manual, HI-2460) and the
   // edge cases (edges) run when asked for (--only).
-  const ran = only ? [only] : ['fresh', 'upgrade', 'clean']
+  // A release candidate given (HI-2587): its upgrade too, by default.
+  const previousRc = opt('--previous-rc') && path.resolve(opt('--previous-rc'))
+  if (previousRc && (!fs.existsSync(previousRc) || !versionOf(previousRc))) throw new Error('--previous-rc must name an existing Combwork-Setup-<version>.exe of a 1.1 release candidate')
+  if (only === 'upgrade-rc' && !previousRc) throw new Error("--only upgrade-rc needs --previous-rc <a 1.1 release candidate's installer>")
+  const ran = only ? [only] : ['fresh', 'upgrade', 'clean', ...(previousRc ? ['upgrade-rc'] : [])]
   let previous = opt('--previous') && path.resolve(opt('--previous'))
   const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges')
   if (ran.includes('edges') && (!short || !fs.existsSync(short))) throw new Error('--only edges needs --short <an installer built with CW_TEST_SHORT_LEGACY_WAIT=1>, beside --installer')
@@ -164,7 +171,8 @@ function plan(argv) {
   }
   if (previous && (!fs.existsSync(previous) || !versionOf(previous))) throw new Error('--previous must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
   const upgrade = overOld
-  const root = buildRoot(installer, upgrade ? previous : null)
+  const fromRc = ran.includes('upgrade-rc')
+  const root = buildRoot(installer, upgrade ? previous : null, fromRc ? previousRc : null)
   const buildInfo = (() => { try { return JSON.parse(fs.readFileSync(path.join(path.dirname(installer), 'build-info.json'), 'utf8')) } catch { return null } })()
   const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex')
   const guest = f => 'C:\\build\\' + path.relative(root, f)
@@ -181,6 +189,8 @@ function plan(argv) {
     sameInstaller: upgrade && sha(installer) === sha(previous),
     guestInstaller: guest(installer),
     guestPrevious: upgrade ? guest(previous) : null,
+    previousRc: fromRc ? previousRc : null,
+    guestPreviousRc: fromRc ? guest(previousRc) : null,
     guestShort: short ? guest(short) : null,
     report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'hive-test', 'sandbox-reports', stamp))),
     waitMin: Number(opt('--wait-min', 0)),
@@ -289,7 +299,7 @@ function steps(srv, ctx) {
   return { run, ps, drive, desktop, collect, record, readSac, install }
 }
 
-const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, clean: 9 }
+const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, clean: 9, 'upgrade-rc': 10 }
 // How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
 // unit tests, whose fake server shows nothing, set it to 0.
 const SETTINGS_OPEN_MS = Number(process.env.CW_SANDBOX_TEST_SETTINGS_MS ?? 6000)
@@ -328,15 +338,15 @@ async function main(argv) {
   const ctx = { report: p.report, files: {}, shots: [], steps: [], timings: {}, leftRunning: [], notRun: {}, sac: null, sacOff: p.sacOff }
   const start = { build: p.root, network: false, session: true, tools: ['node', 'playwright', 'hive-tests'], maxMinutes: 30, ...(p.sacOff ? { smartAppControl: 'off' } : {}) }
   const time = async (k, fn) => { const t = Date.now(); const r = await fn(); ctx.timings[k] = `${((Date.now() - t) / 1000).toFixed(1)} s`; return r }
-  const overPrevious = async (srv, n, pre, args) => {
+  const overPrevious = async (srv, n, pre, args, from = { installer: p.guestPrevious, exe: '%LOCALAPPDATA%\\Programs\\Hive\\Hive.exe' }) => {
     const s = steps(srv, ctx)
     await s.readSac()
-    await time(`${n}. previous release install`, () => s.install(n, `${n}. install previous`, p.guestPrevious, `-Arguments "/S" -Name ${pre}-prev`, { timeoutSec: 300 }))
+    await time(`${n}. previous release install`, () => s.install(n, `${n}. install previous`, from.installer, `-Arguments "/S" -Name ${pre}-prev`, { timeoutSec: 300 }))
     await s.drive(n, `${n}. change settings`, 'mark', `${pre}-mark`)
     await s.desktop(n, `${pre}-desktop-before`)
     // The previous release running as the new installer starts, as when its updater runs it (or a user didn't quit it):
     // its exact main process up with a window first (start-app.ps1 fails the step otherwise), then the installer.
-    await s.ps(n, `${n}. start the previous release, running with a window`, 'start-app.ps1', `-Exe "%LOCALAPPDATA%\\Programs\\Hive\\Hive.exe" -Name ${pre}-prev-started`, { timeoutSec: 120 })
+    await s.ps(n, `${n}. start the previous release, running with a window`, 'start-app.ps1', `-Exe "${from.exe}" -Name ${pre}-prev-started`, { timeoutSec: 120 })
     await time(`${n}. install over it (${args})`, () => s.install(n, `${n}. install new`, p.guestInstaller, `-Arguments "${args}" -Name ${pre}-new`, { timeoutSec: 300 }))
     await s.drive(n, `${n}. after the upgrade`, 'after-upgrade', `${pre}-after`)
     await s.desktop(n, `${pre}-desktop-after`)
@@ -366,6 +376,8 @@ async function main(argv) {
     // runs the new installer (scenario 4) and as a user installs it by hand (7).
     upgrade: srv => overPrevious(srv, 4, 's4', '--updated /S --force-run'),
     manual: srv => overPrevious(srv, 7, 's7', '/S --force-run'),
+    // Over a 1.1 release candidate (HI-2587), installed as Combwork already: the names upgrade from a partly converted install.
+    'upgrade-rc': srv => overPrevious(srv, 10, 's10', '--updated /S --force-run', { installer: p.guestPreviousRc, exe: '%LOCALAPPDATA%\\Programs\\Combwork\\Combwork.exe' }),
     // The installer's edge cases over Hive Desktop (edges.ps1), then a notification under the new app ID (HI-2460).
     // HI-2592, the rename's acceptance test: a Windows that never had Hive or Combwork, the build installed, used as a new
     // user would (drive.cjs clean), quit, then every place it wrote or shows searched for "hive" (inside/clean-scan.cjs).
@@ -426,6 +438,8 @@ async function main(argv) {
     app: p.app,
     previous: p.previous && path.relative(p.root, p.previous),
     previousVersion: p.previous && versionOf(p.previous),
+    previousRc: p.previousRc && path.relative(p.root, p.previousRc),
+    previousRcVersion: p.previousRc && versionOf(p.previousRc),
     sameInstaller: p.sameInstaller,
     hostBuild: os.release(),
     ran: p.ran,

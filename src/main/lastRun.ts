@@ -23,6 +23,7 @@ import { sessions } from './sessions'
 import { adoptInstalledRun, ownsResume } from './restartResume'
 import { inWorkspace, openWorkspaces, workspaceOf } from './workspace'
 import { dataFolder } from './hiveFolder'
+import { upgradeRunMarkerFile } from './nameUpgradeProfile'
 
 /**
  * Hive closing unexpectedly (#984, shared/unexpectedClose.ts): the marker in the profile while Hive runs, and at the next
@@ -88,6 +89,8 @@ const markerFile = (): string => join(app.getPath('userData'), RUN_MARKER)
 export function checkLastRun(file = markerFile()): UnexpectedClose | null {
   found = null
   if (!existsSync(file)) return null
+  // A 1.0 or RC run's marker names its version under the old key (HI-2587): renamed first.
+  upgradeRunMarkerFile(file)
   let text = ''
   let at = new Date().toISOString()
   try {
@@ -102,10 +105,10 @@ export function checkLastRun(file = markerFile()): UnexpectedClose | null {
   found = { lastSeen: m?.lastSeen ?? at, startedAt: m?.startedAt ?? null, agents: m?.agents ?? [], workspaces: m?.workspaces ?? [], dump, merges: [], processes: m?.processes ?? [] }
   // Ended by an installer that couldn't ask it to close first (HI-1707): a newer version starting now. Its agents are an
   // install's, resumed by the restart queue as the switch says, not left to this notice.
-  if (m && m.hive && m.hive !== app.getVersion() && found.agents.length) adoptInstalledRun(found.agents, m.hive, found.lastSeen)
+  if (m && m.app && m.app !== app.getVersion() && found.agents.length) adoptInstalledRun(found.agents, m.app, found.lastSeen)
   // The agents a restart's record has (restartResume.ts owns their resume): not resumed from here too.
   toResume = found.agents.filter((a) => !ownsResume(a.projectPath, a.agentId))
-  log.warn(`The last run of Combwork ended without quitting: last seen ${found.lastSeen}${m ? ` (Combwork ${m.hive}, started ${m.startedAt})` : ' (its marker could not be read)'}; ${found.agents.length} agent(s) were running${found.agents.length ? `: ${found.agents.map((a) => `${userText(a.agentName)} in ${userText(a.project)}`).join(', ')}` : ''}${dump ? `; a crash dump from ${new Date(dump.at).toISOString()}` : '; no crash dump'}`) // i18n-ignore: a line of hive.log
+  log.warn(`The last run of Combwork ended without quitting: last seen ${found.lastSeen}${m ? ` (Combwork ${m.app}, started ${m.startedAt})` : ' (its marker could not be read)'}; ${found.agents.length} agent(s) were running${found.agents.length ? `: ${found.agents.map((a) => `${userText(a.agentName)} in ${userText(a.project)}`).join(', ')}` : ''}${dump ? `; a crash dump from ${new Date(dump.at).toISOString()}` : '; no crash dump'}`) // i18n-ignore: a line of combwork.log
   return found
 }
 
@@ -194,7 +197,7 @@ export async function writeMarkerFile(file: string, marker: RunMarker, wanted: (
 /** Writes the marker now (writeMarkerFile), unless this run has ended. */
 async function writeMarkerNow(processes: LaunchProcesses[]): Promise<void> {
   if (ended) return
-  const marker: RunMarker = { version: 1, pid: process.pid, startedAt, lastSeen: new Date().toISOString(), hive: app.getVersion(), workspaces: openWorkspaces().flatMap((w) => (w.path ? [w.path] : [])), agents: runningAgents(), processes }
+  const marker: RunMarker = { version: 1, pid: process.pid, startedAt, lastSeen: new Date().toISOString(), app: app.getVersion(), workspaces: openWorkspaces().flatMap((w) => (w.path ? [w.path] : [])), agents: runningAgents(), processes }
   await writeMarkerFile(markerFile(), marker, () => !ended)
 }
 
@@ -222,10 +225,10 @@ export function startRunMarker(): void {
   })
   onLaunchProcessJoined(writeSoon)
   // Windows ending the session is a clean end too: Hive may be ended without quitting after it.
-  const watch = (w: BrowserWindow): void => void w.on('session-end', () => endRunMarker('Windows is ending the session')) // i18n-ignore: why, for hive.log
+  const watch = (w: BrowserWindow): void => void w.on('session-end', () => endRunMarker('Windows is ending the session')) // i18n-ignore: why, for combwork.log
   for (const w of BrowserWindow.getAllWindows()) watch(w)
   app.on('browser-window-created', (_e, w) => watch(w))
-  app.on('will-quit', () => endRunMarker('Combwork is quitting')) // i18n-ignore: why, for hive.log
+  app.on('will-quit', () => endRunMarker('Combwork is quitting')) // i18n-ignore: why, for combwork.log
 }
 
 /** A normal end (quitting, an update, a restart, Windows ending the session): the marker goes, and isn't written again. */
@@ -377,7 +380,7 @@ export async function tellUnexpectedClose(): Promise<void> {
   const kept = c.processes.flatMap((l) => l.processes)
   const leftRunning = (await stillRunningOf(kept).catch(() => null)) ?? []
   leftovers.set(leftRunning, kept)
-  if (kept.length) log.info(`Of ${kept.length} process(es) the agents had started, ${leftRunning.length} still run${leftRunning.length ? `: ${userText(leftRunning.map((p) => p.label).join('; '))}` : ''}`) // i18n-ignore: a line of hive.log
+  if (kept.length) log.info(`Of ${kept.length} process(es) the agents had started, ${leftRunning.length} still run${leftRunning.length ? `: ${userText(leftRunning.map((p) => p.label).join('; '))}` : ''}`) // i18n-ignore: a line of combwork.log
   told = true
   const actions: ToastAction[] = []
   if (!r && mine.length) actions.push({ label: tr(msg({ id: 'main.unexpectedClose.resumeAll', defaultMessage: 'Resume All', description: 'A button in the notice that Combwork closed unexpectedly: resumes the agents that were running.' })), command: 'session.resumeAfterClose' })

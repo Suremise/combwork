@@ -1,5 +1,5 @@
 {
-  "schema": "hive-benchmark/1",
+  "schema": "combwork-benchmark/1",
   "kind": "scenarios",
   "app": {
     "name": "Hive",

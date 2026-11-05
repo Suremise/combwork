@@ -14,7 +14,7 @@ const log = createLogger('skills')
  * Hive's skill copies in the folders agents work in (#1431, SPEC §16.10.7, §16.15 C row 15). Codex and Copilot read
  * Hive's skills from copies in `<folder>/.agents/skills/hive-*` (providers/common.ts syncAgentsSkills), which outlive
  * the session, so a CLI run on its own there still sees them; Claude Code's launch plugin leaves nothing behind. Hive
- * records each copy it makes (`skill_copies` in hive.db) and removes its own, unchanged ones (removeHiveCopies) once no
+ * records each copy it makes (`skill_copies` in combwork.db) and removes its own, unchanged ones (removeHiveCopies) once no
  * session of Hive's works in the folder, as Settings → Advanced's switch says: when the last session there ends, at
  * start for folders whose sessions are gone, and when a lease ends or a slot goes (removeCopiesIn, for #1438 and #1429).
  */
@@ -36,7 +36,7 @@ export function removesIn(folder: string, project: string, value: IdleCopies = i
   return value === 'everywhere' || (value === 'slots' && !samePath(folder, project))
 }
 
-/** The record of a workspace's skill copies, in its hive.db. A board that can't be read or written records nothing. */
+/** The record of a workspace's skill copies, in its combwork.db. A board that can't be read or written records nothing. */
 export function copyBook(ws: WorkspaceService): SkillCopyBook {
   const key = (folder: string): string => resolve(folder)
   return {

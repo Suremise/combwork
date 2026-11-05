@@ -90,7 +90,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     const capturedToasts = async () => (await toasts()).filter((t) => t.title.startsWith('Captured '))
     const toastFor = (title) => lib.until(async () => (await toasts()).find((t) => t.title === title) ?? null, HUNG_MS)
     const setAdvanced = (id, value) => inv('advanced:set', id, value)
-    const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+    const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
 
     // Two agents in alpha (so Combwork names one "alpha · Claude"), one in beta ("beta").
     const claude = await lib.addAgent(inv, alpha, { name: 'Claude' })

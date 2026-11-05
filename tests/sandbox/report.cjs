@@ -21,9 +21,12 @@ const SCENARIOS = {
   6: 'A new workspace in the fresh install (for the fresh-install comparison)',
   7: 'Install by hand over the previous release, running (/S --force-run)',
   8: "The installer's edge cases over the previous release, and a notification under the new app ID",
-  9: 'A clean install used as a new user would, then searched: no "hive" anywhere (HI-2592)'
+  9: 'A clean install used as a new user would, then searched: no "hive" anywhere (HI-2592)',
+  10: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old'
 }
-const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'clean']
+const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'clean', 'upgrade-rc']
+/** The names upgrade's checks after an upgrade (HI-2587), from 1.0 and from a release candidate alike. */
+const NAME_IDS = ['4.board-file', '4.board-backups', '4.log-file', '4.workspace-files', '4.copy-marker', '4.names-done', '4.no-old-names']
 /** electron-builder's APP_GUID for appId it.surmise.combwork (HI-2460): its uninstall entry's key. */
 const COMBWORK_GUID = '10a7595a-0e90-558c-b6b6-ae33bdd80748'
 
@@ -39,6 +42,7 @@ const REQUIRED = {
   },
   upgrade: overPrevious(4, 's4'),
   manual: overPrevious(7, 's7'),
+  'upgrade-rc': overPrevious(10, 's10', true),
   edges: { drivers: { s8: { scenario: 8, ids: ['8.notification'], facts: ['exe'] } }, shots: ['s8-notified.png', 's8-desktop.jpg'] },
   // HI-2592: a new user's first session (drive.cjs clean), then the scan (inside/clean-scan.cjs, its checks clean.cjs's).
   clean: {
@@ -52,11 +56,23 @@ const REQUIRED = {
 const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.refuses-unchanged', '8.running', '8.running-unchanged', '8.uninstall-fails', '8.uninstall-fails-unchanged', '8.fallback-running', '8.fallback-moved']
 
 /** An upgrade over the previous release (scenario n, its files' prefix pre): the drivers' checks (HI-2460's too) and shots. */
-function overPrevious(n, pre) {
+function overPrevious(n, pre, fromRc = false) {
+  // From a release candidate (HI-2587): its profile, .combwork and cw.* ids are moved already, so only what a 1.1 RC
+  // still keeps under Hive's names is checked, besides what every upgrade keeps.
+  if (fromRc) {
+    return {
+      drivers: {
+        [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.workspace-made'], facts: ['version'] },
+        [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.workspace-moved', '4.workspace-card', ...NAME_IDS], facts: ['version'] },
+        [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
+      },
+      shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`, `${pre}-toast.jpg`]
+    }
+  }
   return {
     drivers: {
       [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved'], facts: ['version'] },
-      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.trust-kept', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card', '4.advanced-kept', '4.advanced-old-id'], facts: ['version'] },
+      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.trust-kept', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card', '4.advanced-kept', '4.advanced-old-id', ...NAME_IDS], facts: ['version'] },
       [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
     },
     shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`, `${pre}-toast.jpg`]
@@ -136,7 +152,7 @@ function evaluate(meta, files) {
     }
   }
 
-  for (const [kind, n, pre] of [['upgrade', 4, 's4'], ['manual', 7, 's7']]) {
+  for (const [kind, n, pre] of [['upgrade', 4, 's4'], ['manual', 7, 's7'], ['upgrade-rc', 10, 's10']]) {
     if (!ran.includes(kind)) continue
     const prevRun = need(n, `${pre}-prev-run`)
     const prevSt = need(n, `${pre}-prev-state`)
@@ -230,6 +246,7 @@ function markdown(r) {
     '',
     `- Installer: \`${m.installer}\` (version ${m.installerVersion}${m.buildInfo ? `, code ${m.buildInfo.code}, branch ${m.buildInfo.branch}, built ${m.buildInfo.builtAt}` : ''})`,
     m.previous ? `- Previous release for the upgrade: \`${m.previous}\` (version ${m.previousVersion})` : null,
+    m.previousRc ? `- Release candidate for scenario 10's upgrade: \`${m.previousRc}\` (version ${m.previousRcVersion})` : null,
     `- Host Windows ${m.hostBuild}; network **off** in the Sandbox; fake CLIs only, nothing signed in.`,
     m.smartAppControl?.option === 'off' ? `- **Smart App Control in the Sandbox: ${m.smartAppControl.note}** (\`--smart-app-control off\`; state ${m.smartAppControl.state ?? 'unknown'}, read before each install). Inside the Sandbox only: the host isn't changed. Unsigned installers could run, so this run says nothing about signing.` : null,
     `- Scenarios run: ${(m.ran || []).filter(k => !(r.notRun || []).some(n => n.kind === k)).join(', ') || 'none'}. Took ${m.minutes} min.`,

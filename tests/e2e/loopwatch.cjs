@@ -72,7 +72,7 @@ const check = (name, ok, extra = '') => {
     const l = await live(id)
     const state = l ? `${l.status}${l.notWatching ? `, not watching ${JSON.stringify(l.notWatching)}` : ''}` : 'no session'
     const term = lib.plainText(await inv('pty:buffer', lib.ptyKey(alpha, id)).catch(() => '')).trim().slice(-600)
-    return `${state}; terminal: ${term || '(empty)'}; hive.log: ${hiveLog().split(/\r?\n/).filter(Boolean).slice(-25).join(' | ')}`
+    return `${state}; terminal: ${term || '(empty)'}; combwork.log: ${hiveLog().split(/\r?\n/).filter(Boolean).slice(-25).join(' | ')}`
   }
   /** Starts an agent: whether it is ready for a line, a failed check saying why when it isn't (#539). */
   const start = async (id, name) => {
@@ -108,7 +108,7 @@ const check = (name, ok, extra = '') => {
   const rawStalled = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.stalled ?? null
   const stalledOf = async (n) => lib.unkey(await rawStalled(n))
   const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
-  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
 
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })

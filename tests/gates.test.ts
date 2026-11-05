@@ -1,5 +1,5 @@
 // Gates at boardWrite (#1265, SPEC §16.7, §16.8): the user's and the Assistant's column moves go through the card's
-// workflow runtime, on the real board (a temp hive.db) and temp repositories. The runtime writes the move's facts (one
+// workflow runtime, on the real board (a temp combwork.db) and temp repositories. The runtime writes the move's facts (one
 // owner: the recorder adds none of them), the board's 0.9 fields follow in the same change; a move that skips a rule
 // records one Override (the user's, interim: never asked yet; the Assistant's only with a reason, else refused with a
 // Refused fact and the Agent API's 409). With every option off nothing asks or is refused; with the rules not enforced

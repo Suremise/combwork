@@ -37,7 +37,7 @@ export class ServerMarks {
     const k = key(host)
     if (this.everywhere || this.failClosedHosts.has(k) || this.unsaved.get(k)?.has(sessionId)) return
     if (this.count() >= UNSAVED_MAX) {
-      this.failClosed(k, `more than ${UNSAVED_MAX} server sessions' records couldn't be saved`) // i18n-ignore: hive.log
+      this.failClosed(k, `more than ${UNSAVED_MAX} server sessions' records couldn't be saved`) // i18n-ignore: combwork.log
       return
     }
     const ids = this.unsaved.get(k) ?? new Set<string>()
@@ -66,7 +66,7 @@ export class ServerMarks {
   /** A workspace closing: its hosts' unsaved ids can't be kept for its reopening, so those hosts fail closed. */
   closing(workspacePath: string): void {
     const root = key(workspacePath).replace(/[\\/]+$/, '')
-    for (const k of [...this.unsaved.keys()]) if (k === root || k.startsWith(root + sep) || k.startsWith(root + '/')) this.failClosed(k, 'its workspace closed with server sessions whose records couldn\'t be saved') // i18n-ignore: hive.log
+    for (const k of [...this.unsaved.keys()]) if (k === root || k.startsWith(root + sep) || k.startsWith(root + '/')) this.failClosed(k, 'its workspace closed with server sessions whose records couldn\'t be saved') // i18n-ignore: combwork.log
   }
 
   /** For tests and diagnostics: how much is kept. */
@@ -86,10 +86,10 @@ export class ServerMarks {
     if (this.failClosedHosts.size >= FAIL_CLOSED_HOSTS_MAX) {
       this.failClosedHosts.clear()
       this.everywhere = true
-      this.warn(`Every session's usage is read without its CLI's cost reports until Combwork restarts: ${why}, in more than ${FAIL_CLOSED_HOSTS_MAX} folders`, null) // i18n-ignore: hive.log
+      this.warn(`Every session's usage is read without its CLI's cost reports until Combwork restarts: ${why}, in more than ${FAIL_CLOSED_HOSTS_MAX} folders`, null) // i18n-ignore: combwork.log
       return
     }
     this.failClosedHosts.add(k)
-    this.warn(`Sessions here are read without their CLI's cost reports until Combwork restarts: ${why}`, k) // i18n-ignore: hive.log
+    this.warn(`Sessions here are read without their CLI's cost reports until Combwork restarts: ${why}`, k) // i18n-ignore: combwork.log
   }
 }

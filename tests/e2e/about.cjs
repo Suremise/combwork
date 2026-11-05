@@ -8,7 +8,7 @@ fs.rmSync(userData, { recursive: true, force: true })
 // A log as after an upgrade: a run of 0.3.1 (which didn't mark the user's text) with a card title in it, then a run
 // that marks, with a secret and the home folder in it. Copy Diagnostics takes all three out.
 fs.mkdirSync(path.join(userData, 'logs'), { recursive: true })
-fs.writeFileSync(path.join(userData, 'logs', 'hive.log'), [
+fs.writeFileSync(path.join(userData, 'logs', 'combwork.log'), [
   '2026-10-01T09:00:00.000Z [INFO] [main] Hive 0.3.1 starting (Electron 44.5.1)',
   '2026-10-01T09:01:00.000Z [INFO] [tasks] #1 created by You: Legacy confidential takeover notes',
   '2026-10-02T09:00:00.000Z [INFO] [main] Hive 0.3.1 starting (Electron 44.5.1; your text marked)',
@@ -87,7 +87,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await openWs(secretWs)
   await inv('tasks:create', { title: 'Confidential customer merger notes', project: 'PrivateProject' })
   await openWs(otherWs)
-  const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const log = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   check('the log has the card and the first workspace', log.includes('Confidential customer merger notes') && log.includes('PrivateProject'))
   const report = await inv('app:diagnostics')
   const reportLog = report.slice(report.indexOf('### Log'))

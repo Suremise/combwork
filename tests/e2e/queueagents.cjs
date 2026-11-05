@@ -84,7 +84,7 @@ async function call(h, who, method, url, body) {
     check("its builder's wake says what came back and what to do", !!wake && wake.includes('a conflict with integration in a.txt') && wake.includes('Merge integration into your worktree'), String(wake))
     check("…and every line about it leads with the return, none with the review's pass (HI-2087)", seen.length > 0 && seen.every((i) => String(i.text).includes(`${key} came back from the merge queue`)) && !JSON.stringify(seen).includes('latest comment by'), JSON.stringify(seen))
     const said = await until(async () => (await h.card(card.n))?.comments?.findLast((c) => c.by === 'Combwork') ?? null, HUNG_MS)
-    check('…and Combwork says so on the card (its latest comment): what came back, in English for agents and as a message for the window', !!said && String(said.text).startsWith(`${key} came back from the merge queue: a conflict with integration in a.txt`) && said.hiveText?.id === 'tasks.history.queueReturned', JSON.stringify(said))
+    check('…and Combwork says so on the card (its latest comment): what came back, in English for agents and as a message for the window', !!said && String(said.text).startsWith(`${key} came back from the merge queue: a conflict with integration in a.txt`) && said.appText?.id === 'tasks.history.queueReturned', JSON.stringify(said))
     const after = await call(h, card.builder, 'GET', `/v1/tasks/${encodeURIComponent(key)}`)
     check('its card read now says it came back, and what to do', String(after.body?.merge).includes('came back from the merge queue'), JSON.stringify(after.body?.merge))
 

@@ -1,5 +1,5 @@
 // A project's review and check copies (#1435, SPEC §16.10.5, §16.13; src/main/copies.ts): leased at an exact revision
-// and returned; two Hives leasing one copy at once (two processes on one hive.db); the pool's size from roles; installs
+// and returned; two Hives leasing one copy at once (two processes on one combwork.db); the pool's size from roles; installs
 // only when the lock files changed; a dirty copy cleaned at its next lease; the quiescence barrier, each condition
 // holding a returned copy back in turn; a restart with a leased and a returning copy; and a real process in a copy held
 // through its return while another lease asks (gate-based: conditions, never time).
@@ -67,7 +67,7 @@ afterEach(async () => {
   for (const w of worlds.splice(0)) w.close()
 })
 
-/** A workspace with a hive.db and a project on main (git-ignoring node_modules/ and warm/), and its copies pool. */
+/** A workspace with a combwork.db and a project on main (git-ignoring node_modules/ and warm/), and its copies pool. */
 function world(o: { setup?: string; size?: number } = {}): World {
   const ws = join(tempDir('copies-'), 'ws')
   const project = gitRepo(join(ws, 'project'))

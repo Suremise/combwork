@@ -34,8 +34,8 @@ export interface TemplatePair {
   builder: string
   reviewer: string
 }
-/** An exported template's file name ends so ("Build and review.hive-template.json"). */
-export const TEMPLATE_EXPORT_SUFFIX = '.hive-template.json'
+/** An exported template's file name ends so ("Build and review.combwork-template.json"). */
+export const TEMPLATE_EXPORT_SUFFIX = '.combwork-template.json'
 /** A file to import is at most this big (a template of 24 agents is a few KB). */
 export const TEMPLATE_IMPORT_MAX = 256 * 1024
 /** A template's description (#271, optional) is at most this long. */
@@ -395,7 +395,7 @@ export function namePatterns(agents: readonly Pick<TemplateAgent, 'name' | 'role
 /** Whether a project's agent names follow its key (#1440: HI-B1…), so Save Template offers to keep them as patterns. */
 export const namesFollowKey = (names: readonly string[], key: string | null | undefined): boolean => !!key && names.some((n) => new RegExp(`^${key.replace(/[^A-Za-z]/g, '')}-[A-Za-z]+\\d+$`, 'i').test(n))
 
-/** A template's export file name: its name, made safe for a file name ("Build and review.hive-template.json"). */
+/** A template's export file name: its name, made safe for a file name ("Build and review.combwork-template.json"). */
 export function exportFileName(name: string): string {
   return `${name.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '').slice(0, 60) || 'template'}${TEMPLATE_EXPORT_SUFFIX}`
 }

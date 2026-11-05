@@ -1,7 +1,7 @@
-// Lanes, watches and metrics in hive.db's typed tables (#1212): each entry written in columns and read back equal as
+// Lanes, watches and metrics in combwork.db's typed tables (#1212): each entry written in columns and read back equal as
 // JSON, an odd one kept whole, the 1.0 step moving 0.9's store_rows in (order, values, entries no row can hold kept aside),
 // saves that write only what changed and are all or nothing, 0.8's lanes.json moved in once, and a copy of a live board
-// migrated with every lane, watch and metric equal (CW_STORE_MIGRATION_DB names its hive.db).
+// migrated with every lane, watch and metric equal (CW_STORE_MIGRATION_DB names its combwork.db).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
@@ -149,7 +149,7 @@ describe('entries as rows, and back (#1212)', () => {
 /** A 0.9 board's file (every step before the 1.0 group) with these store_rows rows and store_meta values. */
 function board09(rows: [string, string, string, number, string][], meta: [string, string, string][] = []): DatabaseSync {
   const file = join(base, `board-09-${++n}.db`)
-  openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.3' }).close()
+  openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group), appVersion: '0.9.3' }).close()
   const db = new DatabaseSync(file)
   db.exec('PRAGMA foreign_keys = ON')
   for (const r of rows) db.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)').run(...r)
@@ -451,7 +451,7 @@ describe("0.8's lanes.json moved in (from #1018's tests)", () => {
 })
 
 const live = process.env.CW_STORE_MIGRATION_DB
-describe.skipIf(!live)("a copy of a live board's hive.db (CW_STORE_MIGRATION_DB)", () => {
+describe.skipIf(!live)("a copy of a live board's combwork.db (CW_STORE_MIGRATION_DB)", () => {
   it('migrates with every lane, watch and metric equal as JSON, in order, and their values kept', () => {
     const copy = join(base, `live-${++n}.db`)
     copyFileSync(live!, copy)

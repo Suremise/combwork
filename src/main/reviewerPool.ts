@@ -6,7 +6,7 @@
 //   either agent building in a slot is never taken; one that can't be read counts as held), it is idle, it reviews no
 //   other card of the project (in a lane or not; a card waiting on its own open question to the user doesn't count,
 //   HI-2559: it stays its), it didn't build the card, and with G1b = 2 it isn't the submission's
-//   first reviewer. Recorded as `ReviewerAssigned` in a write that checks again, as hive.db has it then, the submission
+//   first reviewer. Recorded as `ReviewerAssigned` in a write that checks again, as combwork.db has it then, the submission
 //   still waiting and the agent's leases and reviews (another Hive's or connection's change before it is seen there).
 // - **tell**: the agent given the card is told, once per assignment (its delivery's identity is the card, the submission, the
 //   agent and its `ReviewerAssigned`): typed into its conversation when it runs, else launched with it, for review (the project folder: #1434's
@@ -177,7 +177,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     if (c?.loose && !c.design) cards.set(n, c)
   }
   if (!cards.size) return
-  // Every agent's dispatch lease as hive.db has it; one that can't be read keeps that agent out (never assumed free).
+  // Every agent's dispatch lease as combwork.db has it; one that can't be read keeps that agent out (never assumed free).
   // Running ones first (HI-2046): a stopped reviewer is started only when no running one is free.
   const pool: PoolAgent[] = agents
     .map((a) => ({ id: a.id, role: agentWorkflowRole(a), leased: wf.store.dispatchLeased(slotProject, a.id) !== false, idle: idle(projectPath, a.id) }))
@@ -186,7 +186,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     if (!workflowEnforced() || ws.lifetime.aborted) return
     const c = cards.get(a.card)!
     const given = await wf.write(c.rec, null, 'hive', (w) => {
-      // In this write, as hive.db has it now (another Hive's or connection's change committed before it is seen): the
+      // In this write, as combwork.db has it now (another Hive's or connection's change committed before it is seen): the
       // same submission still waiting, and the agent still free of it, of every other card of the project in Review
       // (whatever its lane: none, ended, another's) and of any dispatch lease.
       const s = w.state()
@@ -240,7 +240,7 @@ function reviewersNow(wf: Workflow, known: (id: string) => boolean, except?: num
 /**
  * Tells a pooled reviewer of the card it was given: once per assignment (a delivery made before for it counts while it
  * was given or is still on its way, and its agent not running is started for it), typed into its conversation when it runs and is idle, else
- * launched with it for review. Checked again first, from the project and hive.db as they are now: an agent gone from
+ * launched with it for review. Checked again first, from the project and combwork.db as they are now: an agent gone from
  * the project, one whose role no longer reviews, or one that took a dispatch lease (an either agent started a card) is
  * released from it (`ReviewerReleased`, in a write that finds it still given and not started) and the pass gives the
  * card again; one busy now, or whose lease can't be read, is told at a later pass.

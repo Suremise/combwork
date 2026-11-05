@@ -53,7 +53,7 @@ const check = (name, ok, extra = '') => {
       // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), home, null, text, { live: () => live(id) })
     }
-    const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+    const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
     /** The nudges Combwork told, by what ended (its log line names it). */
     const nudges = () => [...hiveLog().matchAll(/Suggested a fresh start in .*?\((.+?)\)/g)].map((m) => m[1])
     /** The decisions not to suggest one, by what ended and why. */

@@ -1,5 +1,5 @@
 // For you on the board (#1269, SPEC §16.8.5, §16.11.4): what waits for the user (IPC `tasks:forYou`) and their answers
-// (IPC `tasks:answer`, only the user's), on the real board (a temp hive.db) and temp repositories. The user's review
+// (IPC `tasks:answer`, only the user's), on the real board (a temp combwork.db) and temp repositories. The user's review
 // asked when the card reaches Review, approved through the intent path (the card moves on in the same change); an
 // answer that doesn't fit its request, or to a request answered or retired, refused; a Decide answer's decision
 // recorded on the card (a new generation). At a lane's round limit a failed review given on the board asks the user,

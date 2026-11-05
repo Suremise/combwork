@@ -45,6 +45,13 @@ const KEPT_WS = path.join(process.env.USERPROFILE, 'Workspaces', 'Kept')
 const KEPT_CARD = 'Made before the upgrade'
 // Scenario 4's advanced overrides (HI-2518): set under the release before's hive.* ids, read back under cw.* after.
 const ADV = { app: { old: 'hive.mcp.replySeconds', now: 'cw.mcp.replySeconds', value: 600 }, ws: { old: 'hive.progress.lanesShown', now: 'cw.progress.lanesShown', value: 6 } }
+// Scenario 9 (HI-2587): the upgrade from a 1.1 release candidate (RC2), already partly converted (its profile, .combwork
+// and cw.* ids), its files' prefix s10 (scenario 10; 9 is HI-2592's clean install). What 1.0 needs moving that an RC has done already isn't checked there.
+const FROM_RC = (prefix || '').startsWith('s10')
+// The workspace's folder as the release before made it: .hive in 1.0, .combwork in an RC.
+const TREE_BEFORE = FROM_RC ? '.combwork' : '.hive'
+// A skill copy the release before made in the project (its marker, HI-2587), for the upgrade to rename.
+const COPY = path.join('demo', '.agents', 'skills', 'cw-sandbox-check')
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return null } }
 const res = { step, prefix, at: new Date().toISOString(), checks: [], facts: {}, shots: [] }
 const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.stringify(res, null, 2))
@@ -284,24 +291,32 @@ const steps = {
     await inv('settings:update', { general: { userName: MARK.userName, launchAtLogin: true }, appearance: { theme: MARK.theme } })
     const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, 10_000)
     check('4.settings-saved', `Before the upgrade: user name "${MARK.userName}", the ${MARK.theme} theme and Launch at login saved`, saved, JSON.stringify(readConfig()?.settings?.general))
-    // Something in the local profile folder (where accounts live), for the upgrade to carry across.
-    const local = path.join(process.env.LOCALAPPDATA, 'Hive')
-    fs.mkdirSync(local, { recursive: true })
-    fs.writeFileSync(path.join(local, LOCAL_MARK), 'kept across the upgrade')
-    fs.mkdirSync(path.join(local, TRUST_HOME), { recursive: true })
-    fs.writeFileSync(path.join(local, TRUST_HOME, '.claude.json'), JSON.stringify(TRUST_JSON, null, 2))
-    res.facts.runBefore = runValues()
-    check('4.login-registered', 'Before the upgrade: Launch at login starts Hive.exe', res.facts.runBefore.some((v) => /\\Hive\.exe/i.test(v.command)), JSON.stringify(res.facts.runBefore))
+    // 1.0's own folders and its Launch at login (HI-2460, HI-2461): an RC has moved them already.
+    if (!FROM_RC) {
+      // Something in the local profile folder (where accounts live), for the upgrade to carry across.
+      const local = path.join(process.env.LOCALAPPDATA, 'Hive')
+      fs.mkdirSync(local, { recursive: true })
+      fs.writeFileSync(path.join(local, LOCAL_MARK), 'kept across the upgrade')
+      fs.mkdirSync(path.join(local, TRUST_HOME), { recursive: true })
+      fs.writeFileSync(path.join(local, TRUST_HOME, '.claude.json'), JSON.stringify(TRUST_JSON, null, 2))
+      res.facts.runBefore = runValues()
+      check('4.login-registered', 'Before the upgrade: Launch at login starts Hive.exe', res.facts.runBefore.some((v) => /\\Hive\.exe/i.test(v.command)), JSON.stringify(res.facts.runBefore))
+    }
     // A workspace the release before makes in .hive (HI-2462, HI-2506): a project and a card naming a note by its path,
     // for the upgrade's first open to move to .combwork.
     fs.mkdirSync(path.join(KEPT_WS, 'demo'), { recursive: true })
     fs.writeFileSync(path.join(KEPT_WS, 'demo', 'README.md'), '# demo\n')
     await inv('workspace:open', KEPT_WS)
-    const made = await until(async () => fs.existsSync(path.join(KEPT_WS, '.hive', 'hive.db')) && fs.existsSync(path.join(KEPT_WS, 'demo', '.hive', 'project.json')), 30_000)
+    const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, 'hive.db')) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)
     let card = null
-    if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, '.hive', 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
-    res.facts.keptWorkspace = { made: !!made, card }
-    check('4.workspace-made', 'Before the upgrade: a workspace with a project and a card, in .hive', !!made && typeof card?.number === 'number', JSON.stringify(res.facts.keptWorkspace))
+    if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, TREE_BEFORE, 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
+    // A skill copy as the release before marks it (HI-2587), for the upgrade to rename its marker.
+    fs.mkdirSync(path.join(KEPT_WS, COPY), { recursive: true })
+    fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), '---\nname: cw-sandbox-check\n---\n')
+    fs.writeFileSync(path.join(KEPT_WS, COPY, '.hive-copy'), JSON.stringify({ source: 'sandbox', hash: 'h' }) + '\n')
+    res.facts.keptWorkspace = { made: !!made, card, tree: TREE_BEFORE, logs: fs.readdirSync(path.join(PROFILE, 'logs')).filter((n) => n.endsWith('.log')) }
+    check('4.workspace-made', `Before the upgrade: a workspace with a project and a card, in ${TREE_BEFORE}, its board hive.db, the log hive.log`, !!made && typeof card?.number === 'number' && res.facts.keptWorkspace.logs.includes('hive.log'), JSON.stringify(res.facts.keptWorkspace))
+    if (FROM_RC) return void (await shot('before-upgrade'))
     // Advanced overrides under the release before's hive.* ids (HI-2518), one at each level: Combwork's own (advanced.json
     // in the profile) and the workspace's own (its workspace.json), for the upgrade to bring back under cw.*.
     const setAdv = (id, value, scope) => inv('advanced:set', id, value, scope).then(() => null, (e) => String(e))
@@ -495,27 +510,30 @@ const steps = {
     res.facts.exe = CW_EXE
     res.facts.profile = PROFILE
     check('4.combwork-runs', 'Combwork.exe runs after the upgrade, from %APPDATA%\\Combwork', CW_EXE === COMBWORK_EXE && PROFILE === path.join(process.env.APPDATA, 'Combwork'), `${CW_EXE}, ${PROFILE}`)
-    const localNew = path.join(process.env.LOCALAPPDATA, 'Combwork')
-    check('4.local-moved', 'The local folder moved with its data: %LOCALAPPDATA%\\Combwork, no %LOCALAPPDATA%\\Hive', fs.existsSync(path.join(localNew, LOCAL_MARK)) && !fs.existsSync(path.join(process.env.LOCALAPPDATA, 'Hive')), fs.readdirSync(process.env.LOCALAPPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
-    let trustAfter = null
-    try { trustAfter = JSON.parse(fs.readFileSync(path.join(localNew, TRUST_HOME, '.claude.json'), 'utf8')) } catch { /* below */ }
-    const trustEntries = (j) => Object.entries(j?.projects ?? {}).map(([k, v]) => [k, v?.hasTrustDialogAccepted])
-    check('4.trust-kept', "A connection home's Claude Code folder trust moved as it was: trusted stays trusted, untrusted stays untrusted, nothing added", JSON.stringify(trustEntries(trustAfter)) === JSON.stringify(trustEntries(TRUST_JSON)), JSON.stringify(trustAfter))
-    check('4.roaming-moved', 'The roaming folder moved: no %APPDATA%\\Hive left', !fs.existsSync(path.join(process.env.APPDATA, 'Hive')), fs.readdirSync(process.env.APPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
-    let rec = null
-    try { rec = JSON.parse(fs.readFileSync(path.join(localNew, 'profile-move.json'), 'utf8')) } catch { /* below */ }
-    res.facts.record = rec
-    check('4.record', "The installer's record arrived with the local folder (v 1, by installer)", rec?.v === 1 && rec.by === 'installer' && /\\Hive$/i.test(String(rec.from)), JSON.stringify(rec))
-    // Its Launch at login: written for Combwork.exe at start (loginItem.ts), Hive Desktop's removed by the installer.
-    const runs = await until(async () => { const v = runValues(); return v.some((x) => /\\Combwork\.exe/i.test(x.command)) && v }, 15_000)
-    res.facts.runAfter = runs || runValues()
-    check('4.login-moved', 'Launch at login starts Combwork.exe, and nothing starts Hive.exe', !!runs && !runs.some((x) => /\\Hive\.exe/i.test(x.command)), JSON.stringify(res.facts.runAfter))
-    const fallback = await page.locator('.toast', { hasText: "Hive Desktop's data folders" }).count()
-    check('4.no-fallback', 'No notice that Combwork runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
+    // 1.0's folders, its record and its Launch at login (HI-2460, HI-2461): an RC moved them already.
+    if (!FROM_RC) {
+      const localNew = path.join(process.env.LOCALAPPDATA, 'Combwork')
+      check('4.local-moved', 'The local folder moved with its data: %LOCALAPPDATA%\\Combwork, no %LOCALAPPDATA%\\Hive', fs.existsSync(path.join(localNew, LOCAL_MARK)) && !fs.existsSync(path.join(process.env.LOCALAPPDATA, 'Hive')), fs.readdirSync(process.env.LOCALAPPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
+      let trustAfter = null
+      try { trustAfter = JSON.parse(fs.readFileSync(path.join(localNew, TRUST_HOME, '.claude.json'), 'utf8')) } catch { /* below */ }
+      const trustEntries = (j) => Object.entries(j?.projects ?? {}).map(([k, v]) => [k, v?.hasTrustDialogAccepted])
+      check('4.trust-kept', "A connection home's Claude Code folder trust moved as it was: trusted stays trusted, untrusted stays untrusted, nothing added", JSON.stringify(trustEntries(trustAfter)) === JSON.stringify(trustEntries(TRUST_JSON)), JSON.stringify(trustAfter))
+      check('4.roaming-moved', 'The roaming folder moved: no %APPDATA%\\Hive left', !fs.existsSync(path.join(process.env.APPDATA, 'Hive')), fs.readdirSync(process.env.APPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
+      let rec = null
+      try { rec = JSON.parse(fs.readFileSync(path.join(localNew, 'profile-move.json'), 'utf8')) } catch { /* below */ }
+      res.facts.record = rec
+      check('4.record', "The installer's record arrived with the local folder (v 1, by installer)", rec?.v === 1 && rec.by === 'installer' && /\\Hive$/i.test(String(rec.from)), JSON.stringify(rec))
+      // Its Launch at login: written for Combwork.exe at start (loginItem.ts), Hive Desktop's removed by the installer.
+      const runs = await until(async () => { const v = runValues(); return v.some((x) => /\\Combwork\.exe/i.test(x.command)) && v }, 15_000)
+      res.facts.runAfter = runs || runValues()
+      check('4.login-moved', 'Launch at login starts Combwork.exe, and nothing starts Hive.exe', !!runs && !runs.some((x) => /\\Hive\.exe/i.test(x.command)), JSON.stringify(res.facts.runAfter))
+      const fallback = await page.locator('.toast', { hasText: "Hive Desktop's data folders" }).count()
+      check('4.no-fallback', 'No notice that Combwork runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
+    }
     // The workspace made before the upgrade, opened (again, or restored at start): its .hive folders moved to .combwork,
     // its board and the card's path with them (HI-2462, HI-2506).
     await inv('workspace:open', KEPT_WS).catch(() => undefined)
-    const movedNow = () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'hive.db')) && !fs.existsSync(path.join(KEPT_WS, '.hive')) && fs.existsSync(path.join(KEPT_WS, 'demo', '.combwork', 'project.json')) && !fs.existsSync(path.join(KEPT_WS, 'demo', '.hive'))
+    const movedNow = () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'combwork.db')) && !fs.existsSync(path.join(KEPT_WS, '.hive')) && fs.existsSync(path.join(KEPT_WS, 'demo', '.combwork', 'project.json')) && !fs.existsSync(path.join(KEPT_WS, 'demo', '.hive'))
     const moved = await until(async () => movedNow(), 30_000)
     res.facts.keptWorkspaceAfter = fs.existsSync(KEPT_WS) ? fs.readdirSync(KEPT_WS) : null
     check('4.workspace-moved', "The workspace from before opens with its .hive folders moved to .combwork (the workspace's and the project's)", !!moved, JSON.stringify(res.facts.keptWorkspaceAfter))
@@ -523,19 +541,38 @@ const steps = {
     const card = Array.isArray(cards) ? cards.find((x) => x.title === KEPT_CARD) : null
     res.facts.keptCard = card ? { number: card.number, description: card.description } : cards
     check('4.workspace-card', 'Its card is on the board, its path now into .combwork', !!card && card.description === `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`, JSON.stringify(res.facts.keptCard))
-    // The advanced overrides made before (HI-2518): read back under their cw.* ids, in the app (Settings' state, the Agent
-    // API's settings read) and on disk (advanced.json rewritten at once; workspace.json at its next save, so not checked),
-    // with nothing left under the old id; and an agent naming the old id told the new one.
-    const fileNow = () => readJson(path.join(PROFILE, 'advanced.json'))?.values ?? null
-    const rewritten = await until(async () => { const v = fileNow(); return v && v[ADV.app.now] === ADV.app.value && !(ADV.app.old in v) && v }, 15_000)
-    const state = await inv('advanced:state').catch((e) => ({ error: String(e) }))
-    const viaApi = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.now}`)}`).catch((e) => ({ error: String(e) }))
-    const wsApi = await api(`/v1/settings/${encodeURIComponent(`workspace.advanced.${ADV.ws.now}`)}`).catch((e) => ({ error: String(e) }))
-    res.facts.advancedAfter = { file: fileNow(), values: state?.values, workspace: state?.workspace, api: viaApi, wsApi }
-    check('4.advanced-kept', `The advanced overrides come back under cw.*: ${ADV.app.now} = ${ADV.app.value} (advanced.json rewritten, nothing under ${ADV.app.old}) and the workspace's own ${ADV.ws.now} = ${ADV.ws.value}`, !!rewritten && state?.values?.[ADV.app.now] === ADV.app.value && !(ADV.app.old in (state?.values ?? {})) && state?.workspace?.[ADV.ws.now] === ADV.ws.value && !(ADV.ws.old in (state?.workspace ?? {})), JSON.stringify(res.facts.advancedAfter))
-    const old = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.old}`)}`).catch((e) => ({ error: String(e) }))
-    res.facts.advancedOldId = old
-    check('4.advanced-old-id', `An agent naming the old id (advanced.${ADV.app.old}) is told the new one`, JSON.stringify(old).includes(`use advanced.${ADV.app.now}`), JSON.stringify(old))
+    // HI-2587: the names upgrade. The board's file and its copies, the log, the workspace's files, the skill copy's marker:
+    // Combwork's names, nothing of the old left, the record written; from 1.0 and from an RC alike.
+    const dir = path.join(KEPT_WS, '.combwork')
+    const listed = (d) => (fs.existsSync(d) ? fs.readdirSync(d) : [])
+    res.facts.names = { combwork: listed(dir), backups: listed(path.join(dir, 'backups')), logs: listed(path.join(PROFILE, 'logs')), copy: listed(path.join(KEPT_WS, COPY)) }
+    check('4.board-file', 'The board is .combwork\\combwork.db, with the card made before; no hive.db or its sidecars left', res.facts.names.combwork.includes('combwork.db') && !res.facts.names.combwork.some((n) => n.startsWith('hive.db')) && !!card, JSON.stringify(res.facts.names.combwork))
+    check('4.board-backups', "The board's copies in backups take Combwork's names", !res.facts.names.backups.some((n) => n.startsWith('hive-')), JSON.stringify(res.facts.names.backups))
+    let log = ''
+    try { log = fs.readFileSync(path.join(PROFILE, 'logs', 'combwork.log'), 'utf8') } catch { /* below */ }
+    check('4.log-file', "The log is combwork.log, with the release before's lines in it (its start line and this one's); no hive.log left", !res.facts.names.logs.includes('hive.log') && new Set([...log.matchAll(/\b(?:Hive|Combwork) (\S+) starting/g)].map((m) => m[1])).size >= 2, JSON.stringify(res.facts.names.logs))
+    let gitignore = ''
+    try { gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8') } catch { /* below */ }
+    check('4.workspace-files', "The workspace's .gitignore is Combwork's, for combwork.db, keeping the names upgrade's record out", /\(added by Combwork, #1017\)/.test(gitignore.split(/\r?\n/)[0]) && /^combwork\.db\r?$/m.test(gitignore) && /^combwork-names\.json\r?$/m.test(gitignore) && !/^hive\.db/m.test(gitignore), gitignore.slice(0, 600))
+    check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes('.hive-copy') && readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))?.hash === 'h', JSON.stringify(res.facts.names.copy))
+    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === 1, JSON.stringify(res.facts.names.combwork))
+    const oldNames = [...res.facts.names.combwork.filter((n) => /^hive/i.test(n)), ...res.facts.names.logs.filter((n) => /^hive/i.test(n))]
+    check('4.no-old-names', "No file under Hive's names left in the workspace's .combwork or the profile's logs", oldNames.length === 0, JSON.stringify(oldNames))
+    if (!FROM_RC) {
+      // The advanced overrides made before (HI-2518): read back under their cw.* ids, in the app (Settings' state, the Agent
+      // API's settings read) and on disk (advanced.json rewritten at once; workspace.json at its next save, so not checked),
+      // with nothing left under the old id; and an agent naming the old id told the new one.
+      const fileNow = () => readJson(path.join(PROFILE, 'advanced.json'))?.values ?? null
+      const rewritten = await until(async () => { const v = fileNow(); return v && v[ADV.app.now] === ADV.app.value && !(ADV.app.old in v) && v }, 15_000)
+      const state = await inv('advanced:state').catch((e) => ({ error: String(e) }))
+      const viaApi = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.now}`)}`).catch((e) => ({ error: String(e) }))
+      const wsApi = await api(`/v1/settings/${encodeURIComponent(`workspace.advanced.${ADV.ws.now}`)}`).catch((e) => ({ error: String(e) }))
+      res.facts.advancedAfter = { file: fileNow(), values: state?.values, workspace: state?.workspace, api: viaApi, wsApi }
+      check('4.advanced-kept', `The advanced overrides come back under cw.*: ${ADV.app.now} = ${ADV.app.value} (advanced.json rewritten, nothing under ${ADV.app.old}) and the workspace's own ${ADV.ws.now} = ${ADV.ws.value}`, !!rewritten && state?.values?.[ADV.app.now] === ADV.app.value && !(ADV.app.old in (state?.values ?? {})) && state?.workspace?.[ADV.ws.now] === ADV.ws.value && !(ADV.ws.old in (state?.workspace ?? {})), JSON.stringify(res.facts.advancedAfter))
+      const old = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.old}`)}`).catch((e) => ({ error: String(e) }))
+      res.facts.advancedOldId = old
+      check('4.advanced-old-id', `An agent naming the old id (advanced.${ADV.app.old}) is told the new one`, JSON.stringify(old).includes(`use advanced.${ADV.app.now}`), JSON.stringify(old))
+    }
     await shot('after-upgrade-light')
     await theme('dark')
     await shot('after-upgrade-dark')

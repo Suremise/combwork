@@ -1,6 +1,7 @@
 // The files Combwork writes into projects and workspaces say Combwork (HI-2580), and what Hive wrote in them before 1.1
-// is still recognised as Combwork's own: the .combwork folder's README, its .gitignore and the Assistant's, the comment
-// above the skill copies' lines in a repository's info/exclude, and each launch folder's README.txt.
+// is rewritten once by the names upgrade (HI-2587, nameUpgradeFiles.ts and nameUpgradeProjects.ts), never recognised
+// afterwards: the .combwork folder's README and .gitignore (its board lines for combwork.db too), the comments in a
+// repository's info/exclude, and each launch folder's README.txt. A file the user wrote is left byte for byte.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
@@ -9,9 +10,14 @@ import { tempDir } from './tempDir'
 import { ASSISTANT_GITIGNORE, BOARD_GITIGNORE, HANDOVER_README, WORKSPACE_README, withUsageIgnore } from '../src/main/workspace'
 import { COPIES_EXCLUDE_COMMENT, excludeCopies } from '../src/main/providers/common'
 import { LAUNCH_README } from '../src/main/providers/claude/adapter'
+import { upgradedGitignore, upgradedMcpDefinition, upgradedReadme } from '../src/main/nameUpgradeFiles'
+import { upgradedExclude } from '../src/main/nameUpgradeProjects'
+import { EXCLUDE_COMMENT } from '../src/shared/hiveFolderMove'
 
 /** Hive's .combwork/.gitignore before #1106 added the usage history's lines. */
 const OLD_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
+const USAGE = '# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n'
+const NAMES = "# The names upgrade's record on this machine (HI-2587)\ncombwork-names.json\n"
 
 describe('the wording of the files Combwork writes (HI-2580)', () => {
   it('says Combwork, never Hive, and links the repository', () => {
@@ -20,28 +26,58 @@ describe('the wording of the files Combwork writes (HI-2580)', () => {
       expect(text).not.toMatch(/\bHive\b/)
     }
     expect(WORKSPACE_README).toContain('[Combwork](https://github.com/Suremise/combwork)')
-    // The database's file keeps its name for now.
-    expect(WORKSPACE_README).toContain('`hive.db`')
+    expect(WORKSPACE_README).toContain('`combwork.db`')
+    expect(BOARD_GITIGNORE).not.toMatch(/hive/)
   })
 })
 
 describe("the .combwork folder's .gitignore", () => {
-  it("adds the usage history's lines to Combwork's own, and to Hive's", () => {
+  it("Hive's is rewritten once: Combwork's head, the board's lines for combwork.db, the record kept out", () => {
     const head = BOARD_GITIGNORE.split('\n')[0]
-    expect(withUsageIgnore(`${head}\nhive.db\n`)).toBe(`${head}\nhive.db\n# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n`)
-    expect(withUsageIgnore(OLD_GITIGNORE)).toBe(`${OLD_GITIGNORE}# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n`)
-    // CRLF kept, and a last line without its newline ended first.
-    expect(withUsageIgnore(OLD_GITIGNORE.replace(/\n/g, '\r\n').replace(/\r\n$/, ''))).toBe(`${OLD_GITIGNORE.replace(/\n/g, '\r\n')}# What each session used: the usage history (#1106)\r\nusage.db\r\nusage.db-*\r\n`)
+    expect(upgradedGitignore(OLD_GITIGNORE)).toBe(`${head}\ncombwork.db\ncombwork.db-*\nbackups/\n${NAMES}`)
+    expect(upgradedGitignore(`${OLD_GITIGNORE}${USAGE}`)).toBe(`${head}\ncombwork.db\ncombwork.db-*\nbackups/\n${USAGE}${NAMES}`)
+    // CRLF kept.
+    const crlf = upgradedGitignore(OLD_GITIGNORE.replace(/\n/g, '\r\n'))
+    expect(crlf).toBe(`${head}\ncombwork.db\ncombwork.db-*\nbackups/\n${NAMES}`.replace(/\n/g, '\r\n'))
+    // Then nothing more: the next open writes nothing.
+    expect(upgradedGitignore(upgradedGitignore(OLD_GITIGNORE)!)).toBeNull()
+    expect(upgradedGitignore(BOARD_GITIGNORE)).toBeNull()
   })
 
-  it("leaves the user's own, and one that has them already", () => {
+  it("the user's own is left, and Hive's head is no longer Combwork's for the usage lines", () => {
+    expect(upgradedGitignore('# mine\nhive.db\n')).toBeNull()
+    expect(withUsageIgnore(OLD_GITIGNORE)).toBeNull()
     expect(withUsageIgnore('# mine\nhive.db\n')).toBeNull()
+  })
+
+  it("adds the usage history's lines to Combwork's own once", () => {
+    const head = BOARD_GITIGNORE.split('\n')[0]
+    expect(withUsageIgnore(`${head}\ncombwork.db\n`)).toBe(`${head}\ncombwork.db\n${USAGE}`)
     expect(withUsageIgnore(BOARD_GITIGNORE)).toBeNull()
-    expect(withUsageIgnore(`${OLD_GITIGNORE}usage.db\n`)).toBeNull()
   })
 })
 
-describe("the skill copies' lines in info/exclude", () => {
+describe("the .combwork folder's README", () => {
+  it("1.0's, HI-2462's and HI-2580's become Combwork's; one the user edited is theirs", () => {
+    const hi2580 = WORKSPACE_README.replace('`combwork.db`', '`hive.db`')
+    expect(upgradedReadme(hi2580, WORKSPACE_README)).toBe(WORKSPACE_README)
+    expect(upgradedReadme(hi2580.replace(/\n/g, '\r\n'), WORKSPACE_README)).toBe(WORKSPACE_README.replace(/\n/g, '\r\n'))
+    const v10 = `# .hive\n\nThis folder is managed by [Hive](https://github.com/) and is meant to be committed.\n`
+    expect(upgradedReadme(v10, WORKSPACE_README)).toBeNull()
+    expect(upgradedReadme(`${hi2580}\nMy notes.\n`, WORKSPACE_README)).toBeNull()
+    expect(upgradedReadme(WORKSPACE_README, WORKSPACE_README)).toBeNull()
+  })
+})
+
+describe("stored MCP definitions", () => {
+  it('take the new folder variable and catalogue address; others are left', () => {
+    const old = JSON.stringify({ command: '${HIVE_MCP_DIR}/srv/run.cmd', catalog: { source: 'https://github.com/Suremise/hive-mcp/releases/latest/download/catalog.json' } }, null, 2)
+    expect(upgradedMcpDefinition(old)).toBe(JSON.stringify({ command: '${CW_MCP_DIR}/srv/run.cmd', catalog: { source: 'https://github.com/Suremise/combwork-mcp/releases/latest/download/catalog.json' } }, null, 2))
+    expect(upgradedMcpDefinition('{"command":"${CW_MCP_DIR}/x"}')).toBeNull()
+  })
+})
+
+describe('the comments in info/exclude', () => {
   const repo = (): { dir: string; exclude: string } => {
     const dir = tempDir('hive-copies-exclude-')
     execFileSync('git', ['init', '-q', dir])
@@ -50,19 +86,24 @@ describe("the skill copies' lines in info/exclude", () => {
     return { dir, exclude }
   }
 
-  it("writes Combwork's comment above them", async () => {
+  it("writes Combwork's comment above the copies' lines", async () => {
     const { dir, exclude } = repo()
     writeFileSync(exclude, '')
     await excludeCopies(dir)
     expect(readFileSync(exclude, 'utf8')).toBe(`${COPIES_EXCLUDE_COMMENT}\n/.agents/skills/cw-*/\n/.agents/skills/.cw-*/\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\n`)
   })
 
-  it("takes Hive's comment for Combwork's own: no second comment", async () => {
+  it("Hive's comments become Combwork's once (HI-2575, HI-2580), every other line as it was", () => {
+    const text = "# mine\n# Hive project metadata (added by Hive)\n/alpha/.combwork/\n# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\r\n/.agents/skills/hive-*/\n"
+    expect(upgradedExclude(text)).toBe(`# mine\n${EXCLUDE_COMMENT}\n/alpha/.combwork/\n${COPIES_EXCLUDE_COMMENT}\r\n/.agents/skills/hive-*/\n`)
+    expect(upgradedExclude(upgradedExclude(text)!)).toBeNull()
+    expect(upgradedExclude('# mine\n/x/\n')).toBeNull()
+  })
+
+  it("Hive's comment is no longer taken for Combwork's: the copies get Combwork's", async () => {
     const { dir, exclude } = repo()
     writeFileSync(exclude, "# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\n")
     await excludeCopies(dir)
-    const text = readFileSync(exclude, 'utf8')
-    expect(text).toBe("# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\n/.agents/skills/cw-*/\n/.agents/skills/.cw-*/\n")
-    expect(text).not.toContain(COPIES_EXCLUDE_COMMENT)
+    expect(readFileSync(exclude, 'utf8')).toContain(COPIES_EXCLUDE_COMMENT)
   })
 })

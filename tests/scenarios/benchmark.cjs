@@ -1,11 +1,11 @@
 // A scenario run as a benchmark artifact (#117): what Combwork's own parts cost in each scenario, with each sample's
 // correctness, in a versioned, bounded file the Performance page can import and compare (src/shared/benchmark.ts reads
-// it: schema "hive-benchmark/1"). Runs keep their own folder; baselines are kept apart and never overwritten (the
+// it: schema "combwork-benchmark/1"). Runs keep their own folder; baselines are kept apart and never overwritten (the
 // previous copy is kept, the oldest pruned).
 const fs = require('fs')
 const path = require('path')
 
-const SCHEMA = 'hive-benchmark/1'
+const SCHEMA = 'combwork-benchmark/1'
 // scenarios: as src/shared/benchmark.ts's (200 since #1444).
 const LIMITS = { scenarios: 200, samples: 20, checks: 60, failedChecks: 20, skills: 60, text: 200, resultsKept: 30, baselinesKept: 5 }
 

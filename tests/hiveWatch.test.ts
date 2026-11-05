@@ -68,8 +68,8 @@ describe("a workspace's .combwork watch (HI-1797)", () => {
     // (The writes above have each been told: what they told was waited for.)
     const from = events.length
     for (let i = 0; i < 5; i++) {
-      writeFileSync(join(hive, 'hive.db-wal-test'), 'x'.repeat(i))
-      writeFileSync(join(hive, 'hive.db-journal'), 'x'.repeat(i))
+      writeFileSync(join(hive, 'combwork.db-wal-test'), 'x'.repeat(i))
+      writeFileSync(join(hive, 'combwork.db-journal'), 'x'.repeat(i))
     }
     // A change that is told, after them: once it is, the database files' changes have been seen (and told nothing).
     writeFileSync(join(hive, 'shared', 'after.md'), 'after\n')

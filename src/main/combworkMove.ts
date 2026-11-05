@@ -16,14 +16,15 @@ import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
 import { dataFolder, ours, type HostKind } from './hiveFolder'
 import { withNamedLock } from './repoLock'
+import { projectNamesDone, record as recordNames, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
-import type { CardsAnswer, CardsRewrite } from './hiveMoveWorker'
+import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolders, CopyFoldersAnswer } from './hiveMoveWorker'
 
 /**
  * The move of a workspace's `.hive` folders to `.combwork` (HI-2462, SPEC §4.1.1; the design is the card's: HI-2462/s21,
  * and s65 for its state). Each host (the workspace, its Assistant's home inside it, each project folder the workspace
  * lists) has one folder of Combwork's; from 1.1 it is `.combwork`. When a workspace opens, before anything reads it,
- * each host's `.hive` of ours (one holding project.json, workspace.json or hive.db) is renamed: one atomic rename, never
+ * each host's `.hive` of ours (one holding project.json, workspace.json or combwork.db) is renamed: one atomic rename, never
  * a copy, so nothing is half-moved or lost.
  *
  * - **Ownership**: the move holds a lock across processes (repoLockCore's row, by token, pid and process start, in
@@ -359,8 +360,16 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
     if (s === 'planned') planned++
   }
   await warnRecreated(hosts)
-  // Nothing to rename, and the rewrites finished for the map as it is: no lock, nothing written.
-  if (!planned) {
+  // Nothing to rename, nothing under an old name (HI-2587), and the rewrites finished for the map as it is: no lock,
+  // nothing written.
+  // A single project (one that came later): its own steps by its own record, whatever the workspace's (HR2's round 1).
+  // Only read here (HR2's rounds 2 and 3): whether anything is due. Every write, the names upgrade's records included, is
+  // under the lock, after the other processes' refusal.
+  const namesDue = o.only ? !(await projectNamesDone(o.only)) : await workspaceNeeds(ws)
+  const stop = (): void => {
+    if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  }
+  if (!planned && !namesDue) {
     const moves = await movesOf(ws, all)
     if (!moves.length || (await doneHash(ws)) === mapHash(moves)) {
       publish(ws, moves)
@@ -368,10 +377,26 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
     }
   }
   await moveTestHooks.looked?.()
-  const stop = (): void => {
-    if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
-  }
   return withNamedLock(ws, MOVE_LOCK_FILE, () => movedUnderLock(ws, o, stop), { waitMs: 0, busy: lockBusy })
+}
+
+/**
+ * A workspace just made (its `.combwork` new, nothing of Hive's in it): its names upgrade recorded done, under the move's
+ * lock and only with no other process present, as every write of the upgrade is (HR2's round 3). Not recorded (another
+ * process there, the lock held): its next open looks again, under the lock. Never throws.
+ */
+export function recordNewWorkspace(ws: string): Promise<void> {
+  return inTurn(ws, () =>
+    withNamedLock(
+      ws,
+      MOVE_LOCK_FILE,
+      async () => {
+        for (const dir of [legacy(ws), current(ws)]) if (othersPresentByProcess(dir).length) return
+        await recordNames(ws)
+      },
+      { waitMs: 0, busy: lockBusy }
+    )
+  ).catch((e) => log.warn("recording a new workspace's names upgrade done", e))
 }
 
 /**
@@ -398,12 +423,13 @@ export async function excludeMoveLock(ws: string): Promise<void> {
 
 async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, stop: () => void): Promise<MoveOutcome> {
   stop()
-  await excludeMoveLock(ws)
-  // Inside the lock, everything is looked at again: another process may have moved it meanwhile.
+  // Inside the lock, everything is looked at again: another process may have moved it meanwhile. Another process's
+  // presence refuses it before anything is written (HR2's round 3: the lock file's exclude line too).
   for (const dir of [legacy(ws), current(ws)]) {
     const others = othersPresentByProcess(dir)
     if (others.length) throw hiveError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
   }
+  await excludeMoveLock(ws)
   const id = randomUUID()
   // The workspace first: a Hive with its board open fails it here, before any project is touched; then its Assistant's
   // home (inside the workspace's folder, so looked at after it moved), then the projects.
@@ -426,6 +452,10 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       await moveTestHooks.after?.(`renamed:${kind}`)
     }
   }
+  // Then what is kept inside under Hive's names (HI-2587, nameUpgrade.ts), still under the lock and before anything of
+  // the workspace is admitted.
+  const projects = (await hostsOf(ws)).filter((h) => h.kind === 'project').map((h) => h.host)
+  await upgradeWorkspace(ws, { stop, checkpoint: checkpointOffMain, copyFolders: copyFoldersOffMain, projects, only: o.only })
   const moves = await deriveMoves(ws)
   publish(ws, moves)
   if (!moves.length || (await doneHash(ws)) === mapHash(moves)) return { late: false, moved }
@@ -520,27 +550,45 @@ export async function rewriteNotes(dir: string, moves: FolderMove[]): Promise<nu
 const workerScript = (): string => join(__dirname, 'hive-move-worker.js')
 
 /** Rewrites the board's cards in the worker (hiveMoveWorker.ts). */
-export async function rewriteCardsOffMain(job: CardsRewrite): Promise<CardsAnswer> {
+export function rewriteCardsOffMain(job: CardsRewrite): Promise<CardsAnswer> {
+  return inMoveWorker<CardsAnswer>(job, async () => (await import('./hiveMoveWorker')).rewriteCards(job))
+}
+
+/** Checkpoints and closes the board's old file in the worker (hiveMoveWorker.ts), before its rename (HI-2587). */
+export function checkpointOffMain(file: string): Promise<CheckpointAnswer> {
+  const job: Checkpoint = { kind: 'checkpoint', file }
+  return inMoveWorker<CheckpointAnswer>(job, async () => (await import('./hiveMoveWorker')).checkpointFile(job))
+}
+
+/** The folders the board's skill copies records name, read in the worker (HI-2587's marker step); none without a board. */
+export async function copyFoldersOffMain(file: string): Promise<string[]> {
+  if (!existsSync(file)) return []
+  const job: CopyFolders = { kind: 'copyFolders', file }
+  const a = await inMoveWorker<CopyFoldersAnswer>(job, async () => (await import('./hiveMoveWorker')).copyFolders(job))
+  if (!a.ok) throw new Error(a.error)
+  return a.folders
+}
+
+async function inMoveWorker<A extends { ok: boolean }>(job: CardsRewrite | Checkpoint | CopyFolders, here: () => Promise<A>): Promise<A> {
   if (!bundledScriptExists(workerScript())) {
     workerHere('folder move', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
-    const { rewriteCards } = await import('./hiveMoveWorker')
-    return rewriteCards(job)
+    return here()
   }
   return new Promise((res) => {
     const w = new Worker(workerScript(), { workerData: job })
     workerStarted('folder move', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     let done = false
-    w.once('message', (a: CardsAnswer) => {
+    w.once('message', (a: A) => {
       done = true
       res(a)
       void w.terminate()
     })
     w.once('error', (e: Error) => {
-      if (!done) res({ ok: false, error: e.message })
+      if (!done) res({ ok: false, error: e.message } as unknown as A)
       done = true
     })
     w.once('exit', (code) => {
-      if (!done) res({ ok: false, error: `the worker ended (exit code ${code})` }) // i18n-ignore: for the error's detail
+      if (!done) res({ ok: false, error: `the worker ended (exit code ${code})` } as unknown as A) // i18n-ignore: for the error's detail
       done = true
     })
   })

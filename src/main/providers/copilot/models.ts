@@ -52,7 +52,7 @@ export const catalogArgs = (): string[] => ['--acp', ...noAutoUpdateArgs()]
  * it couldn't be asked or listed nothing (not signed in, or offline).
  */
 export function readCopilotModels(executable: string, env: Record<string, string>, timeoutMs = 30000): Promise<CatalogRead | null> {
-  const dir = join(tmpdir(), 'hive-copilot-models')
+  const dir = join(tmpdir(), 'combwork-copilot-models')
   mkdirSync(dir, { recursive: true })
   const childEnv = copilotEnv(env)
   return new Promise((resolve) => {

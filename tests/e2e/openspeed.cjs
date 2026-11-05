@@ -4,14 +4,14 @@
 // with agents opens (workspace:open answers) within OPEN_MS. Before HI-1705 it took over 3 s here: its bundled skills
 // and modes were hashed inside the open, and its projects read one after another. Its bundled skills and modes are then
 // brought up to date after the open, and what the open started in the background is said in one "after opening" line
-// of hive.log, each part timed. Dev build, throwaway profile and workspace.
+// of combwork.log, each part timed. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 
 const userData = path.join(lib.WORK, 'openspeed-profile')
 const ws = path.join(lib.WORK, 'openspeed-ws')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 // How long each of main's file calls waits during the timed open.
 const LAG_MS = 25
 // The bound on that open: about 0.6 s with HI-1705, over 3 s before it (a chain of some 140 calls).

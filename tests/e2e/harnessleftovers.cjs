@@ -70,7 +70,7 @@ async function detachedCopy(profile) {
   child.unref()
   const id = lib.identify([child.pid])[0] ?? null
   if (id) ids.push(id)
-  await lib.until(() => fs.existsSync(path.join(profile, 'logs', 'hive.log')), HUNG_MS, 250)
+  await lib.until(() => fs.existsSync(path.join(profile, 'logs', 'combwork.log')), HUNG_MS, 250)
   return id
 }
 

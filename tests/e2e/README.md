@@ -88,7 +88,7 @@ fetches the release's `latest.yml`, which GitHub counts as a download. A package
 `CW_TEST_QUIET=1` checks nothing, automatic or manual (Settings → Updates says it's a test copy, and its log says so
 at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Combwork `CW_UPDATE_DELAY` at its maximum (about
 24.8 days: a 0.9's first check never comes) and, in a profile it has saved, automatic checks off (no 6-hourly one).
-The guard: when a suite ends, each packaged Combwork's `hive.log` must show no `[updates] Checking for update` since it
+The guard: when a suite ends, each packaged Combwork's `combwork.log` must show no `[updates] Checking for update` since it
 was started, or the suite fails, naming the lines. The Sandbox checks run with their network off.
 
 Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's `Programs\Hive`): `lib.cjs` refuses it and any exe
@@ -455,7 +455,9 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   release-combwork skill), with the verdict and report folder commented on the release card.
 - **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --hive "<the main checkout>"
   --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
-  upgrade start; `--hive` is only where that is looked for, the newest other installer in its `dist`). It drives the
+  upgrade start; `--hive` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
+  <a 1.1 release candidate's installer>` adds scenario 10, the upgrade from that RC, so the names upgrade, HI-2587, is
+  checked from 1.0.0 and from an RC alike: pass it for 1.1's release candidates). It drives the
   hive-mcp project's **windows-sandbox MCP server** over stdio as any MCP client does, starting its own copy of it, so
   it needs no MCP registration: `--server <its server.js>` (or `WSB_SERVER`), else the copy Combwork installed from the MCP
   catalogue in the workspace holding `--hive` (`<workspace>\.combwork\mcp\windows-sandbox`), else a hive-mcp checkout
@@ -754,7 +756,7 @@ Start from an existing suite and use `lib.cjs`:
 **React's commit bursts and chains** (HI-1387, HI-1865): a render loop (a setState per event in a useEffect, #1366)
 only throws once React's nested-update limit (50) is passed, and a production build says nothing before then. So a quiet
 test copy's window counts React's commits through a DevTools hook installed before React DOM loads
-(`src/renderer/src/commitWatch.ts`; main passes `--hive-commit-watch` to a test copy's window only), and says on its
+(`src/renderer/src/commitWatch.ts`; main passes `--cw-commit-watch` to a test copy's window only), and says on its
 console each new largest burst (the most commits within 250 ms) and each new longest chain (commits with nothing from
 outside between them: no input or other DOM event, no message or reply from main, which the preload marks, and no
 timer's or frame's callback; React's own scheduling, through a MessageChannel and microtasks, keeps a chain going).

@@ -329,6 +329,15 @@
   "main.leftovers.offerUnchecked": {
     "placeholders": {}
   },
+  "main.nameUpgrade.what.board": {
+    "placeholders": {}
+  },
+  "main.nameUpgrade.what.files": {
+    "placeholders": {}
+  },
+  "main.nameUpgrade.what.projects": {
+    "placeholders": {}
+  },
   "main.outage.gaveUpBody": {
     "placeholders": {
       "n": "plural"

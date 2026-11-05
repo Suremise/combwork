@@ -413,9 +413,9 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     expect(sh(g.home, 'branch', '--show-current')).toBe('cw/hr')
   })
 
-  // Another Combwork on the same workspace (HR1's round 2): its own connection to hive.db, its own holder.
+  // Another Combwork on the same workspace (HR1's round 2): its own connection to combwork.db, its own holder.
   const otherHive = { pid: 990_001, started: 1 }
-  const dbFile = (): string => join(ws.path!, '.combwork', 'hive.db')
+  const dbFile = (): string => join(ws.path!, '.combwork', 'combwork.db')
   const reservation = (id: string): string | undefined => boardRead(ws, (db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(deleteKey(id)) as { value: string } | undefined)?.value)
   const opsOf = (id: string): (string | null)[] => boardRead(ws, (db) => [...(db.prepare('SELECT op FROM slots WHERE project = ?').all(id) as { op: string | null }[]), ...(db.prepare('SELECT op FROM copies WHERE project = ?').all(id) as { op: string | null }[])].map((r) => r.op))
   /** A free review copy of the project's, made for real, its row as #1435's pool keeps it. */

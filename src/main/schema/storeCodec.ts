@@ -2,7 +2,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { V1_0_STEPS } from './v1_0'
 
 /**
- * Lanes, watches and metrics as rows of hive.db's typed tables (#1212, #1025's extended scope; the tables are #1208's, in
+ * Lanes, watches and metrics as rows of combwork.db's typed tables (#1212, #1025's extended scope; the tables are #1208's, in
  * v1_0.ts): each store's entry, the JSON object its module keeps in memory, becomes a main row and its child rows, and
  * reads back as the same object. No database work of its own beyond the rows it is given, so the 1.0 step (`moveStores`)
  * and the stores' reads and saves (storeTables.ts) use exactly the same mapping.

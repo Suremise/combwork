@@ -1,4 +1,4 @@
-// A card's kind (#1277, SPEC §16.7.3, OP-6/OP-7), on the real board (a temp hive.db): code by default; the user's or
+// A card's kind (#1277, SPEC §16.7.3, OP-6/OP-7), on the real board (a temp combwork.db): code by default; the user's or
 // the Assistant's no-code from the start; a project agent's only proposed (the card stays code, a KindProposed fact)
 // until the user or the Assistant confirms it (KindDecided) or keeps it code; changing it later is an exception to the
 // rules: the user's asked first, the Assistant's with a reason, one Override (card.kind); agents never.

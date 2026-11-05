@@ -358,7 +358,7 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   } catch {
     return null
   }
-  if (!s || typeof s !== 'object' || s.v !== 1 || s.run !== run || s.hive !== hive || s.observed !== 'complete') return null
+  if (!s || typeof s !== 'object' || s.v !== 1 || s.run !== run || s.app !== hive || s.observed !== 'complete') return null
   const helper = s.helper
   if (typeof helper !== 'string' || !HELPER_ID.test(helper) || !keeperStillBound(run, helper)) return null
   const total = s.total
@@ -380,7 +380,7 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
 const KEEPER_ASK_MS = 5000
 
 /** The pipe a keeper answers on while it keeps (HI-2313), named after its identity ("pid:created"). */
-export const keeperPipe = (helper: string): string => `\\\\.\\pipe\\hive-keeper-${helper.replace(':', '-')}`
+export const keeperPipe = (helper: string): string => `\\\\.\\pipe\\combwork-keeper-${helper.replace(':', '-')}`
 
 /** A keeper's answer of a run's job now (HI-2313): its members described (console hosts left out, counted), `more` beyond. */
 export type KeeperObservation = { helper: string; members: AgentProcess[]; more: number }
@@ -438,7 +438,7 @@ export function parseObservation(line: string, run: string, helper: string, hive
   } catch {
     return null
   }
-  if (!s || typeof s !== 'object' || Array.isArray(s) || s.v !== 1 || s.run !== run || s.helper !== helper || s.hive !== hive || s.state !== 'now' || s.observed !== 'complete') return null
+  if (!s || typeof s !== 'object' || Array.isArray(s) || s.v !== 1 || s.run !== run || s.helper !== helper || s.app !== hive || s.state !== 'now' || s.observed !== 'complete') return null
   const total = s.total
   if (typeof total !== 'number' || !Number.isSafeInteger(total) || total < 0 || !Array.isArray(s.members) || s.members.length > MAX_LISTED || total < s.members.length) return null
   const members: AgentProcess[] = []

@@ -321,8 +321,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check('…its finish recorded as an override, with no merge', finished3?.data?.how === 'override' && finished3.data.verified === null && finished3.data.reason === why, JSON.stringify(finished3))
     check("slot-a leaves card 3's line once B2 is quiet: detached at integration's head", !!(await until(() => branchIn(slotA) === '' && git(slotA, 'rev-parse', 'HEAD') === git(alpha, 'rev-parse', 'integration'), HUNG_MS)), branchIn(slotA))
     check("…card 3's line kept, with its work (not in the target)", hasLine(line(c3, 'slot-three')) && git(alpha, 'rev-parse', line(c3, 'slot-three')) === rev3 && !isIn(rev3, 'integration'))
-    const note = async () => (await card(c4))?.comments?.find((c) => c.hiveText?.id === 'tasks.history.startsWithout') ?? null
-    check("card 4 is told it starts without card 3's work", !!(await until(note, HUNG_MS)) && (await note()).hiveText.values.reason === why, JSON.stringify((await card(c4))?.comments))
+    const note = async () => (await card(c4))?.comments?.find((c) => c.appText?.id === 'tasks.history.startsWithout') ?? null
+    check("card 4 is told it starts without card 3's work", !!(await until(note, HUNG_MS)) && (await note()).appText.values.reason === why, JSON.stringify((await card(c4))?.comments))
     const next4 = (await lane(second.lane.id))
     check("the lane goes on: card 4 is its next, nothing waits", next4?.state === 'active' && next4?.status?.reason !== 'you', JSON.stringify(next4?.status))
     const s4 = await intent(tb2, c4, 'start')

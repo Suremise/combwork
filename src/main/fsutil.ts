@@ -689,7 +689,7 @@ export const holderLookupsRunning = (): number => lookingUp.size
 
 /**
  * A replace that kept failing because the file was held (HI-1749: a view switch's "EPERM … rename" reached the window and
- * nothing of it hive.log): said with the file, the code and how long it was tried, then which processes have it open, as
+ * nothing of it combwork.log): said with the file, the code and how long it was tried, then which processes have it open, as
  * far as Windows can say (it may have let go by then). A lookup already under way for the file says it for this one too;
  * with `max` under way, none is started (never queued: failures while Hive's I/O struggles mustn't pile up processes).
  */
@@ -1268,7 +1268,7 @@ export async function cleanSwaps(parent: string, disposable: (old: string, name:
 }
 
 /** The marker file in a copy Hive made of a skill (Codex's .agents/skills copies): not part of the skill's content. */
-export const COPY_MARKER = '.hive-copy'
+export const COPY_MARKER = '.combwork-copy'
 
 /**
  * What Hive has read to know its skills, since it started (for measurements and tests): files and bytes hashed

@@ -74,7 +74,7 @@ const exits = (a) => {
   a.process().once('exit', () => (gone = true))
   return () => lib.until(async () => gone, HUNG_MS)
 }
-const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profile, 'logs', 'hive.log'), 'utf8') } catch { return '' } }
+const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profile, 'logs', 'combwork.log'), 'utf8') } catch { return '' } }
 
 ;(async () => {
   for (const d of ['upd-a', 'upd-b', 'upd-c', 'upd-d', 'upd-e', 'upd-f', 'upd-g', 'upd-g-ws', 'upd-g-claude', 'res-older', 'res-local', 'res-same']) fs.rmSync(path.join(scratch, d), { recursive: true, force: true })

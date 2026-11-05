@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => !(await live(host, id)), 20000)
   }
   /** Combwork's last launch line for a session key (its log marks the key and ids as the user's text: found by their parts). */
-  const launchLine = (key) => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes(key)).pop() ?? ''
+  const launchLine = (key) => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes(key)).pop() ?? ''
 
   // --- A session in a worktree.
   const reviewer = await inv('agents:testLegacy', proj, { location: 'new-worktree', name: 'Reviewer' })
@@ -81,7 +81,7 @@ const check = (name, ok, extra = '') => {
   await inv('workspace:refresh')
   const restart = page.getByRole('button', { name: 'Restart session' })
   check('a new effort offers Restart session', !!(await lib.until(async () => (await restart.count()) > 0, 10000)))
-  const launched = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((line) => / spawn \W?session:/.test(line) && line.toLowerCase().includes(`#${agent.id.toLowerCase()}`)).length
+  const launched = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((line) => / spawn \W?session:/.test(line) && line.toLowerCase().includes(`#${agent.id.toLowerCase()}`)).length
   const before = launched()
   await restart.first().click()
   await lib.cliStep('the relaunch with the new effort', { session: lib.ptyKey(proj, agent.id) }, async () => {

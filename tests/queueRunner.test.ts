@@ -1,8 +1,8 @@
-// The merge queue's runner (#1360, SPEC §16.9.3): one runner per project and target across Hives on one hive.db, taken
+// The merge queue's runner (#1360, SPEC §16.9.3): one runner per project and target across Hives on one combwork.db, taken
 // over only from a dead process; every process it starts owned by its lease's job (queueJobs.ts) and recorded before
 // the command exists; an earlier runner's duties settled (its jobs and processes ended and seen gone) before a new one
 // runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
-// fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
+// fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one combwork.db copy.
 import { spawn, type ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
@@ -59,7 +59,7 @@ interface World {
   close: () => Promise<void>
 }
 
-/** A workspace with a hive.db and a project repository, and the project's worktrees folder (none made yet). */
+/** A workspace with a combwork.db and a project repository, and the project's worktrees folder (none made yet). */
 function world(): World {
   const ws = join(tempDir('qr-'), 'ws')
   const project = gitRepo(join(ws, 'project'))
@@ -84,7 +84,7 @@ function world(): World {
   }
 }
 
-/** Starts a Combwork (a host process) on a world's hive.db, for its project, worktrees folder and `main` (or another target). */
+/** Starts a Combwork (a host process) on a world's combwork.db, for its project, worktrees folder and `main` (or another target). */
 function host(w: World, profile: string, seams: { linger?: boolean; stallSettle?: boolean; target?: string } = {}): Host {
   const env = { ...baseEnv(), ...(seams.linger ? { QR_LINGER: '1' } : {}), ...(seams.stallSettle ? { QR_STALL_SETTLE: '1' } : {}) }
   const proc = spawn(process.execPath, [bundle, boardFile(w.ws), w.project, w.root, profile, seams.target ?? 'main'], { env, stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true })
@@ -280,7 +280,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       const a = host(w, 'Combwork-A', { linger: true })
       const got = (await a.ask('acquire')) as { lease: string; supervisor: number }
       await identify(got.supervisor)
-      // From here A's board writes never complete (a busy board): nothing of the follow can reach hive.db.
+      // From here A's board writes never complete (a busy board): nothing of the follow can reach combwork.db.
       await a.ask('block')
       const f = (await a.ask('follow')) as { followed: boolean; pid: number }
       expect(f.followed).toBe(true)

@@ -1,7 +1,7 @@
 // Server connections' keys masked wherever Combwork writes text (HI-1772, main/keyMatcher.ts): by each saved key's
 // fingerprint, any run of FRAGMENT or more of its characters, as it is or JSON-escaped (once, twice) or URL-encoded,
 // whatever the key's shape (dummy keys no other rule masks, quotes and backslashes included), alone, inside other text,
-// split anywhere, through the sinks that write (hive.log's line with serialised data, the developer console's events).
+// split anywhere, through the sinks that write (combwork.log's line with serialised data, the developer console's events).
 // Strict (not loaded yet, unreadable, or after a reset's gap): every long run masked. None: nothing to mask.
 import { randomBytes } from 'crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -58,7 +58,7 @@ describe('a saved key, by its fingerprint', () => {
     ready(KEY)
     expect(maskKeys(`value ${OTHER.slice(0, 2)}${'q'.repeat(10)} end`)).toBe(`value ${OTHER.slice(0, 2)}${'q'.repeat(10)} end`)
   })
-  it("through the sinks: the developer console's event (its payload) and hive.log's line with serialised data", () => {
+  it("through the sinks: the developer console's event (its payload) and combwork.log's line with serialised data", () => {
     ready(ODD)
     const e = makeEvent(1, '2026-10-27T00:00:00Z', 'x', { kind: 'hook', name: 'PostToolUse', summary: `ran ${ODD}`, raw: { tool_response: { stdout: `TOKEN=${ODD}\n` } } }, {})
     expect(leaks(JSON.stringify(e), ODD)).toBeNull()
@@ -101,7 +101,7 @@ describe('strict and none', () => {
     setMasking({ state: 'ready', gap: false })
     expect(maskingState().gap).toBe(true)
   })
-  it("hive.log's time, level and scope are kept in strict mode", () => {
+  it("combwork.log's time, level and scope are kept in strict mode", () => {
     setMasking({ state: 'unavailable' })
     expect(logLine('info', 'main', `x ${KEY}`)).toMatch(/^\d{4}-\d\d-\d\dT[\d:.]+Z \[INFO\] \[main\] x <masked>\n$/)
   })

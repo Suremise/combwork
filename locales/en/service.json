@@ -791,6 +791,18 @@
     "defaultMessage": "The skill service and Combwork-wide numbers are shared: not per role or provider.",
     "description": "A note on the Performance page while it is filtered by role or provider: these numbers can't be narrowed."
   },
+  "service.nameUpgrade.boardNotFolded": {
+    "defaultMessage": "Combwork couldn't rename the board's file {file} to combwork.db: its log {log} still holds changes after it was closed. Close any other program using the workspace, then open it again. Nothing was lost.",
+    "description": "An error opening a workspace (HI-2587): the task board database, renamed combwork.db in this version, still had changes in its SQLite log beside it, so it was left as it is. {file} and {log} are file paths. Keep combwork.db as it is (a file name)."
+  },
+  "service.nameUpgrade.boardOrphan": {
+    "defaultMessage": "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back as hive.db beside it (from .combwork\\backups or another copy), then open the workspace again.",
+    "description": "An error opening a workspace (HI-2587): no task board database is there, but an SQLite log or journal of the old one (hive.db) is, holding data. {file} is its path. Keep hive.db and .combwork\\backups as they are (file and folder names)."
+  },
+  "service.nameUpgrade.failed": {
+    "defaultMessage": "Combwork couldn't finish renaming {what} from Hive's names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.",
+    "description": "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names Hive stored (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence."
+  },
   "service.providers.keysStopped": {
     "defaultMessage": "{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.",
     "description": "A notification: Combwork stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")."

@@ -1,6 +1,6 @@
-// hive.db's 1.0 schema (#1208): every step's tables made on an empty file, each module's real query using its index
+// combwork.db's 1.0 schema (#1208): every step's tables made on an empty file, each module's real query using its index
 // (EXPLAIN QUERY PLAN), and the card JSON contract: a card's document split into rows, through SQLite and back, is the
-// same bytes. CW_CARD_ROUNDTRIP_DB=<a hive.db> runs the round trip over every card of that board, on a copy made in
+// same bytes. CW_CARD_ROUNDTRIP_DB=<a combwork.db> runs the round trip over every card of that board, on a copy made in
 // tempDir() (the file itself is never opened).
 import { copyFileSync, existsSync } from 'fs'
 import { join } from 'path'
@@ -146,7 +146,7 @@ describe('the card JSON contract', () => {
 
   const live = process.env.CW_CARD_ROUNDTRIP_DB
   it.skipIf(!live)("round-trips every card of a live board's copy", () => {
-    const copy = join(tempDir('hive-roundtrip-'), 'hive.db')
+    const copy = join(tempDir('hive-roundtrip-'), 'combwork.db')
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     const old = new DatabaseSync(copy)

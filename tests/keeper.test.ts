@@ -108,7 +108,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     await exited(s)
     k.say('keep')
     await exited(k.proc)
-    expect(k.state('j1')).toMatchObject({ v: 1, run: 'j1', helper: self, hive: '100:5', state: 'ended', observed: 'complete', total: 0, members: [] })
+    expect(k.state('j1')).toMatchObject({ v: 1, run: 'j1', helper: self, app: '100:5', state: 'ended', observed: 'complete', total: 0, members: [] })
   }, 60_000)
 
   it('a job with a process: says keeping, "live" with it, then "ended" once it ends, and exits', async () => {
@@ -343,7 +343,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     await waitFor(() => expect(k.state('j8')).toMatchObject({ state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid })]) }))
     const { parseObservation } = await import('../src/main/agentProcesses')
     const now = await answered(self, 'observe j8\n')
-    expect(now).toMatchObject({ v: 1, run: 'j8', helper: self, hive: '100:5', state: 'now', observed: 'complete', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid, name: 'node' })]) })
+    expect(now).toMatchObject({ v: 1, run: 'j8', helper: self, app: '100:5', state: 'now', observed: 'complete', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid, name: 'node' })]) })
     // Its real answer is one the next Combwork takes (parseObservation), its console host counted and not listed.
     expect(parseObservation(JSON.stringify(now), 'j8', self, '100:5')).toMatchObject({ helper: self, more: 0, members: [expect.objectContaining({ pid: s.pid })] })
     expect(parseObservation(JSON.stringify(now), 'j8', self, '100:6')).toBeNull()

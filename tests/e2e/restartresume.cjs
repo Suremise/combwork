@@ -26,7 +26,7 @@ const beta = path.join(wsB, 'beta')
 const PORT = Number(lib.port(47797))
 const recordFile = path.join(userData, 'restart.json')
 const requestFile = path.join(userData, 'restart-request.json')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

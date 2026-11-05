@@ -1,5 +1,5 @@
 // The merge queue's runner (#1360, SPEC §16.9.3): exactly one per project and target across every Hive on the workspace
-// (the dev and the installed one share its hive.db). A runner holds the target's lease (queue_runners); another Hive
+// (the dev and the installed one share its combwork.db). A runner holds the target's lease (queue_runners); another Hive
 // takes it over only once the holder *process* is gone (its pid gone, or given to a process that started at another
 // time), never because its renewals stopped: a stalled but living Hive keeps its queue (the panel says "run by
 // <profile>"), so a living runner is never fenced out of a checkout it may still be writing.

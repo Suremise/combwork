@@ -146,7 +146,7 @@ const isIn = (dir, rev, ref) => {
     const copy = path.join(treesOf(before), 'copies', 'copy-1')
     lib.git(alpha0, ['worktree', 'add', '-q', '--detach', copy])
     const id = JSON.parse(fs.readFileSync(path.join(alpha0, '.combwork', 'project.json'), 'utf8')).id
-    const db = new DatabaseSync(path.join(wsOf(before), '.combwork', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(wsOf(before), '.combwork', 'combwork.db'), { timeout: 5000 })
     try {
       const now = new Date().toISOString()
       db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at) VALUES (?, 'copy-1', ?, 'free', ?, ?)").run(id, copy, now, now)
@@ -190,7 +190,7 @@ const isIn = (dir, rev, ref) => {
       return k.filter((x) => x === 'SlotPrepared').length === 1 && k.filter((x) => x === 'BuilderPlaced').length === 1
     }, HUNG_MS)), JSON.stringify(await kindsNow()))
     // Fenced and logged at slot-a where it is now, never at the folder from before the move (HI-1791).
-    const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+    const log = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
     const preparing = log.slice(log.lastIndexOf('Repairing a move')).split(/\r?\n/).filter((l) => l.includes('preparing a slot'))
     check('…its preparation fenced slot-a at its new folder, never the old one (HI-1791)', preparing.length > 0 && preparing.every((l) => l.toLowerCase().includes(path.join(treesOf(after), 'slot-a').toLowerCase())), JSON.stringify(preparing))
 

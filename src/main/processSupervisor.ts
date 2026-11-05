@@ -99,7 +99,7 @@ public static class HiveJobs {
   /** A kill-on-close job's processes it couldn't journal, and so ended at once, not told yet: "unowned <job> <pid>". */
   static List<string> queueNotes = new List<string>();
   /** The name of a merge queue lease's job, in this Windows session. */
-  public static string QueueJobName(string id) { return "Local\\HiveQueue-" + id; }
+  public static string QueueJobName(string id) { return "Local\\CombworkQueue-" + id; }
   static Dictionary<string, IntPtr> jobs = new Dictionary<string, IntPtr>();
   /** Processes each job adopted (Sweep), for the log. */
   static Dictionary<string, int> adopted = new Dictionary<string, int>();
@@ -872,7 +872,7 @@ public static class HiveJobs {
   }
   /** A job's state as JSON, its members (null: none said) by id, start time and name (never a command line). */
   static string StateJson(string id, string state, string observed, int[] members) {
-    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"hive\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":" + Q(observed));
+    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"app\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":" + Q(observed));
     if (members != null) {
       b.Append(",\"total\":").Append(members.Length).Append(",\"members\":[");
       for (int i = 0; i < members.Length && i < ${MAX_LISTED}; i++) {
@@ -909,7 +909,7 @@ public static class HiveJobs {
   [DllImport("kernel32.dll")] static extern bool CancelIoEx(IntPtr h, IntPtr ov);
   [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateEventW(IntPtr sa, bool manual, bool initial, IntPtr name);
   /** The pipe a keeper answers on, named after its identity (its binding names it). */
-  public static string PipeName() { return @"\\.\pipe\hive-keeper-" + (keepSelf ?? "").Replace(':', '-'); }
+  public static string PipeName() { return @"\\.\pipe\combwork-keeper-" + (keepSelf ?? "").Replace(':', '-'); }
   /** How long one asking may take, from connecting to the answer read (a client that stops is let go). */
   const int ASK_MS = 2000;
   /**

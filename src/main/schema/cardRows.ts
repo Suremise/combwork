@@ -80,7 +80,7 @@ const COMMENT: EntrySpec = {
     { key: 'at', col: 'at' },
     { key: 'by', col: 'by' },
     { key: 'text', col: 'text' },
-    { key: 'hiveText', col: 'hive_text', optional: true, json: true },
+    { key: 'appText', col: 'app_text', optional: true, json: true },
     { key: 'id', col: 'id', optional: true }
   ]
 }

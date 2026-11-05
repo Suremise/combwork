@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
     const key = lib.ptyKey(proj, agent.id)
     const live = async () => (await inv('session:live')).find((l) => l.projectPath.toLowerCase() === proj.toLowerCase())
     const screen = async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '')
-    const launches = () => (fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').match(/ spawn \W?session:/g) ?? []).length
+    const launches = () => (fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').match(/ spawn \W?session:/g) ?? []).length
     const start = async () => {
       const before = launches()
       await inv('session:start', proj, { agentId: agent.id })

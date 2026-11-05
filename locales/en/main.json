@@ -927,6 +927,34 @@
     "defaultMessage": "{n, plural, one {Working on: {projects}, as before its rename.} other {Working on: {projects}, as before their rename.}}",
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): renamed projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them; {n} is how many."
   },
+  "main.nameUpgrade.boardBothBody": {
+    "defaultMessage": "Combwork uses combwork.db and leaves hive.db as it is.",
+    "description": "The warning's text (HI-2587): which of the two files Combwork uses; it never changes the other. Keep hive.db and combwork.db as they are."
+  },
+  "main.nameUpgrade.boardBothTitle": {
+    "defaultMessage": "{folder} has both hive.db and combwork.db",
+    "description": "A warning's title as a workspace opens (HI-2587): its folder {folder} holds the task board's database under both its old name and its new one. Keep hive.db and combwork.db as they are (file names)."
+  },
+  "main.nameUpgrade.boardLeftBody": {
+    "defaultMessage": "The board opens from combwork.db. Combwork doesn't delete this file: it may hold changes from before the rename.",
+    "description": "The warning's text (HI-2587). Keep combwork.db as it is (a file name)."
+  },
+  "main.nameUpgrade.boardLeftTitle": {
+    "defaultMessage": "{file} was left as it is",
+    "description": "A warning's title as a workspace opens (HI-2587): an SQLite log or journal of the board's old file (hive.db) still holds data, beside the board's new file; {file} is its path."
+  },
+  "main.nameUpgrade.what.board": {
+    "defaultMessage": "the board's file",
+    "description": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, hive.db to combwork.db."
+  },
+  "main.nameUpgrade.what.files": {
+    "defaultMessage": "the workspace's .gitignore, README and MCP definitions",
+    "description": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): files in the workspace's .combwork folder. Keep .gitignore, README and MCP as they are."
+  },
+  "main.nameUpgrade.what.projects": {
+    "defaultMessage": "the projects' skill copies, git exclude lines and refs",
+    "description": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…)."
+  },
   "main.notify.answered": {
     "defaultMessage": "Answered",
     "description": "What a notification that an agent waited for you (or asked you something) says once it no longer does (HI-2320): answered, or it moved on. Shown under its title, in the pop-up and the bell's list. Keep it short."

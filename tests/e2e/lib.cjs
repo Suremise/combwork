@@ -62,12 +62,12 @@ function trashed(match = '') {
 }
 
 /**
- * A card of a workspace's board as Combwork saved it (in .combwork\hive.db: its JSON document, from 1.0's tables, #1209), read on a
+ * A card of a workspace's board as Combwork saved it (in .combwork\combwork.db: its JSON document, from 1.0's tables, #1209), read on a
  * connection of its own (read-only; Combwork writing meanwhile is fine). Throws when there is no such card.
  */
 function readCard(ws, n) {
   const { DatabaseSync } = require('node:sqlite')
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true, timeout: 5000 })
   try {
     const [row] = readDocs(db, [n])
     if (!row) throw new Error(`no card #${n} in ${ws}`)
@@ -80,7 +80,7 @@ function readCard(ws, n) {
 /** Saves a card's document as another program would (a running Combwork sees it within about a second, #1017). */
 function writeCard(ws, n, doc) {
   const { DatabaseSync } = require('node:sqlite')
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     writeDoc(db, n, doc)
   } finally {
@@ -896,14 +896,14 @@ function noUpdateChecks(profile) {
 }
 
 /**
- * The guard (#1332): when a suite ends, the log of each packaged Combwork it started (hive.log and its older copy) must show
+ * The guard (#1332): when a suite ends, the log of each packaged Combwork it started (combwork.log and its older copy) must show
  * no update check since that launch (electron-updater's "Checking for update", in Combwork's [updates] scope), or the suite
  * fails, whatever it said.
  */
 const packagedLaunches = []
 function updateChecksLogged({ profile, since }) {
   const found = []
-  for (const name of ['hive.1.log', 'hive.log']) {
+  for (const name of ['combwork.1.log', 'combwork.log']) {
     let text = ''
     try {
       text = fs.readFileSync(path.join(profile, 'logs', name), 'utf8')
@@ -1140,7 +1140,7 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
  */
 const hiveLogLines = (userData) => {
   try {
-    return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n')
+    return fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n')
   } catch {
     return []
   }

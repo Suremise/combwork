@@ -18,7 +18,7 @@ import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { MIGRATED_CLOSE, migrateWorkspaceCommands } from '../shared/commands'
 import { OpenGate } from './openGate'
-import { HiveError, hiveError } from './hiveError'
+import { HiveError, englishError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
 import { changesConfig, viewOf, withoutView } from '../shared/projectView'
@@ -40,7 +40,9 @@ import { gitProblem } from './gitTool'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
-import { classify, finishMove, moveFolders, type MoveOptions, type MoveOutcome } from './combworkMove'
+import { classify, finishMove, moveFolders, recordNewWorkspace, type MoveOptions, type MoveOutcome } from './combworkMove'
+import { projectNamesDone } from './nameUpgrade'
+import { NAMES_IGNORE } from './nameUpgradeFiles'
 import { movedPathOf } from '../shared/hiveFolderMove'
 
 const log = createLogger('workspace')
@@ -102,7 +104,7 @@ This folder is managed by [Combwork](https://github.com/Suremise/combwork) and i
 - \`skills/\` — Combwork skills (one folder per skill, each with a \`SKILL.md\`). Every agent in every project gets them.
 - \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Add them to projects in Combwork.
 - \`workspace.json\` — the workspace's settings, among them the MCP servers added for the Combwork Assistant (a project's are in its \`.combwork/project.json\`).
-- \`hive.db\` — the task board (Combwork's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
+- \`combwork.db\` — the task board (Combwork's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
 - \`usage.db\` — what each session used (the usage history the Overviews read). It is this machine's too, kept out of git.
 
 MCP definitions must not contain secrets. Reference environment variables instead, e.g. \`"\${GITHUB_TOKEN}"\`.
@@ -111,15 +113,13 @@ MCP definitions must not contain secrets. Reference environment variables instea
 /** The usage history's lines of BOARD_GITIGNORE (#1106), added to the .gitignore Hive wrote before them. */
 const USAGE_IGNORE = '# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n' // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 
-/** BOARD_GITIGNORE's first line as Hive wrote it before 1.1 (HI-2580): a .gitignore starting with it is still Combwork's own. */
-const LEGACY_BOARD_GITIGNORE_HEAD = "# The task board's database and what moving it from files left (added by Hive, #1017)" // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
-
 /**
- * A .combwork/.gitignore's text with the usage history's lines added, or null to leave it as it is: one Combwork (or Hive,
- * before 1.1) didn't write is the user's, and one that has them already needs nothing.
+ * A .combwork/.gitignore's text with the usage history's lines added, or null to leave it as it is: one Combwork didn't
+ * write is the user's, and one that has them already needs nothing. Hive's, from before 1.1, has Combwork's head by then
+ * (the names upgrade at the open, HI-2587: nameUpgradeFiles.ts).
  */
 export function withUsageIgnore(text: string): string | null {
-  const ours = text.startsWith(BOARD_GITIGNORE.split('\n')[0]) || text.startsWith(LEGACY_BOARD_GITIGNORE_HEAD)
+  const ours = text.startsWith(BOARD_GITIGNORE.split('\n')[0])
   if (!ours || /^usage\.db\r?$/m.test(text)) return null
   const nl = text.includes('\r\n') ? '\r\n' : '\n'
   return `${text}${text.endsWith('\n') ? '' : nl}${USAGE_IGNORE.replace(/\n/g, nl)}`
@@ -134,8 +134,8 @@ async function addUsageIgnore(file: string): Promise<void> {
 
 // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 export const BOARD_GITIGNORE = `# The task board's database and what moving it from files left (added by Combwork, #1017)
-hive.db
-hive.db-*
+combwork.db
+combwork.db-*
 backups/
 tasks.imported-*/
 tasks.set-aside/
@@ -143,7 +143,7 @@ deleted-cards/
 # What each session used: the usage history (#1106)
 usage.db
 usage.db-*
-`
+${NAMES_IGNORE}`
 
 /** The Assistant's home's .gitignore (HI-2580: before 1.1 it said Hive; nothing reads it back). */
 // agent-protocol: a .gitignore's fixed text for git and whoever opens the file, not words said to an agent
@@ -707,7 +707,8 @@ export class WorkspaceService {
     await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
     await whenAll([
-      existsSync(join(h, 'workspace.json')) ? undefined : newWorkspaceConfig().then((c) => writeKeptJson(join(h, 'workspace.json'), c)),
+      // A new workspace has nothing of Hive's: its names upgrade recorded done, under the move's lock (HI-2587).
+      existsSync(join(h, 'workspace.json')) ? undefined : newWorkspaceConfig().then((c) => writeKeptJson(join(h, 'workspace.json'), c)).then(() => (this.path ? recordNewWorkspace(this.path) : undefined)),
       existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
       // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
       existsSync(join(h, '.gitignore')) ? addUsageIgnore(join(h, '.gitignore')) : writeFile(join(h, '.gitignore'), BOARD_GITIGNORE),
@@ -1413,6 +1414,19 @@ export class WorkspaceService {
         if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
       })()
     ])
+    // Its own names upgrade (HI-2587, HR2's round 1), by its own record: a project that came into an upgraded workspace
+    // with a `.combwork` of an RC's (its skill copies' old markers, git's old comments and refs), or a new one, once.
+    // Under the move's lock, refused while another process has the workspace open (HR2's round 3): then nothing is
+    // written, the project is used as it is, and the next time it is set up (or the workspace opens) tries again.
+    if (this.path && !this.isAssistantHome(projectPath) && !(await projectNamesDone(projectPath))) {
+      try {
+        const moved = await moveFolders(this.path, { only: projectPath })
+        if (moved.late) await this.finishFolderMove()
+      } catch (e) {
+        if (!(e instanceof HiveError) || e.kind !== 'conflict') throw e
+        log.warn(`${userText(basename(projectPath))}: its names upgrade waits: ${userText(englishError(e))}`)
+      }
+    }
     if (!this.isAssistantHome(projectPath) && existsSync(join(h, 'project.json'))) this.markSetUp(projectPath, gen, ticket)
   }
 

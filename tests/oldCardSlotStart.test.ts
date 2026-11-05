@@ -1,5 +1,5 @@
 // The board's Start of a card from before 1.0 in a project that builds in slots (HI-1966), on the real board (a temp
-// hive.db), a temp Git repository and the card's runtime, the slot lending stood in for (setSlotStarts, the seam
+// combwork.db), a temp Git repository and the card's runtime, the slot lending stood in for (setSlotStarts, the seam
 // slotCards.ts fills). On rc.9 the Assistant started HI-1612 (a 0.9 card, marked `pre_workflow`) with cw_start_task:
 // its move took P3's recorded path, which lends no slot and recorded HB2's old 0.9 worktree, and HB2 was launched in the
 // main checkout. Now that start is the runtime's (its slot lent, the card a 1.0 card, its decisions kept as facts), and a

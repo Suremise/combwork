@@ -1,5 +1,5 @@
 // HI-1368: a command Combwork runs as a workspace closes, and When Combwork quits, run. The command (onclose/command.cjs) copies
-// the workspace's hive.db and opens the copy, as a backup would: it opens cleanly (integrity_check ok), holds the card
+// the workspace's combwork.db and opens the copy, as a backup would: it opens cleanly (integrity_check ok), holds the card
 // made just before the close, and no -wal with anything in it is left beside the file. A switch runs the old
 // workspace's command, its panel (spinner, the command, its output) up while it runs; Don't wait opens the next
 // workspace with the command still running, and it finishes by itself. Close Workspace with a failing command keeps
@@ -153,7 +153,7 @@ async function shots(page, name) {
   fs.writeFileSync(goA, 'go')
   const a = await lib.until(() => mark('a-switch'), HUNG_MS)
   check('it finishes by itself, after the close: its reason switch', a?.reason === 'switch', JSON.stringify(a))
-  check('…the copy of hive.db opens cleanly, with the card made just before the close, and no WAL left', a?.integrity === 'ok' && a.titles?.includes('Made as the workspace closed') && a.walLeft === 0, JSON.stringify(a))
+  check('…the copy of combwork.db opens cleanly, with the card made just before the close, and no WAL left', a?.integrity === 'ok' && a.titles?.includes('Made as the workspace closed') && a.walLeft === 0, JSON.stringify(a))
 
   // --- 2. Close Workspace with a failing command: the window waits on the failed panel until Close.
   await saveClose(inv, command('b-fail', 'fail'))

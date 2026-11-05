@@ -74,7 +74,7 @@ const doneFor = (ws: string): boolean => {
   }
 }
 
-const late = (ws: string) => ({ boardFile: join(ws, '.combwork', 'hive.db'), relocateFolders: async () => true })
+const late = (ws: string) => ({ boardFile: join(ws, '.combwork', 'combwork.db'), relocateFolders: async () => true })
 
 /** The whole open's move: early, then late. */
 async function openMove(ws: string): Promise<void> {
@@ -83,7 +83,7 @@ async function openMove(ws: string): Promise<void> {
 }
 
 const cardText = (ws: string): { d: string; c: string; ref: string } => {
-  const db = new DatabaseSync(join(ws, '.combwork', 'hive.db'))
+  const db = new DatabaseSync(join(ws, '.combwork', 'combwork.db'))
   try {
     return {
       d: (db.prepare('SELECT description FROM cards WHERE number = 1').get() as { description: string }).description,
@@ -110,8 +110,22 @@ describe('nothing to move', () => {
     const done = join(base, `done${++n}`)
     json(join(done, '.combwork', 'workspace.json'), {})
     json(join(done, 'alpha', '.combwork', 'project.json'), {})
+    // Its names upgraded too (HI-2587): nothing left of Hive's.
+    json(join(done, '.combwork', 'combwork-names.json'), { version: 1 })
     expect(await moveFolders(done)).toEqual({ late: false, moved: 0 })
     expect(existsSync(join(done, MOVE_LOCK_FILE))).toBe(false)
+  })
+
+  it("one moved by a 1.1 release candidate, its names not yet upgraded (HI-2587): the lock once, then nothing", async () => {
+    const rc = join(base, `rc${++n}`)
+    json(join(rc, '.combwork', 'workspace.json'), {})
+    json(join(rc, 'alpha', '.combwork', 'project.json'), {})
+    expect(await moveFolders(rc)).toEqual({ late: false, moved: 0 })
+    expect(existsSync(join(rc, '.combwork', 'combwork-names.json'))).toBe(true)
+    const lock = join(rc, MOVE_LOCK_FILE)
+    const before = readFileSync(lock)
+    expect(await moveFolders(rc)).toEqual({ late: false, moved: 0 })
+    expect(readFileSync(lock).equals(before)).toBe(true)
   })
 })
 
@@ -120,7 +134,7 @@ describe('a 1.0 workspace', () => {
     const ws = workspace10()
     await openMove(ws)
     for (const gone of ['.hive', 'alpha\\.hive', '.combwork\\assistant\\.hive']) expect(existsSync(join(ws, gone)), gone).toBe(false)
-    expect(existsSync(join(ws, '.combwork', 'hive.db'))).toBe(true)
+    expect(existsSync(join(ws, '.combwork', 'combwork.db'))).toBe(true)
     expect(existsSync(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'))).toBe(true)
     expect(readFileSync(join(ws, 'alpha', '.combwork', 'attachments', 'cards', '1', 'shot.png'), 'utf8')).toBe('png')
     expect(readFileSync(join(ws, 'alpha', 'src.txt'), 'utf8')).toBe('code')
@@ -129,7 +143,7 @@ describe('a 1.0 workspace', () => {
     expect(t.d).toBe(`Evidence: ![shot](${ws}\\alpha\\.combwork\\attachments\\cards\\1\\shot.png), note ${ws}\\.combwork\\shared\\plan.md`)
     expect(t.c).toBe(`See ${ws.replace(/\\/g, '/')}/.combwork/assistant/.combwork/attachments/a.png`)
     expect(t.ref).toBe('shared:plan.md#open')
-    const db = new DatabaseSync(join(ws, '.combwork', 'hive.db'))
+    const db = new DatabaseSync(join(ws, '.combwork', 'combwork.db'))
     expect((db.prepare('SELECT description FROM cards WHERE number = 2').get() as { description: string }).description).toBe(`Unrelated: ${ws}\\beta-lookalike\\.hive\\x and C:\\other\\.hive\\y`)
     db.close()
     expect(readFileSync(join(ws, '.combwork', 'shared', 'handovers', 'h.md'), 'utf8')).toBe(`Logs in ${ws}\\alpha\\.combwork\\attachments\\cards\\1\\shot.png\n`)
@@ -182,7 +196,7 @@ describe('refused, nothing lost', () => {
       held.close()
     }
     await openMove(ws)
-    expect(existsSync(join(ws, '.combwork', 'hive.db'))).toBe(true)
+    expect(existsSync(join(ws, '.combwork', 'combwork.db'))).toBe(true)
     expect(existsSync(join(ws, 'alpha', '.combwork', 'project.json'))).toBe(true)
   })
 
@@ -190,7 +204,7 @@ describe('refused, nothing lost', () => {
     const ws = workspace10()
     const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
     try {
-      json(join(ws, '.hive', 'open', 'Combwork-1234.json'), { pid: other.pid, profile: 'Combwork', hiveVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() })
+      json(join(ws, '.hive', 'open', 'Combwork-1234.json'), { pid: other.pid, profile: 'Combwork', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() })
       await expect(moveFolders(ws)).rejects.toThrow(/open in another Combwork or Hive \(Combwork\)/)
       expect(existsSync(join(ws, '.hive', 'hive.db'))).toBe(true)
       expect(existsSync(join(ws, 'alpha', '.hive'))).toBe(true)

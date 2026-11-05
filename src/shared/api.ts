@@ -253,9 +253,9 @@ export interface HiveRequests {
   'window:setTitleBarColors': (color: string, symbolColor: string) => void
   /** How many backdrops (dialogs, nested or not, the command palette) are up in this window: dims the window buttons to match. */
   'window:setBackdrops': (count: number) => void
-  /** Where this window is (its view, project, tab, dialog, panels), as it changes: what its long-task and hang lines in hive.log name (HI-1775). */
+  /** Where this window is (its view, project, tab, dialog, panels), as it changes: what its long-task and hang lines in combwork.log name (HI-1775). */
   'window:where': (where: WindowWhere) => void
-  /** The page's long tasks just ended, and where it was: logged in hive.log, rate-limited (HI-1775). */
+  /** The page's long tasks just ended, and where it was: logged in combwork.log, rate-limited (HI-1775). */
   'window:longTasks': (tasks: LongTask[], where: WindowWhere) => void
   /** The taskbar button's badge: a PNG (base64) drawn at `scale`, or none at 0. */
   'window:setBadge': (count: number, png: string | null, scale: number) => void

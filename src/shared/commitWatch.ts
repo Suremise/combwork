@@ -7,7 +7,7 @@
 // passes to a test copy's window (testQuiet).
 
 /** The window's command-line argument (webPreferences.additionalArguments) that turns the watch on. */
-export const COMMIT_WATCH_ARG = '--hive-commit-watch'
+export const COMMIT_WATCH_ARG = '--cw-commit-watch'
 /** The window a burst is counted in (ms): React's nested-update limit is reached that fast in a loop. */
 export const COMMIT_BURST_WINDOW_MS = 250
 /**
@@ -58,7 +58,7 @@ export function burstOf(text: string): number | null {
  */
 export const COMMIT_CHAIN_MARKER = '[hive commit chain]' // i18n-ignore: a test copy's console marker, read by the e2e harness
 /** The DOM event the preload sends the page as each message or reply from main arrives (the page can't see IPC itself). */
-export const FROM_MAIN_EVENT = 'hive-commit-watch-from-main'
+export const FROM_MAIN_EVENT = 'cw-commit-watch-from-main'
 
 /** Counts commit chains: outside() as anything from outside arrives, commit() at each commit (returns the chain's length). */
 export function chainCounter(): { outside: () => void; commit: () => number; readonly max: number } {

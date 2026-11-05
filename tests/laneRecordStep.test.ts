@@ -57,8 +57,8 @@ const card = (num: number, project: string): Record<string, unknown> => ({
 
 /** A board as the 1.0 group left it before this step (a P3 board), its cards and runtime lanes written by `fill`. */
 function boardBefore(fill: (db: DatabaseSync) => void): string {
-  const file = join(base, `db-${++n}`, 'hive.db')
-  openDb(file, { migrations: BEFORE, hiveVersion: '1.0.0' }).close()
+  const file = join(base, `db-${++n}`, 'combwork.db')
+  openDb(file, { migrations: BEFORE, appVersion: '1.0.0' }).close()
   const db = new DatabaseSync(file)
   try {
     db.exec('PRAGMA foreign_keys = ON')
@@ -73,7 +73,7 @@ function boardBefore(fill: (db: DatabaseSync) => void): string {
 
 /** The board opened with every step: this one runs as a later step of the 1.0 group. */
 function upgrade(file: string): { tables: string[]; cardCols: string[]; version: number; lanesDocs: unknown[] } {
-  const db = openDb(file, { migrations: store.BOARD_MIGRATIONS, hiveVersion: '1.0.0', approve: () => true })
+  const db = openDb(file, { migrations: store.BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })
   try {
     const r = db.reader
     return {

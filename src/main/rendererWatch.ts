@@ -26,7 +26,7 @@ export function reloadedMessage(unsaved: number): string {
     : tr(msg({ id: 'main.window.reloaded', defaultMessage: 'Your agents kept running.', description: "The notice after Combwork's window crashed and was reloaded." }))
 }
 
-/** What hive.log needs of a window's page to say why it froze (HI-1775): where it is, its last input, its last long tasks. */
+/** What combwork.log needs of a window's page to say why it froze (HI-1775): where it is, its last input, its last long tasks. */
 interface Health {
   where: WindowWhere | null
   /** Its last input (a key, a click, a move): epoch ms. */
@@ -67,11 +67,11 @@ export function noteLongTasks(entry: HiveWindow, tasks: LongTask[], where: Windo
   }
   const longest = tasks.reduce((a, b) => (b.ms > a.ms ? b : a))
   const total = tasks.reduce((t, x) => t + x.ms, 0)
-  const more = h.heldBack ? `; ${h.heldBack} more since the last line, not logged` : '' // i18n-ignore: hive.log, in English
+  const more = h.heldBack ? `; ${h.heldBack} more since the last line, not logged` : '' // i18n-ignore: combwork.log, in English
   // Where the longest ran (its own place: the window may have moved on since), and each other place the burst's tasks ran.
   const at = longest.where ?? where ?? h.where
   const places = new Set(tasks.map((t) => whereText(t.where ?? null, userText)).filter((w) => w !== whereText(at, userText) && w !== 'where unknown'))
-  const elsewhere = places.size ? `; others in ${[...places].join(' | ')}` : '' // i18n-ignore: hive.log, in English
+  const elsewhere = places.size ? `; others in ${[...places].join(' | ')}` : '' // i18n-ignore: combwork.log, in English
   log.warn(`The window's page was busy for ${Math.round(longest.ms)} ms (${whereText(at, userText)}); ${tasks.length} long task(s), ${Math.round(total)} ms in all; the longest: ${taskText(longest)}${elsewhere}${more}`)
   h.loggedAt = now
   h.heldBack = 0
@@ -79,14 +79,14 @@ export function noteLongTasks(entry: HiveWindow, tasks: LongTask[], where: Windo
 
 /** What a hang's lines say of the window: where it was, its last input, its last long tasks. */
 function hangContext(h: Health, now: number): string {
-  const input = h.inputAt ? `its last input ${((now - h.inputAt) / 1000).toFixed(1)} s before` : 'no input seen' // i18n-ignore: hive.log, in English
+  const input = h.inputAt ? `its last input ${((now - h.inputAt) / 1000).toFixed(1)} s before` : 'no input seen' // i18n-ignore: combwork.log, in English
   // Each where it ran, when that isn't where the window is now.
   const here = whereText(h.where, userText)
   const placed = (t: LongTask): string => {
     const there = whereText(t.where ?? null, userText)
-    return there !== here && there !== 'where unknown' ? `${taskText(t)} in ${there}` : taskText(t) // i18n-ignore: hive.log, in English
+    return there !== here && there !== 'where unknown' ? `${taskText(t)} in ${there}` : taskText(t) // i18n-ignore: combwork.log, in English
   }
-  const tasks = h.recent.length ? `its last long tasks: ${h.recent.map(placed).join(', ')}` : 'no long task reported' // i18n-ignore: hive.log, in English
+  const tasks = h.recent.length ? `its last long tasks: ${h.recent.map(placed).join(', ')}` : 'no long task reported' // i18n-ignore: combwork.log, in English
   return `${whereText(h.where, userText)}; ${input}; ${tasks}`
 }
 

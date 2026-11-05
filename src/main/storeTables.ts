@@ -11,7 +11,7 @@ import { keepAsBackup } from './storeBackup'
 const log = createLogger('stores')
 
 /**
- * Lanes, watches and metrics in hive.db's typed tables (#1212; the mapping is schema/storeCodec.ts). A store keeps its
+ * Lanes, watches and metrics in combwork.db's typed tables (#1212; the mapping is schema/storeCodec.ts). A store keeps its
  * entries in memory and its own lock as before; a save is one transaction, under the board's lock (never inside one of
  * the board's own transactions on their shared connection), that rewrites only the entries that changed and removes
  * those gone. A store's values (`imported`, metrics' `observed`, watches' `invalid`) are in `board_meta` as
