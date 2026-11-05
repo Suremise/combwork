@@ -18,6 +18,8 @@
 //   starts over. CW_MOVE_FAIL_AFTER=<n> (only this script reads it, for proving that) stops it after the n-th rewrite.
 // - Then it reports both test homes' sign-ins (claude auth status, codex login status: read only), removes the old
 //   update suite's download caches (%LOCALAPPDATA%\hive-test-updater*, throwaway), and prints the Defender lines.
+// - Then, and on a rerun once the area is moved, the scenario benchmarks' schema is converted to 1.1's
+//   (convertBenchmarks.mjs, HI-2605); --dry-run says how many it would convert.
 // --from and --to move another folder (a copy, to prove the move on); the rewrites then also replace the real old
 // folder's path, which the copy's files name.
 import { spawnSync } from 'child_process'
@@ -25,6 +27,7 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, wri
 import { createRequire } from 'module'
 import { dirname, isAbsolute, join, relative, resolve } from 'path'
 import { fileURLToPath } from 'url'
+import { convertBenchmarks } from './convertBenchmarks.mjs'
 import { claimHeld } from './e2e/lanes.mjs'
 
 const require = createRequire(import.meta.url)
@@ -275,5 +278,16 @@ if (main) {
       }
     }
     console.log(`\nMicrosoft Defender: exclude the new folder and drop the old one, in PowerShell as administrator:\n  Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\\${NAME}"\n  Remove-MpPreference -ExclusionPath "$env:LOCALAPPDATA\\${OLD_NAME}"`)
+  }
+  // The scenario benchmarks' schema (HI-2605), once the area is in its new place: after the move, or on a rerun.
+  if (result.moved || result.state === 'done') {
+    console.log('')
+    try {
+      const conv = convertBenchmarks(to, { dryRun: args.includes('--dry-run'), alive: processAlive, say: (l) => console.log(l) })
+      if (conv.failed.length) process.exit(1)
+    } catch (e) {
+      console.error(e.message)
+      process.exit(1)
+    }
   }
 }
