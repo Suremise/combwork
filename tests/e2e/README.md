@@ -448,7 +448,12 @@ the install), the agent's environment (`set` in its session), the window's text 
 Diagnostics text and the exported board. It passes with no hit; each hit is listed with its place and text. app.asar is
 the one exception: its hits (the upgrade code that knows the 1.0 names) are counted in the report, never failed. Its git
 project uses this machine's Git for Windows, mapped read-only (`--git <its folder>`, by default the one on the PATH).
-Three throwaway Sandboxes, about 15 minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or
+Then the profile move the installer couldn't make (scenario 11, `--only profile-move`, HI-2602;
+`tests/sandbox/inside/profile-move.ps1`): Hive Desktop 1.0 installed and run once, a file in `%LOCALAPPDATA%\Hive` held
+open while the new installer runs (it moves the roaming folder and leaves the local one, its record in it), Combwork
+started with the file still held (refused, with its error box, nothing made under Combwork's name), then let go and
+started again (it moves the folder itself, its record arriving with it, and checks the sign-ins once: not again at the
+next start). Four throwaway Sandboxes, about 20 minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or
 credential goes in. It writes `report.md` (pass or fail per check, with screenshots) and passes only with every check run.
 
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the

@@ -64,12 +64,12 @@ test('build folder: the common folder of both installers; different drives and t
   assert.throws(() => buildRoot('D:\\Hive-Setup-0.6.0.exe', null), /drive root/)
 })
 
-test('--only: anything but fresh, upgrade, manual, edges, clean or upgrade-rc is refused before anything runs', () => {
-  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade or manual or edges or clean or upgrade-rc, not "frseh"/)
+test('--only: anything but fresh, upgrade, manual, edges, clean, upgrade-rc or profile-move is refused before anything runs', () => {
+  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade or manual or edges or clean or upgrade-rc or profile-move, not "frseh"/)
   const s = scratch('only')
   const r = runner(['--only', 'frseh', '--installer', 'x', '--report', path.join(s.dir, 'report')], s.env())
   assert.strictEqual(r.status, 2)
-  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade or manual or edges or clean or upgrade-rc/)
+  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade or manual or edges or clean or upgrade-rc or profile-move/)
   assert.deepStrictEqual(s.read().calls, [], 'wsb or the server was called')
 })
 
@@ -176,11 +176,11 @@ test('what the server gets: hive\'s own scripts and fakes mapped from this check
     CW_API_TOKEN: null
   })
   const build = path.join(run.s.dir, 'builds', 'hive')
-  // Git only in the clean install's Sandbox (HI-2592), for its git project.
-  assert.deepStrictEqual(run.starts.map((a) => [a.build, a.network, a.tools]), [[build, false, ['node', 'playwright', 'hive-tests']], [build, false, ['node', 'playwright', 'hive-tests']], [build, false, ['node', 'playwright', 'hive-tests', 'git']]])
+  // Git only in the clean install's Sandbox (HI-2592), for its git project; the profile move's (HI-2602) is the fourth.
+  assert.deepStrictEqual(run.starts.map((a) => [a.build, a.network, a.tools]), [[build, false, ['node', 'playwright', 'hive-tests']], [build, false, ['node', 'playwright', 'hive-tests']], [build, false, ['node', 'playwright', 'hive-tests', 'git']], [build, false, ['node', 'playwright', 'hive-tests']]])
   // Every script the runner runs inside is here, at the path the Sandbox maps it to.
   const inside = run.guests.flatMap((g) => [...g.matchAll(/C:\\tools\\hive-tests\\([^\s"]+)/g)].map((m) => m[1]))
-  assert.deepStrictEqual([...new Set(inside)].sort(), ['sandbox\\inside\\clean-scan.cjs', 'sandbox\\inside\\drive.cjs', 'sandbox\\inside\\install.ps1', 'sandbox\\inside\\start-app.ps1'])
+  assert.deepStrictEqual([...new Set(inside)].sort(), ['sandbox\\inside\\clean-scan.cjs', 'sandbox\\inside\\drive.cjs', 'sandbox\\inside\\install.ps1', 'sandbox\\inside\\profile-move.ps1', 'sandbox\\inside\\start-app.ps1'])
   for (const f of inside) assert.ok(fs.existsSync(path.join(__dirname, ...f.split('\\'))), f)
   assert.ok(!run.guests.some((g) => /wsb-mcp/i.test(g)), 'a script from the server\'s own folder')
   assert.match(run.log, new RegExp(`server ${FAKE_SERVER.replace(/[\\.]/g, '\\$&')}`))
@@ -206,18 +206,18 @@ test('Smart App Control blocking the installers → one NOT RUN line with the re
   const { s, r, json, md, guests } = run
   assert.strictEqual(r.status, 2, r.stdout + r.stderr)
   oneNotRunLine(run)
-  assert.deepStrictEqual(json.notRun.map((n: Json) => [n.kind, n.installer]), [['fresh', 'Hive-Setup-0.6.0.exe'], ['upgrade', 'Hive-Setup-0.5.1.exe'], ['clean', 'Hive-Setup-0.6.0.exe']])
+  assert.deepStrictEqual(json.notRun.map((n: Json) => [n.kind, n.installer]), [['fresh', 'Hive-Setup-0.6.0.exe'], ['upgrade', 'Hive-Setup-0.5.1.exe'], ['clean', 'Hive-Setup-0.6.0.exe'], ['profile-move', 'Hive-Setup-0.5.1.exe']])
   assert.strictEqual(json.failed, 0)
   assert.strictEqual(json.checks.length, 0)
   assert.deepStrictEqual(json.meta.smartAppControl, { state: 1, option: 'keep', note: 'left as Windows set it (read only)' })
   assert.doesNotMatch(md, /Smart App Control in the Sandbox: /)
   assert.match(md, /^\*\*NOT RUN: Smart App Control in the Sandbox blocks unsigned installers \(VerifiedAndReputablePolicyState = 1\): sign the installer, or run the checks with --smart-app-control off\.\*\* · /m)
-  assert.match(md, /## Not run[\s\S]*- \*\*fresh\*\*: Windows refused `Hive-Setup-0\.6\.0\.exe`\.\n- \*\*upgrade\*\*: Windows refused `Hive-Setup-0\.5\.1\.exe`\.\n- \*\*clean\*\*: Windows refused `Hive-Setup-0\.6\.0\.exe`\./)
+  assert.match(md, /## Not run[\s\S]*- \*\*fresh\*\*: Windows refused `Hive-Setup-0\.6\.0\.exe`\.\n- \*\*upgrade\*\*: Windows refused `Hive-Setup-0\.5\.1\.exe`\.\n- \*\*clean\*\*: Windows refused `Hive-Setup-0\.6\.0\.exe`\.\n- \*\*profile-move\*\*: Windows refused `Hive-Setup-0\.5\.1\.exe`\./)
   assert.doesNotMatch(md, /FAIL/)
   // Nothing ran after the blocked install in any Sandbox, and the policy was only ever read.
-  assert.strictEqual(guests.filter((g) => /install\.ps1/.test(g)).length, 3)
-  assert.ok(!guests.some((g) => /drive\.cjs|clean-scan\.cjs scan/.test(g)), guests.join('\n'))
-  assert.deepStrictEqual(guests.filter((g) => /CI\\Policy|SmartAppControl|VerifiedAndReputable|CiTool/i.test(g)).map((g) => g.split(' ').slice(0, 2).join(' ')), ['reg.exe query', 'reg.exe query', 'reg.exe query'])
+  assert.strictEqual(guests.filter((g) => /install\.ps1/.test(g)).length, 4)
+  assert.ok(!guests.some((g) => /drive\.cjs|clean-scan\.cjs scan|profile-move\.ps1/.test(g)), guests.join('\n'))
+  assert.deepStrictEqual(guests.filter((g) => /CI\\Policy|SmartAppControl|VerifiedAndReputable|CiTool/i.test(g)).map((g) => g.split(' ').slice(0, 2).join(' ')), Array(4).fill('reg.exe query'))
   assert.deepStrictEqual(s.read().sandboxes, [])
 })
 
@@ -266,9 +266,9 @@ test('--previous-rc (HI-2587): a 1.1 release candidate adds scenario 10 beside t
   const installer = path.join(dist, 'Combwork-Setup-1.1.0.exe')
   const rc = path.join(dist, 'Combwork-Setup-1.1.0-rc.2.exe')
   const p = plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--previous-rc', rc, '--hive', hive, '--server', FAKE_SERVER])
-  assert.deepStrictEqual(p.ran, ['fresh', 'upgrade', 'clean', 'upgrade-rc'])
+  assert.deepStrictEqual(p.ran, ['fresh', 'upgrade', 'clean', 'profile-move', 'upgrade-rc'])
   assert.strictEqual(p.guestPreviousRc, 'C:\\build\\Combwork-Setup-1.1.0-rc.2.exe')
-  assert.deepStrictEqual(plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--hive', hive, '--server', FAKE_SERVER]).ran, ['fresh', 'upgrade', 'clean'])
+  assert.deepStrictEqual(plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--hive', hive, '--server', FAKE_SERVER]).ran, ['fresh', 'upgrade', 'clean', 'profile-move'])
   assert.throws(() => plan(['--only', 'upgrade-rc', '--installer', installer, '--hive', hive, '--server', FAKE_SERVER]), /--only upgrade-rc needs --previous-rc/)
 })
 
@@ -290,10 +290,10 @@ test('--smart-app-control off: each Sandbox started with it, the state read back
   assert.strictEqual(r.status, 1, r.stdout + r.stderr) // the fake drivers write no results: checks fail, nothing NOT RUN
   assert.deepStrictEqual(json.notRun, [])
   // The server turns it off (its sandbox_start option); the runner reads it at each Sandbox's start and before each install.
-  assert.deepStrictEqual(starts.map((a) => a.smartAppControl), ['off', 'off', 'off'])
-  assert.deepStrictEqual(guests.filter((g) => /CI\\Policy|CiTool/i.test(g)).map((g) => g.split(' ').slice(0, 2).join(' ')), Array(7).fill('reg.exe query'))
+  assert.deepStrictEqual(starts.map((a) => a.smartAppControl), ['off', 'off', 'off', 'off'])
+  assert.deepStrictEqual(guests.filter((g) => /CI\\Policy|CiTool/i.test(g)).map((g) => g.split(' ').slice(0, 2).join(' ')), Array(9).fill('reg.exe query'))
   const installs = guests.map((g, i) => [g, i] as const).filter(([g]) => /install\.ps1 -Exe "C:\\build\\/.test(g))
-  assert.strictEqual(installs.length, 4)
+  assert.strictEqual(installs.length, 5)
   for (const [, i] of installs) assert.match(guests[i - 1], /^reg\.exe query /)
   assert.deepStrictEqual(json.meta.smartAppControl, { state: 0, option: 'off', note: 'turned off by option' })
   assert.match(md, /^- \*\*Smart App Control in the Sandbox: turned off by option\*\* \(`--smart-app-control off`; state 0, read before each install\)\. Inside the Sandbox only: the host isn't changed\./m)
@@ -306,7 +306,7 @@ test('--smart-app-control off that does not take (still 1) → NOT RUN with that
   const { r, json, md, guests } = run
   assert.strictEqual(r.status, 2, r.stdout + r.stderr)
   const reason = 'Smart App Control was to be turned off in the Sandbox (--smart-app-control off), but it reads 1 (VerifiedAndReputablePolicyState), not 0: the installers weren\'t run.'
-  assert.deepStrictEqual(json.notRun, [{ kind: 'fresh', reason, installer: 'Hive-Setup-0.6.0.exe' }, { kind: 'upgrade', reason, installer: 'Hive-Setup-0.5.1.exe' }, { kind: 'clean', reason, installer: 'Hive-Setup-0.6.0.exe' }])
+  assert.deepStrictEqual(json.notRun, [{ kind: 'fresh', reason, installer: 'Hive-Setup-0.6.0.exe' }, { kind: 'upgrade', reason, installer: 'Hive-Setup-0.5.1.exe' }, { kind: 'clean', reason, installer: 'Hive-Setup-0.6.0.exe' }, { kind: 'profile-move', reason, installer: 'Hive-Setup-0.5.1.exe' }])
   assert.ok(!guests.some((g) => /install\.ps1/.test(g)), guests.join('\n'))
   assert.deepStrictEqual(json.meta.smartAppControl, { state: 1, option: 'off', note: 'asked off by option, but not off' })
   assert.match(md, new RegExp(`^\\*\\*NOT RUN: ${reason.replace(/[.()]/g, '\\$&')}\\*\\*`, 'm'))
@@ -360,6 +360,26 @@ test("the driver's Launch at login reading keeps Hive.exe's and Combwork.exe's R
   assert.deepStrictEqual(kept([hive, other]), [hive.name])
   assert.deepStrictEqual(kept([hive, combwork, other]), [hive.name, combwork.name])
   assert.deepStrictEqual(kept([other]), [])
+})
+
+// Scenario 11's script (tests/sandbox/inside/profile-move.ps1, HI-2602) records the checks the report requires, and reads
+// what the app writes: the record of a move (its file name, by, signInChecked) and the sign-in check's log lines
+// (profileNotices.ts). When one changes, the script must change with it, not fail at the next release candidate.
+test("the profile move's script records the report's check ids, and reads the record and log lines the app writes", () => {
+  const { PROFILE_MOVE_IDS, REQUIRED } = require('./sandbox/report.cjs')
+  const script = fs.readFileSync(path.join(SANDBOX, 'inside', 'profile-move.ps1'), 'utf8')
+  const ids = [...script.matchAll(/^\s*Check '([^']+)'/gm)].map((m) => m[1])
+  assert.deepStrictEqual(ids.filter((id) => id !== '11.error'), PROFILE_MOVE_IDS)
+  for (const shot of REQUIRED['profile-move'].shots.filter((s: string) => s.endsWith('.png'))) assert.ok(script.includes(`Shot '${shot.replace(/\.png$/, '')}'`), shot)
+  const root = path.resolve(__dirname, '..')
+  const notices = fs.readFileSync(path.join(root, 'src', 'main', 'profileNotices.ts'), 'utf8')
+  const folders = fs.readFileSync(path.join(root, 'src', 'main', 'profileFolders.ts'), 'utf8') + notices
+  const said = (name: string) => /^\$\w+ = '([^']+)'/m.exec(script.slice(script.indexOf(`$${name} = `)))?.[1]
+  assert.strictEqual(said('record'), 'profile-move.json')
+  assert.ok(folders.includes("'profile-move.json'"), 'the record is profile-move.json')
+  assert.ok(notices.includes(`log.info(\`${said('checkLine')}`), `profileNotices.ts logs "${said('checkLine')}…" once per check`)
+  assert.ok(notices.includes(`log.info('${said('doneLine')}')`), `profileNotices.ts logs "${said('doneLine')}"`)
+  assert.ok(/signInChecked: true/.test(notices) && /by: 'installer'/.test(notices), 'the record says signInChecked: true, and by')
 })
 
 // The driver's readiness (tests/sandbox/inside/ready.cjs): what Combwork says is done, never a quiet spell. Each case holds a

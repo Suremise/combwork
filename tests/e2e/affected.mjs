@@ -790,6 +790,8 @@ export const UNIT_SCANS = [
   { test: 'tests/sandboxChecks.test.ts', paths: ['locales/en/', 'src/shared/api.ts', 'src/main/servers.ts'] },
   { test: 'tests/sandboxChecks.test.ts', paths: ['src/renderer/src/'], lines: ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git', 'palette', 'data-command', 'help\\.agentSetup', 'overview-page', 'ws-projects', 'board', 'data-note', 'skill-row', 'pane-empty', 'sessions-(list|tree)', 'main-area', 'empty-state', 'name="loading"'] },
   { test: 'tests/sandboxChecks.test.ts', paths: ['tests/e2e/fake-claude/', 'tests/e2e/fake-bridge.cjs'], adds: true },
+  // The profile move's script (HI-2602) reads the record of a move and the sign-in check's log lines the app writes.
+  { test: 'tests/sandboxChecks.test.ts', paths: ['src/main/profileNotices.ts', 'src/main/profileFolders.ts'] },
   // The clean-install check's step (HI-2592): the English text, IPC channels, palette commands and Settings selectors it
   // uses, and StartOptions' prompt, which gives the agent its first task.
   { test: 'tests/sandboxClean.test.ts', paths: ['locales/en/', 'src/shared/api.ts', 'src/renderer/src/commands.ts', 'src/renderer/src/components/ui.tsx', 'src/main/sessions.ts'] },
