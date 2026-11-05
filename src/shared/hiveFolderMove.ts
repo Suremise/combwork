@@ -122,11 +122,17 @@ export function movedContextRef(ref: string): string {
   return m ? `shared:${m[1].replace(/\\/g, '/')}` : ref
 }
 
+/** The comment above the project metadata line Combwork adds to a repository's info/exclude (HI-2575). */
+export const EXCLUDE_COMMENT = '# Combwork project metadata (added by Combwork)' // i18n-ignore: a line in git's exclude file, which stays English
+/** The same comment as Hive wrote it before 1.1: still Combwork's own entry. */
+export const LEGACY_EXCLUDE_COMMENT = '# Hive project metadata (added by Hive)' // i18n-ignore: a line in git's exclude file, which stays English
+
 /**
  * An info/exclude file's text with Hive's own line for a moved project's old folder replaced by the new one's (`/proj/.hive/`
  * → `/proj/.combwork/`, or the bare `.hive/` form for a repository's own), only where it follows Hive's comment line,
  * and only when `oldGone` (no `.hive` is left there: another tool's, or one made again, keeps its line). A line for the
- * new folder that is already there isn't added twice. Every other line stays as it was.
+ * new folder that is already there isn't added twice. Hive's own comment above a replaced line becomes Combwork's
+ * (HI-2575). Every other line stays as it was.
  */
 export function movedExcludeText(text: string, oldLine: string, newLine: string, oldGone: boolean): string {
   const nl = text.includes('\r\n') ? '\r\n' : '\n'
@@ -139,7 +145,10 @@ export function movedExcludeText(text: string, oldLine: string, newLine: string,
     const isOld = l.trim() === oldLine || (bare !== null && l.trim() === bare)
     const ours = isOld && i > 0 && /added by (Hive|Combwork)/i.test(lines[i - 1])
     if (ours && oldGone) {
-      if (!hasNew && !out.includes(newLine)) out.push(newLine)
+      if (!hasNew && !out.includes(newLine)) {
+        if (out.length && out[out.length - 1].trim() === LEGACY_EXCLUDE_COMMENT) out[out.length - 1] = EXCLUDE_COMMENT
+        out.push(newLine)
+      }
       continue
     }
     out.push(l)
