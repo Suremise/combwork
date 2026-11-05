@@ -45,7 +45,7 @@ const HUNG_MS = 10_000
 const fact = { kind: 'baseline', version: '1.0.0-rc.1', commit: '1fef5341a2b3c4d5e6f708192a3b4c5d6e7f8091', branch: '1.0.0', installer: 'D:\\HIVE\\hive\\dist\\Hive-Setup-1.0.0-rc.1.exe', builtAt: '2026-10-24T11:00:00.000Z', by: 'dist' }
 
 describe('a build fact', () => {
-  it('has the same kinds in the scripts and in Hive', () => {
+  it('has the same kinds in the scripts and in Combwork', () => {
     expect(script.BUILD_KINDS).toEqual([...BUILD_KINDS])
   })
 
@@ -116,7 +116,7 @@ describe('a build fact', () => {
   })
 })
 
-describe('the scripts tell Hive of a build', () => {
+describe('the scripts tell Combwork of a build', () => {
   const ws = join(base, 'scripts-ws')
   const repo = join(ws, 'hive')
   const markers = (): string[] => (existsSync(join(ws, '.combwork', 'builds')) ? readdirSync(join(ws, '.combwork', 'builds')) : [])
@@ -131,14 +131,14 @@ describe('the scripts tell Hive of a build', () => {
   })
   const input = { root: repo, version: '1.0.0-rc.1', commit: fact.commit, branch: '1.0.0', installer: fact.installer, builtAt: fact.builtAt, by: 'dist', kind: 'baseline' }
 
-  it('through the Agent API while Hive answers, leaving no marker', async () => {
+  it('through the Agent API while Combwork answers, leaving no marker', async () => {
     const sent: unknown[] = []
     const post = async (f: unknown, to: unknown) => (sent.push({ f, to }), { recorded: true })
-    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post })).toBe("Build recorded in Hive's journal (baseline).")
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post })).toBe("Build recorded in Combwork's journal (baseline).")
     expect(sent).toEqual([{ f: fact, to: { url: 'http://127.0.0.1:1', token: 't', workspace: ws } }])
     expect(markers()).toEqual([])
     // Combwork answered but didn't write it (the switch or the journal off): said, and no marker either.
-    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => ({ recorded: false, reason: 'off.' }) })).toBe("Build not recorded in Hive's journal: off.")
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => ({ recorded: false, reason: 'off.' }) })).toBe("Build not recorded in Combwork's journal: off.")
     expect(markers()).toEqual([])
   })
 
@@ -146,7 +146,7 @@ describe('the scripts tell Hive of a build', () => {
     const sent: unknown[] = []
     const post = async (f: unknown, to: unknown) => (sent.push({ f, to }), { recorded: true })
     const was = new Set(markers())
-    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN: 't' }, post })).toMatch(/^Build left for Hive's journal/)
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN: 't' }, post })).toMatch(/^Build left for Combwork's journal/)
     expect(sent).toEqual([])
     // Left as a marker, as with no API named; taken away again so the next test counts its own.
     const left = markers().filter((m) => !was.has(m))
@@ -154,9 +154,9 @@ describe('the scripts tell Hive of a build', () => {
     for (const m of left) rmSync(join(ws, '.combwork', 'builds', m))
   })
 
-  it("by a marker when Hive can't be reached, or no API is named", async () => {
-    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => null })).toMatch(/^Build left for Hive's journal \(baseline\)/)
-    expect(await script.recordBuild(input, { env })).toMatch(/^Build left for Hive's journal/)
+  it("by a marker when Combwork can't be reached, or no API is named", async () => {
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => null })).toMatch(/^Build left for Combwork's journal \(baseline\)/)
+    expect(await script.recordBuild(input, { env })).toMatch(/^Build left for Combwork's journal/)
     const left = markers()
     expect(left).toHaveLength(2)
     expect(left.every((n) => n.endsWith('.json'))).toBe(true)
@@ -190,7 +190,7 @@ describe('the scripts tell Hive of a build', () => {
     try {
       expect(await script.postBuild(fact, { url, token: 't', workspace: ws })).toBeNull()
       const before = markers().length
-      expect(await script.recordBuild(input, { env: api })).toMatch(/^Build left for Hive's journal \(baseline\)/)
+      expect(await script.recordBuild(input, { env: api })).toMatch(/^Build left for Combwork's journal \(baseline\)/)
       expect(markers()).toHaveLength(before + 1)
       // A post that throws, or rejects, is no reply either.
       const throws = (): never => {
@@ -219,11 +219,11 @@ describe('the scripts tell Hive of a build', () => {
 
   it('says so when no workspace holds the checkout', async () => {
     const lone = tempDir('hive-build-facts-lone-')
-    expect(await script.recordBuild({ ...input, root: lone }, { env: {} })).toBe("Build not recorded in Hive's journal: no Hive workspace holds this checkout (CW_WORKSPACE names one).")
+    expect(await script.recordBuild({ ...input, root: lone }, { env: {} })).toBe("Build not recorded in Combwork's journal: no Combwork workspace holds this checkout (CW_WORKSPACE names one).")
   })
 })
 
-describe('Hive records a build in the journal', () => {
+describe('Combwork records a build in the journal', () => {
   let w: ReturnType<typeof createWorkspaceService>
   const wsPath = join(base, 'ws')
   const dir = join(wsPath, '.combwork', 'builds')
