@@ -123,6 +123,13 @@ describe("a skill's reference files read (skillRefsRead)", () => {
     // Reading SKILL.md is the skill's read, never a reference file's.
     expect(o.skillsRead).toEqual(['card-loop'])
   })
+
+  it('counts a read of a cw-<name> copy (HI-2463), and still not a call naming two of its files (HI-2560, HR2 round 1)', () => {
+    expect(observe([tool('Read', { file_path: '.agents/skills/cw-card-loop/builder.md' }, BODY)], NAMES, REFS).skillRefsRead).toEqual(['card-loop/builder.md'])
+    expect(observe([tool('Shell', "Get-Content -Raw 'C:\\w\\alpha\\.agents\\skills\\cw-card-loop\\builder.md'", BODY.replace(/\n/g, '\r\n'))], NAMES, REFS).skillRefsRead).toEqual(['card-loop/builder.md'])
+    const two = tool('Bash', { command: 'cat .agents/skills/cw-card-loop/builder.md .agents/skills/cw-card-loop/reviewer.md' }, `${HEAD}\n# Card loop: the reviewer`)
+    expect(observe([two], NAMES, REFS).skillRefsRead).toEqual([])
+  })
 })
 
 describe('hive tools named in a transcript are mentions, not calls', () => {

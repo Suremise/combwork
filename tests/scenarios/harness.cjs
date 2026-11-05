@@ -170,6 +170,8 @@ function retainedObserved(observed, tokens) {
  * (a Codex code-mode script's exec_command result carries the file as `"output":"---\r\nname: x\r\n…"`), so the result
  * is also matched with escaped line breaks and quotes turned back into real ones.
  */
+/** A skill copy's folder prefix, as a pattern: cw-<name> since HI-2463, hive-<name> before, or none (HI-2560). */
+const COPY_PREFIX = '(?:hive-|cw-)?'
 function observeTranscript(items, skillNames, skillRefs = new Map()) {
   // `cwd`: the folder a command ran in, where its CLI recorded it apart from the command (a Codex Shell's, HI-2264).
   const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? ''), ...(x.tool.cwd ? { cwd: String(x.tool.cwd) } : {}) }))
@@ -181,8 +183,7 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
       if (skillsRead.includes(n)) continue
       const viaTool = /^skill$/i.test(t.name) && new RegExp(`(^|[":\\s])(hive:)?${escape(n)}(\\b|$)`).test(t.input)
       const nameLine = new RegExp(`(^|\\s)name:\\s*["']?${escape(n)}["']?\\s*$`, 'm')
-      // A Codex copy's folder: cw-<name> since HI-2463, hive-<name> before (HI-2560).
-      const viaRead = new RegExp(`skills[\\\\/]+(?:hive-|cw-)?${escape(n)}[\\\\/]+SKILL\\.md`, 'i').test(t.input) && (nameLine.test(t.result) || nameLine.test(unescaped(t.result)))
+      const viaRead = new RegExp(`skills[\\\\/]+${COPY_PREFIX}${escape(n)}[\\\\/]+SKILL\\.md`, 'i').test(t.input) && (nameLine.test(t.result) || nameLine.test(unescaped(t.result)))
       if (viaTool || viaRead) skillsRead.push(n)
     }
   }
@@ -199,9 +200,9 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
       for (const [file, head] of files) {
         const ref = `${n}/${file}`
         if (skillRefsRead.includes(ref)) continue
-        const at = new RegExp(`skills[\\\\/]+(?:hive-|cw-)?${escape(n)}[\\\\/]+${escape(file)}`, 'gi')
+        const at = new RegExp(`skills[\\\\/]+${COPY_PREFIX}${escape(n)}[\\\\/]+${escape(file)}`, 'gi')
         // One file a call: a command naming two of the skill's files is no evidence of either.
-        const named = [...t.input.matchAll(new RegExp(`skills[\\\\/]+(?:hive-)?${escape(n)}[\\\\/]+[\\w.-]+\\.md`, 'gi'))].length
+        const named = [...t.input.matchAll(new RegExp(`skills[\\\\/]+${COPY_PREFIX}${escape(n)}[\\\\/]+[\\w.-]+\\.md`, 'gi'))].length
         if ((t.input.match(at) ?? []).length && named === 1 && (t.result.includes(head) || unescaped(t.result).includes(head))) skillRefsRead.push(ref)
       }
     }
