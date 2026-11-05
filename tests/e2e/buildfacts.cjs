@@ -1,7 +1,7 @@
 // Builds recorded as facts (#1534, #1062): a fake build script (scripts/buildFact.mjs, as npm run dist and npm run
-// release call it) tells a running Hive of a successful build through the Agent API, and the Assistant view's Journal
-// shows it as Hive's entry; a failed build (no build-info.json) records nothing; Settings → Advanced → Record builds in
-// the journal off, Hive answers that it wrote nothing; with Hive closed the build is left as a marker in the workspace,
+// release call it) tells a running Combwork of a successful build through the Agent API, and the Assistant view's Journal
+// shows it as Combwork's entry; a failed build (no build-info.json) records nothing; Settings → Advanced → Record builds in
+// the journal off, Combwork answers that it wrote nothing; with Combwork closed the build is left as a marker in the workspace,
 // recorded once when it next opens. No agents. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => {
 
 /**
  * The fake build: a child Node process that does what dist.mjs does once its build has run: recordDist on the repo (its
- * dist/build-info.json saying whether the build succeeded). api: the Agent API's URL and token, or none (Hive closed).
+ * dist/build-info.json saying whether the build succeeded). api: the Agent API's URL and token, or none (Combwork closed).
  */
 function fakeBuild(api) {
   const src = `import { recordDist } from ${JSON.stringify(pathToFileURL(path.join(lib.ROOT, 'scripts', 'buildFact.mjs')).href)}
@@ -64,7 +64,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     const entry = rows ? await inv('journal:entry', rows[0].id) : null
     check("its detail names the installer, and it links the commit", !!entry && entry.detail.includes('Hive-Setup-9.9.9-rc.1.exe') && entry.links.some((l) => l.type === 'commit' && l.ref === head()), JSON.stringify(entry))
 
-    // The Assistant view's Journal shows it, marked as Hive's.
+    // The Assistant view's Journal shows it, marked as Combwork's.
     await page.locator('.activity-btn[aria-label="Assistant"]').click()
     await page.locator('.row[data-section="journal"]').click()
     const row = page.locator('.journal .journal-row', { hasText: 'Built Combwork 9.9.9-rc.1 (baseline)' })
@@ -72,14 +72,14 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     check("…marked as Combwork's", (await row.locator('.journal-source-mark[aria-label="Combwork"]').count()) === 1)
     await page.screenshot({ path: path.join(lib.WORK, 'buildfacts-journal.png') })
 
-    // Settings → Advanced → Record builds in the journal off: Hive answers it wrote nothing; no marker either.
+    // Settings → Advanced → Record builds in the journal off: Combwork answers it wrote nothing; no marker either.
     await inv('advanced:set', 'cw.journal.builds', false)
     const off = fakeBuild(api)
     check('with the switch off, Combwork says it wrote nothing', /^Build not recorded in Combwork's journal: Settings → Advanced → Record builds in the journal is off\.$/.test(off), off)
     check('…and nothing was written or left', (await builds(inv)).length === 1 && (!fs.existsSync(markers) || fs.readdirSync(markers).length === 0))
     await inv('advanced:set', 'cw.journal.builds', null)
 
-    // Hive closed: the build is left as a marker, then recorded once as the workspace opens.
+    // Combwork closed: the build is left as a marker, then recorded once as the workspace opens.
     await app.close()
     app = null
     // Another build (its own time: the same build sent twice is recorded once).
