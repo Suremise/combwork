@@ -552,8 +552,11 @@ const backedUp = new Set<string>()
  * `holder` (KeptReadOptions.holder): a holder whose last read of the file gave it a stand-in (HI-2414: the .bak's value or
  * a default, the file unreadable or still being saved) could replace settings it never saw: while the file is there,
  * KeptFileUnreadable, nothing written over it or its .bak, until the holder's own read gives it the file's settings.
+ *
+ * `guard` (HI-2563) runs before each rename of the file into place (renameRetrying's, after each refused one too) and stops
+ * the save by throwing: nothing written, its .bak neither.
  */
-export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object } = {}): Promise<void> {
+export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object; guard?: () => Promise<void> } = {}): Promise<void> {
   await saveKept(path, data, opts)
 }
 
@@ -566,7 +569,7 @@ export async function createKeptJson(path: string, data: unknown, opts: { compac
   return saveKept(path, data, { ...opts, onlyNew: true })
 }
 
-async function saveKept(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object; onlyNew?: boolean }): Promise<boolean> {
+async function saveKept(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object; onlyNew?: boolean; guard?: () => Promise<void> }): Promise<boolean> {
   const k = path.toLowerCase()
   if (opts.holder && staleHolders.get(k)?.has(opts.holder)) {
     if (!(await keptGone(path))) {
@@ -580,7 +583,7 @@ async function saveKept(path: string, data: unknown, opts: { compact?: boolean; 
   forgetKeptStat(path)
   if (opts.onlyNew) {
     if (!(await writeTextNew(path, text, write).finally(() => forgetKeptStat(path)))) return false
-  } else await writeTextAtomic(path, text, write).finally(() => forgetKeptStat(path))
+  } else await writeTextAtomic(path, text, { ...write, guard: opts.guard }).finally(() => forgetKeptStat(path))
   if (opts.bakOncePerRun && backedUp.has(k)) return true
   await writeTextAtomic(`${path}.bak`, text, write).then(
     () => void backedUp.add(k),
@@ -619,6 +622,9 @@ export async function writeTextNew(path: string, text: string, opts: { mkdir?: b
   }
 }
 
+/** For unit tests (HI-2563): the single rename of an atomic write, to refuse one as Windows does while a file is held. */
+export const atomicTestHooks: { renameOnce?: (from: string, to: string) => Promise<void> } = {}
+
 /** Writes via a temp file + rename so a crash never leaves a half-written file. */
 export async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
   await writeTextAtomic(path, JSON.stringify(data, null, 2) + '\n')
@@ -632,14 +638,14 @@ let tmpCounter = 0
  * another process (or another rename) holds the target, so that is retried. `mkdir: false` writes only into a folder
  * that is there (ENOENT otherwise).
  */
-export async function writeTextAtomic(path: string, text: string, opts: { mkdir?: boolean } = {}): Promise<void> {
+export async function writeTextAtomic(path: string, text: string, opts: { mkdir?: boolean; guard?: () => Promise<void> } = {}): Promise<void> {
   if (opts.mkdir !== false) await mkdir(dirname(path), { recursive: true })
   const tmp = `${path}.${process.pid}-${++tmpCounter}.tmp`
   // A write that fails, while the temp file is written (a full disk) or renamed (retries given up, EPERM included),
   // removes it, so failed saves leave nothing behind (#1016). A crash part way still can: sweepLeftovers removes those.
   try {
     await writeFile(tmp, text, 'utf8')
-    await renameRetrying(tmp, path)
+    await renameRetrying(tmp, path, 20, opts.guard, (a, b) => (atomicTestHooks.renameOnce ?? rename)(a, b))
   } catch (e) {
     await rm(tmp, { force: true }).catch(() => undefined)
     throw e
@@ -652,10 +658,10 @@ export async function writeTextAtomic(path: string, text: string, opts: { mkdir?
  * when given, runs before every attempt (after each wait too) and stops the rename by throwing: work whose owner went
  * away meanwhile (a closed workspace) never renames late. `renameOnce` is the single rename (tests replace it).
  */
-export async function renameRetrying(from: string, to: string, tries = 20, guard?: () => void, renameOnce: (a: string, b: string) => Promise<void> = rename): Promise<void> {
+export async function renameRetrying(from: string, to: string, tries = 20, guard?: () => void | Promise<void>, renameOnce: (a: string, b: string) => Promise<void> = rename): Promise<void> {
   const started = Date.now()
   for (let attempt = 0; ; attempt++) {
-    guard?.()
+    await guard?.()
     try {
       await renameOnce(from, to)
       return

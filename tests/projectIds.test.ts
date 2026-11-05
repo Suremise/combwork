@@ -19,6 +19,7 @@ const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWork
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const { movePlan, repairMove } = await import('../src/main/workspaceMove')
+const { atomicTestHooks } = await import('../src/main/fsutil')
 
 vi.setConfig({ testTimeout: 30_000 })
 /** Bounds a wait for Hive's folder watcher: only a hung watcher takes this long. */
@@ -615,6 +616,75 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       expect((await w.updateAgent(copied, 'a-one', { name: 'Uno' })).name).toBe('Uno')
     } finally {
       delete configTestHooks.beforeDefaultConfig
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  // HI-2563: a project.json written from outside while one of Combwork's own changes to it runs (a new project's id, its
+  // connections' migration: each read under the lock, then written) is read again, never written over with the value
+  // read before it (the accounts suite's epsilon on RC3: its default, an id and the migration's stamp, its agent gone).
+  it("a project.json written while a change to it runs isn't written over", async () => {
+    const wsPath = join(base, 'ws-config-in-change')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const taken = join(wsPath, 'taken')
+      mkdirSync(taken)
+      await w.ensureProject(taken)
+      const theirs = { version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }
+      // After the change read the default, before it writes: the project's own arrives then, written in place.
+      let held = 0
+      configTestHooks.beforeConfigWrite = async (p) => {
+        if (p.toLowerCase() !== taken.toLowerCase() || held++) return
+        writeFileSync(join(taken, '.combwork', 'project.json'), JSON.stringify(theirs))
+      }
+      const seen: unknown[][] = []
+      await w.mutateProjectConfig(taken, (cfg) => (seen.push(cfg.agents ?? []), { id: 'p-0123456789ab' }), { existing: true })
+      // Run again on the file as written then: both the change and the project's own agent are kept.
+      expect(held).toBe(2)
+      expect(seen.map((a) => a.length)).toEqual([0, 1])
+      expect(projectJson(taken)).toMatchObject({ id: 'p-0123456789ab', agents: theirs.agents })
+      expect((await w.updateAgent(taken, 'a-one', { name: 'Uno' })).name).toBe('Uno')
+    } finally {
+      configTestHooks.beforeConfigWrite = undefined
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  // HI-2563, as on RC3: the change's rename refused (EPERM) while the project's own project.json is written over the file,
+  // then tried again. It is read again rather than landing on what was written.
+  it("a project.json written while a change's rename is refused isn't written over", async () => {
+    const wsPath = join(base, 'ws-config-in-rename')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const taken = join(wsPath, 'taken')
+      mkdirSync(taken)
+      await w.ensureProject(taken)
+      const file = join(taken, '.combwork', 'project.json')
+      const theirs = { version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }
+      let refused = 0
+      const { rename } = await import('original-fs/promises')
+      atomicTestHooks.renameOnce = async (from, to) => {
+        if (to.toLowerCase() === file.toLowerCase() && !refused) {
+          refused++
+          writeFileSync(file, JSON.stringify(theirs))
+          throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
+        }
+        await rename(from, to)
+      }
+      const seen: number[] = []
+      await w.mutateProjectConfig(taken, (cfg) => (seen.push((cfg.agents ?? []).length), { id: 'p-0123456789ab' }), { existing: true })
+      expect(refused).toBe(1)
+      expect(seen).toEqual([0, 1])
+      expect(projectJson(taken)).toMatchObject({ id: 'p-0123456789ab', agents: theirs.agents })
+      expect(readdirSync(join(taken, '.combwork')).filter((n) => n.endsWith('.tmp'))).toEqual([])
+    } finally {
+      delete atomicTestHooks.renameOnce
       await disposeWorkspaceService(w)
     }
   })

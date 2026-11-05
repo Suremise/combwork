@@ -25,7 +25,7 @@ import { changesConfig, viewOf, withoutView } from '../shared/projectView'
 import { emit, emitTo, toast } from './events'
 import { resolveOffer, resolveOffers } from './notify'
 import { OUTCOME } from './outcomes'
-import { containsPlace, createKeptJson, insideReal, isDir, placeKey, readJson, readKeptJson, readKeptJsonByStat, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
+import { KeptFileBusy, containsPlace, createKeptJson, insideReal, isDir, placeKey, readJson, readKeptJson, readKeptJsonByStat, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
 import { AfterOpen } from './openProgress'
 import { whenAll } from '../shared/atMost'
@@ -165,6 +165,12 @@ export interface ProjectSeen {
 
 /** For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. */
 export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void>; beforeDefaultConfig?: (projectPath: string) => Promise<void> } = {}
+
+/** A file's version as its stat says (HI-2563): its inode, size and time changed; '' when it isn't there or can't be read. */
+async function keptStamp(path: string): Promise<string> {
+  const st = await stat(path, { bigint: true }).catch(() => null)
+  return st ? `${st.ino}:${st.size}:${st.mtimeNs}` : ''
+}
 
 /**
  * Whether an agent may be given a connection now (HI-2107; accounts.ts sets it): it exists and isn't being removed. Asked
@@ -1351,7 +1357,9 @@ export class WorkspaceService {
         // folder's appearing began reading it) is kept, never replaced by the default.
         if (!existsSync(join(h, 'project.json'))) {
           await configTestHooks.beforeDefaultConfig?.(projectPath)
-          await createKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }), { existing: true })
+          const isNew = await createKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }), { existing: true })
+          // Its load, in the log (HI-2563): the default made, or the project's own kept.
+          log.info(`${userText(basename(projectPath))}: ${isNew ? 'default project.json made' : 'project.json written meanwhile kept, no default made'}`)
         }
         // 0.1's launch folder for Agent 1; every agent now has launch-<id>.
         if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
@@ -1465,6 +1473,9 @@ export class WorkspaceService {
     const board = this.path && !this.isAssistantHome(projectPath) ? this.path : null
     const publish = (): Promise<ProjectConfig | null> =>
       retryWhileSaving(() => withFileLock(file, async () => {
+        // The file as this change reads it (HI-2563): one written meanwhile by something outside the lock (a project's own
+        // project.json written into its folder just after Combwork took the folder on) is read again, never replaced.
+        const readAt = await keptStamp(file)
         const cfg = await this.projectConfig(projectPath, { unsettled: 'throw' })
         if (opts.existing && !existsSync(file)) throw Object.assign(new Error('the project is gone'), { code: 'ENOENT' }) // i18n-ignore: internal, its caller drops ENOENT unshown
         const had = projectAgents(cfg).map((a) => a.id)
@@ -1491,7 +1502,14 @@ export class WorkspaceService {
         this.keepView(projectPath, updated)
         if (changesConfig(patch)) {
           await configTestHooks.beforeConfigWrite?.(projectPath)
-          await writeKeptJson(file, withLegacyProjectFields(withoutView(updated)), { existing: opts.existing })
+          // Checked as it goes into place, each try (HI-2563): a rename Windows refused while something outside held the
+          // file to write it would otherwise land on what that wrote.
+          const unchanged = async (): Promise<void> => {
+            if ((await keptStamp(file)) === readAt) return
+            log.info(`${userText(basename(projectPath))}: project.json changed while a change to it was made: read again (HI-2563)`)
+            throw new KeptFileBusy(file)
+          }
+          await writeKeptJson(file, withLegacyProjectFields(withoutView(updated)), { existing: opts.existing, guard: unchanged })
         }
         // As it is written: a read begun before now may have found the config from before.
         ticket = ++this.rootTickets

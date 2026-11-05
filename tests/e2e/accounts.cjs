@@ -244,7 +244,21 @@ const check = (name, ok, extra = '') => {
     check('…it needs set up, naming it: the workspace folder’s trust doesn’t cover a repository', !!gitTrust && JSON.stringify(gitTrust.pending) === JSON.stringify([{ project: 'epsilon', folder: epsilonReal, git: true }]) && !!(await lib.until(async () => /epsilon/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)), JSON.stringify(gitTrust))
     check('…its Set Up would open in the repository’s own folder, not the workspace’s', !!gitTrust && gitTrust.setUpIn?.folder === epsilonReal && !gitTrust.setUpIn.workspace, JSON.stringify(gitTrust?.setUpIn))
     await shots('git-not-covered')
-    fs.rmSync(epsilon, { recursive: true, force: true })
+    // Removed as Explorer's Delete does, moved out in one step (HI-2563): deleted in place, a refresh could find it half
+    // gone and set it up again (its .combwork made anew), so the delete found its folder not empty. A move refused while
+    // something has a file in it open for a moment is tried again.
+    const epsilonGone = path.join(path.dirname(ws1), 'epsilon-removed')
+    const moved = await lib.until(async () => {
+      try {
+        fs.renameSync(epsilon, epsilonGone)
+        return true
+      } catch (e) {
+        if (!['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e
+        return false
+      }
+    }, HUNG_MS)
+    check('…moved out of the workspace', !!moved && !fs.existsSync(epsilon))
+    fs.rmSync(epsilonGone, { recursive: true, force: true })
     await inv('workspace:refresh')
     check('…removed, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
 
