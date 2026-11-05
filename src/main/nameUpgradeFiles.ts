@@ -1,5 +1,4 @@
-import { existsSync } from 'original-fs'
-import { mkdir, readdir, readFile, rm, rmdir } from 'original-fs/promises'
+import { lstat, mkdir, readdir, readFile, rm, rmdir } from 'original-fs/promises'
 import { join } from 'path'
 import { writeTextAtomic } from './fsutil'
 
@@ -98,6 +97,9 @@ export const ifAbsent = <T>(value: T) => (e: NodeJS.ErrnoException): T | Promise
 
 const mcpFiles = async (dir: string): Promise<string[]> => (await readdir(join(dir, 'mcp')).catch(ifAbsent([] as string[]))).filter((f) => f.endsWith('.json')).map((f) => join(dir, 'mcp', f))
 
+/** Tests only: a stat that fails for some paths, in place of lstat (an access error on the board's file, HR1's round 2). */
+export const stubTestHooks: { stat?: (path: string) => Promise<unknown> } = {}
+
 /** Where the board keeps cards an older version saved, for the user to review (boardStore.ts SET_ASIDE, #1044). */
 export const SET_ASIDE_DIR = 'tasks.set-aside'
 
@@ -109,12 +111,15 @@ export const SET_ASIDE_DIR = 'tasks.set-aside'
  * content is there already isn't kept twice; another of a taken name is kept beside it under a name of its own), each
  * copied before it leaves the stub, then the stub's own two files go and the folder with them once empty. Only a stub:
  * a folder without the README, or a workspace with no board yet (0.8's cards, which the board imports), is left as it
- * is. Says how many cards it set aside, for the board's notice.
+ * is. Says how many cards it set aside, for the board's notice. Whether a file is there is asked so that only ENOENT
+ * (or ENOTDIR) is absent: one that can't be looked at fails the step (HR1's round 2), as a listing that can't be read does.
  */
-export async function moveOldStub(dir: string): Promise<number> {
+export async function moveOldStub(dir: string, o: { stat?: (path: string) => Promise<unknown> } = {}): Promise<number> {
+  const stat = o.stat ?? stubTestHooks.stat ?? lstat
+  const there = (p: string): Promise<boolean> => stat(p).then(() => true, (e: NodeJS.ErrnoException) => (e?.code === 'ENOENT' || e?.code === 'ENOTDIR' ? false : Promise.reject(e)))
   const stub = join(dir, 'tasks')
   const names = await readdir(stub).catch(ifAbsent(null))
-  if (!names || !names.includes('README.txt') || !existsSync(join(dir, 'combwork.db'))) return 0
+  if (!names || !names.includes('README.txt') || !(await there(join(dir, 'combwork.db')))) return 0
   const cards = names.filter((f) => /^\d+\.json$/.test(f))
   let found = 0
   if (cards.length) {
@@ -126,7 +131,7 @@ export async function moveOldStub(dir: string): Promise<number> {
     for (const f of cards) {
       const text = await readFile(join(stub, f), 'utf8')
       if (!kept.has(text)) {
-        const to = existsSync(join(aside, f)) ? `${f.slice(0, -5)}.${stamp}-${found}.json` : f
+        const to = (await there(join(aside, f))) ? `${f.slice(0, -5)}.${stamp}-${found}.json` : f
         await writeTextAtomic(join(aside, to), text)
         kept.add(text)
         found++

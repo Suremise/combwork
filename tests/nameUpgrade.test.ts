@@ -20,6 +20,7 @@ const { MOVE_LOCK_FILE, finishMove, moveFolders, recordNewWorkspace } = await im
 const { NAMES_DONE_FILE, projectNamesDone } = await import('../src/main/nameUpgrade')
 const { boardMoveTestHooks } = await import('../src/main/boardFileMove')
 const { contentHash } = await import('../src/main/fsutil')
+const { stubTestHooks } = await import('../src/main/nameUpgradeFiles')
 const { WORKSPACE_README, BOARD_GITIGNORE } = await import('../src/main/workspace')
 
 let n = 0
@@ -233,6 +234,26 @@ describe('the names upgrade at the open', () => {
     expect(existsSync(join(w.ws, '.combwork', NAMES_DONE_FILE))).toBe(false)
     rmSync(skills)
     renameSync(`${skills}.kept`, skills)
+    await open(w.ws)
+    expectUpgraded(w)
+  })
+
+  it("a board file that can't be looked at fails the files step: the stub and its card left, nothing recorded; once it can be, the next open finishes (HR1's round 2)", async () => {
+    const w = workspace('rc2')
+    const { lstat } = await import('fs/promises')
+    const board = join(w.ws, '.combwork', 'combwork.db')
+    stubTestHooks.stat = async (p) => {
+      if (p === board) throw Object.assign(new Error('access denied'), { code: 'EACCES' })
+      return lstat(p)
+    }
+    try {
+      await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the workspace's \.gitignore, README and MCP definitions/)
+    } finally {
+      stubTestHooks.stat = undefined
+    }
+    expect(existsSync(join(w.ws, '.combwork', NAMES_DONE_FILE))).toBe(false)
+    expect(readFileSync(join(w.ws, '.combwork', 'tasks', '7.json'), 'utf8')).toBe(STUB_CARD)
+    expect(existsSync(join(w.ws, '.combwork', 'tasks.set-aside'))).toBe(false)
     await open(w.ws)
     expectUpgraded(w)
   })
