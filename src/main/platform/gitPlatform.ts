@@ -9,7 +9,7 @@ import { dirname, join } from 'path'
 import { git } from '../git'
 import { withRepoLock } from '../repoLock'
 import type { CardState, FileChange } from '../../shared/workflow/facts'
-import { GUARD_FNS, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
+import { trailerRefusal, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
 import { attributeFolder, reconcileGit, type ReconcileHooks } from '../workflow/reconcile'
@@ -351,8 +351,7 @@ export class GitPlatform implements PlatformAdapter {
       if (commits && args.guards.includes('submit.trailer')) {
         const u = await this.untrailered(card, s)
         if (isUnknown(u)) return { ok: false, refusal: unknownRefusal(card, u, 'submit') }
-        const refusal = u ? GUARD_FNS['submit.trailer']({ card, untrailered: u } as GuardInputs) : null
-        if (refusal) return { ok: false, refusal }
+        if (u) return { ok: false, refusal: trailerRefusal(card.key, u) }
       }
       const all = dirty ?? (await G.dirty(folder))
       const notMine = this.wf.ownLine(s) || isUnknown(all) ? [] : await this.inRepo(this.notMine(card, s))
