@@ -1979,12 +1979,18 @@ export function cycleProject(delta: number): void {
   selectProject(next.path)
 }
 
-/** Looks for the enabled providers' CLIs again and reports what it found. */
-export async function refreshProviders(): Promise<void> {
-  const all = await attempt(tr(msg({ id: 'actions.providers.checkFailed', defaultMessage: 'Could not check the providers', description: "An error's title: looking for the coding agent CLIs again failed." })), () => call('provider:refresh'))
+/**
+ * Looks for the enabled providers' CLIs again and reports what it found. With `only` (a provider's page's Check now,
+ * HI-2550), just that provider's CLI is checked and reported, whether it is on or not, and the others' results are
+ * left as they are.
+ */
+export async function refreshProviders(only?: ProviderId): Promise<void> {
+  const all = await attempt(tr(msg({ id: 'actions.providers.checkFailed', defaultMessage: 'Could not check the providers', description: "An error's title: looking for the coding agent CLIs again failed." })), () => (only ? call('provider:refresh', only) : call('provider:refresh')))
   if (!all) return
-  set({ providers: all })
-  const enabled = Object.values(all).filter((i) => isProviderEnabled(get().settings, i.provider))
+  const one = only ? all[only] : undefined
+  if (only && !one) return
+  set(one ? (s) => ({ providers: { ...s.providers, [one.provider]: one } }) : { providers: all })
+  const enabled = one ? [one] : Object.values(all).filter((i) => isProviderEnabled(get().settings, i.provider))
   if (!enabled.length) return notify('info', tr(msg({ id: 'actions.providers.noneOn', defaultMessage: 'No providers are turned on', description: "A notification's title: no coding agent CLI is turned on in Settings." })), tr(msg({ id: 'actions.providers.noneOnMessage', defaultMessage: 'Turn on Claude Code or another provider in Settings → Providers.', description: 'Under the notification that no provider is on. Claude Code is a name; Settings → Providers is where: use its translated names.' })), [{ label: openSettingsLabel(), command: 'settings.providers' }])
   for (const info of enabled) {
     const name = providerName(info.provider)
