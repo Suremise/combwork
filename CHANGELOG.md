@@ -27,7 +27,7 @@
 
 ### Fixed
 
-- **A provider's page's Check now checks only that provider** (HI-2550). **Settings → GitHub Copilot → Check now** (and Claude Code's, and Codex's) checked all three CLIs; it now looks again for that page's CLI alone: its install, version, problems and update. **Help → Check Coding Agents for Updates** and Provider Setup still check them all.
+- **A provider's page's Check now checks only that provider** (HI-2550). **Settings → GitHub Copilot → Check now** (and Claude Code's, and Codex's) checked all three CLIs; it now looks again for that page's CLI alone: its install, version, problems and update, as Provider Setup's **Check again** does. **Help → Check Coding Agents for Updates** still checks them all.
 - **A project's own settings are kept when its folder appears in the workspace** (HI-2542). A project folder copied or made in the workspace with its `.combwork\project.json` already in it could have that file replaced by a new project's defaults, its agents lost, if Combwork noticed the folder just before the file arrived. Combwork now makes the default file only where there still isn't one.
 - **An account's Sign In and Set Up terminal opens in its own card** (HI-2541). Settings → Accounts & Connections opened it under the whole list of accounts, so Set Up on an account higher up showed its terminal far from it, below the others. It now opens in that account's card, under its name, scrolled into view.
 - **Stopped agents' panes no longer scroll sideways in German** (HI-2536). At 900 px with two panes side by side, Neue Sitzung and Fortsetzen didn't fit on one row and each pane got a horizontal scrollbar; the buttons now wrap, one above the other, when a pane is too narrow for both.
