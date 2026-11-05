@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 124
+const FIXTURES_VERSION = 125
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -73,6 +73,73 @@ const relaysOk = (text) =>
   /\b(ok|okay|go ahead|approved|can push|may push)\b/i.test(
     String(text ?? '').replace(/\b(?:ask|asks|asking|wait for|waits for|waiting for|get|request)\b[^.;]{0,60}?\b(?:ok|okay|go-ahead|go ahead|approval)\b/gi, '')
   )
+/** A tool call's argument, from its input as a transcript records it: JSON, or Claude Code's "name: value" lines. */
+const toolArg = (input, name) => {
+  try {
+    const v = JSON.parse(String(input ?? ''))?.[name]
+    if (v !== undefined) return String(v)
+  } catch {
+    // Not JSON: its "name: value" lines.
+  }
+  return new RegExp(`^${name}:\\s*(.*)$`, 'm').exec(String(input ?? ''))?.[1]?.trim()
+}
+/** A command line as a process's label or a pipeline's stage shows it, compared: no quotes, single spaces. */
+const commandWords = (s) => String(s ?? '').replace(/["']/g, '').replace(/\s+/g, ' ').trim()
+/**
+ * A shell command's commands and pipeline stages (split at `;`, `&&`, `||`, `&` and `|` outside quotes: a grep's
+ * `"FAIL|ERROR"` is one argument), each without its redirections (`2>/dev/null`, `>out`, `2>&1`, `<in`).
+ */
+const pipelineStages = (command) => {
+  const stages = ['']
+  let quote = null
+  const s = String(command ?? '')
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]
+    if (quote) {
+      if (ch === quote) quote = null
+      stages[stages.length - 1] += ch
+    } else if (ch === '"' || ch === "'") {
+      quote = ch
+      stages[stages.length - 1] += ch
+    } else if (ch === ';' || ch === '|' || (ch === '&' && s[i - 1] !== '>' && s[i + 1] !== '>')) {
+      // `||` and `&&` are one split; `2>&1` is a redirection, not a split.
+      if (s[i + 1] === ch) i++
+      stages.push('')
+    } else stages[stages.length - 1] += ch
+  }
+  return stages.map((stage) => commandWords(stage.replace(/\s*\d*>>?\s*(?:&\d+|\S+)|\s*<\s*\S+/g, ''))).filter(Boolean)
+}
+/**
+ * What Combwork listed as left running once the agent stopped (`o.leftovers`), split by whose it is (HI-2571, from
+ * HI-2570). A process is the CLI's only on the run's own evidence: a Monitor the agent started (its task id in the
+ * reply, its command in the call), a TaskStop of that same task that worked, and the process's command line being one
+ * stage of that Monitor's pipeline, its program the stage's own (Claude Code's stop on Windows leaves a Git Bash
+ * pipeline's tail and grep running: anthropics/claude-code#101012). Never by a program's name alone. Everything else is
+ * the agent's, and so is any process Combwork counted but didn't list (`more`): nothing shows whose it is.
+ */
+const leftoversByOwner = (o) => {
+  // Each TaskStop that worked, by the task its own reply says it stopped.
+  const stopped = new Set(
+    (o.tools ?? [])
+      .filter((t) => t.name === 'TaskStop' && !t.isError)
+      .map((t) => [toolArg(t.input, 'task_id'), String(t.result)])
+      .filter(([id, result]) => id && result.includes(`Successfully stopped task: ${id}`))
+      .map(([id]) => id)
+  )
+  const monitors = (o.tools ?? []).filter((t) => t.name === 'Monitor' && !t.isError).map((t) => ({ stopped: stopped.has(/\(task (\w+)/.exec(String(t.result))?.[1]), stages: pipelineStages(toolArg(t.input, 'command')) }))
+  const program = (s) => String(s).split(' ')[0].split(/[\\/]/).pop().replace(/\.exe$/i, '').toLowerCase()
+  const matches = (p, stages) => {
+    const label = commandWords(p.label)
+    const cut = label.endsWith('…')
+    const shown = cut ? label.slice(0, -1).trim() : label
+    return !!shown && stages.some((s) => (cut ? s.startsWith(shown) : s === shown) && program(s) === String(p.name ?? '').replace(/\.exe$/i, '').toLowerCase())
+  }
+  // Unambiguous only (HR2, HI-2571 round 1): a process that is also a stage of a Monitor never stopped (the same
+  // command started again, say) may be that one's, so it stays the agent's.
+  const isStage = (p) => monitors.some((m) => m.stopped && matches(p, m.stages)) && !monitors.some((m) => !m.stopped && matches(p, m.stages))
+  const all = (o.leftovers ?? []).flatMap((l) => l.processes ?? [])
+  return { cli: all.filter(isStage), agent: all.filter((p) => !isStage(p)), more: (o.leftovers ?? []).reduce((n, l) => n + (l.more ?? 0), 0) }
+}
 /** A question that names nothing itself ("Should I go ahead?", "OK?"): it asks about the sentence before it. */
 const BARE = /^(?:(?:should|shall|can|may) I (?:go ahead|proceed|do (?:it|that|so))|(?:is that |that )?(?:ok|okay|alright|fine)|go ahead|proceed)\s*\?$/i
 /**
@@ -2059,9 +2126,15 @@ module.exports.SCENARIOS = [
       ['ran the checks', testRuns(o).length > 0 || runs(o, 'checks.js').length > 0, o.tools.map((t) => t.name).join(',')],
       handedOnCheck(o, c, 'w'),
       ['said which check failed on the card', (o.cards.w?.comments ?? []).some((x) => /currency/i.test(x.text)), (o.cards.w?.comments ?? []).map((x) => x.text.slice(0, 120)).join(' | ')],
-      ['left nothing running once its card was in Review (Hive listed nothing as it stopped)', Array.isArray(o.leftovers) && o.leftovers.every((l) => !l.processes.length && !l.more), JSON.stringify(o.leftovers)],
+      // HI-2571: what Combwork listed, less a stopped Monitor's pipeline the CLI left (leftoversByOwner: by the run's own
+      // evidence). What was left is still recorded (o.leftovers, and the observation below).
+      ['left nothing running of its own once its card was in Review (Hive listed nothing else as it stopped)', Array.isArray(o.leftovers) && !leftoversByOwner(o).agent.length && !leftoversByOwner(o).more, JSON.stringify({ agent: leftoversByOwner(o).agent, more: leftoversByOwner(o).more })],
+      // Combwork's handling of what it listed: its End Them ended each process (by id and start time), the CLI's too.
+      ["Combwork's End Them ended what it listed (nothing listed still runs)", !(o.leftovers ?? []).some((l) => l.processes?.length || l.more) || (typeof o.leftoversEnded === 'number' && Array.isArray(o.leftoversStillRunning) && !o.leftoversStillRunning.length), JSON.stringify({ ended: o.leftoversEnded, still: o.leftoversStillRunning })],
       ['changed no files (nothing uncommitted, and no commit)', o.gitStatus.trim() === '' && c.git('rev-parse', 'HEAD').trim() === c.head, `${o.gitStatus}; ${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`]
     ],
+    // What the CLI left of a Monitor the agent stopped (HI-2570: Claude Code on Windows): recorded, never its failure.
+    observe: (o) => [["the CLI left a stopped Monitor's pipeline running (Combwork listed it)", leftoversByOwner(o).cli.length > 0, JSON.stringify(leftoversByOwner(o).cli.map((p) => [p.name, p.label]))]],
     fakeSkips: ['ran the checks', 'said which check failed on the card']
   },
   {
@@ -5412,4 +5485,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, relaysOk, laneRunsOn, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
