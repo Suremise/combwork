@@ -464,7 +464,7 @@ const prose = (seed, n) => {
   const consoleOne = measure('cw_console (an event in full)', tool('cw_console', { agent: 'Coder', seq: [promptSeq] }), 3000)
   check('…one in full: the raw hook and what Combwork made of it, its prompt still hidden', consoleOne.includes('"raw"') && consoleOne.includes('"made"') && /"prompt":"<text: \d+ chars>"/.test(consoleOne), consoleOne)
   const consoleList = measure('cw_console (sources, as the Assistant)', tool('cw_console', { action: 'sources' }, 'assistant'), 1200)
-  check('the sources: a line each, with how to name it', /^alpha · Coder \(claude-code\): captured, \d+ events \[agent="a-[\w-]+" project="alpha"\]$/m.test(consoleList) && /^Combwork: not captured \[source="hive"\]$/m.test(consoleList), consoleList)
+  check('the sources: a line each, with how to name it', /^alpha · Coder \(claude-code\): captured, \d+ events \[agent="a-[\w-]+" project="alpha"\]$/m.test(consoleList) && /^Combwork: not captured \[source="combwork"\]$/m.test(consoleList), consoleList)
   // On a connection of its own (agent: false): after the slow tool calls above, fetch's kept-alive socket can be the one
   // Combwork's server is closing for idleness, which reset this request once under load.
   const sourcePage = await new Promise((resolve, reject) => {
@@ -661,7 +661,7 @@ const prose = (seed, n) => {
   // Templates (HI-1502): a line per template; a plan and a load (Team 3×3 into gamma, which has no agents, one named) in
   // a few lines each; project agents aren't given the tool.
   const templateList = measure('cw_template (list)', tool('cw_template', { action: 'list', project: 'gamma' }, 'assistant'), 1200)
-  check('templates: a line each, with the scope and file to name it by', templateList.split('\n').some((l) => l.startsWith('Team 3×3 (scope hive, file team-3x3.json): 6 agents')), templateList)
+  check('templates: a line each, with the scope and file to name it by', templateList.split('\n').some((l) => l.startsWith('Team 3×3 (scope combwork, file team-3x3.json): 6 agents')), templateList)
   const templatePlan = measure('cw_template (plan)', tool('cw_template', { action: 'plan', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
   check('…a plan: who comes, the name given beside its own', /^"Team 3×3" into gamma: removes no agents; creates Gamma lead \([A-Z]+-B1\) builder with [A-Z]+-R1/.test(templatePlan), templatePlan)
   const templateLoaded = measure('cw_template (load)', tool('cw_template', { action: 'load', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
