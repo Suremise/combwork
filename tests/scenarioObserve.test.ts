@@ -2194,3 +2194,68 @@ describe("assistant-doing-nobody checks each batch by its own reply (HI-2238, HR
     expect(check([batch('No card changed.'), batch(refusedRow('AL-2'), ['AL-9'])], [{ name: 'cw_update_tasks', result: refusedRow('AL-2') }])).toBe(false)
   })
 })
+
+describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, by the run's own evidence (HI-2571)", () => {
+  type Proc = { pid: number; name: string; label: string; created: string; parent: number }
+  const h = helpers as unknown as { leftoversByOwner: (o: unknown) => { cli: Proc[]; agent: Proc[]; more: number } }
+  const scenario = SCENARIOS.find((s) => s.id === 'watcher-stopped') as unknown as { expect: (o: unknown, c: unknown) => [string, boolean, string?][]; observe: (o: unknown) => [string, boolean, string?][] }
+  // Sonnet 5.5's second run (2026-11-05T10-06-20-claude-code): the Monitor, its TaskStop, and what Combwork listed.
+  const COMMAND = 'touch checks.log; tail -n +1 -F checks.log 2>/dev/null | grep --line-buffered -E "FAIL|ERROR|DONE|PASS|passed|failed|complete"'
+  const monitor = (id = 'b4jl1w9p0', command = COMMAND) => ({ name: 'Monitor', input: `command: ${command}\ndescription: FAIL lines and completion in checks.log\ntimeout_ms: 180000`, isError: false, result: `Monitor started (task ${id}, expires in 3m unless the source ends first; you get one notice at expiry — re-arm if you still need the watch).` })
+  const taskStop = (id = 'b4jl1w9p0', ok = true) => ({ name: 'TaskStop', input: `task_id: ${id}`, isError: !ok, result: ok ? JSON.stringify({ message: `Successfully stopped task: ${id} (${COMMAND})`, task_id: id, task_type: 'local_bash', command: COMMAND }) : 'No task found' })
+  const tail = { pid: 126080, name: 'tail.exe', label: 'tail -n +1 -F checks.log', created: '134383469320616428', parent: 38292 }
+  const grep = { pid: 40376, name: 'grep.exe', label: 'grep --line-buffered -E FAIL|ERROR|DONE|PASS|passed|failed|complete', created: '134383469320700319', parent: 191456 }
+  // A later command of its own (its `until … done &` loop): Claude Code's bash wrapper, its label cut.
+  const loop = { pid: 178324, name: 'bash.exe', label: 'bash -c "source /c/Users/Darren/AppData/Local/hive-test/claude/shell-snapshots/…', created: '134383469784723750', parent: 62048 }
+  const run = (tools: unknown[], processes: Proc[], more = 0, extra: object = {}) => ({ tools, leftovers: [{ projectPath: 'C:\w\alpha', agentId: 'a-1', agentName: 'Coder', processes, more }], ...extra })
+
+  it('credits the CLI with tail and grep only when the agent stopped that Monitor (TaskStop worked) and they are its stages', () => {
+    const o = h.leftoversByOwner(run([monitor(), taskStop()], [grep, tail]))
+    expect(o.cli.map((p) => p.pid).sort((a, b) => a - b)).toEqual([40376, 126080])
+    expect(o.agent).toEqual([])
+    expect(o.more).toBe(0)
+  })
+
+  it("keeps the agent's own leftovers its own, and what Combwork counted but didn't list: Sonnet's second run still fails", () => {
+    const o = h.leftoversByOwner(run([monitor(), taskStop()], [grep, tail, loop], 1))
+    expect(o.cli.map((p) => p.name).sort()).toEqual(['grep.exe', 'tail.exe'])
+    expect(o.agent.map((p) => p.pid)).toEqual([178324])
+    expect(o.more).toBe(1)
+  })
+
+  it('credits nothing without the evidence: no TaskStop, a failed one, another task stopped, or a process that is no stage of it', () => {
+    // Sonnet's first run: the Monitor, never stopped (its expiry isn't a stop).
+    expect(h.leftoversByOwner(run([monitor()], [grep, tail])).agent.length).toBe(2)
+    expect(h.leftoversByOwner(run([monitor(), taskStop('b4jl1w9p0', false)], [grep, tail])).agent.length).toBe(2)
+    expect(h.leftoversByOwner(run([monitor(), monitor('bother1', 'tail -f other.log | grep x'), taskStop('bother1')], [grep, tail])).agent.length).toBe(2)
+    // Never by a program's name: a grep or tail on other arguments, or a stage's words run by another program.
+    const otherGrep = { ...grep, pid: 1, label: 'grep --line-buffered -E FAIL' }
+    const otherTail = { ...tail, pid: 2, label: 'tail -f checks.log' }
+    const renamed = { ...tail, pid: 3, name: 'node.exe' }
+    expect(h.leftoversByOwner(run([monitor(), taskStop()], [otherGrep, otherTail, renamed])).cli).toEqual([])
+    // The Monitor's tool call failed: no task was started.
+    expect(h.leftoversByOwner(run([{ ...monitor(), isError: true }, taskStop()], [grep, tail])).cli).toEqual([])
+  })
+
+  it("the scenario's checks: passes the agent that stopped its Monitor, fails one that didn't, and records what the CLI left", () => {
+    const c = { cards: { w: 1 }, agents: { coder: { id: 'a-1' } }, head: 'h', git: () => 'h' }
+    const card = { column: 'done', history: [{ what: 'Moved to Done' }], comments: [] }
+    const base = { skillsRead: [], hiveCalls: [], gitStatus: '', cards: { w: card }, facts: {} }
+    const checks = (o: object) => Object.fromEntries(scenario.expect({ ...base, ...o }, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
+    const OWN = 'left nothing running of its own once its card was in Review'
+    const ENDED = "Combwork's End Them ended what it listed"
+    const ended = { leftoversEnded: 2, leftoversStillRunning: [] }
+    const stoppedIt = run([monitor(), taskStop()], [grep, tail], 0, ended)
+    expect(checks(stoppedIt)).toMatchObject({ [OWN]: true, [ENDED]: true })
+    expect(checks(run([monitor()], [grep, tail], 0, ended))[OWN]).toBe(false)
+    expect(checks(run([monitor(), taskStop()], [grep, tail, loop], 1, ended))[OWN]).toBe(false)
+    // Cleanup still verified: what Combwork listed and didn't end fails, the CLI's included.
+    expect(checks(run([monitor(), taskStop()], [grep, tail], 0, { leftoversEnded: 2, leftoversStillRunning: [{ pid: 40376, started: 1 }] }))[ENDED]).toBe(false)
+    expect(checks(run([monitor(), taskStop()], [grep, tail], 0, { leftoversEnded: 'failed: no such run', leftoversStillRunning: [] }))[ENDED]).toBe(false)
+    // Nothing left: nothing to end.
+    expect(checks(run([], [])) ).toMatchObject({ [OWN]: true, [ENDED]: true })
+    // What the CLI left stays visible: an observation, never a failure.
+    expect(scenario.observe(stoppedIt)[0][1]).toBe(true)
+    expect(scenario.observe(run([], []))[0][1]).toBe(false)
+  })
+})

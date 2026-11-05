@@ -1088,6 +1088,17 @@ async function runScenario(sc, providerKey, opts = {}) {
       await inv('session:stop', host, agentId)
       await lib.until(async () => !(await live()), HUNG_MS)
       observed.leftovers = ((await inv('session:leftovers', true)) ?? []).filter((l) => l.projectPath.toLowerCase() === host.toLowerCase() && l.agentId === agentId)
+      // HI-2571: Combwork's handling of what it listed, checked: its End Them (as the notice's), then each listed process
+      // looked for again by its id and start time. Bounded at 30 s (a job's kill lands within a second or two).
+      if (observed.leftovers.some((l) => l.processes?.length || l.more)) {
+        observed.leftoversEnded = await inv('session:settleLeftovers', host, agentId, 'end').catch((e) => `failed: ${e?.message ?? e}`)
+        let still = []
+        await lib.until(async () => {
+          still = leftoverIdentities(processes(), observed.leftovers)
+          return !still.length
+        }, 30000)
+        observed.leftoversStillRunning = still
+      }
     }
     result.checks = (notTaken ? [] : (sc.expect?.(observed, ctx) ?? [])).map(([name, ok, detail]) =>
       p.fake && (typeof sc.fakeSkips === 'function' ? sc.fakeSkips(providerKey) : (sc.fakeSkips ?? [])).includes(name) ? { name, ok: null, skipped: 'fake provider' } : { name, ok: !!ok, ...(ok ? {} : { detail: String(detail ?? '').slice(0, 300) }) }
