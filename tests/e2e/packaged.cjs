@@ -61,7 +61,7 @@ const HUNG_MS = 10000
     return Buffer.from(await win.webContents.printToPDF({})).toString('base64')
   })
   w('doc.pdf', Buffer.from(pdf, 'base64'))
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Files' }).click()
@@ -75,7 +75,7 @@ const HUNG_MS = 10000
   check('md: heading rendered', (await pane.locator('.md-preview h1').innerText()) === 'Demo project')
   check('md: front matter hidden', !(await pane.locator('.md-preview').innerText()).includes('front matter'))
   check('md: code block coloured', (await pane.locator('.md-preview code[data-colorized]').count()) === 1)
-  check('md: relative image loads', await pane.locator('.md-preview img').first().evaluate((i) => i.src.startsWith('hive-img:') && i.complete && i.naturalWidth > 0))
+  check('md: relative image loads', await pane.locator('.md-preview img').first().evaluate((i) => i.src.startsWith('combwork-img:') && i.complete && i.naturalWidth > 0))
   check('md: table rendered', (await pane.locator('.md-preview table').count()) === 1)
   await page.screenshot({ path: path.join(shots, '1-md-preview.png') })
 

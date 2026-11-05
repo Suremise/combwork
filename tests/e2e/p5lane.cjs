@@ -354,7 +354,7 @@ const ancestor = (x, y) => {
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
     const msg1 = git(alpha, 'log', '-1', '--format=%B', 'main')
-    check("…Integrated by Combwork at the approved revision: a merge commit of One's line, Combwork's trailers", i1?.data?.by === 'hive' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Hive-Card: ${k1}`) && msg1.includes(`Hive-Revision: ${one.rev}`), JSON.stringify(i1))
+    check("…Integrated by Combwork at the approved revision: a merge commit of One's line, Combwork's trailers", i1?.data?.by === 'hive' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Combwork-Card: ${k1}`) && msg1.includes(`Combwork-Revision: ${one.rev}`), JSON.stringify(i1))
     const main1 = head()
     // HI-1990: nobody starts Two. Once One is Done and B1's turn is over, Combwork starts it on B1 as the lane's next card, and
     // B1 is given it in its slot; B1's own start then is that start (it raced Combwork's), with the same folder and line.
@@ -372,7 +372,7 @@ const ancestor = (x, y) => {
     check('Two merged: Done', await done(c2), JSON.stringify(await kinds(c2)))
     const [up] = await factsOf(c2, 'Updated')
     check('…brought up to date by the queue (strict): Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === two.rev, JSON.stringify(up))
-    check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
+    check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Combwork-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Combwork-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
     // The queue's update and merge leave the slot alone. Combwork starts Three about a second after Two is Done (HI-1990), its
     // line made in the slot: the slot may be exactly as Three's start prepared it by now (HR1's round 2: its own
     // SlotPrepared, on the lease Three was started with: that line checked out at that revision, nothing changed), and
@@ -429,7 +429,7 @@ const ancestor = (x, y) => {
 
     // --- Four: squash-merged by the queue; Five's line made from main with it.
     const four = await round(c4, 'four.txt')
-    check('Four squash-merged by the queue: Done, one commit on main with its trailers', (await done(c4)) && git(alpha, 'rev-list', '--parents', '-1', 'main').split(' ').length === 2 && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${four.rev}`), JSON.stringify(await kinds(c4)))
+    check('Four squash-merged by the queue: Done, one commit on main with its trailers', (await done(c4)) && git(alpha, 'rev-list', '--parents', '-1', 'main').split(' ').length === 2 && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Combwork-Revision: ${four.rev}`), JSON.stringify(await kinds(c4)))
     const main4 = head()
     const s5 = await start(c5)
     check("Five starts on a line of its own from main (Four's squash in), no branch moved", s5.s.status === 200 && s5.base === main4 && git(wt, 'rev-parse', 'HEAD') === main4 && s5.line !== s4.line && !(await kinds(c4)).includes('LineMoved'), JSON.stringify(s5))

@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 const logText = () => {
   try {
     return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')

@@ -21,7 +21,7 @@ export function applyLanguage(info: LanguageInfo): void {
 
 /** Before the first render: the language main chose, then each change of it. */
 export async function initLanguage(): Promise<void> {
-  window.hive.onEvent((e) => {
+  window.combwork.onEvent((e) => {
     if (e.type === 'language-changed') applyLanguage(e.language)
   })
   try {

@@ -105,7 +105,7 @@ const write = (file, text) => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   // The open's background work ended first (its "after opening" line): its pass adopting agents' 0.9 worktrees as slots
   // (#1441) among it. Tree's worktree, made while that pass ran, was adopted as slot "tree" instead of staying Tree's

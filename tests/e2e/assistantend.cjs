@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await live())?.status === 'ready', HUNG_MS)
   check('stopped for the narrow panel', await stopFromHeader())
   await inv('settings:update', { appearance: { theme: 'light' } }).catch(() => undefined)
-  await page.evaluate(() => window.hive.invoke('ui:setPane', 'assistant', 300))
+  await page.evaluate(() => window.combwork.invoke('ui:setPane', 'assistant', 300))
   await page.reload()
   await until(async () => (await header.count()) === 1, 10000)
   check('narrow: Resume is still in the header', !!(await until(async () => (await header.getByRole('button', { name: 'Resume', exact: true }).count()) === 1, 5000)), String((await header.boundingBox())?.width))
@@ -154,7 +154,7 @@ const check = (name, ok, extra = '') => {
   // --- Nothing it can resume: an Assistant now on Codex can't go back to a Claude Code conversation.
   await until(async () => (await live())?.status === 'ready', HUNG_MS)
   // Wide again, where Stop is a header button.
-  await page.evaluate(() => window.hive.invoke('ui:setPane', 'assistant', 430))
+  await page.evaluate(() => window.combwork.invoke('ui:setPane', 'assistant', 430))
   await page.reload()
   await until(async () => (await header.getByRole('button', { name: 'Stop', exact: true }).count()) === 1, 10000)
   // After a reload the panel shows its start page rather than the ended bar: stopped is what counts here.

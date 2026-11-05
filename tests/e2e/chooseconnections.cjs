@@ -32,7 +32,7 @@ const connectionOf = (id) => project().agents.find((a) => a.id === id)?.connecti
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const themed = async (theme) => {
       await inv('settings:update', { appearance: { theme } })

@@ -16,7 +16,7 @@ Its tools wrap this API. Use HTTP only for what they don't cover: a script, a te
 - Sessions started from Combwork have `CW_API_URL` and `CW_API_TOKEN_FILE` (a JSON file whose `token` is this agent's own token for this launch), not the token.
 - Read the token in the command that uses it; never print, log or write it into files or notes. In PowerShell: `$t = (Get-Content $env:CW_API_TOKEN_FILE | ConvertFrom-Json).token; Invoke-RestMethod "$env:CW_API_URL/v1/status" -Headers @{ Authorization = "Bearer $t" }`.
 - Never list the environment (`env`, `set`, `Get-ChildItem env:`): it holds a secret, `CW_HOOK_TOKEN`.
-- With several windows open, name the workspace with the `X-Hive-Workspace` header (its path, URL-encoded). An agent's own token always means its own workspace.
+- With several windows open, name the workspace with the `X-Combwork-Workspace` header (its path, URL-encoded). An agent's own token always means its workspace.
 
 ## Discover before you call
 

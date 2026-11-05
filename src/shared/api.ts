@@ -171,7 +171,7 @@ export type SettingsPatch = DeepPartial<AppSettings>
 
 /**
  * Every request the renderer can make of the main process.
- * The preload bridge exposes these as `window.hive.invoke(channel, ...args)`.
+ * The preload bridge exposes these as `window.combwork.invoke(channel, ...args)`.
  */
 export interface HiveRequests {
   'app:info': () => AppInfo
@@ -1143,7 +1143,7 @@ export interface HiveRequests {
 
 export type HiveChannel = keyof HiveRequests
 
-export interface HiveBridge {
+export interface CombworkBridge {
   invoke<C extends HiveChannel>(channel: C, ...args: Parameters<HiveRequests[C]>): Promise<ReturnType<HiveRequests[C]>>
   onEvent(listener: (event: HiveEvent) => void): () => void
   onPtyData(listener: (key: string, data: string) => void): () => void

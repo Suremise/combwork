@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
   await page.keyboard.press('Escape')
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click(); await lib.until(async () => /alpha/.test(await page.locator('.project-header h1').innerText().catch(() => '')), HUNG_MS)
   const tab = () => page.locator('.tabs .tab.active').innerText()

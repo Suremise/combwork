@@ -56,7 +56,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     // Every notice that reaches the window, kept: a toast goes from the screen after a while.
     await page.evaluate(() => {
       window.__toasts = []
-      window.hive.onEvent((e) => {
+      window.combwork.onEvent((e) => {
         if (e.type === 'toast') window.__toasts.push(e.toast)
       })
     })
@@ -69,12 +69,12 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     await pageB.waitForLoadState('domcontentloaded')
     await lib.appReady(pageB)
     pageB.on('pageerror', (e) => check('no page errors (B)', false, e.message))
-    const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await invB('workspace:open', wsB)
     await until(async () => (await invB('workspace:get'))?.path?.toLowerCase() === wsB.toLowerCase())
     await pageB.evaluate(() => {
       window.__toasts = []
-      window.hive.onEvent((e) => {
+      window.combwork.onEvent((e) => {
         if (e.type === 'toast') window.__toasts.push(e.toast)
       })
     })

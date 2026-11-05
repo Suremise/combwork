@@ -27,7 +27,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   // A price for the fake model, so the cost is Combwork's estimate: "≈ $…".
   await inv('settings:setProviderPrices', 'claude-code', { 'claude-fake': { input: 1000, cachedInput: 100, cacheWrite: 1000, output: 1000 } })
   await lib.openWorkspace(inv, page, ws)

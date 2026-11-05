@@ -1111,7 +1111,7 @@ export function Markdown({ source, className, onLink, cards, breaks, images }: {
   const clean = DOMPurify.sanitize(marked.parse(source, { async: false, ...(breaks ? { breaks: true } : {}) }) as string)
   const html = cards ? linkCards(clean, cards) : clean
   // Images the caller gives a source of its own once shown (HI-1700: a card's attachments, by a relative placeholder the
-  // sanitiser keeps; their hive-img: and blob: URLs it wouldn't).
+  // sanitiser keeps; their combwork-img: and blob: URLs it wouldn't).
   const ref = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (!images || !ref.current) return
@@ -1132,7 +1132,7 @@ export function Markdown({ source, className, onLink, cards, breaks, images }: {
         const card = /^hive-card:(\d+)$/.exec(href)
         if (card && cards) return cards.open(Number(card[1]))
         if (onLink?.(href)) return
-        if (/^https?:/.test(href)) void window.hive.invoke('app:openExternal', href)
+        if (/^https?:/.test(href)) void window.combwork.invoke('app:openExternal', href)
         else if (href.startsWith('#')) document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' })
       }}
       dangerouslySetInnerHTML={{ __html: html }}

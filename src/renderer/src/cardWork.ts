@@ -21,7 +21,7 @@ export function useCardWork(n: number | null): { view: WorkView | null; error: s
   const scope = `${ws}\n${n ?? ''}`
   const { data, error, at, load } = useScopedLoad<WorkView | null>(scope)
   useEffect(() => {
-    if (n !== null && ws) load(scope, () => window.hive.invoke('tasks:work', n))
+    if (n !== null && ws) load(scope, () => window.combwork.invoke('tasks:work', n))
   }, [scope, n, ws, reads, load, again])
   return { view: data, error, loaded: at > 0, retry: () => setAgain((x) => x + 1) }
 }
@@ -47,4 +47,4 @@ export function useWorkBadges(): Map<number, WorkBadge> {
 }
 
 /** The window's work badges (useWorkBadges). */
-export const badgeSource = makeBadgeSource(() => window.hive.invoke('tasks:workBadges'))
+export const badgeSource = makeBadgeSource(() => window.combwork.invoke('tasks:workBadges'))

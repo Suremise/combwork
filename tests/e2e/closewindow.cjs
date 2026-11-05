@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 
 ;(async () => {
   for (const d of [userData, wsA, wsB, path.dirname(wsDup1), path.dirname(wsDup2), claudeHome]) fs.rmSync(d, { recursive: true, force: true })

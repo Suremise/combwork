@@ -65,7 +65,7 @@ const cliFile = (sid) => path.join(claudeHome, 'projects', alpha.replace(/[^a-zA
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     const claude = await lib.addAgent(inv, alpha, { name: 'Claude' })

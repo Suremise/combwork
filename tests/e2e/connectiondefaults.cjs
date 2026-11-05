@@ -41,7 +41,7 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', '
   const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null
     const shots = async (name) => {

@@ -1,5 +1,5 @@
 // A card's text as the window shows it (HI-1700): its links to attachments (`attachment:<id>`, a draft's `draft-<k>`)
-// made into what Markdown can show. An image is shown inline (hive-img: for a stored one, a blob: preview for a draft),
+// made into what Markdown can show. An image is shown inline (combwork-img: for a stored one, a blob: preview for a draft),
 // any other file is a link the dialog opens (`#card-attachment-<id>`), and a link to one no longer on the card is a grey
 // "removed" chip, never a broken image. Apart from the dialog so a unit test can read it.
 import { msg, tr } from '../../shared/i18n'
@@ -27,7 +27,7 @@ export function withAttachmentUrls(text: string, lookup: AttachmentLookup): stri
   return text.replace(LINK, (_all, _bang: string, label: string, id: string) => {
     const a = lookup(id)
     if (!a) return `<span class="attachment-gone">${escapeHtml(tr(REMOVED, { name: label.replace(/\\(.)/g, '$1') }))}</span>` // i18n-ignore: markup around a message
-    // A relative source (the sanitiser keeps it), given its URL once shown (Markdown's `images`): hive-img: and blob:
+    // A relative source (the sanitiser keeps it), given its URL once shown (Markdown's `images`): combwork-img: and blob:
     // aren't sources the sanitiser lets through.
     // A link around it: a click opens it (the dialog's onLink).
     if (a.kind === 'image' && a.url) return `[![${label}](${ATTACHMENT_IMAGE}${id})](${ATTACHMENT_ANCHOR}${id})`

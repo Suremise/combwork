@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1200, height: 750 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const settings = await inv('settings:get')
   check('background sessions are off by default', settings.providers['claude-code'].allowBackgroundSessions === false)

@@ -39,7 +39,7 @@ const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     // HI-2126: the opening adopts Builder's worktree as its carried slot after the window shows the workspace; a card
     // started before that is started as 0.9 did (an agent not migrated yet works in its worktree), so wait for it.

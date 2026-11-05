@@ -1429,7 +1429,7 @@
   },
   "workflow.refused.submit.trailer.message": {
     "defaultMessage": "{card}: commit {commit} has no card trailer, and another card's agent works in this folder.",
-    "description": "A refused submit in a shared folder: a commit lacks the Hive-Card trailer. {commit} is a short commit id."
+    "description": "A refused submit in a shared folder: a commit lacks the Combwork-Card trailer. {commit} is a short commit id."
   },
   "workflow.refused.submit.trailer.next": {
     "defaultMessage": "{at, select, head {Run {command}, then submit again.} other {Other commits follow it, so amending or rebasing would rewrite them, other agents' work among them: do neither. Report it with cw_cannot_within_rules (rule submit.trailer), and the user decides.}}",
@@ -1953,7 +1953,7 @@
   },
   "workflow.value.commitMessage.hive": {
     "defaultMessage": "Combwork’s: the card’s key and title, with trailers",
-    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end."
+    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Combwork’s trailers (Combwork-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end."
   },
   "workflow.value.finish.agentMerges": {
     "defaultMessage": "The agent merges, Combwork checks",

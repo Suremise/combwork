@@ -209,8 +209,8 @@ function registerDevAppId(): void {
   execFile('reg', ['add', key, '/v', 'IconUri', '/d', icon, '/f'], { windowsHide: true }, () => undefined)
 }
 
-// hive-img://img/<encoded absolute path> serves images inside the workspace to the renderer (Attachments tab thumbnails, image and PDF previews).
-protocol.registerSchemesAsPrivileged([{ scheme: 'hive-img', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
+// combwork-img://img/<encoded absolute path> serves images inside the workspace to the renderer (Attachments tab thumbnails, image and PDF previews).
+protocol.registerSchemesAsPrivileged([{ scheme: 'combwork-img', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
 /** A script a plain Node process runs (cw-mcp.js, cw-progress.js): unpacked from the asar (electron-builder.yml). */
 function unpackedScript(name: string): string {
@@ -973,7 +973,7 @@ app.whenReady().then(async () => {
   flightRecorder.start((source) => sessions.flightAgent(source))
   session.defaultSession.setPermissionRequestHandler((_wc, permission, done) => done(ALLOWED_PERMISSIONS.has(permission)))
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => ALLOWED_PERMISSIONS.has(permission))
-  protocol.handle('hive-img', async (req) => {
+  protocol.handle('combwork-img', async (req) => {
     let p = resolve(decodeURIComponent(new URL(req.url).pathname.slice(1)))
     if (!SERVABLE_EXT.test(p) || insideArchive(p) || !workspace.isAllowedPath(p)) return new Response('Not found', { status: 404 }) // i18n-ignore: an HTTP reply to the window, never shown
     // Read with original-fs, never Electron's file: loader, which would open an archive on the path and keep it (#246, #261).

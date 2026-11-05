@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = async (fn, ms = 10000) => {
     const t = Date.now()
@@ -122,7 +122,7 @@ const check = (name, ok, extra = '') => {
   page2.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(again, page2, { width: 1400, height: 850 })
   await lib.appReady(page2)
-  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv2, page2, ws)
   await page2.getByText('alpha', { exact: true }).first().click()
   const started = await inv2('session:start', alpha, { agentId: agent.id, prompt: 'Work on card #12' }).then(() => '', (e) => String(e?.message ?? e))

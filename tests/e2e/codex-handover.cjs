@@ -37,7 +37,7 @@ const check = (name, ok, extra = '') => {
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await sleep(500)
