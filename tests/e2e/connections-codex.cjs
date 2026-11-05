@@ -93,7 +93,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     const trustOf = async (id) => (await view(id))?.trust ?? null
     check("with Hive's per-launch trust on (the default), a Codex connection on here needs no trust answer", !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
     await inv('advanced:set', 'codex.trust.perLaunch', false)
-    check("off, it needs its trust of the project's repository root", !!(await lib.until(async () => JSON.stringify((await trustOf(work.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: root }]), HUNG_MS)) && (await view(work.id))?.setUp === true)
+    check("off, it needs its trust of the project's repository root", !!(await lib.until(async () => JSON.stringify((await trustOf(work.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: root, git: true }]), HUNG_MS)) && (await view(work.id))?.setUp === true, JSON.stringify(await trustOf(work.id)))
     const { key, in: opened } = await inv('connections:setUp', work.id)
     const workToml = path.join(accountsRoot, work.id, 'config.toml')
     check('…its Set Up runs Codex in that folder, where its trust is answered (the fake records it)', !!(await lib.until(async () => fs.existsSync(workToml) && fs.readFileSync(workToml, 'utf8').includes(`[projects.'${root}']`), HUNG_MS)))
