@@ -73,7 +73,7 @@ function scan() {
     if (dump.trim()) scanText(t, 'registry', k, dump)
   }
   // Any key under Classes naming Combwork (a protocol, a file type), whole.
-  for (const k of new Set(run('reg.exe', ['query', 'HKCU\\Software\\Classes', '/f', 'combwork', '/k']).split(/\r?\n/).filter((l) => /^HKEY_/.test(l)).map((l) => l.trim()))) scanText(t, 'registry', k, run('reg.exe', ['query', k, '/s']))
+  for (const k of new Set(run('reg.exe', ['query', 'HKCU\\Software\\Classes', '/f', 'combwork', '/k']).split(/\r?\n/).filter((l) => l.startsWith('HKEY_')).map((l) => l.trim()))) scanText(t, 'registry', k, run('reg.exe', ['query', k, '/s']))
   scanText(t, 'registry', 'the app\'s AppUserModelID', AUMID)
   let before = null
   try { before = fs.readFileSync(out('reg-before.txt'), 'utf8') } catch { /* below */ }

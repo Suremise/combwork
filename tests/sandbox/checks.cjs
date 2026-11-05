@@ -86,7 +86,8 @@ function gitRoot(opt) {
   let found = ''
   try { found = execFileSync('where.exe', ['git'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 }).split(/\r?\n/)[0].trim() } catch { /* none */ }
   // git.exe is in <root>\cmd (or <root>\bin, <root>\mingw64\bin): the root is the folder above it holding cmd\git.exe.
-  for (let d = path.dirname(found); found && d !== path.dirname(d); d = path.dirname(d)) if (ok(d)) return d
+  if (!found) return null
+  for (let d = path.dirname(found); d !== path.dirname(d); d = path.dirname(d)) if (ok(d)) return d
   return null
 }
 const isInside = (child, parent) => { const r = path.relative(parent, child); return !!r && !r.startsWith('..') && !path.isAbsolute(r) }

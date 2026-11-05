@@ -51,7 +51,7 @@ function hiveHits(text) {
 
 /** The line holding s[at, at+len), at most 80 characters each side of it, control characters as dots. */
 function lineAround(s, at, len) {
-  let a = s.lastIndexOf('\n', at) + 1
+  const a = s.lastIndexOf('\n', at) + 1
   let b = s.indexOf('\n', at + len)
   if (b < 0) b = s.length
   const from = Math.max(a, at - 80)
@@ -177,7 +177,7 @@ function regEntries(text) {
   const out = []
   let key = null
   for (const raw of String(text ?? '').split(/\r?\n/)) {
-    if (/^HKEY_/.test(raw)) {
+    if (raw.startsWith('HKEY_')) {
       key = raw.trim()
       out.push(key)
       continue
