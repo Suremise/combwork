@@ -17,16 +17,49 @@ const OLD_NAME = 'hive-test'
 /** In the test area while a move is unfinished (written in the old folder before the rename, so it moves with it). */
 const MARKER = '.move-in-progress.json'
 
+/**
+ * Only its absence (ENOENT; ENOTDIR, a parent that is a file) answers "not there", as src/main/fsPresence.ts does for
+ * the app's upgrade (which these plain scripts can't load): any other error (access denied, a file held) is thrown, so
+ * the guard and the move refuse rather than take a folder they couldn't look at for one that isn't there.
+ */
+const absent = (e) => e?.code === 'ENOENT' || e?.code === 'ENOTDIR'
+
+/** Whether a path is there; throws on anything but its absence. */
+function present(p) {
+  try {
+    fs.statSync(p)
+    return true
+  } catch (e) {
+    if (absent(e)) return false
+    throw e
+  }
+}
+
 /** The test area and its old folder, in env's LOCALAPPDATA (the temp folder where it is unset, off Windows). */
 function areas(env = process.env) {
   const local = env.LOCALAPPDATA || os.tmpdir()
   return { area: path.join(local, NAME), old: path.join(local, OLD_NAME) }
 }
 
-/** Why a test run can't use the test area yet, or null when it can. Reads nothing in the old folder: it only looks for it. */
+/**
+ * Why a test run can't use the test area yet, or null when it can. Reads nothing in the old folder: it only looks for it.
+ * A folder or marker it can't look at is a reason too (HR1, HI-2590 round 1): never taken for one that isn't there.
+ */
 function notReady({ area, old } = areas()) {
-  if (fs.existsSync(path.join(area, MARKER))) return `The test area's move to ${area} is unfinished: run npm run test:move-area again (HI-2590).`
-  if (fs.existsSync(old) && !fs.existsSync(area)) return `The test area is still at ${old}: move it first with npm run test:move-area (HI-2590), while no test runs.`
+  const there = (p) => {
+    try {
+      return present(p)
+    } catch (e) {
+      return { error: e.code || e.message }
+    }
+  }
+  const marker = there(path.join(area, MARKER))
+  if (marker.error) return `Couldn't look for the test area's move marker in ${area} (${marker.error}): fix its access, then run again (HI-2590).`
+  if (marker) return `The test area's move to ${area} is unfinished: run npm run test:move-area again (HI-2590).`
+  const o = there(old)
+  const a = there(area)
+  for (const [p, r] of [[old, o], [area, a]]) if (r.error) return `Couldn't look at ${p} (${r.error}): fix its access, then run again; the test area's move (npm run test:move-area, HI-2590) needs to see both folders.`
+  if (o && !a) return `The test area is still at ${old}: move it first with npm run test:move-area (HI-2590), while no test runs.`
   return null
 }
 
@@ -36,4 +69,4 @@ function assertReady(dirs) {
   if (why) throw new Error(why)
 }
 
-module.exports = { NAME, OLD_NAME, MARKER, areas, notReady, assertReady }
+module.exports = { NAME, OLD_NAME, MARKER, absent, present, areas, notReady, assertReady }

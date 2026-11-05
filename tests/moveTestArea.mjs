@@ -21,14 +21,14 @@
 // --from and --to move another folder (a copy, to prove the move on); the rewrites then also replace the real old
 // folder's path, which the copy's files name.
 import { spawnSync } from 'child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { dirname, isAbsolute, join, relative, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { claimHeld } from './e2e/lanes.mjs'
 
 const require = createRequire(import.meta.url)
-const { NAME, OLD_NAME, MARKER, areas } = require('./testArea.cjs')
+const { NAME, OLD_NAME, MARKER, absent, present, areas } = require('./testArea.cjs')
 
 /** The files under the test area that name its folders by absolute path, and must name the new one after the move. */
 export const REWRITES = ['claude/.claude.json', 'claude/plugins/known_marketplaces.json', 'codex/config.toml']
@@ -58,27 +58,67 @@ export function rewriteText(text, froms, to) {
   return { text, count }
 }
 
-/** The live claims in root's claim folders: [{ file, pid, what }]. */
-export function liveClaims(root, alive) {
+/** A folder in a claim folder this new, with no claim in it yet, is a claim being made (build.mjs's and lanes.mjs's locks: their 30 s). */
+export const CLAIM_MAKING_MS = 30_000
+
+/**
+ * The claims in root's claim folders that keep the area busy: [{ file, pid, what }]. Fails closed (HR1, HI-2590 round
+ * 1): only a claim folder or file that isn't there (gone between listing and reading: released) counts as no claim. A
+ * claim it can't read, or that isn't whole JSON (being written: claims aren't written atomically; or broken), and a lock
+ * folder just made with its claim not written yet, keep it busy too, as does a claim held by a live process; listing a
+ * claim folder failing otherwise throws.
+ */
+export function liveClaims(root, alive, now = Date.now()) {
   const out = []
+  const busy = (file, what, pid = null) => out.push({ file: relative(root, file), pid, what })
   for (const d of CLAIM_DIRS) {
     const dir = join(root, d)
     let names = []
     try {
       names = readdirSync(dir, { recursive: true })
-    } catch {
-      continue
+    } catch (e) {
+      if (absent(e)) continue
+      throw e
     }
     for (const n of names) {
       const file = join(dir, String(n))
-      if (!file.endsWith('.json')) continue
-      let claim
+      let st
       try {
-        claim = JSON.parse(readFileSync(file, 'utf8'))
-      } catch {
+        st = statSync(file)
+      } catch (e) {
+        if (absent(e)) continue
+        busy(file, `couldn't look at it (${e.code || e.message})`)
         continue
       }
-      if (claimHeld(claim, alive)) out.push({ file: relative(root, file), pid: claim.pid, what: claim.what || claim.root || '' })
+      if (st.isDirectory()) {
+        let inside = []
+        try {
+          inside = readdirSync(file)
+        } catch (e) {
+          if (absent(e)) continue
+          busy(file, `couldn't list it (${e.code || e.message})`)
+          continue
+        }
+        if (!inside.some((x) => x.endsWith('.json')) && now - st.mtimeMs < CLAIM_MAKING_MS) busy(file, 'a claim being made')
+        continue
+      }
+      if (!file.endsWith('.json')) continue
+      let text
+      try {
+        text = readFileSync(file, 'utf8')
+      } catch (e) {
+        if (absent(e)) continue
+        busy(file, `couldn't read it (${e.code || e.message})`)
+        continue
+      }
+      let claim
+      try {
+        claim = JSON.parse(text)
+      } catch {
+        busy(file, 'not a whole claim: being written, or broken (look at it)')
+        continue
+      }
+      if (claimHeld(claim, alive)) busy(file, claim.what || claim.root || '', claim.pid)
     }
   }
   return out
@@ -90,21 +130,29 @@ export function moveState(from, to) {
     try {
       return JSON.parse(readFileSync(join(dir, MARKER), 'utf8'))
     } catch (e) {
-      return e.code === 'ENOENT' ? null : { unreadable: e.message }
+      return absent(e) ? null : { unreadable: e.code || e.message }
     }
   }
   const same = (m) => m && resolve(m.from ?? '').toLowerCase() === resolve(from).toLowerCase() && resolve(m.to ?? '').toLowerCase() === resolve(to).toLowerCase()
-  const fromThere = existsSync(from)
-  const toThere = existsSync(to)
+  let fromThere, toThere
+  try {
+    fromThere = present(from)
+    toThere = present(to)
+  } catch (e) {
+    return { state: 'refuse', why: `couldn't look at ${e.path ?? 'a folder'} (${e.code || e.message}): fix its access first.` }
+  }
   if (toThere) {
     const m = marker(to)
+    if (m?.unreadable) return { state: 'refuse', why: `couldn't read the move marker in ${to} (${m.unreadable}): fix its access first.` }
     if (m && same(m) && !fromThere) return { state: 'resume', marker: m }
     if (m) return { state: 'refuse', why: `${to} holds a move marker for other folders, or the old folder is back too (${JSON.stringify(m)}): look at both before going on.` }
     if (fromThere) return { state: 'refuse', why: `both ${from} and ${to} are there: a checkout older than the move (HI-2590) has made the old one again. Look at what is in it; nothing is moved.` }
     return { state: 'done', why: `the test area is at ${to} already: nothing to move.` }
   }
   if (!fromThere) return { state: 'refuse', why: `there is no ${from} to move.` }
-  return marker(from) ? { state: 'restart' } : { state: 'fresh' }
+  const m = marker(from)
+  if (m?.unreadable) return { state: 'refuse', why: `couldn't read the move marker in ${from} (${m.unreadable}): fix its access first.` }
+  return m ? { state: 'restart' } : { state: 'fresh' }
 }
 
 /** The rewrites in to, resumable: each file's backup is written once, each write is atomic. Returns [{ file, count }]. */
@@ -112,13 +160,13 @@ export function rewriteAll(to, { froms, backup, failAfter = Infinity, say = () =
   const done = []
   for (const rel of REWRITES) {
     const file = join(to, rel)
-    if (!existsSync(file)) {
+    if (!present(file)) {
       done.push({ file: rel, count: 0, missing: true })
       continue
     }
     const before = readFileSync(file, 'utf8')
     const kept = join(backup, rel)
-    if (!existsSync(kept)) {
+    if (!present(kept)) {
       mkdirSync(dirname(kept), { recursive: true })
       writeFileSync(kept, before)
     }
@@ -134,7 +182,7 @@ export function rewriteAll(to, { froms, backup, failAfter = Infinity, say = () =
   }
   for (const rel of REWRITES) {
     const file = join(to, rel)
-    if (existsSync(file) && rewriteText(readFileSync(file, 'utf8'), froms, to).count) throw new Error(`${rel} still names the old folder after its rewrite`)
+    if (present(file) && rewriteText(readFileSync(file, 'utf8'), froms, to).count) throw new Error(`${rel} still names the old folder after its rewrite`)
   }
   return done
 }
@@ -154,7 +202,7 @@ export function moveArea(from, to, { froms = [from], running = [], alive = () =>
   const holder = st.state === 'resume' ? to : from
   const claims = liveClaims(holder, alive)
   if (claims.length || running.length) {
-    const lines = [...claims.map((c) => `  a runner's claim ${c.file} (process ${c.pid}${c.what ? `, ${c.what}` : ''})`), ...running.map((p) => `  process ${p.pid}: ${p.commandLine}`)]
+    const lines = [...claims.map((c) => `  a runner's claim ${c.file} (${c.pid == null ? c.what : `process ${c.pid}${c.what ? `, ${c.what}` : ''}`})`),...running.map((p) => `  process ${p.pid}: ${p.commandLine}`)]
     throw new Error(`Not moved: tests are using ${holder}. Wait for them to end (nothing is stopped here):\n${lines.join('\n')}`)
   }
   if (dryRun) {

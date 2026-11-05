@@ -5,19 +5,22 @@ import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types
-import { moveArea, moveState, rewriteText, REWRITES } from './moveTestArea.mjs'
+import { CLAIM_MAKING_MS, liveClaims, moveArea, moveState, rewriteText, REWRITES } from './moveTestArea.mjs'
 import { tempDir } from './tempDir'
 
 const require = createRequire(import.meta.url)
-const { MARKER, NAME, OLD_NAME, areas, notReady } = require('./testArea.cjs') as {
+const { MARKER, NAME, OLD_NAME, areas, notReady, present } = require('./testArea.cjs') as {
   MARKER: string
   NAME: string
   OLD_NAME: string
   areas: (env?: NodeJS.ProcessEnv) => { area: string; old: string }
   notReady: (dirs?: { area: string; old: string }) => string | null
+  present: (p: string) => boolean
 }
+/** The fs testArea.cjs's present() calls (CommonJS: a spy on it is seen there). */
+const cjsFs = require('fs') as typeof import('fs')
 const { baseEnv } = require('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 const root = join(__dirname, '..')
 
@@ -123,6 +126,51 @@ describe("the test area's move (HI-2590)", () => {
     expect(() => moveArea(from, to)).toThrow(/both .* are there/)
     writeFileSync(join(to, MARKER), JSON.stringify({ from: 'C:\\other', to }))
     expect(() => moveArea(from, to)).toThrow(/marker for other folders/)
+  })
+
+  it('fails closed on claims (HR1, round 1): one half written or broken, and a lock folder just made, keep the area busy; released or old empty ones do not', () => {
+    const { from } = oldArea()
+    const now = Date.now()
+    expect(liveClaims(from, () => false, now)).toEqual([])
+    mkdirSync(join(from, 'e2e-lanes'))
+    writeFileSync(join(from, 'e2e-lanes', 'lane-1.json'), '{"pid": 42')
+    mkdirSync(join(from, 'build-locks', 'slot-x'), { recursive: true })
+    const found = liveClaims(from, () => false, now)
+    expect(found.map((c: { file: string; what: string }) => [c.file, c.what])).toEqual([
+      [join('e2e-lanes', 'lane-1.json'), 'not a whole claim: being written, or broken (look at it)'],
+      [join('build-locks', 'slot-x'), 'a claim being made']
+    ])
+    expect(() => moveArea(from, join(from, '..', NAME))).toThrow(/lane-1\.json \(not a whole claim[\s\S]*slot-x \(a claim being made\)/)
+    // The same folder half a minute on, its maker gone: a leftover, not a claim.
+    expect(liveClaims(from, () => false, now + CLAIM_MAKING_MS + 1_000).map((c: { file: string }) => c.file)).toEqual([join('e2e-lanes', 'lane-1.json')])
+    writeFileSync(join(from, 'e2e-lanes', 'lane-1.json'), JSON.stringify({ pid: 42, at: now }))
+    expect(liveClaims(from, () => false, now + CLAIM_MAKING_MS + 1_000)).toEqual([])
+  })
+
+  it("a folder or marker it can't look at refuses the move and the guard (HR1, round 1): only its absence is \"not there\"", () => {
+    const { local, from, to } = oldArea()
+    const denied = (p: unknown): never => {
+      throw Object.assign(new Error(`EPERM: operation not permitted, stat '${String(p)}'`), { code: 'EPERM', path: String(p) })
+    }
+    const realStat = cjsFs.statSync
+    const deny = (match: (p: string) => boolean): void => {
+      vi.spyOn(cjsFs, 'statSync').mockImplementation(((p: string, o?: unknown) => (match(String(p)) ? denied(p) : realStat(p, o as undefined))) as typeof cjsFs.statSync)
+    }
+    try {
+      deny((p) => p === from)
+      expect(moveState(from, to)).toMatchObject({ state: 'refuse', why: expect.stringMatching(/couldn't look at .*hive-test \(EPERM\)/) })
+      expect(() => moveArea(from, to)).toThrow(/Not moved: couldn't look at/)
+      expect(notReady({ area: to, old: from })).toMatch(/Couldn't look at .*hive-test \(EPERM\)/)
+      vi.restoreAllMocks()
+      deny((p) => p.endsWith(MARKER))
+      expect(notReady({ area: to, old: from })).toMatch(/Couldn't look for the test area's move marker .*\(EPERM\)/)
+    } finally {
+      vi.restoreAllMocks()
+    }
+    // A parent that is a file (ENOTDIR) is an absence, as fsPresence.ts has it.
+    writeFileSync(join(local, 'a-file'), '')
+    expect(present(join(local, 'a-file', 'x'))).toBe(false)
+    expect(existsSync(from) && !existsSync(to)).toBe(true)
   })
 
   it('a dry run says what it would do and changes nothing', () => {
