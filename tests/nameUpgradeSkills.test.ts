@@ -12,15 +12,15 @@ import HISTORY from '../src/main/bundledHistory.json'
 import { tempDir } from './tempDir'
 
 /** Paths matching a pattern whose calls (`call`'s alone, when named) fail once `pass` of them have gone through. */
-const faults: { match: { test: (p: string) => boolean }; code: string; pass: number; call?: string; then?: () => void }[] = []
+const faults: { match: { test: (p: string) => boolean }; code: string; pass: number; call?: string; arms?: () => void }[] = []
 const failing = (p: unknown, call: string): string | undefined => {
   const f = faults.find((x) => x.match.test(String(p)) && (!x.call || x.call === call))
   if (!f) return undefined
   if (f.pass > 0) return void f.pass--
   // Its first failure arms what follows from it (a later look failing too).
-  const then = f.then
-  f.then = undefined
-  then?.()
+  const arms = f.arms
+  f.arms = undefined
+  arms?.()
   return f.code
 }
 
@@ -260,7 +260,7 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
       const { dir, ws } = atV3()
       const place = join(dir, 'skills', 'use-hive-api')
       const atPlace = { test: (p: string): boolean => p.toLowerCase() === place.toLowerCase() }
-      faults.push({ match: /\.use-hive-api\.cw-old-[^\\/]+[\\/]SKILL\.md$/, code, pass: 0, then: () => void faults.push({ match: atPlace, code, pass: 0, call: 'lstat' }) })
+      faults.push({ match: /\.use-hive-api\.cw-old-[^\\/]+[\\/]SKILL\.md$/, code, pass: 0, arms: () => void faults.push({ match: atPlace, code, pass: 0, call: 'lstat' }) })
       try {
         await move.moveFolders(ws)
         expect(faults).toHaveLength(2)
