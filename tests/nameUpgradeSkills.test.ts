@@ -12,11 +12,15 @@ import HISTORY from '../src/main/bundledHistory.json'
 import { tempDir } from './tempDir'
 
 /** Paths matching a pattern whose calls (`call`'s alone, when named) fail once `pass` of them have gone through. */
-const faults: { match: RegExp; code: string; pass: number; call?: string }[] = []
+const faults: { match: { test: (p: string) => boolean }; code: string; pass: number; call?: string; then?: () => void }[] = []
 const failing = (p: unknown, call: string): string | undefined => {
   const f = faults.find((x) => x.match.test(String(p)) && (!x.call || x.call === call))
   if (!f) return undefined
   if (f.pass > 0) return void f.pass--
+  // Its first failure arms what follows from it (a later look failing too).
+  const then = f.then
+  f.then = undefined
+  then?.()
   return f.code
 }
 
@@ -245,6 +249,32 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
       expect(readdirSync(join(dir, 'skills'))).toEqual(['use-hive-api'])
       expect(readFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), 'utf8')).toBe(mine)
       expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+      expect(record(dir)).toBe(names.NAMES_VERSION)
+    })
+  }
+
+  // swapOut's put-back after a failed check: a look at the place that fails too leaves the copy aside (never a conflict
+  // copy on a guess), not recorded; released, the next open puts it back and retires it.
+  for (const code of ['EACCES', 'EPERM', 'EIO']) {
+    it(`${code} looking at its place as a failed check puts it back: left aside, not recorded; released, retired`, async () => {
+      const { dir, ws } = atV3()
+      const place = join(dir, 'skills', 'use-hive-api')
+      const atPlace = { test: (p: string): boolean => p.toLowerCase() === place.toLowerCase() }
+      faults.push({ match: /\.use-hive-api\.cw-old-[^\\/]+[\\/]SKILL\.md$/, code, pass: 0, then: () => void faults.push({ match: atPlace, code, pass: 0, call: 'lstat' }) })
+      try {
+        await move.moveFolders(ws)
+        expect(faults).toHaveLength(2)
+      } finally {
+        faults.length = 0
+      }
+      const left = readdirSync(join(dir, 'skills'))
+      expect(left).toHaveLength(1)
+      expect(left[0]).toMatch(/^\.use-hive-api\.cw-old-/)
+      expect(readFileSync(join(dir, 'skills', left[0], 'SKILL.md'), 'utf8')).toBe(OLD)
+      expect(record(dir)).toBe(3)
+      await move.moveFolders(ws)
+      expect(readdirSync(join(dir, 'skills'))).toEqual([])
+      expect(manifest(dir).skills).toEqual({ handover: { from: 'y' } })
       expect(record(dir)).toBe(names.NAMES_VERSION)
     })
   }

@@ -1242,7 +1242,14 @@ export async function swapOut(dest: string, expected: string): Promise<void> {
     if (before) throw before
     await renameRetrying(dest, old, 5)
     const putBack = async (why: SwapAbandoned): Promise<never> => {
-      if (!(await exists(dest))) await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
+      // Whether its place is still empty: only an absence says so (HI-2611). A look that fails leaves it aside, where
+      // cleanSwaps finds it again, never made a conflict copy on a guess: an I/O failure, so SwapUnreadable.
+      const filled = await lstat(dest).then(
+        () => true,
+        (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' || e.code === 'ENOTDIR' ? false : e)
+      )
+      if (filled instanceof Error) throw new SwapUnreadable(why.message, { cause: filled })
+      if (!filled) await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
       else await keepAsConflict(old, parent, name)
       throw why
     }
