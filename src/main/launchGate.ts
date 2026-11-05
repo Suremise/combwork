@@ -36,7 +36,7 @@ try {
 } catch { $why = "its connection to Hive failed ($($_.Exception.InnerException.Message))" }
 if ($word -ne 'go') {
   if ($word -and $word.StartsWith('stop ')) { $why = $word.Substring(5) }
-  [Console]::Error.WriteLine("Error: Hive didn't start $([System.IO.Path]::GetFileName($file)): $why")
+  [Console]::Error.WriteLine("Error: Combwork didn't start $([System.IO.Path]::GetFileName($file)): $why")
   exit 1
 }
 $s = [System.Diagnostics.ProcessStartInfo]::new($file, $argline)

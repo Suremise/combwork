@@ -19,7 +19,7 @@ const withValue = (v: unknown): string => advancedFileText({ [HARDWARE_ACCELERAT
 describe('hardware acceleration at start (#676)', () => {
   it("is Settings → Advanced's value, read early from advanced.json", () => {
     expect(gpuAtStart(profile(withValue(true)), false)).toEqual({ off: true, why: 'setting', setting: true })
-    // As Hive reads the value anywhere else: "on" written by hand is on.
+    // As Combwork reads the value anywhere else: "on" written by hand is on.
     expect(gpuAtStart(profile(withValue('on')), false)).toEqual({ off: true, why: 'setting', setting: true })
     expect(gpuAtStart(profile(withValue(false)), false)).toEqual({ off: false, why: null, setting: false })
   })
@@ -50,7 +50,7 @@ describe('hardware acceleration at start (#676)', () => {
     expect(gpuAtStart(profile(withValue(true)), true)).toEqual({ off: true, why: 'setting', setting: true })
   })
 
-  it('a restart starts Hive as it was started, without the once-only --disable-gpu', () => {
+  it('a restart starts Combwork as it was started, without the once-only --disable-gpu', () => {
     expect(relaunchArgs(['C:\\Hive\\Hive.exe', '--disable-gpu', '--hidden'])).toEqual(['--hidden'])
     expect(relaunchArgs(['electron.exe', '.', '--DISABLE-GPU'])).toEqual(['.'])
     expect(relaunchArgs(['Hive.exe'])).toEqual([])
@@ -63,7 +63,7 @@ describe('hardware acceleration at start (#676)', () => {
     expect(gpuDiagnostics({ off: false, why: null, setting: false }, { webgl: 'enabled' })).toBe('- **Graphics**: hardware acceleration on; webgl: enabled')
   })
 
-  it('is a Hive setting that applies when Hive restarts, for Settings and the Assistant', () => {
+  it('is a Combwork setting that applies when Combwork restarts, for Settings and the Assistant', () => {
     expect(advancedDef(HARDWARE_ACCELERATION_OFF)).toMatchObject({ group: 'cw', kind: 'boolean', default: false, applies: 'restart' })
     expect(settingEntry(`advanced.${HARDWARE_ACCELERATION_OFF}`)?.restart).toBe('hive')
   })

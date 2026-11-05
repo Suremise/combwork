@@ -114,7 +114,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     const head = `- **${providerName(id)}**: ${set?.enabled ? 'on' : 'off'}; ${info.found ? `${info.version ?? 'version unknown'} at \`${info.path ?? '?'}\`${info.source ? ` (${info.source})` : ''}` : 'not found'}; signed in: ${yesNo(info.loggedIn)}${info.updateAvailable && info.latestVersion ? `; ${info.latestVersion} available` : ''}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     const extra = [
       // The version this release was tested with (#365): what a bug report about the CLI needs first.
-      ...(info.tested ? [`  - this Hive release was tested with ${info.tested.version}${info.tested.testedAt ? ` (${info.tested.testedAt})` : ''}; installed: ${info.found ? testedComparison(info.tested) : 'not found'}`] : ['  - no tested version recorded for this Hive release']), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+      ...(info.tested ? [`  - this Combwork release was tested with ${info.tested.version}${info.tested.testedAt ? ` (${info.tested.testedAt})` : ''}; installed: ${info.found ? testedComparison(info.tested) : 'not found'}`] : ['  - no tested version recorded for this Combwork release']), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
       ...(set?.executablePath ? ['  - its path is set in Settings'] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
       ...(set?.extraArgs ? ['  - extra arguments are set'] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
       ...(info.editorExtensionOnly ? ["  - only an editor extension's copy was found"] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
@@ -141,9 +141,9 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
   const dialectLine = onDialect.length ? [`- Dialects: ${onDialect.length} running agent${onDialect.length === 1 ? '' : 's'} on ${new Set(onDialect).size} chain${new Set(onDialect).size === 1 ? '' : 's'} other than the Default`] : [] // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 
   const header = [
-    '## Hive diagnostics',
+    '## Combwork diagnostics',
     '',
-    `- **Hive** ${app.getVersion()} (${app.isPackaged ? 'installed' : 'development build'}); updates: ${s.updates.prerelease ? 'beta' : 'stable'} channel, check ${s.updates.checkAutomatically ? 'automatically' : 'manually'}, install ${s.updates.install}`,
+    `- **Combwork** ${app.getVersion()} (${app.isPackaged ? 'installed' : 'development build'}); updates: ${s.updates.prerelease ? 'beta' : 'stable'} channel, check ${s.updates.checkAutomatically ? 'automatically' : 'manually'}, install ${s.updates.install}`,
     `- **Electron** ${process.versions.electron}, Chromium ${process.versions.chrome}, Node ${process.versions.node}`,
     `- **Windows**: ${osVersion()} ${release()} (${process.arch}); display scaling ${Math.round(display.scaleFactor * 100)}%; locale ${app.getLocale()}`,
     gpuDiagnostics(gpuThisRun(), app.getGPUFeatureStatus() as unknown as Record<string, string>),

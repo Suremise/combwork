@@ -62,7 +62,7 @@ const script = { kind: 'agent', name: 'script' } as const
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
 let n = 0
 
-/** "Hive merges" into main, a reviewer agent, one merge check. */
+/** "Combwork merges" into main, a reviewer agent, one merge check. */
 const HIVE_MERGES = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', mergeChecks: ['quick'], commands: { quick: 'quick' } } as const
 
 async function workspace(at?: string): Promise<{ w: WS; repo: string; wt: string; ws: string }> {
@@ -232,20 +232,20 @@ describe("the Assistant's authority, checked again at each write (HR3's round 1 
 })
 
 describe('Pause queue and Resume (#1353)', () => {
-  it('a pause is saved with who made it and kept across a restart; one of Hive\'s own is kept, not replaced', async () => {
+  it('a pause is saved with who made it and kept across a restart; one of Combwork\'s own is kept, not replaced', async () => {
     const first = await workspace()
     const card = await approved(first.w, first.wt)
     const v = await inWorkspace(first.w, () => pauseQueue(first.w, first.repo, 'main', 'user'))
     expect(v.paused).toMatchObject({ reason: 'user', by: 'user', card: null, at: expect.any(String) })
     expect(v.queued.map((q) => q.card)).toEqual([card])
     expect(host.changed).toContain('main')
-    // Hive restarted: the workspace opened again reads the same pause.
+    // Combwork restarted: the workspace opened again reads the same pause.
     await disposeWorkspaceService(first.w)
     store.closeAllBoards()
     const again = await workspace(first.ws)
     const [after] = await inWorkspace(again.w, () => queueViews(again.w, again.repo, 'main'))
     expect(after.paused).toMatchObject({ reason: 'user', by: 'user' })
-    // A queue Hive paused (needs you) keeps that pause: it says more than the user's.
+    // A queue Combwork paused (needs you) keeps that pause: it says more than the user's.
     const wf = (await service.workflowFor(again.w, again.repo))!
     await wf.locked(() => wf.store.setQueuePause('next', { reason: 'needsYou', card: card.toString(), files: ['a.txt'] }))
     const kept = await inWorkspace(again.w, () => pauseQueue(again.w, again.repo, 'next', 'assistant'))
@@ -272,7 +272,7 @@ describe('Pause queue and Resume (#1353)', () => {
     // Nothing staged now: resumed.
     git(repo, 'reset', '-q')
     expect((await resume()).resumed).toBe(true)
-    // A checked-out pause from before #1351 (Hive merges into a checked-out target now): resumed.
+    // A checked-out pause from before #1351 (Combwork merges into a checked-out target now): resumed.
     await pause({ reason: 'checkedOut', card: 'p-1', files: ['old'] })
     expect((await resume()).resumed).toBe(true)
     git(repo, 'checkout', '-q', '--detach')
@@ -292,10 +292,10 @@ describe('Pause queue and Resume (#1353)', () => {
 })
 
 describe("the window's listing (#1356: which queues the panel can show)", () => {
-  it("lists the current options' target, empty, and a card in flight under Hive merges keeps it after a switch to the agent merging", async () => {
+  it("lists the current options' target, empty, and a card in flight under Combwork merges keeps it after a switch to the agent merging", async () => {
     const { w, wt, repo } = await workspace()
     const { setWorkflowOptions } = await import('../src/main/workflow/optionsForm')
-    // Nothing queued: the Agent API lists no queue; the window's listing has main, Hive merging into it.
+    // Nothing queued: the Agent API lists no queue; the window's listing has main, Combwork merging into it.
     expect(await inWorkspace(w, () => queueViews(w, repo))).toEqual([])
     expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: true, inFlight: [], queued: [] }])
     const card = await approved(w, wt)
@@ -535,7 +535,7 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
 })
 
 describe('the queue on the card, in the Git tab and in the Merge dialog (#1357)', () => {
-  it("the Merge dialog's card for a branch: Hive merges it (its own ruleset, the rules enforced), where it stands; Merge anyway recorded as an override", async () => {
+  it("the Merge dialog's card for a branch: Combwork merges it (its own ruleset, the rules enforced), where it stands; Merge anyway recorded as an override", async () => {
     const { w, wt, repo } = await workspace()
     const { branchQueueCard, mergedOutsideQueue } = await import('../src/main/workflow/queueControls')
     const { setWorkflowOptions } = await import('../src/main/workflow/optionsForm')
@@ -550,7 +550,7 @@ describe('the queue on the card, in the Git tab and in the Merge dialog (#1357)'
     await act(w, card, reviewer, { kind: 'startReview' })
     await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'ok' })
     expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'card'))).toMatchObject({ card, where: 'queued', position: 1 })
-    // The next cards go to the agent: this one keeps its ruleset, so Hive still merges it.
+    // The next cards go to the agent: this one keeps its ruleset, so Combwork still merges it.
     await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...HIVE_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
     expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'card'))).toMatchObject({ card, where: 'queued' })
     // Another branch, or the rules off: none.
@@ -639,7 +639,7 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     expect(second).not.toBe(first)
     expect(second).toEqual(first)
     expect(await list()).toBe(second)
-    // ...another process's commit to the board (read before Hive's poll tells it)...
+    // ...another process's commit to the board (read before Combwork's poll tells it)...
     const other = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
     try {
       other.prepare("INSERT INTO board_meta (key, value) VALUES ('hi1683-probe', '1')").run()
@@ -648,7 +648,7 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     }
     const third = await list()
     expect(third).not.toBe(second)
-    // ...this Hive's host of the queue starting or stepping...
+    // ...this Combwork's host of the queue starting or stepping...
     host.stamp = 'running'
     const fourth = await list()
     expect(fourth).not.toBe(third)

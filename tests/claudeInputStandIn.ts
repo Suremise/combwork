@@ -1,9 +1,9 @@
-// Claude Code 2.1.312's input box, for unit tests of what Hive types into it (HI-1979), written apart from Hive's code
+// Claude Code 2.1.312's input box, for unit tests of what Combwork types into it (HI-1979), written apart from Combwork's code
 // as the real CLI was tried: its input between two rules under a footer, wrapped at the box's width and at its line
 // breaks; a Ctrl+U deletes the row the cursor is on (at a row begun by a line break, that break); a Backspace one
 // character as the user sees it (a grapheme); a bracketed paste is text; Enter sends what is there.
 //
-// It is fed what Hive writes, by `feed`, or, for a test that records writes its own way, by `from(writes)`: its screen
+// It is fed what Combwork writes, by `feed`, or, for a test that records writes its own way, by `from(writes)`: its screen
 // replays the writes not read yet each time it is read. Options:
 // - `draft`: what is in the input to begin with;
 // - `viewport`: the screen's rows (a box taller than that has its top rule off the screen);
@@ -36,7 +36,7 @@ function rows(text: string): string[] {
 
 export interface ClaudeInput {
   input: { text: string; sent: string[]; keys: number; ctrlU: number; answers: number }
-  /** What Hive wrote, as the CLI reads it. */
+  /** What Combwork wrote, as the CLI reads it. */
   feed(data: string): void
   /** Reads `writes` (its new entries) before each look at the screen. */
   from(writes: () => readonly string[]): void

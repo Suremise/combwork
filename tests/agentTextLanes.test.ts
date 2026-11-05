@@ -60,7 +60,7 @@ const rec = (over: Partial<LaneRecord> = {}): LaneRecord => ({
 const card = (number: number, column: TaskCard['column'], over: Partial<TaskCard> = {}): TaskCard =>
   ({ number, title: `Card ${number}`, column, project: 'alpha', blocked: null, history: [], comments: [], archived: false, ...over }) as unknown as TaskCard
 
-/** The values the tests below pass: names, ids and titles are the caller's, not Hive's wording. */
+/** The values the tests below pass: names, ids and titles are the caller's, not Combwork's wording. */
 const VALUES = ['B1', 'R1', 'alpha', 'slot-b', 'lane-1', 'lane-0', 'Card 1', 'Card 2', 'Card 3', 'first', '3f2a', 'Asked the user', 'disk full', 'merging next', 'HI-9', 'rounds', 'waitMinutes']
 
 /** Every variant of what the lane builders say, each output named. */

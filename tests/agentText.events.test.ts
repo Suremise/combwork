@@ -13,7 +13,7 @@ const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: 
 const AGENT = { workspace: 'C:\\ws', projectPath: 'C:\\ws\\webapp', agentId: 'a-1' }
 /** A client's line, as broadcast says it: in the agent's scope, or the API's for the workspace and viewer tokens. */
 const forClient = (event: HiveEvent, agent: typeof AGENT | null) => inRequestScope(agent ? { projectPath: agent.projectPath, agentId: agent.agentId } : null, () => apiEventFor(event, agent))
-const noticeEvent = (n: Partial<Notice>): HiveEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Hive a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as HiveEvent
+const noticeEvent = (n: Partial<Notice>): HiveEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Combwork a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as HiveEvent
 const titleOf = (e: Record<string, unknown> | null): unknown => (e?.notice as { title?: unknown } | undefined)?.title
 
 
@@ -32,9 +32,9 @@ describe("the events stream's notification titles", () => {
   })
 
   it("are said in each client's chain", () => {
-    setChainResolver((scope) => (scope.kind === 'session' ? chain({ 'main.quit.closed': 'Hive quit' }) : chain({ 'main.quit.closed': 'Hive closed (API)' })))
-    expect(titleOf(forClient(event, AGENT))).toBe('Hive quit')
-    expect(titleOf(forClient(event, null))).toBe('Hive closed (API)')
+    setChainResolver((scope) => (scope.kind === 'session' ? chain({ 'main.quit.closed': 'Combwork quit' }) : chain({ 'main.quit.closed': 'Combwork closed (API)' })))
+    expect(titleOf(forClient(event, AGENT))).toBe('Combwork quit')
+    expect(titleOf(forClient(event, null))).toBe('Combwork closed (API)')
     // An override of another text leaves it as made.
     setChainResolver(() => chain({ 'main.plan.used': 'x' }))
     expect(titleOf(forClient(event, AGENT))).toBe('Combwork has closed')

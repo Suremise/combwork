@@ -51,7 +51,7 @@ describe('agentApiCall (#371)', () => {
 
   it('a reply later than its deadline fails, saying so, and the request ends (the server sees it go)', async () => {
     const s = await slowServer(3000)
-    await expect(agentApiCall(`${s.url}/v1/agents/wait`, 'POST', {}, '{}', 300)).rejects.toThrow("Hive didn't reply within 1 s")
+    await expect(agentApiCall(`${s.url}/v1/agents/wait`, 'POST', {}, '{}', 300)).rejects.toThrow("Combwork didn't reply within 1 s")
     await expect.poll(() => s.closed.length, { timeout: HUNG_MS }).toBe(1)
   })
 
@@ -62,7 +62,7 @@ describe('agentApiCall (#371)', () => {
     expect(s.got[0].headers['content-length']).toBeUndefined()
   })
 
-  it('no Hive listening: the call fails at once', async () => {
+  it('no Combwork listening: the call fails at once', async () => {
     const s = await slowServer(0)
     const url = s.url
     await new Promise<void>((r) => server!.close(() => r()))
@@ -76,7 +76,7 @@ describe('agentApiCall (#371)', () => {
     expect((await agentApiCall(`${s.url}/v1/tasks/1`, 'GET', {}, undefined)).text).toBe(reply)
   })
 
-  it("passes on Hive's X-Hive-Notice header (#357's new-decision flag), still encoded", async () => {
+  it("passes on Combwork's X-Hive-Notice header (#357's new-decision flag), still encoded", async () => {
     const line = encodeURIComponent('[CW] #4 has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.')
     server = createServer((_req, res) => {
       res.setHeader('X-Hive-Notice', line)

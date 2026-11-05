@@ -89,7 +89,7 @@ describe("an idle broker from before a restart, or at a quit, holds nothing (HI-
     await exited('q-writer', [row(9102, 'WindowsSandboxServer.exe', BROKER), row(9103, 'node.exe', 'C:\\nodejs\\node.exe')])
     await exited('q-sandbox', [row(9104, 'WindowsSandboxServer.exe', BROKER)])
     expect(m.runOutcome('q-broker')).toBeNull()
-    // The Sandbox closes just as Hive quits (before the leftovers' next look): the quit's own look decides.
+    // The Sandbox closes just as Combwork quits (before the leftovers' next look): the quit's own look decides.
     host.running = []
     host.listing.set('q-sandbox', { total: 2, adopted: 0, processes: [{ ...row(9104, 'WindowsSandboxServer.exe', BROKER), cmd: '' }, { ...row(9105, 'WindowsSandboxClient.exe', 'C:\\x\\WindowsSandboxClient.exe'), cmd: '' }] })
     await m.recordEndedLaunches()

@@ -1,6 +1,6 @@
 // A workspace's open commands holding its agents back (HI-1954, design HI-1954/s19 §1 and s21 §3): the gate settles once,
 // and as closed when its open's lifetime ends; it is reserved as the workspace opens, before anything hears of the open,
-// when its open point has commands and this Hive runs them; while it is held every start is refused at the chokepoint,
+// when its open point has commands and this Combwork runs them; while it is held every start is refused at the chokepoint,
 // and restart-resume's own starts wait for it. The workspace is real; no command or session runs.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -75,7 +75,7 @@ describe('the open gate', () => {
     await ws.close()
   })
 
-  it('none reserved with no open commands, or in a Hive that runs none; closed while held, it settles as closed', async () => {
+  it('none reserved with no open commands, or in a Combwork that runs none; closed while held, it settles as closed', async () => {
     WorkspaceService.runsCommands = () => true
     const ws = createWorkspaceService()
     open.push(ws)

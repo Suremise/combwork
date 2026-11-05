@@ -57,9 +57,9 @@ describe("the board's Stalled mark while an agent starts (HI-1977)", () => {
 
   it("a failed start: the board's mark says why, the same words as the notice", () => {
     startBegun(p, 'b1', '#7', { fresh: true })
-    startEnded(p, 'b1', '#7', { failed: "Hive couldn't get slot-b ready: the folder is in use" })
-    expect(agentStartOf(p, 'b1')).toEqual({ failed: "Hive couldn't get slot-b ready: the folder is in use" })
-    expect(boardMark()).toBe("B1's start failed: Hive couldn't get slot-b ready: the folder is in use")
+    startEnded(p, 'b1', '#7', { failed: "Combwork couldn't get slot-b ready: the folder is in use" })
+    expect(agentStartOf(p, 'b1')).toEqual({ failed: "Combwork couldn't get slot-b ready: the folder is in use" })
+    expect(boardMark()).toBe("B1's start failed: Combwork couldn't get slot-b ready: the folder is in use")
     expect(boardMark()).toBe(notice())
   })
 

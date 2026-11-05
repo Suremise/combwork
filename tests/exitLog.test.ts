@@ -1,5 +1,5 @@
-// Why Hive stopped (#985): the profile's crash dumps are listed newest first and named in Copy Diagnostics, and every
-// place Hive's main process ends or restarts the app goes through exitBy(), which logs it with its caller.
+// Why Combwork stopped (#985): the profile's crash dumps are listed newest first and named in Copy Diagnostics, and every
+// place Combwork's main process ends or restarts the app goes through exitBy(), which logs it with its caller.
 import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'

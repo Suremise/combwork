@@ -55,7 +55,7 @@ describe("the Assistant's changes in its panel (#1283)", () => {
     for (const [why, english] of Object.entries(UNDO_FINAL) as [UndoFinalWhy, string][]) expect(finalWhys(english)).toEqual([why])
     // A card's change records its reasons joined, in the order it found them.
     expect(finalWhys([UNDO_FINAL.decision, UNDO_FINAL.comment, UNDO_FINAL.context].join(' '))).toEqual(['decision', 'comment', 'context'])
-    expect(finalWhys('Something Hive says another way.')).toEqual([])
+    expect(finalWhys('Something Combwork says another way.')).toEqual([])
   })
 })
 

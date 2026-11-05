@@ -5,7 +5,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 
-// Hive's terminals, recorded instead (no process runs).
+// Combwork's terminals, recorded instead (no process runs).
 const pty = vi.hoisted(() => ({ onData: null as ((d: string) => void) | null, open: new Set<string>(), typed: [] as { at: number; keys: string }[] }))
 vi.mock('../src/main/ptyHost', async (original) => ({
   ...(await original<object>()),

@@ -251,7 +251,7 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     const s = e.wf.state(card)
     const line = s.started!.line!
     await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease, line, revision: s.started!.base! }))
-    // Prepared, then deleted outside Hive before this observer reads it.
+    // Prepared, then deleted outside Combwork before this observer reads it.
     sh(e.project, 'branch', line, s.started!.base!)
     sh(e.project, 'branch', '-D', line)
     let changed = false

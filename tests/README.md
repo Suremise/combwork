@@ -7,21 +7,21 @@ tests run git with no global config, as CI does), `cliHomes.ts` (each test file 
 Copilot homes, never the user's, whatever the shell sets: HI-1703), `loggerListeners.ts` (takes off the process
 listeners a test's fresh load of the logger added: HI-1728), and `electron-stub.ts` standing in for `electron`.
 
-Test runs' temp folders are in the test area, `%LOCALAPPDATA%\hive-test\tmp` (#992), not `%TEMP%`: Hive's Antivirus
+Test runs' temp folders are in the test area, `%LOCALAPPDATA%\hive-test\tmp` (#992), not `%TEMP%`: Combwork's Antivirus
 scanning setting covers the test area, and thousands of folders made and removed in `%TEMP%` kept Defender busy.
 `tempDir()` makes them there, and `vitest.config.ts` makes it the run's temp folder (`TEMP`, `TMP`, `TMPDIR`) too, so
-Vitest's own copies of the modules, Hive's code under test and the programs tests start (git) put theirs there. The e2e
+Vitest's own copies of the modules, Combwork's code under test and the programs tests start (git) put theirs there. The e2e
 and scenario runners do the same for their suites (HI-2102: Playwright's `playwright-artifacts-*`, the test copies of
-Hive, the CLIs), and remove theirs as they exit (an e2e run with `--record` keeps it). Each run has its own folder
+Combwork, the CLIs), and remove theirs as they exit (an e2e run with `--record` keeps it). Each run has its own folder
 there, `run-<pid>-<random>` (`runTemp.mts`), and a run's start removes those older than a day whose run has ended, as the board's evidence rules allow
 (`e2e/evidence.cjs`: nothing an open card cites, nothing while the board can't be read). A
-unit run's is removed once the run has ended (`tempRun.ts`, #995), with whatever Hive's code wrote
+unit run's is removed once the run has ended (`tempRun.ts`, #995), with whatever Combwork's code wrote
 late; and every folder `tempDir()` makes is removed when its test file ends (`tempCleanup.ts`), after the file's own
 `afterAll` hooks, so a run doesn't grow as it goes: close what holds files in it (watchers, services, processes) in the
 test or its hooks, or the run warns that it was left behind. `npm run test:clean` and the e2e and scenario runners sweep what is older than a day (e2e/README.md,
 Housekeeping). Off Windows, with no `LOCALAPPDATA`, they are in the temp folder.
 
-A test run outlives the session that started it when Hive closes or the agent restarts (#1008). A heavy run's runner
+A test run outlives the session that started it when Combwork closes or the agent restarts (#1008). A heavy run's runner
 says as it starts when one of this worktree's runs was left over that way (`Still running in this worktree, left over
 from a session that ended: …`), and a waiting run names it in its wait line. For a run that isn't heavy, look for a
 `node` whose command line has this worktree's path (`Get-CimInstance Win32_Process`), and stop it by its process id,
@@ -37,7 +37,7 @@ where no one else's Store PowerShell runs (a Windows Sandbox, or a machine of yo
 
 Tests never assume they're alone on the machine or inherit their shell.
 - What a run uses of its own comes from the run context (`e2e/runContext.cjs`, `lanes.mjs`, `build.mjs`): environments
-  from an allowlist (`lib.hiveEnv()` for a test Hive, `lib.childEnv()` for the combwork MCP server or `cw-progress`), a
+  from an allowlist (`lib.hiveEnv()` for a test Combwork, `lib.childEnv()` for the combwork MCP server or `cw-progress`), a
   lane's ports and folders, the CLI test homes, and the dev build under a lock per worktree.
 - Never build a child's environment from `process.env`. Give every child the runners, `lib.cjs` or the harness start
   themselves an `env` (`runContext.baseEnv()` for git and the build), so a shell's `GIT_DIR` or `NODE_OPTIONS` can't
@@ -49,11 +49,11 @@ Tests never assume they're alone on the machine or inherit their shell.
   third waits, not hung, printing who holds the slots ("e2e: waiting for a test slot" in Progress; `--no-wait` fails at
   once).
 - Temp folders come from `tempDir()`, by long, real paths, in `%LOCALAPPDATA%\hive-test\tmp`, never under
-  `os.tmpdir()` (a unit test fails): CI's is the 8.3 form `C:\Users\RUNNER~1\…` and Hive compares real paths, so such
+  `os.tmpdir()` (a unit test fails): CI's is the 8.3 form `C:\Users\RUNNER~1\…` and Combwork compares real paths, so such
   tests failed on CI only. Another name for a folder comes from `pathAliases.ts`: `junction()` works on any machine,
   `shortPath()` only where the volume makes 8.3 names.
 - Unit tests run git with none of the shell's `GIT_*` variables (`cleanGitEnv.ts`) and no global config, as CI does
-  (`noGlobalGit.ts`): a test whose Hive code commits or merges sets its repository's own `user.name` and `user.email`.
+  (`noGlobalGit.ts`): a test whose Combwork code commits or merges sets its repository's own `user.name` and `user.email`.
 - e2e suites use `lib.cjs` and work under `%LOCALAPPDATA%\hive-test\e2e` (each runner's suites in its lane's
   `lanes\<k>\<suite>`, so runners in different worktrees don't collide), never the real clipboard, profile or
   `~/.codex`.
@@ -81,7 +81,7 @@ Anyone who clones the repository must get the same results, on any machine and u
   `HUNG_MS` (10–30 s) in the file, as `until(fn, HUNG_MS)` or `{ timeout: HUNG_MS }`. A bound under 5 s is a time
   budget, so it needs a comment saying why it is short: a retry's pace (press again if this one was lost), or a quiet
   period that is the point of the check (nothing comes within it).
-- **Wait for Hive to settle, not for a quiet spell.** Watches and loop wakes finish their work in the background (a
+- **Wait for Combwork to settle, not for a quiet spell.** Watches and loop wakes finish their work in the background (a
   delivery a comment started, the settle before a wake, the check that a typed wake was taken). In unit tests,
   `await watches.settled()` (and `await loopWakes.settled()`, which waits for both) resolves once nothing of theirs is
   in flight; check after it, never straight after `evaluateWatches` or `tryLoopWakes`, and never after a short sleep.

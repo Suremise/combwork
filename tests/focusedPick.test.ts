@@ -1,4 +1,4 @@
-// The hive project's focused-test picker (HI-1367): `node tests/e2e/affected.mjs --pick`, which Hive's merge queue runs
+// The hive project's focused-test picker (HI-1367): `node tests/e2e/affected.mjs --pick`, which Combwork's merge queue runs
 // as the project's focused.pick. Which unit tests and e2e suites a change needs: the e2e suites are affectedSuites'
 // (tests/e2esuites.test.ts checks those), the unit tests a changed test, Vitest's import graph, and UNIT_SCANS for the
 // tests that read the repository rather than import it. These check the table can't drift from the tests, and replay
@@ -125,7 +125,7 @@ describe('the tests a change needs (pickTests)', () => {
     const paths = ['src/main/diagnostics.ts', 'src/main/fsutil.ts', 'src/main/git.ts', 'src/main/logger.ts', 'src/main/mainStalls.ts', 'src/main/places.ts', 'src/main/providers/conversation.ts', 'src/main/providers/copilot/events.ts', 'src/main/repoLock.ts', 'src/main/usageHistory.ts', 'src/main/walCheckpoint.ts', 'src/main/workerThreads.ts', 'tests/e2e/packaged-workers.cjs', 'tests/e2e/suites.mjs', 'tests/workerImports.test.ts']
     const added = ['src/main/places.ts', 'src/main/workerThreads.ts', 'tests/e2e/packaged-workers.cjs', 'tests/workerImports.test.ts']
     expect(units({ paths, added })).toEqual(expect.arrayContaining(['tests/e2esuites.test.ts', 'tests/workerImports.test.ts']))
-    // Its fsutil.ts and logger.ts are shared by every part of Hive: the whole change needs every test.
+    // Its fsutil.ts and logger.ts are shared by every part of Combwork: the whole change needs every test.
     expect(pick({ paths, added })).toMatchObject({ every: true })
   })
 

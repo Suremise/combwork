@@ -5,8 +5,8 @@
 // - the pool's rename operation: its destination reserved in the write that takes the slot and honoured by every write
 //   that makes a slot, so two different slots renamed at once (in two Hives), or a lend meanwhile, never share it; each
 //   step acts only on the worktree with the rename's identity (another arriving at the destination is never followed or
-//   moved); a live rename's intent left alone by another Hive's pass; one cut
-//   short after git's move finished by the Hive that takes its operation over, one cut short before it given up, and one
+//   moved); a live rename's intent left alone by another Combwork's pass; one cut
+//   short after git's move finished by the Combwork that takes its operation over, one cut short before it given up, and one
 //   whose putting back fails kept out of the pool until a later look puts it back;
 // - the pass: only free adopted slots (no lease, no session running), only with the rules and the switch on, history and
 //   sessions kept, generic names never renamed again.
@@ -121,7 +121,7 @@ function gate(): { open: () => void; reached: Promise<void>; wait: () => Promise
 }
 const never = (): Promise<never> => new Promise<never>(() => undefined)
 
-/** Another Hive's pool on the board: its own holder (its pid), gone once its pid is in `dead`. */
+/** Another Combwork's pool on the board: its own holder (its pid), gone once its pid is in `dead`. */
 const dead = new Set<number>()
 function hivePool(pid: number, renamer: Renamer): Pool {
   const me = { pid, started: 1 }
@@ -323,14 +323,14 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     expect(await cwdOf('s-b5')).toBe(iB.to.toLowerCase())
   })
 
-  it("a rename's reserved name never lent: a new slot made meanwhile in another Hive gets another name and folder", async () => {
+  it("a rename's reserved name never lent: a new slot made meanwhile in another Combwork gets another name and folder", async () => {
     const name = await free('c1')
     const atCopy = gate()
     const r = realRenamer()
     const renaming = hivePool(95001, { ...r, copy: async (a, b, w) => (await atCopy.wait(), r.copy(a, b, w)) }).rename(name)
     await atCopy.reached
     const intent = intentOf(name)!
-    // Another Hive lends a new slot while the rename copies (its destination not on disk yet): made and set up for real.
+    // Another Combwork lends a new slot while the rename copies (its destination not on disk yet): made and set up for real.
     const lending = hivePool(95002, realRenamer())
     const lent = await lending.lend({ card: 9901, agent: 'c2' }, { install: false })
     expect(lent.ok).toBe(true)
@@ -351,10 +351,10 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     expect(await cwdOf('s-c1')).toBe(intent.to.toLowerCase())
   })
 
-  it("a live rename's intent left alone by another Hive's pass; its Hive gone after git's move, the other finishes it", async () => {
+  it("a live rename's intent left alone by another Combwork's pass; its Combwork gone after git's move, the other finishes it", async () => {
     const name = await free('b6')
     const after = gate()
-    // Hive A stops right after git's move: its follow never goes on.
+    // Combwork A stops right after git's move: its follow never goes on.
     void hivePool(92001, { ...realRenamer(), follow: async () => (await after.wait(), never()) }).rename(name)
     await after.reached
     const intent = intentOf(name)!
@@ -376,7 +376,7 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     expect(intentOf(name)).toBeNull()
   })
 
-  it("cut short before git's move: its Hive gone, given up, the slot as it was", async () => {
+  it("cut short before git's move: its Combwork gone, given up, the slot as it was", async () => {
     const name = await free('b8')
     const before = gate()
     void hivePool(93001, { ...realRenamer(), move: async () => (await before.wait(), never()) }).rename(name)
@@ -390,11 +390,11 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     expect(intentOf(name)).toBeNull()
   })
 
-  it('its Hive gone right after git moved it inside another worktree that came to the destination: put back from there, given up', async () => {
+  it('its Combwork gone right after git moved it inside another worktree that came to the destination: put back from there, given up', async () => {
     const name = await free('c3')
     const r = realRenamer()
     const crashed = gate()
-    // Hive A: another worktree arrives at the destination, git moves this one inside it, and A stops before its check.
+    // Combwork A: another worktree arrives at the destination, git moves this one inside it, and A stops before its check.
     void hivePool(96001, {
       ...r,
       move: async (from, to) => {

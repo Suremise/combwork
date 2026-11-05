@@ -1,5 +1,5 @@
-// The merge queue's e2e fixture (tests/e2e/queueFixture.cjs): Release Slot on a slot a Hive that ended at a seam left
-// held (`releaseHeld`). HI-2177: Hive may free that writer itself meanwhile (HI-2055), so a refusal counts as released
+// The merge queue's e2e fixture (tests/e2e/queueFixture.cjs): Release Slot on a slot a Combwork that ended at a seam left
+// held (`releaseHeld`). HI-2177: Combwork may free that writer itself meanwhile (HI-2055), so a refusal counts as released
 // only once a read shows that run no longer holds the slot (HR2's round 1).
 import { createRequire } from 'module'
 import { describe, expect, it } from 'vitest'
@@ -24,7 +24,7 @@ function hive(after: () => Promise<unknown>) {
 }
 
 describe("the queue fixture's Release Slot (HI-2177)", () => {
-  it('refused, the writer then gone or another run: released (Hive freed it itself)', async () => {
+  it('refused, the writer then gone or another run: released (Combwork freed it itself)', async () => {
     expect(await releaseHeld(fx, hive(async () => null))).toEqual(['slot-a'])
     expect(await releaseHeld(fx, hive(async () => ({ run: 'r-2' })))).toEqual(['slot-a'])
   })

@@ -133,7 +133,7 @@ const check = (name, ok, extra = '') => {
     check('…and one in full on request, still redacted', full.status === 200 && full.body.events[0]?.raw?.prompt?.startsWith('<text:') && !JSON.stringify(full.body).includes(PRIVATE), JSON.stringify(full.body).slice(0, 300))
     for (const [what, q] of [
       ['another agent of its project', `agent=B2`],
-      ["Hive's own events", 'source=hive'],
+      ["Combwork's own events", 'source=hive'],
       ["the Assistant's", 'source=assistant'],
       ['an agent that does not exist', 'agent=Nobody']
     ]) {

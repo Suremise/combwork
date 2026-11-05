@@ -1,4 +1,4 @@
-// The Hive Assistant's MCP servers (HI-1472, HI-2059): it works like a project. A workspace server runs for it only when
+// The Combwork Assistant's MCP servers (HI-1472, HI-2059): it works like a project. A workspace server runs for it only when
 // added for it (workspace.json's mcp.assistant, none until added); a project's never reach it, nor its a project. Adding
 // one shows what it runs. Before its list is converted to mean added, #1093's meaning holds (on in the workspace too).
 // The old Advanced switch (every workspace server for it) moves once per workspace, before the Assistant can start: a
@@ -56,7 +56,7 @@ async function opened(ws: string): Promise<Service> {
   return w
 }
 
-/** The servers a launch gets, but Hive's own. */
+/** The servers a launch gets, but Combwork's own. */
 const gets = async (path: string, agent: object): Promise<string[]> => Object.keys((await sessions.effective(path, agent as never)).mcpServers).filter((n) => n !== 'hive').sort()
 const assistantGets = (w: Service) => gets(w.assistantHome, ASSISTANT)
 const saved = (ws: string): unknown => json(join(ws, '.combwork', 'workspace.json')).mcp.assistant

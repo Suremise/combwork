@@ -91,7 +91,7 @@ describe('Purge', () => {
     expect([r.items.map((i) => i.sessionId), r.running]).toEqual([['b'], 2])
   })
 
-  it("lists what is left of sessions Hive no longer has, and old usage of deleted ones", () => {
+  it("lists what is left of sessions Combwork no longer has, and old usage of deleted ones", () => {
     const f = purgeFacts({ files: [file('gone')], attachmentFolders: [folder('gone'), folder('run-9')], deletedUsage: [{ id: 'd', name: 'Old', bytes: 9 }] })
     expect(planPurge(f).items.map((i) => i.kind)).toEqual(['leftover-backup', 'orphan-attachments', 'orphan-attachments', 'deleted-usage'])
   })

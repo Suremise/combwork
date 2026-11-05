@@ -1,4 +1,4 @@
-// G19 (HI-1697): the message of the commit Hive's merge queue makes. Hive's names the card with its trailers; the
+// G19 (HI-1697): the message of the commit Combwork's merge queue makes. Combwork's names the card with its trailers; the
 // branch's own is the branch's commits' messages, with no card key and no trailer, and the card is still the merge's
 // (its `Integrated` names the commit). The message builder alone, then the queue on real temporary repositories; and
 // an upgraded project's first merge, which waits for the user to choose them.
@@ -18,7 +18,7 @@ afterEach(() => {
 const card = { key: 'RE-229', title: 'CI: drop the nightly scheduled run' }
 
 describe("the merge's commit message (G19)", () => {
-  it("Hive's: the card's key and title, then its trailers", () => {
+  it("Combwork's: the card's key and title, then its trailers", () => {
     expect(mergeMessage('hive', { card, revision: 'abc', reviewers: 'a-1', messages: [] })).toBe('RE-229: CI: drop the nightly scheduled run\n\nHive-Card: RE-229\nHive-Revision: abc\nHive-Reviewed-By: a-1')
     expect(mergeMessage('hive', { card, revision: 'abc', updated: 'def', messages: [] })).toBe('RE-229: CI: drop the nightly scheduled run\n\nHive-Card: RE-229\nHive-Revision: abc\nHive-Updated: def')
   })
@@ -32,18 +32,18 @@ describe("the merge's commit message (G19)", () => {
     expect(branchMessage(['First\n\nWhy the first.', 'Second', 'Third\n\nWhy the third.'], card.title)).toBe('First\n\nWhy the first.\n\nSecond\n\nThird\n\nWhy the third.')
   })
 
-  it("Hive's trailers a commit of the branch has are left out; a branch with no message of its own takes the card's title, with no key", () => {
+  it("Combwork's trailers a commit of the branch has are left out; a branch with no message of its own takes the card's title, with no key", () => {
     expect(branchMessage(['Fix it\n\nBecause.\n\nHive-Card: RE-229\nCo-Authored-By: Someone <x@y>'], card.title)).toBe('Fix it\n\nBecause.\n\nCo-Authored-By: Someone <x@y>')
     expect(branchMessage([], card.title)).toBe(card.title)
     expect(branchMessage(['Hive-Card: RE-229'], card.title)).toBe(card.title)
   })
 
-  it("strict's update of the work: git's plain message for the branch's own, Hive's names the card", () => {
+  it("strict's update of the work: git's plain message for the branch's own, Combwork's names the card", () => {
     expect(updateMessage('branch', 'main', 'RE-229', 'abc')).toBe("Merge branch 'main'")
     expect(updateMessage('hive', 'main', 'RE-229', 'abc')).toBe('Merge main into RE-229\n\nHive-Card: RE-229\nHive-Revision: abc')
   })
 
-  it("isn't a rule, is the branch's own in every preset (HI-1997), and shows only when Hive merges with a merge commit or squash", () => {
+  it("isn't a rule, is the branch's own in every preset (HI-1997), and shows only when Combwork merges with a merge commit or squash", () => {
     for (const p of ['solo', 'pairAgent', 'pair', 'team'] as const) expect(preset('git', p).commitMessage, p).toBe('branch')
     expect('commitMessage' in ruleOptions({ ...preset('git', 'pair'), commitMessage: 'branch' })).toBe(false)
     expect(formShows('commitMessage', preset('git', 'pair'))).toBe(true)
@@ -53,7 +53,7 @@ describe("the merge's commit message (G19)", () => {
   })
 })
 
-/** Pair (Hive merges), with no checks, the target `main` checked out nowhere. */
+/** Pair (Combwork merges), with no checks, the target `main` checked out nowhere. */
 function merging(o: Partial<WorkflowOptions>): Env {
   const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], ...o }))
   sh(e.project, 'checkout', '-q', '--detach')
@@ -106,7 +106,7 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     expect(body(e)).not.toMatch(new RegExp(`${c.key}|Hive-|private`))
   })
 
-  it("Hive's, chosen: the card's key and title with its trailers, as before", async () => {
+  it("Combwork's, chosen: the card's key and title with its trailers, as before", async () => {
     const e = merging({ style: 'squash', commitMessage: 'hive' })
     const c = await approved(e, 'Keyed', [['Its own message', 'k.txt']])
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])

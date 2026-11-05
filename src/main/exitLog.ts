@@ -70,7 +70,7 @@ export function crashDumps(dir = join(crashDumpsDir(), 'reports')): CrashDump[] 
 export function crashDumpLines(dumps: CrashDump[], dir: string): string[] {
   if (!dumps.length) return ['None.']
   const newest = dumps[0]
-  return [`- ${dumps.length} in \`${dir}\`; the newest from ${new Date(newest.at).toISOString()}: \`${basename(newest.file)}\` (${Math.round(newest.bytes / 1024)} KB)`, '- Saved on this PC only: Hive never sends them. Attach one to an issue yourself if asked.'] // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  return [`- ${dumps.length} in \`${dir}\`; the newest from ${new Date(newest.at).toISOString()}: \`${basename(newest.file)}\` (${Math.round(newest.bytes / 1024)} KB)`, '- Saved on this PC only: Combwork never sends them. Attach one to an issue yourself if asked.'] // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 }
 
 /** What a process that went says of itself, for the log. */

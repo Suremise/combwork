@@ -1,6 +1,6 @@
 // Observations by two Hives on one workspace (#1118, SPEC §16.17): each transition is written once, a repeat of the same
 // values later is still recorded, and a writer that loses the race reads the platform again and writes only what is
-// true now. Two Workflows on separate connections to one store file stand in for the dev and the installed Hive.
+// true now. Two Workflows on separate connections to one store file stand in for the dev and the installed Combwork.
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
@@ -58,7 +58,7 @@ describe('two Hives observing one workspace', () => {
     expect(e.store.facts(card.id).filter((f) => f.kind === 'Integrated')).toHaveLength(2)
   })
 
-  it('S62: from A, one Hive sees B and the other C (made just after) → the second writer reads the platform now; the log ends at the real head', async () => {
+  it('S62: from A, one Combwork sees B and the other C (made just after) → the second writer reads the platform now; the log ends at the real head', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
     const other = e.another()
     const card = e.wf.createCard({ title: 'Raced' })
@@ -68,7 +68,7 @@ describe('two Hives observing one workspace', () => {
     const a = commit(folder, { 'a.txt': 'a\n' }, 'A')
     await reconcile(e.wf, card)
     let c = ''
-    // The first Hive reads B; before it writes, C is made and the second Hive observes and writes it.
+    // The first Combwork reads B; before it writes, C is made and the second Combwork observes and writes it.
     const b = commit(folder, { 'b.txt': 'b\n' }, 'B')
     await reconcile(e.wf, card, {
       afterRead: async () => {

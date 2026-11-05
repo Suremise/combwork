@@ -1,4 +1,4 @@
-// What Hive's profile keeps by a workspace's folder follows it when the workspace moves (HI-2007, from HI-1968's sweep;
+// What Combwork's profile keeps by a workspace's folder follows it when the workspace moves (HI-2007, from HI-1968's sweep;
 // design HI-2007/s40 and s42): its window's pin (config.json's alwaysOnTop) and its close command's runs
 // (close-commands/ws-<name>-<place>-…). The Assistant's old token file is left as it is. A move is recorded as the
 // moved workspace opens, one record per old folder, and tried at each open and Repair until nothing is left there,

@@ -80,7 +80,7 @@ describe('attention inbox', () => {
     // 25 Oct's case: Claude Code's StopFailure on an API connection error.
     const st = live('working', '2026-10-25T21:30:00Z')
     step(st, { hook_event_name: 'StopFailure', error: 'unknown', last_assistant_message: 'API Error: Connection error.' })
-    // Still idle as a turn's end makes it (Hive prompts and wakes it as any idle agent), and it needs you.
+    // Still idle as a turn's end makes it (Combwork prompts and wakes it as any idle agent), and it needs you.
     expect(st.status).toBe('finished')
     expect(at(st).needYou.map((i) => `${i.kind}/${i.message}/${i.since}`)).toEqual(['error/API Error: Connection error./2026-10-25T21:40:00.000Z'])
     expect(inboxStateText(at(st).needYou[0])).toBe('Stopped by an error: API Error: Connection error.')

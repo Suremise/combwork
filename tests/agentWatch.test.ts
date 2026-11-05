@@ -166,7 +166,7 @@ describe('agent watches (main/watches.ts)', async () => {
   const tasks = await import('../src/main/tasks')
   const watches = await import('../src/main/watches')
   watches.testHooks.settleMs = 0
-  // A check reads what Hive did after `await watches.settled()`: deliveries run in the background (#570).
+  // A check reads what Combwork did after `await watches.settled()`: deliveries run in the background (#570).
   const { sessions } = await import('../src/main/sessions')
   /** The watches a workspace has saved (#1018: rows in its database, what watches.json's `watches` held). */
   // oxlint-disable-next-line typescript/no-explicit-any -- saved entries read as JSON, as the file's were
@@ -185,8 +185,8 @@ describe('agent watches (main/watches.ts)', async () => {
     return { w, path, alpha, beta }
   }
   /**
-   * Stand-in sessions: the watcher a1 (its status, the user typing, what Hive typed and what it read: #650, it follows
-   * Hive's doorbell with cw_inbox, as a model does) and the agents it watches.
+   * Stand-in sessions: the watcher a1 (its status, the user typing, what Combwork typed and what it read: #650, it follows
+   * Combwork's doorbell with cw_inbox, as a model does) and the agents it watches.
    */
   const fake = (alpha: string) => {
     const state = { status: 'watching' as string, typing: false, typed: [] as string[], told: [] as string[], agents: new Map<string, AgentNow | null>() }
@@ -212,7 +212,7 @@ describe('agent watches (main/watches.ts)', async () => {
   }
   const reviewer = (alpha: string) => ({ projectPath: alpha, agentId: 'a2', name: 'Reviewer', project: 'alpha' })
   const second = (alpha: string) => ({ projectPath: alpha, agentId: 'a3', name: 'Second', project: 'alpha' })
-  /** An agent's new state, told to the watches as its status event is in Hive (noteAgentStatus). */
+  /** An agent's new state, told to the watches as its status event is in Combwork (noteAgentStatus). */
   const move = (st: ReturnType<typeof fake>, alpha: string, id: string, now: AgentNow) => {
     st.agents.set(id, now)
     watches.noteAgentStatus({ projectPath: alpha, agentId: id, status: now.status, runId: now.runId ?? '', statusMessage: now.statusMessage ?? undefined } as never)
@@ -268,7 +268,7 @@ describe('agent watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it("a project renamed while Hive runs: an agent watch follows both its watcher and the agents it watches (#508)", async () => {
+  it("a project renamed while Combwork runs: an agent watch follows both its watcher and the agents it watches (#508)", async () => {
     const { w, path, alpha } = await open()
     const st = fake(alpha)
     move(st, alpha, 'a2', nowOf())
@@ -295,7 +295,7 @@ describe('agent watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it('the whole workspace moved while Hive was closed: an agent watch comes with its watcher, its agents and their marks, and is delivered (#508 round 3)', async () => {
+  it('the whole workspace moved while Combwork was closed: an agent watch comes with its watcher, its agents and their marks, and is delivered (#508 round 3)', async () => {
     const { w, path, alpha, beta } = await open()
     const st = fake(alpha)
     move(st, alpha, 'a2', nowOf())
@@ -344,7 +344,7 @@ describe('agent watches (main/watches.ts)', async () => {
     writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-ffffffffffff', agents: [{ id: 'b1', name: 'Other' }] }))
     Object.assign(sessions, { agentNow: (p: string, id: string) => (p.toLowerCase() === beta.toLowerCase() && id === 'b1' ? { status: 'finished', runId: 'r9', prompts: 3, pending: false, statusMessage: null, backgroundTasks: 0, reply: 'NEW PROJECT REPLY' } : agentNow(p, id)) })
     watches.noteAgentStatus({ projectPath: beta, agentId: 'b1', status: 'finished', runId: 'r9' } as never)
-    // Read back first (Hive reopened), then checked.
+    // Read back first (Combwork reopened), then checked.
     watches.forgetWatches(w)
     await w.projectIds({ fresh: true })
     await watches.stampWatchProjects(w)
@@ -406,7 +406,7 @@ describe('agent watches (main/watches.ts)', async () => {
     await watches.settled()
     expect(st.typed).toHaveLength(1)
     expect(st.told[0]).toMatch(/is waiting for the user: "Trust this folder\?"/)
-    // The user answers it (ready, no turn ran), and Hive gives it a task: watched again, nothing is told yet.
+    // The user answers it (ready, no turn ran), and Combwork gives it a task: watched again, nothing is told yet.
     st.status = 'watching'
     move(st, alpha, 'a2', nowOf({ status: 'ready', runId: 'r1', prompts: 0 }))
     move(st, alpha, 'a2', nowOf({ status: 'ready', runId: 'r1', prompts: 0, pending: true }))
@@ -591,7 +591,7 @@ describe('agent watches (main/watches.ts)', async () => {
       a.status = 'working'
       watches.noteUserReply(alpha, 'a2', 'Reviewer', 'PRIVATE queued reply')
       await watches.settled()
-      // Many more replies since, to an agent it doesn't follow: the queued one is no longer among those Hive keeps.
+      // Many more replies since, to an agent it doesn't follow: the queued one is no longer among those Combwork keeps.
       for (let i = 0; i < 201; i++) watches.noteUserReply(alpha, 'a3', 'Second', `unfollowed ${i}`)
       await watches.settled()
       config.settings.assistant.tellReplies = false
@@ -611,8 +611,8 @@ describe('agent watches (main/watches.ts)', async () => {
       config.settings.assistant.tellReplies = true
       expect(await inboxText()).not.toContain('PRIVATE while revoked')
 
-      // One made before a restart (another run of Hive): given while replies are told, not once they are off.
-      await deliveries.createDelivery(home, { agentId: 'assistant', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: '[CW] User replied to Reviewer (alpha): "EARLIER RUN".', source: 'reply', ref: 'reply:1', meta: { generation: 0, run: 'an-earlier-run' } })
+      // One made before a restart (another run of Combwork): given while replies are told, not once they are off.
+      await deliveries.createDelivery(home, { agentId: 'assistant', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, body: '[CW] User replied to Reviewer (alpha): "EARLIER RUN".', source: 'reply', ref: 'reply:1', meta: { generation: 0, run: 'an-earlier-run' } })
       config.settings.assistant.tellReplies = false
       expect(await inboxText()).not.toContain('EARLIER RUN')
     } finally {
@@ -803,7 +803,7 @@ describe('agent watches (main/watches.ts)', async () => {
     }
   })
 
-  /** The Assistant as a watcher here: its status, what Hive typed into it and what it read (the agents' stand-ins stay as they are). */
+  /** The Assistant as a watcher here: its status, what Combwork typed into it and what it read (the agents' stand-ins stay as they are). */
   const assistantOf = (home: string) => {
     const a = { status: 'watching' as string, typed: [] as string[], told: [] as string[] }
     const liveFor = sessions.liveFor
@@ -1562,7 +1562,7 @@ describe('agent watches (main/watches.ts)', async () => {
   describe('usage watches (HI-2195)', async () => {
     const { config } = await import('../src/main/config')
     const { emit } = await import('../src/main/events')
-    // Hive's own wiring of the watches to its events (a usage report among them), as it starts.
+    // Combwork's own wiring of the watches to its events (a usage report among them), as it starts.
     watches.initWatches()
     const watch = [{ account: 'a-acct1', name: 'Max 1', percent: 98, limit: 'weekly' as const }]
     const weekly = (used: number) => ({ provider: 'claude-code' as const, plan: null, limits: [{ id: 'seven_day', label: 'weekly', windowMinutes: 10080, usedPercent: used, resetsAt: new Date(Date.now() + 48 * 3600e3).toISOString() }], updatedAt: new Date().toISOString() })

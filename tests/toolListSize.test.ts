@@ -22,14 +22,14 @@ describe('the tool list’s size and its parts', () => {
         required: ['description']
       }
     },
-    { name: 'cw_inbox', description: 'What Hive has for you', inputSchema: { type: 'object', properties: {} } },
+    { name: 'cw_inbox', description: 'What Combwork has for you', inputSchema: { type: 'object', properties: {} } },
     { name: 'no_description', inputSchema: { type: 'object' } }
   ]
 
   it('counts descriptions and nested parameter descriptions as the JSON has them, escapes included', () => {
     const size = toolListSize(list)
     expect(size.toolsChars).toBe(JSON.stringify(list).length)
-    expect(size.descriptionChars).toBe(inJson(DESC) + inJson('What Hive has for you'))
+    expect(size.descriptionChars).toBe(inJson(DESC) + inJson('What Combwork has for you'))
     expect(size.paramChars).toBe(['What to do', 'Related cards', 'Its key ("HI-12")', 'Ünïcode\tleaf'].map(inJson).reduce((a, b) => a + b, 0))
     // Escapes count as the JSON has them: \" and \n are two characters each, an emoji two UTF-16 code units.
     expect(inJson(DESC)).toBe(DESC.length + 3)

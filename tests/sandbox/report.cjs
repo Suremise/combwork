@@ -13,7 +13,7 @@
 const SCENARIOS = {
   1: 'Fresh install and first launch',
   2: 'First run with no coding-agent CLIs',
-  3: 'A CLI appearing while Hive runs (fake CLI)',
+  3: 'A CLI appearing while Combwork runs (fake CLI)',
   4: 'Upgrade from the previous release, running, as its updater runs the installer (--updated /S --force-run)',
   5: 'Uninstall',
   6: 'A new workspace in the fresh install (for the fresh-install comparison)',
@@ -183,7 +183,7 @@ function evaluate(meta, files) {
     differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The "Hive Desktop updated to …" notice can't show.`)
   }
   const s1 = files.s1
-  if (s1?.facts?.gitMissing || files['s1-state']?.git === false) differences.push('**No Git** on a fresh machine: Hive shows its Git warning (status bar "Git", Provider Setup "Git not found"). Expected; a fresh-install difference.')
+  if (s1?.facts?.gitMissing || files['s1-state']?.git === false) differences.push('**No Git** on a fresh machine: Combwork shows its Git warning (status bar "Git", Provider Setup "Git not found"). Expected; a fresh-install difference.')
   return { meta, checks, passed, failed: checks.length - passed, notRun, differences, files }
 }
 
@@ -203,7 +203,7 @@ function markdown(r) {
   const m = r.meta
   const esc = s => String(s).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ')
   const lines = [
-    `# Hive build checks in Windows Sandbox`,
+    `# Combwork build checks in Windows Sandbox`,
     '',
     `**${verdict(r)}** · ${m.date}`,
     '',

@@ -1,5 +1,5 @@
 // Agent names unique across the workspace (#702): the rules (a project's prefix, a suggested name, duplicates from
-// before), and Hive keeping them — Add Agent and its default name, a rename (its own name kept), a template's load
+// before), and Combwork keeping them — Add Agent and its default name, a rename (its own name kept), a template's load
 // (renamed, refused while a name is another project's, a name taken while it stages) and one of its agents (numbered), adds and renames in two projects at once (only one gets the name), duplicates from before flagged
 // once, and a template loading into a project without git (#1436: no worktrees, so nothing needs one).
 import { AsyncLocalStorage } from 'async_hooks'
@@ -67,7 +67,7 @@ describe('the name rules', () => {
   })
 })
 
-describe('Hive keeps agent names unique across the workspace', () => {
+describe('Combwork keeps agent names unique across the workspace', () => {
   const wsPath = join(base, 'ws')
   const alpha = join(wsPath, 'alpha')
   const beta = join(wsPath, 'beta')

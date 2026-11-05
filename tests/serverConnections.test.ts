@@ -116,7 +116,7 @@ describe('a profile that never saved a key (round 2)', () => {
   })
 
   it("before ready, hive.log's first lines aren't masked; a config.json that can't be read keeps them strict (HI-1855)", async () => {
-    const line = "The install folder C:\\Program Files\\Hive has an app package's entry"
+    const line = "The install folder C:\\Program Files\\Combwork has an app package's entry"
     resetMaskingForTests('pending')
     coverage.startCoverageEarly()
     expect(maskingState().state).toBe('none')

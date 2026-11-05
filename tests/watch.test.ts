@@ -333,7 +333,7 @@ describe('what counts as a change', () => {
       expect(l).not.toMatch(/\n/)
       expect(l).toMatch(/^\[CW\] HI-7 came back from the merge queue: the merge check typecheck failed on the merged result\. .*… Fix it in your worktree, commit and submit again \(cw_submit\)\. (Your card watch has ended|This is your card in its loop)/)
     }
-    // Another note of Hive's (a stale pass) is quoted after where the card is, as before.
+    // Another note of Combwork's (a stale pass) is quoted after where the card is, as before.
     expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[CW\] #7 is in Doing: HR1 \(hive\) passed it; latest comment by HR1 \(hive\): "Round 2: PASSED — no findings"\. Combwork: "#7: its pass is stale"/)
   })
 
@@ -344,7 +344,7 @@ describe('what counts as a change', () => {
     const again = resubmittedText('HI-2122', conflict as never, 'HB1')
     expect(again).toBe('HI-2122 is back in Review after the merge queue returned it (a conflict with 1.0.0 in src/main/projectAgents.ts (1 conflict, line 447), tests/providerDetect.test.ts (2 conflicts, lines 78 and 89)); HB1 resolved it and submitted it again: review the resolution')
     const change = { ...cardChange(7, c, ['column']), about: { ...wakeAbout(c, ['column'], 'r1'), resubmitted: again } }
-    // Its own watch's line, and Hive's loop wake for it.
+    // Its own watch's line, and Combwork's loop wake for it.
     expect(wakeLine(change)).toBe(`[CW] ${again}. Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`)
     expect(loopWakeLine(change, 'review')).toBe(`[CW] ${again}. You review this card in its loop: carry on with it (cw_read_task with latestComment for the comment in full).`)
     expect(wakeLines([change, cardChange(8, cardOf({ number: 8, column: 'doing' }), ['column'])])).toMatch(/^\[CW\] HI-2122 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in src\/main\/projectAgents\.ts/)
@@ -534,7 +534,7 @@ describe('watches (main/watches.ts)', async () => {
   /** The watches a workspace has saved (#1018: rows in its database, what watches.json's `watches` held). */
   // oxlint-disable-next-line typescript/no-explicit-any -- saved entries read as JSON, as the file's were
   const savedOf = (path: string): any[] => storeDocs(path, 'watches')
-  /** Saves a workspace's watches as Hive would have (what writing watches.json by hand was). */
+  /** Saves a workspace's watches as Combwork would have (what writing watches.json by hand was). */
   const putSaved = (path: string, list: unknown[], invalid?: unknown[]): Promise<void> => putStoreDocs(path, 'watches', list, invalid ? { meta: { invalid } } : {})
   const user = { kind: 'user' } as const
   let n = 0
@@ -548,8 +548,8 @@ describe('watches (main/watches.ts)', async () => {
     return { w, path, alpha }
   }
   /**
-   * Stand-in sessions: an agent's status, whether the user is typing, what Hive typed, the prompts its CLI took, and what
-   * it read (#650: it follows Hive's doorbell with cw_inbox, as a model does: a wake is received, and its watch ends,
+   * Stand-in sessions: an agent's status, whether the user is typing, what Combwork typed, the prompts its CLI took, and what
+   * it read (#650: it follows Combwork's doorbell with cw_inbox, as a model does: a wake is received, and its watch ends,
    * once it is read).
    */
   const fake = (alpha: string) => {
@@ -606,7 +606,7 @@ describe('watches (main/watches.ts)', async () => {
       await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
       // A message left while it works waits for its next line.
       st.status = 'working'
-      expect((await messages.leaveMessage(alpha, 'a1', 'Builder', { kind: 'hive', name: 'Hive' }, 'hello')).fate).toBe('queued')
+      expect((await messages.leaveMessage(alpha, 'a1', 'Builder', { kind: 'hive', name: 'Combwork' }, 'hello')).fate).toBe('queued')
       st.status = 'watching'
       // The saves from here: the wake handed over (1), then the offer of the message and the wake together (2), held.
       holdAt = saves + 2
@@ -821,7 +821,7 @@ describe('watches (main/watches.ts)', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a1', column: 'review' }, user))
-    // The card as the builder's submission left it, and then the reviewer's verdict before Hive armed the watch.
+    // The card as the builder's submission left it, and then the reviewer's verdict before Combwork armed the watch.
     const submitted = await inWorkspace(w, () => tasks.getTask(c.number, w))
     await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'doing' }, { kind: 'agent', name: 'Reviewer (alpha)' }, { comment: 'Round 1: FAILED\n1. Add a test.' }))
     const cond = (): WatchCondition => ({ cards: [c.number], changes: ['verdict', 'column', 'comment'], column: 'passed', moveInto: true })
@@ -1063,7 +1063,7 @@ describe('watches (main/watches.ts)', async () => {
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
     expect(savedOf(path)[0]).toMatchObject({ agentId: 'a1', limitMinutes: 30, cond: { cards: [c.number], changes: ['verdict'] } })
-    // Read back after the workspace's watches are forgotten (Hive restarted): the same watch.
+    // Read back after the workspace's watches are forgotten (Combwork restarted): the same watch.
     watches.forgetWatches(w)
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
     await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c.number]), { timeout: HUNG_MS })
@@ -1779,7 +1779,7 @@ describe('watches (main/watches.ts)', async () => {
     }
   })
 
-  it('a wake being offered when Hive stopped (its CLI never took it) is offered once more after the restart, saying it may repeat; its watch ends once that is received (#649)', async () => {
+  it('a wake being offered when Combwork stopped (its CLI never took it) is offered once more after the restart, saying it may repeat; its watch ends once that is received (#649)', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
     const takes = sessions.sendPrompt
@@ -1800,7 +1800,7 @@ describe('watches (main/watches.ts)', async () => {
       expect(st.typed).toHaveLength(1)
       expect((await deliveries.deliveriesOf(alpha, 'a1')).map((r) => r.state)).toEqual(['offered'])
       expect(watches.watchFor(alpha, 'a1')).not.toBeNull()
-      // Hive stops (memory forgotten, the files read again), and the CLI takes what is typed after the restart.
+      // Combwork stops (memory forgotten, the files read again), and the CLI takes what is typed after the restart.
       await deliveries.forgetDeliveriesForTests()
       watches.forgetWatches(w)
       Object.assign(sessions, { sendPrompt: takes })
@@ -1927,7 +1927,7 @@ describe('watches (main/watches.ts)', async () => {
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'Legacy', project: 'alpha' }, user))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
     await watches.settled()
-    // The file as a build from before #649 left it, typing when Hive stopped.
+    // The file as a build from before #649 left it, typing when Combwork stopped.
     const data = savedOf(path)
     data[0].fired = { line: `[CW] #${c.number} has news. Your card watch has ended: carry on.`, at: new Date().toISOString(), cards: [c.number], sending: new Date().toISOString() }
     await putSaved(path, data)
@@ -2038,7 +2038,7 @@ describe('watches (main/watches.ts)', async () => {
     // The entries that aren't valid are still kept, as they were.
     expect(storeMeta(path, 'watches', 'invalid')).toEqual([earlier, bad, elsewhere, stranger])
     expect(savedOf(path)).toEqual([])
-    // A watches file found after that (an older Hive's) is kept as a backup too, never read, even one that isn't JSON.
+    // A watches file found after that (an older Combwork's) is kept as a backup too, never read, even one that isn't JSON.
     writeFileSync(file, '{ not json')
     watches.forgetWatches(w)
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
@@ -2081,7 +2081,7 @@ describe('watches (main/watches.ts)', async () => {
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
     const id = JSON.parse(readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')).id
     expect(savedOf(path)[0].projectId).toBe(id)
-    // Renamed while Hive was closed: read back, the watch is the project's under its new name.
+    // Renamed while Combwork was closed: read back, the watch is the project's under its new name.
     await disposeWorkspaceService(w)
     const gamma = join(path, 'gamma')
     await moveFolder(alpha, gamma)
@@ -2151,7 +2151,7 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w2)
   })
 
-  it('the whole workspace moved while Hive was closed: its watches come with it, by their ids, and still wake their agents (#508 round 3)', async () => {
+  it('the whole workspace moved while Combwork was closed: its watches come with it, by their ids, and still wake their agents (#508 round 3)', async () => {
     // A workspace with no record of where it was (lastPath, #146): the watches with ids say where.
     const { w, path, alpha } = await open()
     fake(alpha)
@@ -2178,16 +2178,16 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w2)
   })
 
-  it('a project renamed while Hive runs keeps its watches: a change to the card still wakes its agent (#508)', async () => {
+  it('a project renamed while Combwork runs keeps its watches: a change to the card still wakes its agent (#508)', async () => {
     const { w, path, alpha } = await open()
     fake(alpha)
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
     const gamma = join(path, 'gamma')
-    // Tried again while Windows holds the folder a moment (#1365: EPERM under load, Hive's own watchers or a scanner).
+    // Tried again while Windows holds the folder a moment (#1365: EPERM under load, Combwork's own watchers or a scanner).
     await moveFolder(alpha, gamma)
     const st = fake(gamma)
-    // Once Hive's project ids have the folder by its new name (they're read again a second on, #508), not after a time.
+    // Once Combwork's project ids have the folder by its new name (they're read again a second on, #508), not after a time.
     await vi.waitFor(async () => expect((await w.projectIds()).byPath.has(gamma.toLowerCase())).toBe(true), { timeout: HUNG_MS })
     await inWorkspace(w, () => tasks.commentTask(c.number, 'Ready', user))
     await evaluated(w)
@@ -2358,7 +2358,7 @@ describe('watches (main/watches.ts)', async () => {
     }
   })
 
-  it("a wake isn't typed if Hive can't first save the delivery it is handed over as; it is tried again", async () => {
+  it("a wake isn't typed if Combwork can't first save the delivery it is handed over as; it is tried again", async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
@@ -2423,7 +2423,7 @@ describe('watches (main/watches.ts)', async () => {
     for (let i = 0; i < 20; i++) cards.push((await inWorkspace(w, () => tasks.createTask({ title: `C${i}`, project: 'alpha' }, user))).number)
     await watches.registerWatch(w, alpha, 'a1', { cards, changes: ['comment'] })
     const one = savedOf(path)[0]
-    // As many watches on 20 cards each as fit in 1 MB as saved (the most Hive reads), but not at their longest (fired,
+    // As many watches on 20 cards each as fit in 1 MB as saved (the most Combwork reads), but not at their longest (fired,
     // being typed): about 1 KB more each.
     const count = Math.floor((1024 * 1024 - 1024) / (Buffer.byteLength(JSON.stringify(one)) + 16))
     const many = Array.from({ length: count }, (_, i) => ({ ...one, id: `w${i}`, agentId: `b${String(i).padStart(3, '0')}` }))

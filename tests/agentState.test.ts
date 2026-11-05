@@ -75,7 +75,7 @@ describe('agent state marks (#973)', () => {
   it("an agent whose start is under way (main's start state, HI-1977) isn't stalled on its Doing card; one whose start failed is", () => {
     const starting = { ...agent('a1', null), start: { starting: true as const } }
     expect(boardExtras('alpha', starting, [card('a1', 'doing')])).toEqual({ blocked: false, stalled: false })
-    const failed = { ...agent('a1', null), start: { failed: "Hive couldn't get slot-b ready: busy" } }
+    const failed = { ...agent('a1', null), start: { failed: "Combwork couldn't get slot-b ready: busy" } }
     expect(boardExtras('alpha', failed, [card('a1', 'doing')])).toEqual({ blocked: false, stalled: true })
   })
 

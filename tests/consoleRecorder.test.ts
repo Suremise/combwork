@@ -10,13 +10,13 @@ import { SECRET_SAMPLES } from './secretSamples'
 // Recording a console source (#638), the service itself: one recording per window, only while the window still wants
 // it (a start overtaken by a close, a stop or a newer start records nothing, whenever it is overtaken); a file each,
 // reserved however many starts come at once; stopping writes what was captured up to then before the end line and
-// nothing after; the newest recording by when it started. Hive's profile folder is a new temp folder of this file's.
+// nothing after; the newest recording by when it started. Combwork's profile folder is a new temp folder of this file's.
 vi.mock('electron', async () => {
   const { tempDir } = await import('./tempDir')
   const profile = tempDir('hive-recorder-')
   return { app: { getPath: () => profile, getVersion: () => '0.7.0-test' } }
 })
-// A file open can be made to fail once (a recordings folder Hive can't write to), and a recording's writes can fail (a
+// A file open can be made to fail once (a recordings folder Combwork can't write to), and a recording's writes can fail (a
 // full disk) or take only part of what they're given, chosen by what is being written.
 const openFails = vi.hoisted(() => ({ next: false }))
 const writeFaults = vi.hoisted(() => ({ rules: [] as { when: (text: string) => boolean; fault: 'enospc' | number; times: number }[] }))

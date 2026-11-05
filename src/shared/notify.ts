@@ -47,7 +47,7 @@ export function notifyRoute(n: Gates, kind: NotifyKind, focused: FocusedHive | n
   if (GATED.has(kind) && !n.desktopNotifications) return { route: 'none', why: 'notifications off' } // i18n-ignore: the log's reason (English)
   if (kind === 'finished' && !n.notifyOnFinished) return { route: 'none', why: 'finished notices off' } // i18n-ignore: the log's reason (English)
   if (kind === 'needsYou' && !n.notifyOnWaiting) return { route: 'none', why: 'waiting notices off' } // i18n-ignore: the log's reason (English)
-  if (!focused) return AWAY.has(kind) ? { route: 'windows', why: 'no Hive window focused' } : { route: 'popup', why: 'no Hive window focused: waits in its window' } // i18n-ignore: the log's reason (English)
+  if (!focused) return AWAY.has(kind) ? { route: 'windows', why: 'no Combwork window focused' } : { route: 'popup', why: 'no Combwork window focused: waits in its window' } // i18n-ignore: the log's reason (English)
   if (kind === 'quit') return { route: 'none', why: 'Hive has closed: no window to show it' } // i18n-ignore: the log's reason (English)
   if (!SCOPED.has(kind)) return { route: 'popup', why: 'Hive focused' } // i18n-ignore: the log's reason (English)
   if (!from.projectPath && !from.workspacePath) return { route: 'popup', why: 'about no project' } // i18n-ignore: the log's reason (English)

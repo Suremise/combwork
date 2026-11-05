@@ -1,4 +1,4 @@
-// No line of Hive's before a launch's hive tools have connected (#865): a resumed Claude Code is ready at its SessionStart
+// No line of Combwork's before a launch's hive tools have connected (#865): a resumed Claude Code is ready at its SessionStart
 // before its hive MCP server has connected, and a doorbell typed then is a turn that can't call cw_inbox. The server
 // says when the CLI has connected it (POST /v1/launch/connected → sessions.hiveToolsConnected); until then, at most
 // cw.mcp.connectSeconds (30 s) from when the launch first became ready, the line writer and the watch wakes wait. The
@@ -16,7 +16,7 @@ const live = (sessions as unknown as { live: Map<string, Entry> }).live
 const key = `${project.toLowerCase()}#${id}`
 const emit = (e: Entry) => (sessions as unknown as { emitState(s: unknown): void }).emitState(e.state)
 
-/** A launch as its CLI reports it (`status`), given Hive's tools unless `tools` is false; sent through emitState. */
+/** A launch as its CLI reports it (`status`), given Combwork's tools unless `tools` is false; sent through emitState. */
 function launched(status = 'ready', tools = true): Entry {
   const e: Entry = {
     state: { runId: 'run1', status, statusSince: new Date().toISOString(), projectPath: project, agentId: id, agentName: 'B1', runtime: { lifecycle: 'running', maintenance: null, attention: null, composer: 'free' }, turn: { state: 'over' } },
@@ -29,7 +29,7 @@ function launched(status = 'ready', tools = true): Entry {
   return e
 }
 
-describe("no line of Hive's before a launch's hive tools have connected (#865)", () => {
+describe("no line of Combwork's before a launch's hive tools have connected (#865)", () => {
   const watched = { current: false }
   let spy: ReturnType<typeof vi.spyOn>
   beforeEach(() => {
@@ -77,7 +77,7 @@ describe("no line of Hive's before a launch's hive tools have connected (#865)",
     expect(whyNoLine(project, id)).toBeNull()
   })
 
-  it('a launch without Hive\'s tools (Settings → Agent API off) never waits for them', () => {
+  it('a launch without Combwork\'s tools (Settings → Agent API off) never waits for them', () => {
     launched('ready', false)
     expect(sessions.hiveToolsWaiting(project, id)).toBe(false)
     expect(whyNoLine(project, id)).toBeNull()

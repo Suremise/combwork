@@ -82,7 +82,7 @@ interface World {
   clock: { now: number }
   /** Pids of holder processes that have ended. */
   dead: Set<number>
-  /** Another Hive on the same hive.db: its own connection and holder process. */
+  /** Another Combwork on the same hive.db: its own connection and holder process. */
   another: (pid: number) => { pool: SlotPool; store: SlotStore }
   /** Holds the next `what` run of a slot at a gate: resolves once it has started; `open()` lets it go. */
   hold: (slot: string, what: SlotRun['what']) => { started: Promise<void>; open: () => void }
@@ -261,7 +261,7 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(w.store.slot('slot-a')?.state).toBe('ready')
   })
 
-  it("a writer is cleared by a refresh only once its processes are proven ended (writerOver): never just because its Hive is gone (#1434)", async () => {
+  it("a writer is cleared by a refresh only once its processes are proven ended (writerOver): never just because its Combwork is gone (#1434)", async () => {
     const w = world()
     const r = await lent(w, { agent: 'a1', card: 1 })
     const db = new DatabaseSync(boardFile(w.ws))
@@ -274,14 +274,14 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     writeFileSync(join(r.slot.folder, 'left.txt'), 'untracked\n')
     await w.pool.refresh()
     expect(w.store.slot('slot-a')?.writer).not.toBeNull()
-    // Its Hive gone: still held (its processes aren't known to have ended), not lent, not removed.
+    // Its Combwork gone: still held (its processes aren't known to have ended), not lent, not removed.
     w.dead.add(77)
     await w.pool.refresh()
     expect(w.store.slot('slot-a')?.writer).toMatchObject({ run: 'run-1' })
     expect(w.store.lease(r.lease.id)?.endRev).toBeNull()
     expect((await w.pool.lend({ agent: 'a2', card: 2, slot: 'slot-a' })).ok).toBe(false)
     expect(await w.pool.remove('slot-a')).not.toBeNull()
-    // Proven ended (its own Hive's release that couldn't be written): cleared, and drained.
+    // Proven ended (its own Combwork's release that couldn't be written): cleared, and drained.
     w.set.writersOver.add('run-1')
     await w.pool.refresh()
     expect(w.store.slot('slot-a')?.writer).toBeNull()
@@ -543,14 +543,14 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
       return r
     }
 
-    it('holds the slot as an operation with no lease through its look and detach; an overlapping settle, here or in another Hive, does nothing', async () => {
+    it('holds the slot as an operation with no lease through its look and detach; an overlapping settle, here or in another Combwork, does nothing', async () => {
       const w = world({ builders: 1 })
       const r = await onLine(w)
       const held = holdDirty(r.slot.folder)
       const release = w.pool.release(r.lease.id, 'done')
       await held.started
       expect(w.store.slot('slot-a')?.op).toMatchObject({ kind: 'warm', lease: null, pid: 1 })
-      // This pool's refresh (a refresh overlapping drained's settle) and another Hive's: nothing taken or changed.
+      // This pool's refresh (a refresh overlapping drained's settle) and another Combwork's: nothing taken or changed.
       await w.pool.refresh()
       await w.another(2).pool.refresh()
       expect(w.store.slot('slot-a')?.op).toMatchObject({ kind: 'warm', lease: null, pid: 1 })
@@ -652,7 +652,7 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
       expect(branch(r.slot.folder)).toBe('HEAD')
     })
 
-    it("a settle whose Hive has gone: taken over with the slot as it was (never failed as a warming), then looked at again", async () => {
+    it("a settle whose Combwork has gone: taken over with the slot as it was (never failed as a warming), then looked at again", async () => {
       const w = world({ builders: 1 })
       const r = await onLine(w)
       await w.store.end(r.lease.id, 'done')
@@ -826,9 +826,9 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(await w.pool.remove('slot-a')).toBeNull()
   })
 
-  it("removes Hive's own unchanged skill copies first, and keeps a slot whose .agents/skills still holds a hive-* folder (#1500)", async () => {
+  it("removes Combwork's own unchanged skill copies first, and keeps a slot whose .agents/skills still holds a hive-* folder (#1500)", async () => {
     const { w, folder } = await freeSlot()
-    // Hive's copies are git-ignored (info/exclude, as Hive keeps them), so the dirty guard doesn't count them.
+    // Combwork's copies are git-ignored (info/exclude, as Combwork keeps them), so the dirty guard doesn't count them.
     writeFileSync(join(w.project, '.git', 'info', 'exclude'), '.agents/\n')
     const skills = join(folder, '.agents', 'skills')
     for (const name of ['hive-merge-ready', 'hive-edited']) {
@@ -1030,7 +1030,7 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
     const gate = w.hold('slot-a', 'setup')
     const lending = w.pool.lend({ agent: 'a1', card: 1 })
     await gate.started
-    // Another Hive, the same card and builder: not handed a slot still being set up.
+    // Another Combwork, the same card and builder: not handed a slot still being set up.
     expect(await b.pool.lend({ agent: 'a1', card: 1 })).toEqual({ ok: false, refusal: { why: 'warming', slot: 'slot-a' } })
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', op: { kind: 'warm', pid: 1 } })
     gate.open()
@@ -1040,7 +1040,7 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
     expect(again).toMatchObject({ ok: true, slot: { name: 'slot-a', state: 'lent', op: null, job: null } })
   })
 
-  it('a Hive that dies mid-setup: its job is settled, the warming failed (never ready), its late writes refused', async () => {
+  it('a Combwork that dies mid-setup: its job is settled, the warming failed (never ready), its late writes refused', async () => {
     const w = world({ setup: WRITE_ENV, builders: 2 })
     const b = w.another(2)
     const gate = w.hold('slot-a', 'setup')
@@ -1175,7 +1175,7 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
     expect(await w.pool.carry('a2', { name: 'hb1', folder: join(w.root, 'elsewhere') })).toBeNull()
   })
 
-  it('a removal whose Hive died is taken over and the slot looked at again; a live one is left alone', async () => {
+  it('a removal whose Combwork died is taken over and the slot looked at again; a live one is left alone', async () => {
     const w = world({ builders: 1 })
     const b = w.another(2)
     const r = await lent(w, { agent: 'a1', card: 1 })
@@ -1196,7 +1196,7 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
     expect((await lent({ ...w, pool: b.pool }, { agent: 'a2', card: 2 })).slot.name).toBe('slot-a')
   })
 
-  it("this Hive's own operation left by a closed workspace is taken over as gone", async () => {
+  it("this Combwork's own operation left by a closed workspace is taken over as gone", async () => {
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })
     await w.pool.release(r.lease.id, 'done')
@@ -1273,9 +1273,9 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
     }
   }
 
-  it("a refresh in the same Hive right after the reservation commits doesn't take the operation over", async () => {
+  it("a refresh in the same Combwork right after the reservation commits doesn't take the operation over", async () => {
     const w = world({ setup: WRITE_ENV })
-    // Another of this Hive's pools on the project: the same store, holder and live operations.
+    // Another of this Combwork's pools on the project: the same store, holder and live operations.
     const same = new SlotPool({ ...w.pool.deps })
     afterTake(w, () => same.refresh())
     const r = await w.pool.lend({ agent: 'a1', card: 1 })
@@ -1308,7 +1308,7 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
     expect(w.store.leaseOf({ card: 2 })).toBeNull()
   })
 
-  it("a removal and its takeover check are this Hive's from before their writes too", async () => {
+  it("a removal and its takeover check are this Combwork's from before their writes too", async () => {
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })
     await w.pool.release(r.lease.id, 'done')
@@ -1502,7 +1502,7 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     expect(readFileSync(join(r.slot.folder, 'wip.txt'), 'utf8')).toBe('wip\n')
   })
 
-  it('a preparation whose Hive died is taken over: the lease kept, the slot lent, the operation gone', async () => {
+  it('a preparation whose Combwork died is taken over: the lease kept, the slot lent, the operation gone', async () => {
     const w = world({ builders: 1, setup: WRITE_ENV })
     commit(w.project, { 'package-lock.json': '{"v":1}\n' }, 'lock')
     const r = await lent(w, { agent: 'a1', card: 1 })

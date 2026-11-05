@@ -18,7 +18,7 @@ const { stopProcessesIn, endExactly } = createRequire(import.meta.url)('./e2e/fo
 
 const events: unknown[] = []
 vi.mock('../src/main/events', () => ({ emit: (e: unknown) => events.push(e) }))
-// Hive's profile, where what is listed is kept across a restart (#614): this file's own, never the shared test root.
+// Combwork's profile, where what is listed is kept across a restart (#614): this file's own, never the shared test root.
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
@@ -227,12 +227,12 @@ else {
     expect(await agentsMemory()).toBeNull()
   }, 60000)
 
-  it("Hive quitting keeps a run as ended for its slot writer only once its job is seen empty, never while what its CLI started still runs (HI-1886)", async () => {
+  it("Combwork quitting keeps a run as ended for its slot writer only once its job is seen empty, never while what its CLI started still runs (HI-1886)", async () => {
     const { endedEarlier, launchEnded, recordEndedLaunches, runningProcesses, runTookWriter, trackLaunch } = await import('../src/main/agentProcesses')
     // Both slots' writers' runs (HI-2299: only those are kept).
     runTookWriter('quit1')
     runTookWriter('quit2')
-    // A CLI that started a detached server and exited, its exit not yet seen (Hive quitting): its job isn't empty.
+    // A CLI that started a detached server and exited, its exit not yet seen (Combwork quitting): its job isn't empty.
     const out = join(dir, 'quit1.txt')
     const cli = spawn(process.execPath, [script, 'cli', out], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true })
     expect(await trackLaunch({ runId: 'quit1', projectPath: dir, agentId: 'q1', agentName: 'Quitter' }, cli.pid!)).toEqual({ tracked: true })
@@ -397,7 +397,7 @@ else {
   // An escaped process already in a job is followed, never assigned to the launch's (#659): Windows would nest one job in
   // the other. The Store PowerShell's job is its package's, which every Store PowerShell joins: when it had no parent,
   // assigning one made it this launch's, and the next ones (any agent's or app's, other test runs') were listed and
-  // ended with it. A test can't make a job without a parent here (Hive's own runs in one, which refuses breakaway), but
+  // ended with it. A test can't make a job without a parent here (Combwork's own runs in one, which refuses breakaway), but
   // a launch's job that is still empty has none: assigning nested it the other way, which is as wrong, and shows.
   it('follows an escaped process that is already in another job, never nesting the jobs (#659)', async () => {
     const { HOST_SOURCE } = await import('../src/main/agentProcesses')
@@ -830,11 +830,11 @@ $r | ConvertTo-Json -Compress
     const [first] = saved.launches[0].processes
     const older = String(BigInt(saved.launches[0].processes.find((p: { pid: number }) => p.pid === child).created) - 10_000_000n)
     saved.launches.unshift({ runId: 'run-old', projectPath: dir, agentId: 'a8', agentName: 'Old', since: saved.launches[0].since, processes: [{ ...first, pid: child, created: older }] })
-    // More launches for one agent than Hive keeps (5 an agent): the newest are kept, however often Hive restarts.
+    // More launches for one agent than Combwork keeps (5 an agent): the newest are kept, however often Combwork restarts.
     for (let i = 1; i <= 7; i++) saved.launches.push({ runId: `many${i}`, projectPath: dir, agentId: 'a9', agentName: 'Many', since: saved.launches[1].since, processes: saved.launches[1].processes.filter((p: { pid: number }) => p.pid === grandchild) })
     writeFileSync(kept, JSON.stringify(saved))
 
-    // Hive restarts: its tracker and its memory go (the processes keep running), the kept list stays.
+    // Combwork restarts: its tracker and its memory go (the processes keep running), the kept list stays.
     const restart = async (mod: typeof before): Promise<typeof before> => {
       await mod.closeProcessTracking()
       vi.resetModules()
@@ -873,8 +873,8 @@ $r | ConvertTo-Json -Compress
 
 // Stop Them's whole tree (#1008): EndTree picks what to end by the parent ids of a snapshot, holding a handle on each
 // process it checked. Driven here with the OS's answers given (PickTree's open, absent, createdOf, running), so the
-// races are deterministic: an id another process took between the snapshot and the check, a root Hive can't open, a
-// root gone, a root whose id names another process now, a child that has exited, a child Hive can't open or read
+// races are deterministic: an id another process took between the snapshot and the check, a root Combwork can't open, a
+// root gone, a root whose id names another process now, a child that has exited, a child Combwork can't open or read
 // (reported, never passed over). Nothing real is ended.
 describe.runIf(process.platform === 'win32')("what Stop Them ends of a test run's tree (#1008)", () => {
   const dir = tempDir('hive-picktree-')
@@ -890,7 +890,7 @@ describe.runIf(process.platform === 'win32')("what Stop Them ends of a test run'
 $ErrorActionPreference = 'Stop'
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -Raw $src)
 # A case: the snapshot's parent ids (parent = children), and each process as the check finds it (id = created, running,
-# open: whether Hive can open it to end it, peek: what a query-only look says of one it can't, the start time, 0 gone
+# open: whether Combwork can open it to end it, peek: what a query-only look says of one it can't, the start time, 0 gone
 # or -1 unreadable); one not listed has gone (no process has its id). The snapshot is at 200.
 function Pick($roots, $tree, $now) {
   $children = New-Object 'System.Collections.Generic.Dictionary[int,System.Collections.Generic.List[int]]'
@@ -920,7 +920,7 @@ $r.gone = Pick '10:100' @{ 10 = @(20) } @{ 20 = @{ created = 150 } }
 $r.other = Pick '10:100' @{ 10 = @(20) } @{ 10 = @{ created = 999 }; 20 = @{ created = 1000 } }
 # A child that has exited (its id still held): not taken.
 $r.exited = Pick '10:100' @{ 10 = @(20) } @{ 10 = @{ created = 100 }; 20 = @{ created = 150; running = $false } }
-# Children that run and Hive can't open to end: one a query-only look shows is the run's (reported by its identity), one
+# Children that run and Combwork can't open to end: one a query-only look shows is the run's (reported by its identity), one
 # it can't read at all (unverified), one that has gone by then, one whose id a later process took: never passed over in
 # silence, nor anything below them followed. A child opened whose start time can't be read, running: unverified too.
 $r.unopenable = Pick '10:100' @{ 10 = @(21, 22, 23, 24, 25) } @{ 10 = @{ created = 100 }; 21 = @{ created = 151; open = $false; peek = 151 }; 22 = @{ open = $false; peek = -1 }; 23 = @{ open = $false; peek = 0 }; 24 = @{ open = $false; peek = 300 }; 25 = @{ created = 0 } }

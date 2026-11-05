@@ -94,15 +94,15 @@ function platformNotice(project: string, p: ProjectPlatform): { title: string; m
 }
 
 // i18n-ignore: the .combwork folder's README, a file committed with the workspace
-const WORKSPACE_README = `# .combwork
+export const WORKSPACE_README = `# .combwork
 
-This folder is managed by [Hive](https://github.com/) and is meant to be committed.
+This folder is managed by [Combwork](https://github.com/Suremise/combwork) and is meant to be committed.
 
 - \`shared/\` — notes, instructions and handovers shared across AI sessions and projects.
-- \`skills/\` — Hive skills (one folder per skill, each with a \`SKILL.md\`). Every agent in every project gets them.
-- \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Add them to projects in Hive.
-- \`workspace.json\` — the workspace's settings, among them the MCP servers added for the Hive Assistant (a project's are in its \`.combwork/project.json\`).
-- \`hive.db\` — the task board (Hive's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
+- \`skills/\` — Combwork skills (one folder per skill, each with a \`SKILL.md\`). Every agent in every project gets them.
+- \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Add them to projects in Combwork.
+- \`workspace.json\` — the workspace's settings, among them the MCP servers added for the Combwork Assistant (a project's are in its \`.combwork/project.json\`).
+- \`hive.db\` — the task board (Combwork's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
 - \`usage.db\` — what each session used (the usage history the Overviews read). It is this machine's too, kept out of git.
 
 MCP definitions must not contain secrets. Reference environment variables instead, e.g. \`"\${GITHUB_TOKEN}"\`.
@@ -111,16 +111,29 @@ MCP definitions must not contain secrets. Reference environment variables instea
 /** The usage history's lines of BOARD_GITIGNORE (#1106), added to the .gitignore Hive wrote before them. */
 const USAGE_IGNORE = '# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n' // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 
-/** Adds the usage history's lines to the .gitignore Hive wrote (only its own: one the user wrote is theirs). */
+/** BOARD_GITIGNORE's first line as Hive wrote it before 1.1 (HI-2580): a .gitignore starting with it is still Combwork's own. */
+const LEGACY_BOARD_GITIGNORE_HEAD = "# The task board's database and what moving it from files left (added by Hive, #1017)" // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
+
+/**
+ * A .combwork/.gitignore's text with the usage history's lines added, or null to leave it as it is: one Combwork (or Hive,
+ * before 1.1) didn't write is the user's, and one that has them already needs nothing.
+ */
+export function withUsageIgnore(text: string): string | null {
+  const ours = text.startsWith(BOARD_GITIGNORE.split('\n')[0]) || text.startsWith(LEGACY_BOARD_GITIGNORE_HEAD)
+  if (!ours || /^usage\.db\r?$/m.test(text)) return null
+  const nl = text.includes('\r\n') ? '\r\n' : '\n'
+  return `${text}${text.endsWith('\n') ? '' : nl}${USAGE_IGNORE.replace(/\n/g, nl)}`
+}
+
+/** Adds the usage history's lines to the .gitignore Combwork wrote (only its own: one the user wrote is theirs). */
 async function addUsageIgnore(file: string): Promise<void> {
   const text = await readFile(file, 'utf8').catch(() => null)
-  if (text === null || !text.startsWith(BOARD_GITIGNORE.split('\n')[0]) || /^usage\.db\r?$/m.test(text)) return
-  const nl = text.includes('\r\n') ? '\r\n' : '\n'
-  await writeFile(file, `${text}${text.endsWith('\n') ? '' : nl}${USAGE_IGNORE.replace(/\n/g, nl)}`).catch(() => undefined)
+  const next = text === null ? null : withUsageIgnore(text)
+  if (next !== null) await writeFile(file, next).catch(() => undefined)
 }
 
 // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
-const BOARD_GITIGNORE = `# The task board's database and what moving it from files left (added by Hive, #1017)
+export const BOARD_GITIGNORE = `# The task board's database and what moving it from files left (added by Combwork, #1017)
 hive.db
 hive.db-*
 backups/
@@ -132,11 +145,15 @@ usage.db
 usage.db-*
 `
 
+/** The Assistant's home's .gitignore (HI-2580: before 1.1 it said Hive; nothing reads it back). */
+// agent-protocol: a .gitignore's fixed text for git and whoever opens the file, not words said to an agent
+export const ASSISTANT_GITIGNORE = "# Combwork Assistant: this machine's sessions (added by Combwork)\n*\n" // i18n-ignore: the Assistant's .gitignore, a file in the workspace
+
 // i18n-ignore: the handovers folder's README, a file committed with the workspace
-const HANDOVER_README = `# Handovers
+export const HANDOVER_README = `# Handovers
 
 Notes written at the end of a session so the next session (or another project) can pick up where it left off.
-Agents can create these with the Hive MCP tool \`cw_create_handover\`.
+Agents can create these with the Combwork MCP tool \`cw_create_handover\`.
 `
 
 export interface SessionsFile {
@@ -507,7 +524,7 @@ export class WorkspaceService {
         await this.ensureProject(this.assistantHome)
         // The Assistant's conversations and backups are this machine's: kept out of git if the workspace is a repository.
         const ignore = join(this.assistantHome, '.gitignore')
-        if (!existsSync(ignore)) await writeFile(ignore, "# Hive Assistant: this machine's sessions (added by Hive)\n*\n")
+        if (!existsSync(ignore)) await writeFile(ignore, ASSISTANT_GITIGNORE)
       } catch (e) {
         log.warn('setting up the Assistant', e)
       }

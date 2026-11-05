@@ -354,7 +354,7 @@ describe("0.9's providers' order, read by the migration only (HI-2139)", () => {
     expect(project.agents[0].provider).toBe('codex')
   })
 
-  it("isn't today's: Automatic's fallback picks in Hive's order", () => {
+  it("isn't today's: Automatic's fallback picks in Combwork's order", () => {
     expect(autoProvider(loaded.settings)).toBe('claude-code')
   })
 })

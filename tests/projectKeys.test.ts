@@ -429,7 +429,7 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     expect(named(() => wakeLine(cardChange(c.number, c, ['column'])))).toContain(`[CW] ${name} is in Todo`)
     expect(named(() => limitLine({ cards: [c.number], changes: ['column'] }, 60))).toContain(`No change on ${name}`)
     expect(named(() => releasedLine([{ number: c.number, why: 'reassigned', detail: 'B1' }]))).toContain(`${name} was reassigned`)
-    expect(named(() => inboxText([{ ids: ['m1'], from: 'Hive', card: c.number, text: 'changed', at: '', state: 'received' } as never], []))).toContain(`· ${name}:`)
+    expect(named(() => inboxText([{ ids: ['m1'], from: 'Combwork', card: c.number, text: 'changed', at: '', state: 'received' } as never], []))).toContain(`· ${name}:`)
     expect(named(() => staleWhy(null, c.number, 1))).toBe(`${name} is gone`)
     expect(named(() => taskPrompt(c, true))).toContain(`Work on task ${name}`)
     expect(named(() => wakeLine(cardChange(c.number, c, ['column'])))).not.toContain(`#${c.number}`)

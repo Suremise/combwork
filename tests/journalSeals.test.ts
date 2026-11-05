@@ -1,7 +1,7 @@
 // Sealed journals retired (HI-1723: an empty `<lease>.followed` folder per slot or copy job piled up in .slot-journals,
 // never removed): a seal goes once its lease's job is gone, so nothing can write the journal again, and stays while any
-// supervisor still holds the job (this Hive's, or one that outlived its Hive), while the journal holds a settle's
-// evidence, or while that can't be told (fail-closed). With Hive's real process supervisor (Windows), as
+// supervisor still holds the job (this Combwork's, or one that outlived its Combwork), while the journal holds a settle's
+// evidence, or while that can't be told (fail-closed). With Combwork's real process supervisor (Windows), as
 // queueRunner.test does, and with `gone` simulated for the rest.
 import { spawn } from 'child_process'
 import { createRequire } from 'module'
@@ -41,7 +41,7 @@ async function settled(root: string, dir: string, lease: string): Promise<string
 }
 
 describe.runIf(process.platform === 'win32')("a seal goes once its job is gone (the real supervisor)", () => {
-  it('stays, and so does the process running in its job, while this Hive holds the job; goes once it lets it go', async () => {
+  it('stays, and so does the process running in its job, while this Combwork holds the job; goes once it lets it go', async () => {
     const { root, dir } = folders()
     const host = queueHost()
     const lease = `copy-seal-${Date.now()}`
@@ -78,10 +78,10 @@ describe.runIf(process.platform === 'win32')("a seal goes once its job is gone (
     expect(readdirSync(dir)).toEqual([])
   })
 
-  it('stays while a supervisor that outlived its Hive holds the job; a sweep removes it once that one is gone', async () => {
+  it('stays while a supervisor that outlived its Combwork holds the job; a sweep removes it once that one is gone', async () => {
     const { root, dir } = folders()
     const host = queueHost()
-    // Another Hive's supervisor, outliving it (queueJobs.ts' RELAY): it holds the job, which this Hive can't close.
+    // Another Combwork's supervisor, outliving it (queueJobs.ts' RELAY): it holds the job, which this Combwork can't close.
     const other = queueHost({ linger: true })
     const lease = `slot-seal-${Date.now()}`
     expect(await LeaseJob.open(other, lease, await journalPath(root, lease, dir))).toBeInstanceOf(LeaseJob)

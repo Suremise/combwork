@@ -1,4 +1,4 @@
-// A compaction Hive asked for: how it ends when the CLI doesn't say so (the transcript, the CLI refusing it, the
+// A compaction Combwork asked for: how it ends when the CLI doesn't say so (the transcript, the CLI refusing it, the
 // time limits), and that it ends once, with the status rules deciding what the agent shows.
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
 
-// What Hive types into agents' terminals, recorded instead (no process runs).
+// What Combwork types into agents' terminals, recorded instead (no process runs).
 const typed = vi.hoisted(() => [] as { key: string; data: string }[])
 // Run as each key is written (a test acting at that moment, as the user typing then).
 const hooks = vi.hoisted(() => ({ onWrite: null as null | ((key: string, data: string) => void) }))
@@ -26,7 +26,7 @@ const { claudeInput } = await import('./claudeInputStandIn')
 
 const claudeFailure = async (): Promise<RegExp | null> => (await import('../src/main/providers/claude/adapter')).claudeCode.compactFailure
 
-/** A transcript's n compactions (their times don't count for Hive's own Compact). */
+/** A transcript's n compactions (their times don't count for Combwork's own Compact). */
 const times = (n: number) => Array.from({ length: n }, () => ({ timestamp: '' }))
 
 /**
@@ -41,7 +41,7 @@ function compacting(before = 2, failure: RegExp | null = null, submitted = true)
   return { st, over, c }
 }
 
-describe('a compaction Hive asked for', () => {
+describe('a compaction Combwork asked for', () => {
   it('while its /compact is typed, no limit runs; the time to begin counts from its submission', () => {
     const { c, over } = compacting(2, null, false)
     expect(vi.getTimerCount()).toBe(0)
@@ -139,7 +139,7 @@ describe('a compaction Hive asked for', () => {
     expect(over).not.toHaveBeenCalled()
   })
 
-  it('its end unsaid, a prompt began a turn: what Hive sees later leaves the turn working', () => {
+  it('its end unsaid, a prompt began a turn: what Combwork sees later leaves the turn working', () => {
     const { c, st, over } = compacting()
     c.begin()
     const s: HookStatusInput = { ...st, askedAtStart: false, compacting: 'started', backgroundWakes: true, tasks: 0, attention: 'hooks', reviewed: false, titleAsks: false, open: [], waitingOn: null, question: false, reviewing: false, safeguardPrompt: false }
@@ -161,7 +161,7 @@ describe('SessionManager.compact: typing the /compact', () => {
 
   /**
    * A running Claude Code agent, idle, as SessionManager keeps it (no process: what is typed is recorded). Its input is
-   * Claude Code's box (claudeInputStandIn, fed what is typed into it: HI-1979, Hive types into it only once a key of its
+   * Claude Code's box (claudeInputStandIn, fed what is typed into it: HI-1979, Combwork types into it only once a key of its
    * own shows it empty), holding `draft`; or a screen that only ever shows `shows`.
    */
   async function running(runId = 'run-1', { draft = '', shows }: { draft?: string; shows?: string } = {}) {
@@ -260,7 +260,7 @@ describe('SessionManager.compact: typing the /compact', () => {
     expect([state.status, l.compacting]).toEqual(['ready', undefined])
   })
 
-  it('while Hive types a prompt into the agent, Compact is refused (the two would mix)', async () => {
+  it('while Combwork types a prompt into the agent, Compact is refused (the two would mix)', async () => {
     const { sessions, l, state } = await running()
     const prompt = sessions.sendPrompt(project, 'a1', FOCUS)
     await vi.advanceTimersByTimeAsync(1_000)

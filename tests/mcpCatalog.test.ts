@@ -1,7 +1,7 @@
 // MCP catalogues (HI-545): catalog.json v1 checked as the mcp project's validator checks it; this PC's requirements
 // (met, not met, or not checkable); search and filters. Downloads keep to their source's scheme at every redirect and
 // to one size and time budget; a zip is used only if its size and sha256 match; the cache stays bounded. Install is
-// #550's Add (added nowhere, Hive's provenance kept out of launches); Update keeps the places shown, the user's env
+// #550's Add (added nowhere, Combwork's provenance kept out of launches); Update keeps the places shown, the user's env
 // values too, and writes nothing when the definition or the places changed meanwhile, or a project can't be read; a
 // workspace closed during a download gets nothing. Each case has a workspace of its own; the catalogues are file://.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
@@ -222,7 +222,7 @@ describe('installing and updating (HI-545)', () => {
     await disposeWorkspaceService(w)
   })
 
-  it('lists a source as a category, with the note for a source Hive doesn\'t check, until noted', async () => {
+  it('lists a source as a category, with the note for a source Combwork doesn\'t check, until noted', async () => {
     const [p] = await pages()
     expect(p).toMatchObject({ name: 'Test catalogue', ours: false, noteDue: true, total: 2, skipped: 0 })
     expect(p.rows.find((r) => r.name === 'needs-mac')!.checks[0].state).toBe('no')

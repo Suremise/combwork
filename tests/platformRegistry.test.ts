@@ -1,4 +1,4 @@
-// Each project's platform (SPEC §16.3, #1213): detected per case of §16.3.5's table, recorded in project.json when Hive
+// Each project's platform (SPEC §16.3, #1213): detected per case of §16.3.5's table, recorded in project.json when Combwork
 // makes it and never switched silently after (a different detection is offered and said once), the
 // descriptor's capabilities in ProjectInfo, and the two git calls that bypassed `git()` now going through it.
 import { execFileSync } from 'child_process'
@@ -105,7 +105,7 @@ describe('in ProjectInfo', () => {
   const events: HiveEvent[] = []
   let off: () => void = () => undefined
   /**
-   * A project Hive sets up (its project.json made by ensureProject, as adding one does): as the workspace opens with it,
+   * A project Combwork sets up (its project.json made by ensureProject, as adding one does): as the workspace opens with it,
    * then with the refresh the open scheduled run. A folder made in an open workspace is a root-watch event, whose refresh
    * reads the project (its `.git` too) while the test renames or reads it (#1375: EPERM renaming `.git`, its notice said
    * by that refresh): now only the test reads it.
@@ -179,7 +179,7 @@ describe('in ProjectInfo', () => {
     expect(notices(p).map((t) => t.message)).toEqual(["beta's Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab."])
   })
 
-  it("one notice per project: a newer detection replaces the earlier one, in Hive's language (#1419)", async () => {
+  it("one notice per project: a newer detection replaces the earlier one, in Combwork's language (#1419)", async () => {
     const p = await project('gamma', gitInit)
     renameSync(join(p, '.git'), join(p, 'moved.git'))
     await info(p)

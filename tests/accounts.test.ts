@@ -1,4 +1,4 @@
-// Hive's accounts (HI-980): the folder and its junction made and checked, removal that never reaches through a link into
+// Combwork's accounts (HI-980): the folder and its junction made and checked, removal that never reaches through a link into
 // the CLI's home (also with links added partway through), accepted and observed identities kept apart, checks queued
 // while one runs, the watches, and a workspace's choice of accounts. All in this file's temp folders: the CLI is never
 // run (its status is faked), nothing signs in, and no real home or accounts folder is touched.
@@ -158,8 +158,8 @@ describe('an account’s folder and its junction', () => {
 
   it('a rename changes the name only: the id, folder and junction stay', async () => {
     const a = await accounts.addAccount('claude-code', 'Work')
-    accounts.renameAccount(a.id, 'Hive overnight')
-    expect(accounts.getAccount(a.id)).toMatchObject({ id: a.id, name: 'Hive overnight' })
+    accounts.renameAccount(a.id, 'Combwork overnight')
+    expect(accounts.getAccount(a.id)).toMatchObject({ id: a.id, name: 'Combwork overnight' })
     expect(lstatSync(join(folderOf(a), 'projects')).isSymbolicLink()).toBe(true)
   })
 })
@@ -210,12 +210,12 @@ describe('removing an account', () => {
     rmSync(join(folderOf(a), 'projects'))
   })
 
-  it("a link Hive didn't make anywhere inside it: refused before anything is deleted", async () => {
+  it("a link Combwork didn't make anywhere inside it: refused before anything is deleted", async () => {
     const a = await accounts.addAccount('claude-code', 'Linked')
     mkdirSync(join(folderOf(a), 'plugins'), { recursive: true })
     writeFileSync(join(folderOf(a), 'plugins', 'a.txt'), 'a')
     symlinkSync(projects, join(folderOf(a), 'plugins', 'sneaky'), 'junction')
-    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/links Hive didn't make are in it: .*sneaky/)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/links Combwork didn't make are in it: .*sneaky/)
     // Nothing deleted: its own file is still there, and so is everything the link reaches.
     expect(existsSync(join(folderOf(a), 'plugins', 'a.txt'))).toBe(true)
     expect(readFileSync(keep, 'utf8')).toContain('kept')
@@ -725,13 +725,13 @@ describe('who an account is signed in as', () => {
   })
 
   it('at a launch, a login rewritten during the check counts with no event seen for it yet (HI-1873)', async () => {
-    // Not on in any workspace, so not watched: no event reaches Hive, as when one is still on its way or queued.
+    // Not on in any workspace, so not watched: no event reaches Combwork, as when one is still on its way or queued.
     const a = await accounts.addAccount('claude-code', 'Unseen')
     writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"old"}')
     let n = 0
     status.set(folderOf(a), async () => {
       n++
-      // The CLI answered from the old login; the new one is written before its answer reaches Hive.
+      // The CLI answered from the old login; the new one is written before its answer reaches Combwork.
       if (n === 1) writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"new, and longer"}')
       return { ok: true, loggedIn: true, email: n === 1 ? 'old@example.com' : 'new@example.com', orgId: 'org-1' }
     })
@@ -915,7 +915,7 @@ describe("a workspace's accounts", () => {
       let spy: ReturnType<typeof vi.spyOn>
       let a: Account
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
-      // A project's config with one agent, and an id of its own: one written without is given its id by Hive whenever it
+      // A project's config with one agent, and an id of its own: one written without is given its id by Combwork whenever it
       // next reads the ids, in temp files and a .bak beside it, and a folder removed while that lands is found not empty
       // (HI-2060).
       const writeProject = (i: number, agent: { provider: string; connection?: string }): void => {
@@ -936,7 +936,7 @@ describe("a workspace's accounts", () => {
         const want = names.slice(0, n).join()
         await refreshedTo((info) => info.projects.filter((p) => p.agents.length).map((p) => p.name).sort().join() === want)
       }
-      // The workspace as written: a refresh can hand back the info it had, when Hive wrote a project's config after the
+      // The workspace as written: a refresh can hand back the info it had, when Combwork wrote a project's config after the
       // refresh read it (a new project given its id: #999's guard), with a refresh of its own to follow (HI-1919).
       const refreshedTo = (shows: (info: Awaited<ReturnType<typeof w.refresh>>) => boolean): Promise<void> => vi.waitFor(async () => expect(shows(await w.refresh())).toBe(true), { timeout: HUNG_MS })
       /** alpha's agent's own connection, as the workspace shows it (none: undefined). */

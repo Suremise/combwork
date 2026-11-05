@@ -23,7 +23,7 @@ type Rule = { match: (args: string) => boolean; times: number; native?: string; 
 const fail = vi.hoisted(() => ({ rules: [] as Rule[], calls: [] as string[] }))
 vi.mock('../../src/main/gitWorker', async (orig) => {
   const real = (await orig()) as typeof import('../../src/main/gitWorker')
-  // The command as Hive's code wrote it: GIT_PREFIX (git.ts's options for every command) left out.
+  // The command as Combwork's code wrote it: GIT_PREFIX (git.ts's options for every command) left out.
   const commandOf = (args: string[]): string => args.slice(args.indexOf('core.quotepath=off') + 1).join(' ')
   return {
     ...real,
@@ -141,7 +141,7 @@ afterEach(() => {
   env = null
 })
 
-/** Hive merges, one merge check; the target checked out in the project folder (`checkedOut`) or nowhere. */
+/** Combwork merges, one merge check; the target checked out in the project folder (`checkedOut`) or nowhere. */
 function project(o: Partial<WorkflowOptions> = {}, checkedOut = true): Env {
   const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: ['quick'], commands: { quick: 'quick' }, okBefore: { mode: 'never', labels: [] }, ...o }))
   if (!checkedOut) sh(e.project, 'checkout', '-q', '--detach')
@@ -395,7 +395,7 @@ describe('admitted afresh after the wait, before any new merge or check', () => 
       expect(out).toMatchObject([{ outcome: 'paused', reason: 'rulesOff' }])
     })
 
-    it(`${path}: the lease lost meanwhile (another Hive took it, or this workspace closed): stops, writing nothing`, async () => {
+    it(`${path}: the lease lost meanwhile (another Combwork took it, or this workspace closed): stops, writing nothing`, async () => {
       const e = project()
       let holds = true
       const card = await queued(e)
@@ -434,7 +434,7 @@ describe('after the advance: only the branch is read again', () => {
       expect(count(e, card.id, 'IntegrationStarted')).toBe(1)
       expect(count(e, card.id, 'Integrated')).toBe(1)
       expect(e.store.queuePause('main')).toBeNull()
-      // Hive's merge commit, once (the card's own commit isn't a merge).
+      // Combwork's merge commit, once (the card's own commit isn't a merge).
       expect(sh(e.project, 'log', '--merges', '--format=%s', 'main').split('\n').filter((s) => s.startsWith(`${card.key}:`))).toHaveLength(1)
     })
 

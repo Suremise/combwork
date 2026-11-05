@@ -1,6 +1,6 @@
-// A Hive's merge queue runner in a process of its own, for tests/queueRunner.test.ts (#1360): two or three of these on
+// A Combwork's merge queue runner in a process of its own, for tests/queueRunner.test.ts (#1360): two or three of these on
 // one hive.db copy are Hives on one workspace. Bundled by the test (esbuild, Electron stubbed) and run by Node; it reads
-// one JSON command a line on stdin and answers each with one line on stdout: REPLY and JSON (Hive's log lines go there
+// one JSON command a line on stdin and answers each with one line on stdout: REPLY and JSON (Combwork's log lines go there
 // too). Its seams come from its environment: QR_LINGER (its job's supervisor outlives it), QR_STALL_SETTLE (a takeover
 // that never gets past its first step); and from commands: `block` (its board writes wait for ever, as behind a busy
 // board), `other` (a second target's acquire that fails part way).
@@ -42,7 +42,7 @@ async function run(c: Command): Promise<Record<string, unknown>> {
       return { ok: true, lease: runner.lease, folder: runner.folder(), paused: r.paused ?? null, supervisor: runner.supervisorPid }
     }
     case 'other': {
-      // Another target in this same Hive (its supervisor shared), whose start fails part way: its folder's record.
+      // Another target in this same Combwork (its supervisor shared), whose start fails part way: its folder's record.
       const set = store.setQueueFolder.bind(store)
       store.setQueueFolder = () => {
         throw new Error('disk full')
@@ -62,7 +62,7 @@ async function run(c: Command): Promise<Record<string, unknown>> {
     case 'holds':
       return { holds: runner?.holds() ?? false }
     case 'stall':
-      // A Hive that stops renewing (stalled), however long: its lease is noted as last seen then.
+      // A Combwork that stops renewing (stalled), however long: its lease is noted as last seen then.
       renew = false
       return {}
     case 'worktree': {

@@ -1,4 +1,4 @@
-// The Hive Assistant's attachments (#243, #387): listed from its home (a session host, not a project), grouped by
+// The Combwork Assistant's attachments (#243, #387): listed from its home (a session host, not a project), grouped by
 // conversation; deleting one, or a conversation's group, has the checks of deleting sessions (#239): none while the conversation
 // runs, and none if another program has one open (all or nothing).
 import { spawn, type ChildProcess } from 'child_process'

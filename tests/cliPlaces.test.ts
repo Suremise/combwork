@@ -1,7 +1,7 @@
-// The CLIs' recorded cwd against Hive's spelling of a folder (#493). Started in a folder named through a junction or an
+// The CLIs' recorded cwd against Combwork's spelling of a folder (#493). Started in a folder named through a junction or an
 // 8.3 short name, Codex and Copilot record the cwd as given, and Claude Code files its transcripts under Node's realpath
 // of it (the junction followed, an 8.3 name kept; checked with Claude Code 2.1.296, Codex 0.162.1, Copilot 1.0.95).
-// Hive finds a folder's sessions by place, whichever name it has now. Each test uses a junction, which makes another name
+// Combwork finds a folder's sessions by place, whichever name it has now. Each test uses a junction, which makes another name
 // on any machine (tests/pathAliases.ts), and an 8.3 name where the volume makes them.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'

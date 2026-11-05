@@ -59,7 +59,7 @@ async function askedForRestart(): Promise<void> {
   expect(await needsRestart()).toBe(true)
 }
 
-/** One of Hive's skills copied into the workspace's. */
+/** One of Combwork's skills copied into the workspace's. */
 const addSkill = (name: string): void => cpSync(join(resolve('resources/skills'), name), join(skills, name), { recursive: true })
 
 /** A skill a test added, removed, with the refresh its removal's watch scheduled run (none if it wasn't there). */

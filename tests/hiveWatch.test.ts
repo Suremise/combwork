@@ -57,7 +57,7 @@ describe("a workspace's .combwork watch (HI-1797)", () => {
     mkdirSync(join(hive, 'personas'), { recursive: true })
     await told('modes-changed', from)
     await toldOnceWatched('modes-changed', join(hive, 'personas', 'old.md'))
-    // workspace.json changed outside Hive: read again (it tells skills-changed).
+    // workspace.json changed outside Combwork: read again (it tells skills-changed).
     from = events.length
     const cfg = JSON.parse(String(await import('fs').then((f) => f.readFileSync(join(hive, 'workspace.json'), 'utf8'))))
     writeFileSync(join(hive, 'workspace.json'), JSON.stringify({ ...cfg, hiveWatchTest: 1 }))

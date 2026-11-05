@@ -66,7 +66,7 @@ describe('the panes area', () => {
     for (const n of notes) expect(safeguardText(n, label, tr)).toBe(safeguardText(n, label))
     for (const n of [1, 2, 7]) expect(processCount(n, tr)).toBe(processCount(n))
     const left = { processes: ['a', 'b', 'b', 'c', 'd', 'e', 'f'].map((l, i) => ({ pid: i, name: 'node.exe', label: l, created: '' })), more: 2 } as never
-    // Hive's English lists are British (no serial comma), as the window's are with Windows set to en-GB.
+    // Combwork's English lists are British (no serial comma), as the window's are with Windows set to en-GB.
     setLanguage('en', {}, 'en-GB')
     expect(leftoversSummary(left, 4, { tr, list: fmt.list })).toBe(leftoversSummary(left, 4))
     expect(leftoversSummary(left, 4)).toBe('a, 2 × b, c, d and 4 more processes')

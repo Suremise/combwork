@@ -1,8 +1,8 @@
-// A session list's other sessions (HI-1681): those the CLIs keep for a project's folders that Hive didn't start. The
+// A session list's other sessions (HI-1681): those the CLIs keep for a project's folders that Combwork didn't start. The
 // Sessions tab took up to 19 s to open on a busy machine with hundreds of sessions, reading every CLI folder in full on
-// every listing, and a listing asked for while one ran waited for it and then for one more. Now each CLI leaves Hive's
+// every listing, and a listing asked for while one ran waited for it and then for one more. Now each CLI leaves Combwork's
 // own sessions out by id before looking at their files and reads a folder's names again only when it changed; the
-// other sessions' listing under way is joined; and Hive's sessions can be listed alone, for the tab to show them first.
+// other sessions' listing under way is joined; and Combwork's sessions can be listed alone, for the tab to show them first.
 import { appendFileSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -121,7 +121,7 @@ describe('a session list (HI-1681)', () => {
     await disposeWorkspaceService(w)
   })
 
-  it("lists Hive's sessions and the others; Hive's alone when asked, without the CLIs' folders", async () => {
+  it("lists Combwork's sessions and the others; Combwork's alone when asked, without the CLIs' folders", async () => {
     const all = await run(() => sessions.list(p))
     expect(all.filter((i) => i.source === 'hive').map((i) => i.id).sort()).toEqual([...own].sort())
     const ext = all.find((i) => i.id === outside)
@@ -133,7 +133,7 @@ describe('a session list (HI-1681)', () => {
     expect(listed).not.toHaveBeenCalled()
   })
 
-  it("never looks at Hive's own sessions' files in the CLIs' folders", async () => {
+  it("never looks at Combwork's own sessions' files in the CLIs' folders", async () => {
     // What each folder's listing is told to leave out, as it is asked.
     const skipped: { own: boolean; outside: boolean }[] = []
     const real = claude.listSessions.bind(claude)
@@ -146,7 +146,7 @@ describe('a session list (HI-1681)', () => {
     expect(skipped.every((s) => s.own && !s.outside)).toBe(true)
   })
 
-  it("lists asked for while one runs share its reading of the other sessions; Hive's alone joins its records' listing", async () => {
+  it("lists asked for while one runs share its reading of the other sessions; Combwork's alone joins its records' listing", async () => {
     const real = claude.listSessions.bind(claude)
     let release: () => void = () => undefined
     const gate = new Promise<void>((r) => (release = r))
@@ -168,12 +168,12 @@ describe('a session list (HI-1681)', () => {
     expect(m.map((i) => i.id).sort()).toEqual([...own].sort())
     // One reading of the CLIs' folders between them.
     expect(folders.mock.calls.length).toBe(asked)
-    // Hive's records: the first listing's, and one more for the second (its records as they were after it asked);
-    // Hive's alone joined one of them.
+    // Combwork's records: the first listing's, and one more for the second (its records as they were after it asked);
+    // Combwork's alone joined one of them.
     expect(records).toHaveBeenCalledTimes(2)
   })
 
-  it('a session started outside Hive since the last listing is in the next', async () => {
+  it('a session started outside Combwork since the last listing is in the next', async () => {
     await run(() => sessions.list(p))
     const later = newId()
     write(join(dir, `${later}.jsonl`), transcript(later))

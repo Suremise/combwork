@@ -1,4 +1,4 @@
-// The Assistant's journal in a workspace (#1031): its settings in workspace.json (on by default, work only), Hive's own
+// The Assistant's journal in a workspace (#1031): its settings in workspace.json (on by default, work only), Combwork's own
 // facts (lanes started and ended with their merge, a card into Done, an unexpected close), nothing written while it is
 // off or outside its scope while the entries are kept, the Assistant told when they change, and deleting it.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -86,7 +86,7 @@ describe('the journal in a workspace', () => {
     expect(service.journalSettingsOf(w)).toEqual(before)
   })
 
-  it("records Hive's facts: a lane started and ended with its merge, a card into Done", async () => {
+  it("records Combwork's facts: a lane started and ended with its merge, a card into Done", async () => {
     const [c1, c2] = [await run(() => tasks.createTask({ title: 'One', project: 'alpha' }, user)), await run(() => tasks.createTask({ title: 'Two', project: 'alpha' }, user))]
     const l = await run(() => lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], name: 'storage', by: 'B1 (alpha)' }))
     await run(() => tasks.updateTask(c1.number, { column: 'done' }, user))
@@ -105,8 +105,8 @@ describe('the journal in a workspace', () => {
   })
 
   it('an unexpected close is a fact for the workspace, open or not', async () => {
-    await service.journalFactAt(wsPath, { summary: 'Hive closed unexpectedly (a test)', importance: 2, tags: ['incident'] })
-    expect(facts()[0]).toBe('Hive closed unexpectedly (a test)')
+    await service.journalFactAt(wsPath, { summary: 'Combwork closed unexpectedly (a test)', importance: 2, tags: ['incident'] })
+    expect(facts()[0]).toBe('Combwork closed unexpectedly (a test)')
   })
 
   it('off: nothing written, the entries kept; facts outside the scope neither; on again, as before', async () => {
@@ -116,7 +116,7 @@ describe('the journal in a workspace', () => {
     await doneCard('Three')
     expect(facts()).toHaveLength(before)
     expect(service.journalStatus(w).entries).toBeGreaterThanOrEqual(before)
-    // On, but events out of the scope: Hive's facts aren't written either.
+    // On, but events out of the scope: Combwork's facts aren't written either.
     await service.setJournalSettings(w, { enabled: true, scope: ['decision'] })
     expect((await told()).at(-1)).toMatch(/journal is on again/)
     await doneCard('Four')

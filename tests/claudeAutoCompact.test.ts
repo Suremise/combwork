@@ -113,7 +113,7 @@ describe('Claude Code auto-compaction settings (#242)', () => {
     expect(effectiveEnv({ A: 'launch', B: 'launch' }, [{ label: 'high', json: { env: { A: 'high' } } }, { label: 'low', json: { env: { A: 'low', B: 'low', C: { no: 1 } } } }])).toEqual({ env: { A: 'high', B: 'low' }, from: { A: 'high', B: 'low' } })
   })
 
-  it('says a default is an estimate: what Hive cannot read could change it', () => {
+  it('says a default is an estimate: what Combwork cannot read could change it', () => {
     const d = autoCompactOf([], {}, [], OPUS)
     expect(d.estimate).toBe(UNREAD_SOURCES)
     expect(autoCompactLine('claude-code', 200_000, d)).toMatch(/its default for this window \(an estimate: managed policies Combwork can't read \(such as Windows registry policies/)
@@ -226,7 +226,7 @@ describe('Claude Code auto-compaction settings (#242)', () => {
     mkdirSync(join(cwd, 'folder.json'))
     expect(cliSettings(['--settings', 'folder.json'], cwd)).toEqual({ label: '--settings folder.json', kind: 'cli', file: join(cwd, 'folder.json'), json: null, unsure: "couldn't be read (it isn't a file)" })
     expect(cliSettings(['--settings', 'CON'], cwd)?.json).toBeNull()
-    // The user's settings.json as a folder: Hive can't tell what it gives, so the project's window is an estimate.
+    // The user's settings.json as a folder: Combwork can't tell what it gives, so the project's window is an estimate.
     mkdirSync(join(home, 'settings.json'))
     writeFileSync(join(cwd, '.claude', 'settings.json'), JSON.stringify({ autoCompactWindow: 450_000 }))
     const scopes = settingsScopes(cwd, home).slice(1)

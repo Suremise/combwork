@@ -76,7 +76,7 @@ export function refusedHookNote(runId: string | null): string | null {
   // agent-protocol: hive.log's line (servers.ts logs it), never an agent's
   if (!runId) return 'Refused a hook call that named no launch'
   // agent-protocol: hive.log's line, as above
-  if (!ours) return "Refused a hook call naming a run this Hive didn't start"
+  if (!ours) return "Refused a hook call naming a run this Combwork didn't start"
   // agent-protocol: hive.log's line, as above
   return `Refused a hook call for run ${runId}: ${tokens.has(runId!) ? "its token didn't match the launch's" : 'that launch has ended'}`
 }

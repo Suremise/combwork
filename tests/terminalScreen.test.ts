@@ -1,4 +1,4 @@
-// The headless screen Hive keeps of each session's terminal (TerminalScreen, #1572): whatever a CLI prints, at whatever
+// The headless screen Combwork keeps of each session's terminal (TerminalScreen, #1572): whatever a CLI prints, at whatever
 // size, never stops it, and never throws where nothing can catch it (xterm parses in its own timer).
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -53,7 +53,7 @@ describe("a session's headless screen (#1572)", () => {
     s.resize(26, 38)
     expect(warnings).toEqual([expect.stringContaining('26×38')])
     await vi.waitFor(() => expect(pendingParsed).toBe(true), { timeout: HUNG_MS })
-    // It keeps what Hive reads besides the cells (bracketed paste), and takes what was going to throw.
+    // It keeps what Combwork reads besides the cells (bracketed paste), and takes what was going to throw.
     expect(s.bracketedPaste()).toBe(true)
     await parsed(s, '\x1b[K\x1b[41;1H')
     s.resize(114, 50)

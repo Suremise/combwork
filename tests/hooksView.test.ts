@@ -1,5 +1,5 @@
-// An agent's Hooks dialog and live lock blocks (HI-982): what its launch has, each row saying how sure Hive is; what
-// Hive observed of the hooks it received (its reply apart from the turn ledger's verdict), bounded; and a lock block in
+// An agent's Hooks dialog and live lock blocks (HI-982): what its launch has, each row saying how sure Combwork is; what
+// Combwork observed of the hooks it received (its reply apart from the turn ledger's verdict), bounded; and a lock block in
 // Activity only while its decision stands, by its launch, tool call, file and holder.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -25,7 +25,7 @@ describe('the shared helpers', () => {
     expect(g.map((x) => x.count)).toEqual([3, 1, 1])
   })
 
-  it('cuts text short, saying so, and leaves Hive\'s authentication out', () => {
+  it('cuts text short, saying so, and leaves Combwork\'s authentication out', () => {
     expect(clip('abcdef', 4)).toEqual({ text: 'abc…', truncated: true })
     expect(clip('abc', 4)).toEqual({ text: 'abc', truncated: false })
     const shown = withoutHiveAuth('curl -H @C:\\data\\auth-1.txt "http://127.0.0.1:5/hook?run=abc123&statusline" -H "Authorization: Bearer s3cret"', ['C:\\data\\auth-1.txt'])
@@ -35,7 +35,7 @@ describe('the shared helpers', () => {
 })
 
 describe('what a launch has', () => {
-  it("reads a hooks table's every form, marking one Hive doesn't know as unsupported rather than leaving it out", () => {
+  it("reads a hooks table's every form, marking one Combwork doesn't know as unsupported rather than leaving it out", () => {
     const { rows } = rowsOfHooksTable({ Stop: [{ hooks: [{ type: 'command', command: 'echo hi' }, { type: 'http', url: 'http://x' }, { type: 'mcp_tool', server: 's' }] }], PreToolUse: [{ matcher: 'Edit', hooks: [{ type: 'prompt', prompt: 'check' }] }] }, { source: 'user', file: 'u.json', status: 'unverified' })
     expect(rows.map((r) => [r.event, r.type, r.command, r.status, r.observed])).toEqual([
       ['Stop', 'command', 'echo hi', 'unverified', false],
@@ -55,7 +55,7 @@ describe('what a launch has', () => {
     expect(got.rows[0].truncated).toBe(true)
   })
 
-  it("Claude Code's scopes: configured with their loading unverified, turned off where disableAllHooks decides, and a file Hive couldn't read or that isn't JSON said so", () => {
+  it("Claude Code's scopes: configured with their loading unverified, turned off where disableAllHooks decides, and a file Combwork couldn't read or that isn't JSON said so", () => {
     const hooks = { Stop: [{ hooks: [{ type: 'command', command: 'echo s' }] }] }
     const on = claudeScopeHooks([
       { kind: 'managed', label: 'managed', file: 'm.json', json: null },
@@ -81,13 +81,13 @@ describe('what a launch has', () => {
     expect(managedOnly.rows.map((r) => r.status)).toEqual(['notLoaded'])
   })
 
-  it("Codex's own listing: Hive's by the exact command Hive passed (with Codex's trust), anyone else's with theirs and their file", () => {
+  it("Codex's own listing: Combwork's by the exact command Combwork passed (with Codex's trust), anyone else's with theirs and their file", () => {
     const hive = { command: 'curl.exe hive', flagsFile: 'C:\\<session-flags>\\config.toml' }
     const got = codexListedHooks(
       [
         { key: 'C:\\<session-flags>\\config.toml:pre_tool_use:0:0', source: 'sessionFlags', command: 'curl.exe hive', trustStatus: 'trusted' },
         { key: 'C:\\<session-flags>\\config.toml:stop:0:0', source: 'sessionFlags', command: 'curl.exe hive', trustStatus: 'modified' },
-        // The user's own -c hook that names Hive's endpoint isn't Hive's: only Hive's exact command is.
+        // The user's own -c hook that names Combwork's endpoint isn't Combwork's: only Combwork's exact command is.
         { key: 'C:\\<session-flags>\\config.toml:stop:1:0', source: 'sessionFlags', command: 'curl.exe hive --extra', trustStatus: 'untrusted' },
         { key: 'C:\\home\\config.toml:post_tool_use:0:0', source: 'user', command: 'echo user', trustStatus: 'trusted', matcher: '*' }
       ],
@@ -134,7 +134,7 @@ async function hook(l: any, body: Record<string, unknown>) {
 }
 const edit = (l: any, file: string, call: string) => hook(l, { hook_event_name: 'PreToolUse', tool_name: 'apply_patch', tool_use_id: call, turn_id: 't1', tool_input: { command: `*** Begin Patch\n*** Update File: ${file}\n@@\n+x\n*** End Patch` } })
 
-describe("what Hive observed, and the lock blocks standing now", () => {
+describe("what Combwork observed, and the lock blocks standing now", () => {
   beforeAll(async () => {
     for (const d of [join(wsPath, '.combwork'), join(p, '.combwork'), join(q, '.combwork')]) mkdirSync(d, { recursive: true })
     for (const f of ['a.txt', 'b.txt']) writeFileSync(join(p, f), 'hi\n')
@@ -147,7 +147,7 @@ describe("what Hive observed, and the lock blocks standing now", () => {
     await disposeWorkspaceService(w)
   })
 
-  it("records Hive's reply apart from the ledger's verdict: an allowed edit, a lock block, a stale hook ignored with why", async () => {
+  it("records Combwork's reply apart from the ledger's verdict: an allowed edit, a lock block, a stale hook ignored with why", async () => {
     const holder = agent(p, 'hb3')
     const editor = agent(p, 'hb6')
     await hook(holder, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
@@ -172,7 +172,7 @@ describe("what Hive observed, and the lock blocks standing now", () => {
     expect(l.hookHistory).toHaveLength(HOOK_FIRED_MAX)
   })
 
-  it('records an error at its step, and a hook of no launch of Hive\'s nowhere', async () => {
+  it('records an error at its step, and a hook of no launch of Combwork\'s nowhere', async () => {
     const l = agent(p, 'err')
     const obs = await run(() => sessions.observeHook(l.state.runId, {}))
     sessions.hookHandled(obs!, null, { step: 'read', error: new SyntaxError('Unexpected token') })

@@ -1,5 +1,5 @@
 // The merge slot (#350): one merge at a time into a project's branch, others in order; never stuck (a hold ends with
-// its launch, after its time, or when the user releases it), and an expiry or a hold Hive closed under is reported.
+// its launch, after its time, or when the user releases it), and an expiry or a hold Combwork closed under is reported.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HOLD_MS, KEEP_PLACE_MS, MAX_WAIT_MS, MergeSlots, PROGRESS_FRESH_MS, parseSlotRecords, slotBranch, slotCards, type SlotAgent } from '../src/main/mergeSlots'
 
@@ -410,7 +410,7 @@ describe('merge slot', () => {
     start(a)
     await slots.claim(a, P, 'main', [3, 4], 0)
     const text = JSON.stringify({ version: 1, holds: [...slots.heldByAgents(), { projectPath: 1 }, null, 'x'] })
-    // A new Hive (a restart): nothing held in memory; the record says who held what.
+    // A new Combwork (a restart): nothing held in memory; the record says who held what.
     const fresh = setup().slots
     expect(fresh.heldByAgents()).toEqual([])
     expect(parseSlotRecords(text)).toEqual([{ projectPath: P, branch: 'main', agentId: 'a', agentName: 'A', runId: 'A-run', cards: [3, 4], since: Date.now(), until: Date.now() + HOLD_MS }])

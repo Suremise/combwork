@@ -286,7 +286,7 @@ describe('sliceSession', () => {
     expect(sliceSession(slice(t), held(2, 4), DEFAULT_SETTINGS)).toBeNull()
   })
 
-  it('splits a charge between its requests by Hive’s estimate where a card took only some of them, marked ≈', () => {
+  it('splits a charge between its requests by Combwork’s estimate where a card took only some of them, marked ≈', () => {
     const t: UsageTimeline = { step: 1, reports: [3], rows: [[S(0), 100, 0, 0, 0, 1, 0, 0], [S(1), 200, 0, 0, 0, 1, 0, 0]] }
     const first = sliceSession(slice(t), held(0, 0.5), DEFAULT_SETTINGS)!
     expect(first.cost).toBeCloseTo(1, 10)

@@ -128,7 +128,7 @@ describe('.combwork kept out of version control (#345)', () => {
     expect(literalPattern('a*b?[c]')).toBe('a\\*b\\?\\[c\\]')
   })
 
-  it("isn't reported excluded when a .gitignore rule brings .combwork back (git's answer, not the line Hive wrote)", async () => {
+  it("isn't reported excluded when a .gitignore rule brings .combwork back (git's answer, not the line Combwork wrote)", async () => {
     const p = folder('project')
     execFileSync('git', ['init', '-q'], { env: gitEnv, cwd: p })
     writeFileSync(join(p, '.gitignore'), '!/.combwork/\n')
@@ -163,7 +163,7 @@ describe('.combwork kept out of version control (#345)', () => {
     expect(syncServiceOf('D:\\Code\\app', roots)).toBeNull()
   })
 
-  it('says why, and offers Exclude only where Hive can', () => {
+  it('says why, and offers Exclude only where Combwork can', () => {
     expect(hiveVcsText({ state: 'excluded' })).toBeNull()
     expect(hiveVcsText(undefined)).toBeNull()
     expect(hiveVcsText({ state: 'none' })).toMatchObject({ title: ".combwork isn't excluded from version control", canExclude: false })
@@ -186,7 +186,7 @@ describe('.combwork committed before it was excluded (#364)', () => {
     writeFileSync(join(p, '.combwork', 'project.json'), '{}')
     writeFileSync(join(p, '.combwork', 'sessions', 's.jsonl'), 'x')
     writeFileSync(join(p, 'a.txt'), 'a')
-    // Committed with add -A before Hive excluded it.
+    // Committed with add -A before Combwork excluded it.
     git(p, 'add', '-A')
     git(p, 'commit', '-qm', 'everything')
     const v = await hiveVcs(p)

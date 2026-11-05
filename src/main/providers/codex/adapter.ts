@@ -509,7 +509,7 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
     const ownEnv = (table.env ?? {}) as Record<string, string>
     if (env.some((k) => !(k in ownEnv))) out.env = { ...((out.env ?? {}) as Record<string, string>), ...Object.fromEntries(env.filter((k) => !(k in ownEnv)).map((k) => [k, ''])), ...ownEnv }
     if ('env_vars' in n && !('env_vars' in table)) out.env_vars = []
-    log.warn(`Codex has an MCP server named ${TOOLS_SERVER} in ${userText(file)}: Hive's own server is used instead, its keys over those of the same name (${Object.keys(n).join(', ')}).`)
+    log.warn(`Codex has an MCP server named ${TOOLS_SERVER} in ${userText(file)}: Combwork's own server is used instead, its keys over those of the same name (${Object.keys(n).join(', ')}).`)
   }
   return out
 }

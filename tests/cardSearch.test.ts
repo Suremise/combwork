@@ -160,7 +160,7 @@ describe("the board's full-text search", () => {
     // A comment isn't searched, as the board's search doesn't read comments.
     expect(found('zebras')).toEqual([])
     expect((await both(w, 'zebras')).memory).toEqual([])
-    // Moved to another project, by a write that isn't Hive's card edit (a script's, another Hive's).
+    // Moved to another project, by a write that isn't Combwork's card edit (a script's, another Combwork's).
     await editCard(w, made[4], (doc) => ({ ...doc, project: 'beta' }))
     expect(found('beta')).toContain(made[4])
     // Its label taken off, then the card deleted.

@@ -12,7 +12,7 @@ import { closedNotice } from '../src/main/notices'
 import type { HiveEvent, Notice } from '../src/shared/types'
 
 const AGENT = { workspace: 'C:\\ws', projectPath: 'C:\\ws\\webapp', agentId: 'a-1' }
-const noticeEvent = (n: Partial<Notice>): HiveEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Hive a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as HiveEvent
+const noticeEvent = (n: Partial<Notice>): HiveEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Combwork a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as HiveEvent
 
 describe("the events stream's lines, as broadcast says them", async () => {
   // The real resolver (sessions.ts registers it: a session's pinned chain, else the bound workspace's API chain) and two

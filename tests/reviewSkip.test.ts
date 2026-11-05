@@ -1,4 +1,4 @@
-// Review: Skip (#1625, SPEC §16.7.3), on a real workspace and repository under "Hive merges" with a reviewer agent and a
+// Review: Skip (#1625, SPEC §16.7.3), on a real workspace and repository under "Combwork merges" with a reviewer agent and a
 // merge check: set when the card is made or before it is submitted, by the user (an optional note) or the Assistant (the
 // user's reason, required); a project agent's only proposed, answered by the user or the Assistant (with the user's
 // reason, never the agent's). A skipped card's submission finishes it: a no-code card is Done, a code card goes to the
@@ -67,7 +67,7 @@ const script = { kind: 'agent', name: 'Agent API' } as const
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
 let n = 0
 
-/** "Hive merges" into main, a reviewer agent, one merge check. */
+/** "Combwork merges" into main, a reviewer agent, one merge check. */
 const HIVE_MERGES = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', mergeChecks: ['quick'], commands: { quick: 'quick' } } as const
 
 async function workspace(options: object = HIVE_MERGES): Promise<{ w: WS; repo: string; wt: string }> {

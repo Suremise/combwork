@@ -144,7 +144,7 @@ describe("a skill's header problem: English for agents, the window's text beside
     }
   })
 
-  it("lists a Hive skill with a broken header with both, and a new skill's SKILL.md stays English", async () => {
+  it("lists a Combwork skill with a broken header with both, and a new skill's SKILL.md stays English", async () => {
     setLanguage('de', GERMAN)
     const made = await run(() => skills.createSkill('fresh', ''))
     const text = readFileSync(join(made.path, 'SKILL.md'), 'utf8')
@@ -158,7 +158,7 @@ describe("a skill's header problem: English for agents, the window's text beside
 })
 
 describe("MCP servers: a definition's error English for the Agent API, the window's text beside it", () => {
-  it("gives errorText for Hive's words only, and what a server runs in the window's language", async () => {
+  it("gives errorText for Combwork's words only, and what a server runs in the window's language", async () => {
     setLanguage('de', GERMAN)
     mkdirSync(join(wsPath, '.combwork', 'mcp'), { recursive: true })
     writeFileSync(join(wsPath, '.combwork', 'mcp', 'list.json'), '[1, 2]')
@@ -167,7 +167,7 @@ describe("MCP servers: a definition's error English for the Agent API, the windo
     const list = listed.find((m) => m.name === 'list')!
     expect(list.error).toBe('Definition must be a JSON object')
     expect(shownText(list.errorText!)).toBe('Die Definition muss ein JSON-Objekt sein')
-    // JSON's reader's words stay as it gave them, with no text of Hive's beside them.
+    // JSON's reader's words stay as it gave them, with no text of Combwork's beside them.
     const broken = listed.find((m) => m.name === 'broken')!
     expect(broken.error).toMatch(/JSON/)
     expect(broken.errorText).toBeUndefined()
@@ -248,7 +248,7 @@ describe("lists in the language's way, never joined with English commas", () => 
 })
 
 describe("the Assistant's instructions stay English", () => {
-  it("puts a mode's name under an English heading whatever language Hive shows", async () => {
+  it("puts a mode's name under an English heading whatever language Combwork shows", async () => {
     setLanguage('de', GERMAN)
     await run(() => modes.createMode('Tester'))
     const told = await run(() => modes.assistantInstructions('tester'))

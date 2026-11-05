@@ -6,7 +6,7 @@ import { PSEUDO_LANGUAGE } from '../../src/shared/i18n/languages'
 import { formatBytes, formatGigabytes, formatSize, formatTokens } from '../../src/shared/units'
 import { formatDate, formatDayLabel, formatTime, formatWeekdayTime, type DateStyle } from '../../src/shared/dates'
 
-// #851 (F3): sizes, token counts, percentages and the words in dates are in the language Hive shows: the number from fmt
+// #851 (F3): sizes, token counts, percentages and the words in dates are in the language Combwork shows: the number from fmt
 // (its decimal separator), the unit a message (`units` area), weekdays, months and AM/PM from Intl in the language's
 // locale. The numeric date and time forms stay the user's choice.
 
@@ -26,7 +26,7 @@ describe('the units area', () => {
     }
   })
 
-  it('reads in English as Hive always showed it', () => {
+  it('reads in English as Combwork always showed it', () => {
     expect([formatTokens(950), formatTokens(12_345), formatTokens(5_500_000), formatTokens(12.9e9)]).toEqual(['950', '12.3k', '5.5M', '12.9B'])
     expect([formatBytes(160), formatBytes(1536), formatBytes(3.4 * 1024 ** 2)]).toEqual(['160 B', '1.5 KB', '3.4 MB'])
     expect([formatSize(0), formatSize(820 * 1024), formatSize(6.1 * 1024 ** 2), formatSize(2.4 * 1024 ** 3), formatGigabytes(16 * 1024 ** 3)]).toEqual(['0 KB', '820 KB', '6.1 MB', '2.4 GB', '16.0 GB'])

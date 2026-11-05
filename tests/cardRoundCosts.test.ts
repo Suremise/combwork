@@ -250,7 +250,7 @@ describe('cardRoundCosts (#1226)', () => {
     expect(c.total).toMatchObject({ outputTokens: 220, cost: close(2.2) })
     const parts = [...c.rounds, c.outside!].flatMap((r) => [r.build, r.review])
     expect(parts.reduce((a, p) => a + p.cost, 0)).toBeCloseTo(c.total!.cost, 9)
-    // A share of a role's part is Hive's: ≈; a reviewer's whole part is as reported.
+    // A share of a role's part is Combwork's: ≈; a reviewer's whole part is as reported.
     expect(c.rounds[1].build).toMatchObject({ estimated: true, tokensEstimated: true })
     expect(c.rounds[1].review).toMatchObject({ estimated: false })
     expect(c.rounds[0]).toMatchObject({ from: iso(0), to: iso(20), submitted: iso(10) })

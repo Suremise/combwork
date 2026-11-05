@@ -86,7 +86,7 @@ describe("a finish's handler (HI-2014)", () => {
     expect(steps.sort()).toEqual(['dependents', 'journal', 'lane', 'requests', 'wake'])
   })
 
-  // HR2's round 1: an effect made and Hive ending before its step is recorded. Each effect is found where it was made
+  // HR2's round 1: an effect made and Combwork ending before its step is recorded. Each effect is found where it was made
   // (the comment by its id, the wake by its move's action), so the run after the restart makes none again.
   it("a crash after the dependent's comment and the builder's wake, before their steps were recorded: run again, each once", async () => {
     const { w, repo } = await workspace()

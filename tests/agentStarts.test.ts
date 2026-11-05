@@ -44,8 +44,8 @@ describe('an agent being started (HI-1976)', () => {
 describe('a start that failed (HI-1976)', () => {
   it('is said with why (its lines as one), over any hold, until a session of it is started again', () => {
     startBegun(p, 'b1', '#12', { fresh: true })
-    startEnded(p, 'b1', '#12', { failed: "Hive couldn't get slot-g ready:\n  git worktree add failed" })
-    expect(startNow(p, 'b1')).toEqual({ starting: false, failed: "Hive couldn't get slot-g ready: | git worktree add failed", waiting: null })
+    startEnded(p, 'b1', '#12', { failed: "Combwork couldn't get slot-g ready:\n  git worktree add failed" })
+    expect(startNow(p, 'b1')).toEqual({ starting: false, failed: "Combwork couldn't get slot-g ready: | git worktree add failed", waiting: null })
     // A retry's hold doesn't hide it; its plain end keeps it.
     startBegun(p, 'b1', '#12')
     expect(startNow(p, 'b1').failed).toMatch(/git worktree add failed/)

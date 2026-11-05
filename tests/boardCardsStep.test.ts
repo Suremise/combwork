@@ -55,19 +55,19 @@ function workspace(): string {
   return ws
 }
 
-/** Documents of every form a 0.9 board can hold: Hive's own, an older Hive's, hand-edited ones. */
+/** Documents of every form a 0.9 board can hold: Combwork's own, an older Hive's, hand-edited ones. */
 const ODD: Record<number, Record<string, unknown>> = {
-  // Another key order, a field Hive doesn't know, and one named like Object.prototype's.
+  // Another key order, a field Combwork doesn't know, and one named like Object.prototype's.
   901: { title: 'Out of order', number: 901, column: 'todo', project: 'p', agent: null, description: '', order: 3, labels: ['x'], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z', custom: { deep: [1, 2] }, ['__proto__']: 'kept' },
   // Fields missing or of another type: what tasks.ts' clean reads safely.
   902: { number: 902, title: 42, column: 'nowhere', order: '2', labels: 'not a list', comments: [{ text: 'a comment', by: 'You' }, 'not an entry'], held: [], archived: 1 },
-  // A string with a lone surrogate, and a review not of Hive's form.
+  // A string with a lone surrogate, and a review not of Combwork's form.
   903: { number: 903, title: 'Lone \ud800 surrogate', description: 'tail \udc00', project: 'p', agent: 'a1', review: { agent: 'a2', since: '2026-01-02T00:00:00.000Z' }, column: 'review', order: 1, labels: [], blocked: null, blockedBy: [999], links: [1], comments: [], history: [], archived: false, createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z' },
-  // Archived, with holds and decisions of Hive's form.
+  // Archived, with holds and decisions of Combwork's form.
   904: { number: 904, title: 'Archived', description: 'd', project: 'p', agent: 'a1', agentName: 'Agent 1', column: 'done', order: 2, labels: ['1.0.0'], blocked: null, blockedBy: [], links: [], comments: [], history: [{ at: '2026-01-01T00:00:00.000Z', by: 'You', what: 'Moved to Done' }], archived: true, decisions: [{ id: 'd1', text: 'Keep it', decidedBy: 'You', recordedBy: 'You', at: '2026-01-01T00:00:00.000Z' }], held: [{ agent: 'a1', name: 'Agent 1', role: 'agent', from: '2026-01-01T00:00:00.000Z', to: '2026-01-02T00:00:00.000Z' }], createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z', archivedFor: 'done', archivedBatch: 'b1' }
 }
 
-/** A 0.9 board (#1209: its cards as documents): cards made by this Hive, the odd ones, then the file put back as 0.9 left it. */
+/** A 0.9 board (#1209: its cards as documents): cards made by this Combwork, the odd ones, then the file put back as 0.9 left it. */
 async function board09(): Promise<{ ws: string; numbers: number[] }> {
   const ws = workspace()
   const w = await open(ws)

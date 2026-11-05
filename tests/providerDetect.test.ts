@@ -17,7 +17,7 @@ const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
 const ALL: ProviderId[] = ['claude-code', 'codex', 'copilot']
 const svc = providerService as unknown as { set: (id: ProviderId, info: AgentInstallInfo) => void }
-/** Hive's answer for a CLI: found, missing, or still looking (null). */
+/** Combwork's answer for a CLI: found, missing, or still looking (null). */
 const hear = (id: ProviderId, found: boolean | null): void => svc.set(id, { ...providerService.info(id), found: !!found, path: found ? `C:\\fake\\${id}.exe` : null, checking: found === null })
 const waitMs = providerService.detectWaitMs
 

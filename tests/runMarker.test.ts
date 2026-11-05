@@ -19,7 +19,7 @@ describe('the running marker (#1111)', () => {
     expect(readdirSync(dir)).toEqual(['running.json'])
   })
 
-  it('is not put back when the run ended while it was written (Hive quitting)', async () => {
+  it('is not put back when the run ended while it was written (Combwork quitting)', async () => {
     const dir = tempDir('run-marker-')
     const file = join(dir, 'running.json')
     expect(await writeMarkerFile(file, marker, () => false)).toBe(false)

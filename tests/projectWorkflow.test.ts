@@ -1,6 +1,6 @@
 // One writer for project.json's `workflow` (#1417): the form's Save, a preset and a Paste (setWorkflowOptions) and the
 // Assistant's settings tool set the platform, preset and options through `writeWorkflow`, and every other field of
-// `workflow` (`kept`, `presetAsked`, a field a later Hive adds) survives. Stage names (N5) through the same paths: a
+// `workflow` (`kept`, `presetAsked`, a field a later Combwork adds) survives. Stage names (N5) through the same paths: a
 // rename is checked, applies at once (no lane or card keeps old rules, the ruleset id stays), and shows in
 // `workflow:stages` and `cw_project_status`.
 import { execFileSync } from 'child_process'
@@ -39,8 +39,8 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 let n = 0
 const user = { kind: 'user' } as const
 
-/** Fields of `workflow` this card's writers don't set: the other platform's kept options, the answer, a later Hive's. */
-const OTHERS = { kept: { none: { preset: 'solo', options: { review: 'none' }, presetAsked: 'notNow' } }, presetAsked: 'chosen', later: { from: 'a newer Hive' } }
+/** Fields of `workflow` this card's writers don't set: the other platform's kept options, the answer, a later Combwork's. */
+const OTHERS = { kept: { none: { preset: 'solo', options: { review: 'none' }, presetAsked: 'notNow' } }, presetAsked: 'chosen', later: { from: 'a newer Combwork' } }
 
 /** A workspace with a git project `p` whose project.json has `workflow` as given. */
 async function workspace(workflow?: unknown): Promise<{ w: WS; repo: string }> {
@@ -151,7 +151,7 @@ describe('stage names (N5) through the writers (#1417)', () => {
     expect((await workflowFor(w, repo))!.store.facts(card.number).filter((f) => f.kind === 'Override')).toEqual([])
   })
 
-  it("refuses a name the window shows for another stage in Hive's language, through the form and the tool (HR2's round 1, finding 2)", async () => {
+  it("refuses a name the window shows for another stage in Combwork's language, through the form and the tool (HR2's round 1, finding 2)", async () => {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const { w, repo } = await workspace({ platform: 'git', preset: 'pair', options: pair })
     setLanguage('de', await loadCatalogue('de'), 'de')

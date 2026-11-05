@@ -210,18 +210,18 @@ if (args[0] === 'app-server') {
   process.stdin.on('end', () => process.exit(0))
 }
 `)
-  it("runs each in the launch's own environment and with the connection's overrides, never Hive's home or token", async () => {
+  it("runs each in the launch's own environment and with the connection's overrides, never Combwork's home or token", async () => {
     const conn = join(base, 'profile', 'accounts', 'a-preflight')
     mkdirSync(conn, { recursive: true })
     const cwd = join(base, 'preflight-project')
     mkdirSync(cwd, { recursive: true })
-    // The launch's environment as Hive makes it: the allowlist, the connection's home, the login variables left out.
+    // The launch's environment as Combwork makes it: the allowlist, the connection's home, the login variables left out.
     const env = withoutAccountEnv(codex, { ...baseEnv(), CODEX_HOME: conn, CODEX_ACCESS_TOKEN: 'made-up' })
-    // And a token in Hive's own, which none of them may get.
+    // And a token in Combwork's own, which none of them may get.
     const before = process.env.CODEX_ACCESS_TOKEN
     process.env.CODEX_ACCESS_TOKEN = 'made-up-in-hive'
     try {
-      await codex.prepareLaunch({ projectPath: cwd, agentId: 'a-1', executable: cmd, cwd, workspacePath: cwd, runId: 'r-pre', sessionId: '00000000-0000-4000-8000-000000000001', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: join(cwd, 'auth.txt'), privateDir: cwd, guidance: 'Hive guidance', env, allowBackgroundSessions: false, use200kContext: false, connectionHome: conn } as never)
+      await codex.prepareLaunch({ projectPath: cwd, agentId: 'a-1', executable: cmd, cwd, workspacePath: cwd, runId: 'r-pre', sessionId: '00000000-0000-4000-8000-000000000001', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: join(cwd, 'auth.txt'), privateDir: cwd, guidance: 'Combwork guidance', env, allowBackgroundSessions: false, use200kContext: false, connectionHome: conn } as never)
     } finally {
       if (before === undefined) delete process.env.CODEX_ACCESS_TOKEN
       else process.env.CODEX_ACCESS_TOKEN = before
@@ -242,7 +242,7 @@ if (args[0] === 'app-server') {
     mkdirSync(cwd, { recursive: true })
     await advanced.set('codex.accounts.unelevatedSandbox', true)
     try {
-      await codex.prepareLaunch({ projectPath: cwd, agentId: 'a-1', executable: cmd, cwd, workspacePath: cwd, runId: 'r-pre-u', sessionId: '00000000-0000-4000-8000-000000000002', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: join(cwd, 'auth.txt'), privateDir: cwd, guidance: 'Hive guidance', env: withoutAccountEnv(codex, { ...baseEnv(), CODEX_HOME: conn }), allowBackgroundSessions: false, use200kContext: false, connectionHome: conn } as never)
+      await codex.prepareLaunch({ projectPath: cwd, agentId: 'a-1', executable: cmd, cwd, workspacePath: cwd, runId: 'r-pre-u', sessionId: '00000000-0000-4000-8000-000000000002', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: join(cwd, 'auth.txt'), privateDir: cwd, guidance: 'Combwork guidance', env: withoutAccountEnv(codex, { ...baseEnv(), CODEX_HOME: conn }), allowBackgroundSessions: false, use200kContext: false, connectionHome: conn } as never)
     } finally {
       await advanced.set('codex.accounts.unelevatedSandbox', false)
     }
@@ -315,7 +315,7 @@ process.stdin.on('end', () => { if (!${!!o.stubborn}) { child.kill(); process.ex
     Object.assign(flaky, { unknown: false, slow: 0 })
     for (const k of ['beforeStart', 'afterAssign', 'beforeConfirm', 'onEnd'] as const) codexCheckSeams[k] = undefined
     codexCheckSeams.host = sharedHost
-    // Each test ends with nothing held and Hive not quitting, as a new start.
+    // Each test ends with nothing held and Combwork not quitting, as a new start.
     await stopCodexChecks()
     resetCodexChecksForTests()
   })
@@ -397,12 +397,12 @@ process.stdin.on('end', () => process.exit(0))
     await accounts.removeAccount(a.id)
   }, 90_000)
 
-  it('a process of the check that leaves its job (ended by the supervisor, unconfirmed): a failed check, held until Hive restarts', async () => {
+  it('a process of the check that leaves its job (ended by the supervisor, unconfirmed): a failed check, held until Combwork restarts', async () => {
     const s = server('escaped-cli')
     const k = await sleeper()
     // The supervisor told to follow a process for the check's job, which has no journal: it ends it and says "unowned".
     codexCheckSeams.afterAssign = async (job) => void expect(await job.follow(k.pid)).toBe(false)
-    const escaped = { ok: false, error: "a process Codex started left Hive's job: its end can't be confirmed" }
+    const escaped = { ok: false, error: "a process Codex started left Combwork's job: its end can't be confirmed" }
     expect(await status(s.cmd, homeOf('a-escaped'))).toEqual(escaped)
     expect(codexCheckHeld(homeOf('a-escaped'))).toBe(true)
     await until(async () => (await running(k)) === false)
@@ -437,11 +437,11 @@ process.stdin.on('end', () => process.exit(0))
     await until(async () => (await s.left()).length === 2)
     await stopCodexChecks()
     expect(await s.left()).toEqual([])
-    expect(await check).toEqual({ ok: false, error: 'Hive is quitting' })
+    expect(await check).toEqual({ ok: false, error: 'Combwork is quitting' })
     expect(codexCheckHeld(homeOf('a-waiting'))).toBe(false)
   }, 60_000)
 
-  it("a held check's retry under way when Hive quits: the quit's end runs after it, never beside it", async () => {
+  it("a held check's retry under way when Combwork quits: the quit's end runs after it, never beside it", async () => {
     const s = server('retry-cli')
     codexCheckSeams.host = doubtful
     flaky.unknown = true
@@ -452,7 +452,7 @@ process.stdin.on('end', () => process.exit(0))
       inFlight += phase === 'in' ? 1 : -1
       most = Math.max(most, inFlight)
     }
-    // A later check retries the old end, slowly (the supervisor slow to answer); Hive quits meanwhile.
+    // A later check retries the old end, slowly (the supervisor slow to answer); Combwork quits meanwhile.
     flaky.slow = 1500
     const retry = status(s.cmd, homeOf('a-retry'))
     await until(() => inFlight === 1)
@@ -463,7 +463,7 @@ process.stdin.on('end', () => process.exit(0))
 
   it('no supervisor, or a launcher whose command is missing: a failed check, nothing held', async () => {
     codexCheckSeams.host = { ensure: async () => false } as never
-    expect(await status(fakeCli('unused-cli', ''), homeOf('a-nohost'))).toEqual({ ok: false, error: "Hive can't own Codex's check here (its process tracking is off)" })
+    expect(await status(fakeCli('unused-cli', ''), homeOf('a-nohost'))).toEqual({ ok: false, error: "Combwork can't own Codex's check here (its process tracking is off)" })
     expect(codexCheckHeld(homeOf('a-nohost'))).toBe(false)
     codexCheckSeams.host = sharedHost
     const r = await status(join(base, 'no-such-codex.exe'), homeOf('a-nostart'))

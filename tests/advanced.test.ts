@@ -1,4 +1,4 @@
-// Advanced settings (#367): Hive's overridable defaults, each CLI-facing one checked against what the CLI was recorded
+// Advanced settings (#367): Combwork's overridable defaults, each CLI-facing one checked against what the CLI was recorded
 // sending (tests/fixtures/advanced and the other recordings), what an override takes and how it falls back, advanced.json
 // (read, written, edited by hand, the CLI version an override was made for), the adapters using them, and the settings
 // catalog's entries for the Assistant.
@@ -57,7 +57,7 @@ describe('advanced defaults', () => {
       expect(d.title && d.desc, d.id).toBeTruthy()
       expect(checkAdvanced(d, d.default), d.id).toEqual({ value: d.default })
       if (d.kind === 'number') expect(d.min! <= (d.default as number) && (d.default as number) <= d.max!, d.id).toBe(true)
-      // Every value of a CLI's is CLI-facing (what Hive reads from it, and what it gives it); Hive's own aren't.
+      // Every value of a CLI's is CLI-facing (what Combwork reads from it, and what it gives it); Combwork's own aren't.
       expect(cliFacing(d), d.id).toBe(d.group !== 'cw')
     }
   })
@@ -160,7 +160,7 @@ describe('an override', () => {
     expect(sampleMiss(def('claude-code.trust.prompt'), 'I trust')).toBeNull()
     expect(sampleMiss(def('codex.rateLimits.field'), 'limits')).toMatch(/Codex 0\.159\.0 sent no field "limits" here \(it sent type, info, rate_limits\)/)
     expect(sampleMiss(def('codex.ready.placeholder'), 'Ask Codex anything')).toMatch(/doesn't find/)
-    // Hive's own have nothing recorded to try.
+    // Combwork's own have nothing recorded to try.
     expect(sampleMiss(def('cw.mcp.replySeconds'), 999)).toBeNull()
   })
 
@@ -308,7 +308,7 @@ describe('the advanced store', () => {
     expect(s.state(null).madeFor['codex.trust.prompt']).toEqual({ version: '0.162.1', value: 'trust it' })
     expect(s.number('codex.hooks.timeoutSeconds')).toBe(5)
     expect(s.pattern('codex.trust.prompt').source).toBe('trust it')
-    // Changed by hand while Hive runs: read again when the file changes.
+    // Changed by hand while Combwork runs: read again when the file changes.
     writeFileSync(file, JSON.stringify({ format: 1, values: { 'codex.trust.prompt': 'trust here' } }))
     await vi.waitFor(() => expect(s.pattern('codex.trust.prompt').source).toBe('trust here'), { timeout: 10_000 })
   })
@@ -321,7 +321,7 @@ describe('the advanced store', () => {
     s.load(dir)
     await vi.waitFor(() => expect(read(file).madeFor).toEqual({ 'codex.trust.prompt': { version: '0.162.1', value: 'trust it' }, 'codex.ready.placeholder': { version: '0.162.1', value: 'Ask Codex' } }), { timeout: 10_000 })
     s.stop()
-    // Hive starts again after Codex updated.
+    // Combwork starts again after Codex updated.
     const again = store().s
     again.noteCli('codex', '0.163.0')
     again.load(dir)
@@ -329,7 +329,7 @@ describe('the advanced store', () => {
     expect(again.diagnostics([null])).toContain('  - made for another CLI version than the installed one: codex.trust.prompt, codex.ready.placeholder')
   })
 
-  it("tracks the version for every value of a CLI's, those Hive gives it too (hooks, title, tool timeout)", async () => {
+  it("tracks the version for every value of a CLI's, those Combwork gives it too (hooks, title, tool timeout)", async () => {
     const { s, dir, file } = store()
     s.load(dir)
     s.noteCli('codex', '0.162.1')
@@ -341,7 +341,7 @@ describe('the advanced store', () => {
     expect(s.diagnostics([null])).toContain('  - made for another CLI version than the installed one: codex.hooks.timeoutSeconds')
   })
 
-  it("resets every override (keeping ids this Hive doesn't know), and refuses while the file can't be read", async () => {
+  it("resets every override (keeping ids this Combwork doesn't know), and refuses while the file can't be read", async () => {
     const { s, dir, file } = store()
     writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 600, 'hive.someday': 1 } }))
     s.load(dir)
@@ -453,7 +453,7 @@ describe('the advanced store', () => {
   it('records each CLI found together: versions learnt at once both reach the file; changes at once all land', async () => {
     const { s, dir, file } = store()
     s.load(dir)
-    // Overrides made before Hive knew either CLI's version.
+    // Overrides made before Combwork knew either CLI's version.
     await s.set('claude-code.trust.prompt', 'trust (this|the) folder')
     await s.set('codex.trust.prompt', 'trust (this|the) folder')
     expect([read(file).madeFor['claude-code.trust.prompt'].version, read(file).madeFor['codex.trust.prompt'].version]).toEqual([null, null])
@@ -484,7 +484,7 @@ describe('the advanced store', () => {
       await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('Fix advanced.json')
       expect(updates).toHaveLength(2)
       expect(readFileSync(file, 'utf8')).toBe('{')
-      // An edit made since Hive read the file: refused, the edit read.
+      // An edit made since Combwork read the file: refused, the edit read.
       writeFileSync(file, JSON.stringify({ values: { 'cw.showDeveloperFeatures': true } }))
       await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: 10_000 })
       advanced.stop()
@@ -506,7 +506,7 @@ describe('the advanced store', () => {
     expect(s.number('cw.mcp.replySeconds')).toBe(900)
     await expect(s.set('cw.mcp.replySeconds', 600)).rejects.toThrow('Fix advanced.json')
     // Through the Agent API (the Assistant's PATCH /v1/settings/:id reaches this set): a refusal by the file's state, 409
-    // with its words and the caller's error in metrics, never Hive's 500 (HI-1952 round 1); so is a reset of them all.
+    // with its words and the caller's error in metrics, never Combwork's 500 (HI-1952 round 1); so is a reset of them all.
     const { apiErrorReply } = await import('../src/main/servers')
     const { apiOutcome } = await import('../src/main/metrics')
     for (const refused of [await s.set('cw.mcp.replySeconds', 600).catch((e: unknown) => e), await s.resetAll().catch((e: unknown) => e)]) {
@@ -532,7 +532,7 @@ describe('the advanced store', () => {
     expect(s.number('cw.mcp.replySeconds')).toBe(1200)
   })
 
-  it('records the CLI version once Hive learns it, keeps an override for a new version, and counts overrides for diagnostics (names only)', async () => {
+  it('records the CLI version once Combwork learns it, keeps an override for a new version, and counts overrides for diagnostics (names only)', async () => {
     const { s, dir, file } = store()
     s.load(dir)
     await s.set('copilot.trust.prompt', 'trust these files')
@@ -549,7 +549,7 @@ describe('the advanced store', () => {
     expect(s.diagnostics([{ 'cw.progress.lanesShown': 6 }])).toEqual(['- Advanced settings: 1 override (copilot.trust.prompt); 1 workspace value'])
     writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 'x', 'hive.other': 1 } }))
     await s.reload()
-    expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.mcp.replySeconds)', '  - not valid, so the default is used: cw.mcp.replySeconds', '  - unknown to this Hive: 1'])
+    expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.mcp.replySeconds)', '  - not valid, so the default is used: cw.mcp.replySeconds', '  - unknown to this Combwork: 1'])
   })
 
   it("the developer console's show text is off by default; turned on, its listeners hear it and diagnostics name it (#699)", async () => {
@@ -767,7 +767,7 @@ describe('the adapters and the hive MCP server use them', () => {
     expect(waitMaxSeconds('cards')).toBe(840)
   })
 
-  it('defaults to what Hive did before: 840 and 600 s waits, 300 s replies', () => {
+  it('defaults to what Combwork did before: 840 and 600 s waits, 300 s replies', () => {
     expect(mcpAdvancedEnv()).toEqual({ HIVE_REPLY_SECONDS: '300', HIVE_WAIT_MAX_SECONDS: '840', HIVE_AGENT_WAIT_MAX_SECONDS: '600' })
   })
 })
@@ -805,7 +805,7 @@ describe("the Assistant's settings catalog", () => {
     // Agents per project (#562) is Maximum agents, a workflow option, since HI-2001 (agentLimit.test.ts).
     expect(settingEntry('workspace.advanced.hive.agents.perProject')).toBeUndefined()
     expect(settingEntry('advanced.hive.agents.perProject')).toBeUndefined()
-    // The developer features switch keeps its key and entry in Hive's settings, with its advanced value's text.
+    // The developer features switch keeps its key and entry in Combwork's settings, with its advanced value's text.
     expect(settingEntry('advanced.showDeveloperFeatures')).toMatchObject({ hidden: true, type: 'boolean', title: def('cw.showDeveloperFeatures').title, desc: def('cw.showDeveloperFeatures').desc })
     expect(settingEntry('advanced.cw.showDeveloperFeatures')).toBeUndefined()
   })

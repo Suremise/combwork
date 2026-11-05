@@ -1,4 +1,4 @@
-// The token record (HIVE_TEST_TOKEN_LOG, HI-2262, HR1's rounds 1 and 2): a test copy of Hive appends each hook, agent
+// The token record (HIVE_TEST_TOKEN_LOG, HI-2262, HR1's rounds 1 and 2): a test copy of Combwork appends each hook, agent
 // and Assistant token where it makes it, before it keeps, writes or returns it, so the scenario harness's leak check
 // knows every token a session could have printed, however soon its launch ended. A record asked for that can't be
 // written issues nothing; without the variable, or in a copy that takes no test seams, nothing is recorded. The harness

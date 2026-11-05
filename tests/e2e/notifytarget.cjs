@@ -55,7 +55,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     const key = card?.key || (await lib.cardLabel(inv, card?.number))
     check('a card to name', typeof card?.number === 'number', JSON.stringify(card))
     const toast = (opens) => page.locator('.toasts .toast').filter({ has: page.locator(`.toast-open[data-opens="${opens}"]`) }).last()
-    const MESSAGES = { 'HB4 needs an Enter in its pane': "HB4's Claude Code didn't take the wake Hive typed. Click HB4's terminal and press Enter.", 'HR1 is waiting for you': 'HR1 asks whether to rebase onto main.' }
+    const MESSAGES = { 'HB4 needs an Enter in its pane': "HB4's Claude Code didn't take the wake Combwork typed. Click HB4's terminal and press Enter.", 'HR1 is waiting for you': 'HR1 asks whether to rebase onto main.' }
     const notify = (target, title = 'HB4 needs an Enter in its pane') => api('POST', '/v1/notify', { title, message: MESSAGES[title] ?? 'Its review passed: it waits for your OK to merge.', level: 'warning', target })
     // The corner's toasts closed, so a shot of the panel shows the panel alone.
     const closeToasts = async () => {

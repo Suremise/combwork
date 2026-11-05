@@ -206,7 +206,7 @@ describe('main process stalls (#1109)', () => {
     expect(s.warnings[0]).toMatch(/during it: api GET \/v1\/tasks \(1\.5 s, still running\)$/)
   })
 
-  it("names hooks and requests only by names Hive knows, never by what a client sent", () => {
+  it("names hooks and requests only by names Combwork knows, never by what a client sent", () => {
     expect(hookLabel(false, { hook_event_name: 'PreToolUse' })).toBe('hook PreToolUse')
     expect(hookLabel(false, { hook_event_name: 'PrivateCustomerName' })).toBe('hook (other event)')
     expect(hookLabel(false, null)).toBe('hook (other event)')
@@ -447,7 +447,7 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     s.stall(7957, 0)
     s.settle()
     expect(s.warnings).toEqual([])
-    expect(s.infos).toEqual(["The main process was paused for 7957 ms with the rest of Hive's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy"])
+    expect(s.infos).toEqual(["The main process was paused for 7957 ms with the rest of Combwork's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy"])
     // Asked about the stall's own span.
     expect(s.watchdog.asked.at(-1)).toEqual([now - 7957, now])
     // One it ticked through is main's own: warned.

@@ -1,7 +1,7 @@
 // For you at the core (#1269, SPEC §16.8.5, §16.11.4): requests for the user and their answers. Only an Approve
 // satisfies an approval gate; an old request never approves newer work; a decline of a gate is a round; an agent's own
 // question (ask the user, couldn't within the rules) is recorded, answered and its asker woken, never a round or a stall;
-// G10 under "the agent merges" holds the builder's report of its merge until the OK; at a lane's round limit Hive asks
+// G10 under "the agent merges" holds the builder's report of its merge until the OK; at a lane's round limit Combwork asks
 // (Decide) and a carry on raises the limit. Each answer wakes once. With the rules not enforced, neither G10 nor the
 // round limit asks; an agent's question still does.
 import { afterEach, describe, expect, it } from 'vitest'
@@ -141,7 +141,7 @@ describe('For you at the core (#1269)', () => {
     }
   })
 
-  it("S49, the round limit: at the lane's limit Hive asks (Decide) once; a carry on raises it by the rounds chosen; declines count, queue failures don't", async () => {
+  it("S49, the round limit: at the lane's limit Combwork asks (Decide) once; a carry on raises it by the rounds chosen; declines count, queue failures don't", async () => {
     const e = pair({ review: 'agentThenYou' })
     const { card, folder } = await started(e)
     e.wf.startLane('L', [card.id], 'R1', 2)

@@ -5,8 +5,8 @@ import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
 // #847 (E10c): sessions in the window's language, English for agents. Errors are HiveErrors (English message, the
-// window's text through IPC); Hive's own statuses are text beside the English statusMessage (statusText), as is the
-// merge slot's note (mergeSlotText) and Hive's sign-in message (signIn.messageText); notices are formatted twice: the
+// window's text through IPC); Combwork's own statuses are text beside the English statusMessage (statusText), as is the
+// merge slot's note (mergeSlotText) and Combwork's sign-in message (signIn.messageText); notices are formatted twice: the
 // user's title and the Agent API stream's English one.
 
 const base = tempDir('hive-i18n-session-')
@@ -49,7 +49,7 @@ const GERMAN = {
   'session.signIn.one': '{agent} muss sich bei {provider} anmelden',
   'session.signIn.expired': 'Die Anmeldung von {provider} ist abgelaufen. {help}',
   'agents.codex.signInHelp': 'Melde dich erneut an: Hilfe → Agent-Einrichtung → Codex → Anmelden.',
-  'session.tracker.title': 'Hive kann die Prozesse der Agenten nicht verfolgen',
+  'session.tracker.title': 'Combwork kann die Prozesse der Agenten nicht verfolgen',
   'session.tracker.body': '{reason}. {detail} Hilfe → Diagnose kopieren sagt warum.',
   'session.tracker.stopped': 'Hives Prozessverfolgung wurde beendet ({why})',
   'session.tracker.lost': '{launches, plural, =0 {Was Agenten starten, wird bis zu ihrem Neustart nicht verfolgt.} one {Was der laufende Agent startet, wird bis zu seinem Neustart nicht verfolgt.} other {Was die # laufenden Agenten starten, wird bis zu ihrem Neustart nicht verfolgt.}}'
@@ -120,7 +120,7 @@ describe('the session area', () => {
     ]
     setLanguage('de', GERMAN, 'de-DE')
     for (const [id, values, english] of before) expect(englishText(values ? withValues(M(id), values) : M(id)), id).toBe(english)
-    // Statuses Hive compares by their English.
+    // Statuses Combwork compares by their English.
     expect(englishText(COMPACTING_TEXT)).toBe(COMPACTING_MESSAGE)
     expect(SAFEGUARD_IDLE_MESSAGE).toBe('Idle after a safeguard stop: give it a nudge')
     expect(englishText(SAFEGUARD_IDLE_TEXT)).toBe(SAFEGUARD_IDLE_MESSAGE)
@@ -153,7 +153,7 @@ describe('errors: English for agents, the window gets its language', () => {
   })
 })
 
-describe("statuses: Hive's words as text beside the English", () => {
+describe("statuses: Combwork's words as text beside the English", () => {
   const input = (status: string, statusMessage?: string) =>
     ({ status, statusMessage, askedAtStart: false, compacting: null, backgroundWakes: false, tasks: 0, attention: 'hooks', reviewed: false, titleAsks: false, open: [], waitingOn: null, question: false, reviewing: false, safeguardPrompt: false }) as never
 
@@ -169,7 +169,7 @@ describe("statuses: Hive's words as text beside the English", () => {
     expect(st.statusText).toBeUndefined()
   })
 
-  it("a CLI's own words stay as they came, with no text; a safeguard prompt is Hive's, in the window's language", () => {
+  it("a CLI's own words stay as they came, with no text; a safeguard prompt is Combwork's, in the window's language", () => {
     setLanguage('de', GERMAN, 'de-DE')
     const st: { status: string; statusMessage?: string; statusText?: unknown } = { status: 'working' }
     applyStep(st as never, hookStep({ kind: 'ask', ask: { kind: 'permission', blocking: true, message: 'Claude needs your permission to use Bash' } } as never, input('working')))
@@ -218,7 +218,7 @@ describe('notices: the user in their language, the Agent API in English', () => 
     setLanguage('de', GERMAN, 'de-DE')
     live('a2', 'R1')
     seen.length = 0
-    // Hive in the background: a Windows notification, told to the Agent API's stream.
+    // Combwork in the background: a Windows notification, told to the Agent API's stream.
     await run(() => sessions.notifyNotWatching(alpha, 'a2', [12, 13]))
     const e = seen.find((x) => x.type === 'notice')!
     expect(e.notice!.title).toBe('alpha · R1 beobachtet #12, #13 nicht')
@@ -257,7 +257,7 @@ describe('notices: the user in their language, the Agent API in English', () => 
     seen.length = 0
     noteUntracked(withValues(M('session.tracker.stopped'), { why: 'exit 1' }), withValues(M('session.tracker.lost'), { launches: 2 }))
     const t = seen.find((x) => x.type === 'toast')!.toast!
-    expect(t.title).toBe('Hive kann die Prozesse der Agenten nicht verfolgen')
+    expect(t.title).toBe('Combwork kann die Prozesse der Agenten nicht verfolgen')
     expect(t.message).toBe('Hives Prozessverfolgung wurde beendet (exit 1). Was die 2 laufenden Agenten starten, wird bis zu ihrem Neustart nicht verfolgt. Hilfe → Diagnose kopieren sagt warum.')
     // Diagnostics reads the tracker's problem in English (none here: the tracker never failed in this run).
     expect(trackingProblem()).toBeNull()

@@ -1,4 +1,4 @@
-// Quiet test copies (src/main/testQuiet.ts): an unpackaged Hive with a test profile (HIVE_USER_DATA) or HIVE_TEST_QUIET=1
+// Quiet test copies (src/main/testQuiet.ts): an unpackaged Combwork with a test profile (HIVE_USER_DATA) or HIVE_TEST_QUIET=1
 // shows windows without taking the focus and records Windows notifications instead of showing them; otherwise, or with
 // HIVE_TEST_QUIET=0, everything is as normal. Every e2e suite and scenario starts its copy with a test profile.
 import { readdirSync, readFileSync, rmSync } from 'fs'
@@ -76,7 +76,7 @@ describe('quiet test copies', () => {
     }
   })
 
-  it('every e2e suite and scenario starts Hive with a test profile, and none turns quiet off', () => {
+  it('every e2e suite and scenario starts Combwork with a test profile, and none turns quiet off', () => {
     // A suite that needs a real window (one taking the focus, a native maximise) turns quiet off: list it here.
     const LOUD = ['tests/e2e/carddialog.cjs'] // only with HIVE_E2E_NATIVE=1, its native maximise check
     const root = join(__dirname, '..')
@@ -85,7 +85,7 @@ describe('quiet test copies', () => {
     expect(launching.length).toBeGreaterThan(50)
     for (const f of launching) {
       const text = readFileSync(join(root, f), 'utf8')
-      expect(text.includes('HIVE_USER_DATA'), `${f} starts Hive without a test profile (HIVE_USER_DATA)`).toBe(true)
+      expect(text.includes('HIVE_USER_DATA'), `${f} starts Combwork without a test profile (HIVE_USER_DATA)`).toBe(true)
       expect(/HIVE_TEST_QUIET\W{1,6}['"]?0/.test(text) && !LOUD.includes(f), `${f} turns quiet off: add it to LOUD if it must`).toBe(false)
     }
   })

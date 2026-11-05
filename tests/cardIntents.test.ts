@@ -352,7 +352,7 @@ describe('a card by intent (#1267)', () => {
     const { runCheck } = await import('../src/main/workflow/checks')
     const { sessions } = await import('../src/main/sessions')
     const deliveries = await import('../src/main/deliveries')
-    // Both agents watching and ready for a wake; each wake Hive makes is recorded.
+    // Both agents watching and ready for a wake; each wake Combwork makes is recorded.
     const liveFor = sessions.liveFor
     Object.assign(sessions, { liveFor: (p: string, id: string) => (id === 'a1' || id === 'a2' ? ({ projectPath: repo, agentId: id, status: 'watching', runId: `r-${id}` } as never) : liveFor.call(sessions, p, id)) })
     const made = vi.spyOn(deliveries, 'createDelivery')
@@ -474,7 +474,7 @@ describe('a card by intent (#1267)', () => {
     expect(watches.watchFor(repo, 'a1')).toBeNull()
   })
 
-  it("a lane's builder starting its lane's card itself is told what Hive's start would have: card-loop and the brief (HI-2092)", async () => {
+  it("a lane's builder starting its lane's card itself is told what Combwork's start would have: card-loop and the brief (HI-2092)", async () => {
     const { w } = await workspace()
     const [card, loose, others] = [await create(w), await create(w), await create(w)]
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Assistant', brief: 'Run the lanestages suite only.' })
@@ -583,7 +583,7 @@ describe('a card by intent (#1267)', () => {
     }
   })
 
-  it('a posted design keeps its name and deadline when Hive opens the workspace again (#1382, finding 1: restart)', async () => {
+  it('a posted design keeps its name and deadline when Combwork opens the workspace again (#1382, finding 1: restart)', async () => {
     const { w } = await workspace()
     const card = await inLane(w)
     const posted = await act(w, card, builder, design('Plan'))
@@ -631,7 +631,7 @@ describe('a card by intent (#1267)', () => {
   /** How long a condition here may take before the test has hung (a template's load under load takes seconds), never a wait. */
   const HUNG = { timeout: 15_000 }
   const agentIds = (w: WS) => inWorkspace(w, async () => (await w.projectConfig(join(w.path!, 'p'))).agents.map((a) => a.id))
-  /** The ways a2 leaves the project: Hive's removal, a template's load replacing every agent, a change of project.json. */
+  /** The ways a2 leaves the project: Combwork's removal, a template's load replacing every agent, a change of project.json. */
   const leaving: [string, (w: WS, p: string) => Promise<unknown>][] = [
     ['removeAgent', (w, p) => inWorkspace(w, () => projectAgents.removeAgent(p, 'a2', { deleteWorktree: false }))],
     [
@@ -731,7 +731,7 @@ describe('a card by intent (#1267)', () => {
     expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
   })
 
-  it("Hive's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
+  it("Combwork's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
     const { w, card, p } = await reviewedByA2()
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
     await inWorkspace(w, () => projectAgents.removeAgent(p, 'a3', { deleteWorktree: false }))

@@ -1,4 +1,4 @@
-// Saving where the panes are (#762), as Hive's main process does: placePanes under the project file's lock (the cells,
+// Saving where the panes are (#762), as Combwork's main process does: placePanes under the project file's lock (the cells,
 // and the order as they read), refusing an agent in two cells, and every placement settling as agents are added or
 // removed, so each agent keeps its cell, across a restart too. Each case has a workspace of its own.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'

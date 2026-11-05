@@ -1,7 +1,7 @@
-// A SKILL.md's header is YAML: who gets a Hive skill (metadata.audience) is read as YAML says, whatever form it is
+// A SKILL.md's header is YAML: who gets a Combwork skill (metadata.audience) is read as YAML says, whatever form it is
 // written in (comments, flow mappings, quotes, block scalars, CRLF, a BOM). No audience means the project agents. A
-// header that can't be read, or an audience Hive doesn't know, is a problem: nobody gets that skill, and the Skills view,
-// the API, tool listings and each launch say why, instead of Hive guessing a recipient.
+// header that can't be read, or an audience Combwork doesn't know, is a problem: nobody gets that skill, and the Skills view,
+// the API, tool listings and each launch say why, instead of Combwork guessing a recipient.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -43,7 +43,7 @@ describe('reading the header as YAML', () => {
     expect(parseSkillFrontmatter('# Just a heading\n')).toEqual({})
   })
 
-  it("an audience Hive doesn't know, or the wrong type, is a problem rather than a default", () => {
+  it("an audience Combwork doesn't know, or the wrong type, is a problem rather than a default", () => {
     expect(parse('name: a\nmetadata:\n  audience: assitant')).toEqual({ name: 'a', problem: 'its audience is "assitant", not agents, assistant or all', problemText: expect.anything() })
     expect(parse('name: a\nmetadata:\n  audience: [assistant]').problem).toBe('its audience is a list, not agents, assistant or all')
     expect(parse('name: a\nmetadata:\n  audience: 3').problem).toBe('its audience is a number, not agents, assistant or all')

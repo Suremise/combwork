@@ -224,7 +224,7 @@ describe('the start prompt', () => {
     expect(all).toContain('cw_read_section reads the closest as the card has it (path: the file; heading: # and the slug; from: "project").')
     expect(text).toContain('cw_read_section reads each as the card has it')
   })
-  it("without Hive's tools, or with no sizes worked out, the references alone; none, no line", () => {
+  it("without Combwork's tools, or with no sizes worked out, the references alone; none, no line", () => {
     expect(taskPrompt(card, false)).toBe("Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nRead these sections of the project's docs first: docs/PLAN.md#setup, shared:plans/notes.md.")
     expect(taskPrompt({ ...card, context: undefined }, true)).not.toContain('Read these first')
   })

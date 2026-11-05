@@ -1,6 +1,6 @@
 // No network reply reaches Node's Brotli decoder (#1582, CVE-2026-111497; kept after HI-1503's Electron with Node 24.22.1).
-// fetch decompresses `Content-Encoding: br` with it, so Hive's code that runs in Node (main, preload, shared, the hive
-// MCP server) calls fetch only for Hive's own local API, and decompresses Brotli only for its own data. Network calls
+// fetch decompresses `Content-Encoding: br` with it, so Combwork's code that runs in Node (main, preload, shared, the hive
+// MCP server) calls fetch only for Combwork's own local API, and decompresses Brotli only for its own data. Network calls
 // go through plainHttpsJson, which refuses an encoded reply.
 import { readdirSync, readFileSync } from 'fs'
 import { join, relative } from 'path'
@@ -10,9 +10,9 @@ const SRC = join(__dirname, '..', 'src')
 // Node's code: everything but the renderer, whose fetch is Chromium's.
 const ROOTS = ['main', 'preload', 'shared'].map((d) => join(SRC, d))
 
-/** fetch to Hive's own local API (the Agent API on 127.0.0.1) only: the hive MCP server and hive-progress's reports. */
+/** fetch to Combwork's own local API (the Agent API on 127.0.0.1) only: the hive MCP server and hive-progress's reports. */
 const FETCH_ALLOWED = ['main/mcp/hive-mcp.ts', 'main/progressReporters/report.mts']
-/** Brotli decompression of Hive's own data only (the journal's compressed details, usage.db's saved parser states: HI-1912). */
+/** Brotli decompression of Combwork's own data only (the journal's compressed details, usage.db's saved parser states: HI-1912). */
 const BROTLI_ALLOWED = ['main/journal.ts', 'main/usageParsers.ts']
 
 const FETCH = /(?<![.\w$])fetch\s*\(|globalThis\.fetch\b|from ['"]undici['"]|require\(['"]undici['"]\)/
@@ -38,11 +38,11 @@ function users(re: RegExp): string[] {
 }
 
 describe('network replies and Node’s Brotli decoder (#1582)', () => {
-  it('calls fetch only for Hive’s local API: network calls use plainHttpsJson', () => {
+  it('calls fetch only for Combwork’s local API: network calls use plainHttpsJson', () => {
     expect(users(FETCH)).toEqual(FETCH_ALLOWED)
   })
 
-  it('decompresses Brotli only for Hive’s own data', () => {
+  it('decompresses Brotli only for Combwork’s own data', () => {
     expect(users(BROTLI)).toEqual(BROTLI_ALLOWED)
   })
 

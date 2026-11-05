@@ -293,10 +293,10 @@ test('--smart-app-control off that does not take (still 1) → NOT RUN with that
   assert.deepStrictEqual(run.s.read().sandboxes, [])
 })
 
-// The driver (tests/sandbox/inside/drive.cjs) finds Hive's window by its text and selectors, and calls its IPC channels and
+// The driver (tests/sandbox/inside/drive.cjs) finds Combwork's window by its text and selectors, and calls its IPC channels and
 // Agent API: when one changes, the Sandbox checks fail only at the next release candidate (MC-1478: Agent Setup renamed
 // Provider Setup). These are checked here, so the change and the driver are fixed together.
-test('what the Sandbox driver relies on in Hive\'s window, IPC and Agent API is still there', () => {
+test('what the Sandbox driver relies on in Combwork\'s window, IPC and Agent API is still there', () => {
   const root = path.resolve(__dirname, '..')
   const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
   const english = fs.readdirSync(path.join(root, 'locales', 'en')).map((f) => fs.readFileSync(path.join(root, 'locales', 'en', f), 'utf8')).join('\n')
@@ -304,7 +304,7 @@ test('what the Sandbox driver relies on in Hive\'s window, IPC and Agent API is 
   const ui = renderer(path.join(root, 'src', 'renderer', 'src'))
   const api = fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8')
   const servers = fs.readFileSync(path.join(root, 'src', 'main', 'servers.ts'), 'utf8')
-  const texts = ['Provider Setup', 'Choose providers', 'Check again', 'No coding agents are turned on', 'No coding agent CLI is installed', '{provider} is not installed', '— found via {source}', 'Use {name}', 'Workspace Overview', 'Task Board', 'Shared Notes', 'MCP Servers', 'Hive Assistant']
+  const texts = ['Provider Setup', 'Choose providers', 'Check again', 'No coding agents are turned on', 'No coding agent CLI is installed', '{provider} is not installed', '— found via {source}', 'Use {name}', 'Workspace Overview', 'Task Board', 'Shared Notes', 'MCP Servers', 'Assistant']
   // Selectors, and the palette command it waits for before pressing Enter.
   const classes = ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git', 'palette-item', 'data-command', "'help.agentSetup'"]
   const channels = ['provider:info', 'settings:update', 'workspace:open']
@@ -323,7 +323,25 @@ test('what the Sandbox driver relies on in Hive\'s window, IPC and Agent API is 
   for (const f of ['fake-claude/fake-claude.cjs', 'fake-bridge.cjs']) assert.ok(fs.existsSync(path.join(__dirname, 'e2e', f)), f)
 })
 
-// The driver's readiness (tests/sandbox/inside/ready.cjs): what Hive says is done, never a quiet spell. Each case holds a
+// The driver's Launch at login reading (drive.cjs runValues, HI-2460): HKCU's Run values that start either exe, Hive Desktop's
+// Hive.exe before the upgrade and Combwork.exe after, so 4.login-registered sees the old one and 4.login-moved a stale one
+// (HI-2567 round 1's finding). Its PowerShell filter, -match (case-insensitive), applied to stand-in Run values.
+test("the driver's Launch at login reading keeps Hive.exe's and Combwork.exe's Run values, and nothing else", () => {
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const body = drive.slice(drive.indexOf('function runValues()'))
+  const filter = /\$_\.command -match '([^']+)'/.exec(body.slice(0, body.indexOf('\n}')))?.[1]
+  assert.ok(filter, 'runValues filters its Run values with -match')
+  const re = new RegExp(filter.replace(/\\\\/g, '\\'), 'i')
+  const hive = { name: 'electron.app.Hive Desktop', command: '"C:\\Users\\u\\AppData\\Local\\Programs\\Hive\\Hive.exe" --hidden' }
+  const combwork = { name: 'electron.app.Combwork', command: '"C:\\Users\\u\\AppData\\Local\\Programs\\Combwork\\Combwork.exe" --hidden' }
+  const other = { name: 'OneDrive', command: '"C:\\Program Files\\Microsoft OneDrive\\OneDrive.exe" /background' }
+  const kept = (values: { name: string; command: string }[]) => values.filter((v) => re.test(v.command)).map((v) => v.name)
+  assert.deepStrictEqual(kept([hive, other]), [hive.name])
+  assert.deepStrictEqual(kept([hive, combwork, other]), [hive.name, combwork.name])
+  assert.deepStrictEqual(kept([other]), [])
+})
+
+// The driver's readiness (tests/sandbox/inside/ready.cjs): what Combwork says is done, never a quiet spell. Each case holds a
 // loading state unchanged for many polls before the ready one: the wait must not end on it (HI-2298 round 2's finding).
 const ready = require('./sandbox/inside/ready.cjs')
 /** A reader that answers `before` for n calls and `after` from then on, counting its calls. */
@@ -332,7 +350,7 @@ const scripted = <T>(n: number, before: T, after: T) => {
   return { read: async () => (++calls <= n ? before : after), calls: () => calls }
 }
 
-test('the new workspace counts as set up only once Hive\'s status names it with its Hive skills, however long it stays the same before', async () => {
+test('the new workspace counts as set up only once Combwork\'s status names it with its Combwork skills, however long it stays the same before', async () => {
   const ws = 'C:\\Users\\WDAGUtilityAccount\\Workspaces\\Fresh'
   const done = { workspace: { path: `${ws}\\` }, guidance: { skills: [{ name: 'handover' }] } }
   for (const partial of [{ workspace: null, guidance: { skills: null } }, { workspace: { path: ws }, guidance: { skills: [] } }, { workspace: { path: 'C:\\Other' }, guidance: { skills: [{ name: 'handover' }] } }]) {
@@ -342,7 +360,7 @@ test('the new workspace counts as set up only once Hive\'s status names it with 
   }
   // Never set up within the bound: null (the driver fails the check), not what was read last.
   assert.strictEqual(await ready.workspaceSetUp(async () => ({ workspace: { path: ws }, guidance: { skills: [] } }), ws, 30, 1), null)
-  // A status that fails (its request timed out while Hive was still setting up) is not yet, not an end.
+  // A status that fails (its request timed out while Combwork was still setting up) is not yet, not an end.
   let n = 0
   assert.strictEqual(await ready.workspaceSetUp(async () => { if (++n < 5) throw new Error('timeout'); return done }, ws, 5000, 1), done)
 })
@@ -371,7 +389,7 @@ test('a view counts as loaded only on its own loaded markers, however long its l
   assert.deepStrictEqual(ready.VIEWS.map((v: Json) => v.slug), ['workspace-overview', 'task-board', 'shared-notes', 'skills', 'mcp-servers', 'hive-assistant'])
 })
 
-test('every view marker the driver waits for is in Hive\'s window: its classes and attributes in the renderer, its text in English', () => {
+test('every view marker the driver waits for is in Combwork\'s window: its classes and attributes in the renderer, its text in English', () => {
   const root = path.resolve(__dirname, '..')
   const english = fs.readdirSync(path.join(root, 'locales', 'en')).map((f) => fs.readFileSync(path.join(root, 'locales', 'en', f), 'utf8')).join('\n')
   const renderer = (dir: string): string => fs.readdirSync(dir, { withFileTypes: true }).map((e) => (e.isDirectory() ? renderer(path.join(dir, e.name)) : /\.tsx?$/.test(e.name) ? fs.readFileSync(path.join(dir, e.name), 'utf8') : '')).join('\n')

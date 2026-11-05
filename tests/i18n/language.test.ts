@@ -53,7 +53,7 @@ describe('the language area', () => {
     for (const m of MESSAGES) expect(m.description.length, m.id).toBeGreaterThan(10)
   })
 
-  // #792: the expected text is the catalogue's own, formatted apart from Hive, so a translator can change the wording
+  // #792: the expected text is the catalogue's own, formatted apart from Combwork, so a translator can change the wording
   // without changing this test; a broken placeholder still fails here and in i18n:check.
   it('Polish formats every message it has, with the English placeholders', async () => {
     const problems: string[] = []

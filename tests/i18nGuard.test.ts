@@ -1,5 +1,5 @@
 // The i18n guard (scripts/i18nGuard.mjs, #768): no new hard-coded text in what the user sees. The spike's 24 fixtures
-// (#756), each in a tree of its own, and Hive's own source checked against the merge base's allowlists, as CI does.
+// (#756), each in a tree of its own, and Combwork's own source checked against the merge base's allowlists, as CI does.
 import { afterEach, describe, expect, it } from 'vitest'
 import { spawnSync } from 'child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
@@ -314,7 +314,7 @@ describe('the i18n guard: what review round 1 found', () => {
   })
 })
 
-describe("Hive's own source", () => {
+describe("Combwork's own source", () => {
   it('has no new hard-coded UI text, and its allowlists are no bigger than at the merge base', () => {
     const ref = defaultBaseRef(ROOT)
     const base = baseLists(ROOT, ref) as { base: string; lists: Lists | null } | null

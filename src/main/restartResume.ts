@@ -624,7 +624,7 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   if (ready) {
     setState(e, 'resumed')
     done.resumed.push(e)
-    log.info(`Resumed ${userText(e.agentName)} in ${userText(e.project)} after Hive restarted (${policy()})`)
+    log.info(`Resumed ${userText(e.agentName)} in ${userText(e.project)} after Combwork restarted (${policy()})`)
     return 'done'
   }
   if (!openWorkspaceOf(e)) return closed()

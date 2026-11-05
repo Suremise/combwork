@@ -8,7 +8,7 @@
 //   couldn't start, is made again by the next pass; one uncertain is left to the deliveries' own policy (its agent
 //   started where it is offered, nothing made again);
 // - a card's cycle read from its facts;
-// - Hive quitting (#1628): a pass running is waited for (bounded) before the boards close, goes on to no next step, and
+// - Combwork quitting (#1628): a pass running is waited for (bounded) before the boards close, goes on to no next step, and
 //   a failure as they close is no warning; no pass starts after, and the next start's do.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, setup, sh, type Env } from './workflow/harness'
@@ -28,7 +28,7 @@ const HUNG_MS = 30_000
 const state = vi.hoisted(() => ({
   enforced: true,
   afterList: null as null | (() => void),
-  /** After git's `update-ref -d` has run: throws to stand for Hive ending right there. */
+  /** After git's `update-ref -d` has run: throws to stand for Combwork ending right there. */
   afterRemove: null as null | (() => void),
   /** Git's `update-ref <ref> <head> ''` (putting a branch back) refused. */
   restoreFails: false,
@@ -67,10 +67,10 @@ const state = vi.hoisted(() => ({
   busy: null as string | null,
   /** When the pause after the user typed in its builder's pane ends (sessions.userQuietAt), or null. */
   quietAt: null as number | null,
-  /** What listens for Hive being done with an agent's line (lineWriter.onLineFreed). */
+  /** What listens for Combwork being done with an agent's line (lineWriter.onLineFreed). */
   lineFreed: new Set<(projectPath: string, agentId: string) => void>(),
   /**
-   * Its builder freed right after the pass's look, before the wait listens (HR3's round 2): 'line', Hive's line done
+   * Its builder freed right after the pass's look, before the wait listens (HR3's round 2): 'line', Combwork's line done
    * with (its notice told then, to whoever listens); 'quiet', the user's pause over (nothing told).
    */
   freeAfterLook: null as null | { how: 'line' | 'quiet'; project: string },
@@ -301,10 +301,10 @@ const hasLine = (e: Env, line: string): boolean => {
   }
 }
 
-/** Hive ending right after the ref's removal: the deletion's call ends there (as the process would), its intent kept. */
+/** Combwork ending right after the ref's removal: the deletion's call ends there (as the process would), its intent kept. */
 const crashAfterRemove = (): void => {
   state.afterRemove = () => {
-    throw new Error('Hive ended (test)')
+    throw new Error('Combwork ended (test)')
   }
 }
 
@@ -335,7 +335,7 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
     expect(e.kinds(n)).toContain('LineDeleteUndone')
   })
 
-  it("Hive ending right after the ref's removal, a checkout having come in: the next pass puts the branch back at its head, the checkout kept", async () => {
+  it("Combwork ending right after the ref's removal, a checkout having come in: the next pass puts the branch back at its head, the checkout kept", async () => {
     const { e, n, line, slot } = await doneInSlot('Crashed with a checkout')
     sh(slot, 'switch', '-q', '--detach')
     const head = sh(e.project, 'rev-parse', line)
@@ -343,7 +343,7 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
     state.afterList = () => void sh(e.project, 'worktree', 'add', '-q', other, line)
     crashAfterRemove()
     expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
-    // As Hive left it: the ref gone, the checkout's HEAD naming it, the intent recorded.
+    // As Combwork left it: the ref gone, the checkout's HEAD naming it, the intent recorded.
     expect(hasLine(e, line)).toBe(false)
     expect(sh(other, 'symbolic-ref', 'HEAD')).toBe(`refs/heads/${line}`)
     expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting'])
@@ -355,7 +355,7 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
     expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting', 'LineDeleteUndone'])
   })
 
-  it("Hive ending right after the ref's removal, nothing checking it out: the next pass records it deleted", async () => {
+  it("Combwork ending right after the ref's removal, nothing checking it out: the next pass records it deleted", async () => {
     const { e, n, line, slot } = await doneInSlot('Crashed alone')
     sh(slot, 'switch', '-q', '--detach')
     crashAfterRemove()
@@ -865,8 +865,8 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
       await givenOnce(e, n, placing)
     })
 
-    it("Hive already typing a line into it: woken when that line is done with, with no status change", async () => {
-      const { e, n, placing, said } = await waiting('Hive is already typing a line into it')
+    it("Combwork already typing a line into it: woken when that line is done with, with no status change", async () => {
+      const { e, n, placing, said } = await waiting('Combwork is already typing a line into it')
       await nothingYet(e, n, said)
       state.busy = null
       for (const fn of [...state.lineFreed]) fn(e.project, 'B1')
@@ -876,7 +876,7 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     it.each(['line', 'quiet'] as const)("freed between the pass's look and the wait's listening (%s): not lost, given at once (HR3's round 2)", async (how) => {
       const { e, n, slot, cycle, ws } = await prepared()
       state.live = { cwd: slot, sessionId: 's1' }
-      state.busy = how === 'line' ? 'Hive is already typing a line into it' : 'the user has just typed in its terminal and may still be writing there'
+      state.busy = how === 'line' ? 'Combwork is already typing a line into it' : 'the user has just typed in its terminal and may still be writing there'
       state.freeAfterLook = { how, project: e.project }
       await givenOnce(e, n, place(ws, e.project, e.wf, n, cycle, lease))
     })
@@ -1413,8 +1413,8 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
   })
 })
 
-describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
-  // Each test quits: started again after it, as the next Hive's start does, so the other tests' passes run.
+describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
+  // Each test quits: started again after it, as the next Combwork's start does, so the other tests' passes run.
   afterEach(() => {
     startSlotCards()
     stopSlotCards()
@@ -1459,7 +1459,7 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     expect(state.waitingLooks).toBe(1)
   })
 
-  it("a pass whose boards close under it as Hive quits says so in the log, not as a warning", async () => {
+  it("a pass whose boards close under it as Combwork quits says so in the log, not as a warning", async () => {
     const { pass, go } = await heldPass()
     const quitting = quitSlotCards(HUNG_MS)
     go(new Error('No workspace is open'))
@@ -1469,7 +1469,7 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     expect(state.logged.some((l) => l.startsWith('info settling the slots of') && l.includes('cut short by quitting'))).toBe(true)
   })
 
-  it("a lane waiting for a slot whose lend is under way as Hive quits isn't started: it keeps the slot and its wait for the next start", async () => {
+  it("a lane waiting for a slot whose lend is under way as Combwork quits isn't started: it keeps the slot and its wait for the next start", async () => {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
     state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
@@ -1708,7 +1708,7 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     go()
   })
 
-  it('quitNow quiets the slots before the sessions stop and waits for them before Hive quits, the boards closing after (index.ts)', () => {
+  it('quitNow quiets the slots before the sessions stop and waits for them before Combwork quits, the boards closing after (index.ts)', () => {
     const src = readFileSync(join(__dirname, '..', 'src', 'main', 'index.ts'), 'utf8')
     const body = src.slice(src.indexOf('async function quitNow('), src.indexOf('function relaunch('))
     const at = (s: string): number => {

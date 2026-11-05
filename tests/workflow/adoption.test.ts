@@ -90,7 +90,7 @@ function afterSnapshot(w: WS, fn: () => void): void {
     return list(opts)
   }
 }
-/** A card's saved document changed by another Hive (its own connection to the file). */
+/** A card's saved document changed by another Combwork (its own connection to the file). */
 const editOutside = (ws: string, w: WS, num: number, change: Record<string, unknown>): void => writeCardOutside(ws, num, { ...readCard(w, num), ...change })
 
 const factsOf = (w: WS, project: string, num: number): { kind: string; data: Record<string, unknown>; source: string }[] => FactStore.forBoard(w, { project, key: project }).facts(num) as never
@@ -166,7 +166,7 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(readFileSync(join(ws, 'p', '.combwork', 'project.json'), 'utf8')).toBe(before)
   })
 
-  it('two at once (another Hive, a start during the upgrade) add each fact once', async () => {
+  it('two at once (another Combwork, a start during the upgrade) add each fact once', async () => {
     const { w } = await world()
     const [a, b] = await Promise.all([adoptNow(w), adoptNow(w)])
     expect(a!.adopted + b!.adopted).toBe(4)
@@ -174,7 +174,7 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(a!.configured + b!.configured).toBe(2)
     for (const c of [2, 3, 4]) expect(factsOf(w, 'p', c).filter((f) => f.kind === 'Adopted')).toHaveLength(1)
     expect(factsOf(w, 'p', 3).filter((f) => f.kind === 'Submitted')).toHaveLength(1)
-    // And the coalesced run (what Hive starts) while another is going: one run.
+    // And the coalesced run (what Combwork starts) while another is going: one run.
     const facts = allFacts(w)
     await clearDone(w)
     await Promise.all([adoptWorkspace(w), adoptWorkspace(w)])
@@ -197,7 +197,7 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(store.adoptionCards(f)).toMatchObject([{ number: 1, facts: false, preWorkflow: false }])
   })
 
-  it('leaves a card another Hive started after its snapshot as it is, its stage and column too', async () => {
+  it('leaves a card another Combwork started after its snapshot as it is, its stage and column too', async () => {
     const { ws, w } = await world()
     afterSnapshot(w, () => {
       const other = FactStore.open(store.boardFile(ws), { project: 'p', key: 'p' })
@@ -235,7 +235,7 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(store.boardValue(w, 'adoption')).not.toBeNull()
   })
 
-  it("a card whose agent's folder changed after it was read is read again, by Hive's run itself", async () => {
+  it("a card whose agent's folder changed after it was read is read again, by Combwork's run itself", async () => {
     const { ws, w } = await world()
     const file = join(ws, 'p', '.combwork', 'project.json')
     sh(join(ws, 'p'), 'branch', 'release')

@@ -2,7 +2,7 @@
 // builder's worktree is recorded as a slot under its folder's name and lent to it under a carried lease, kept for its lane
 // running at the upgrade, else its card in flight, else nothing; its sessions in that folder are bound to the lease in
 // the same write; a reviewer's worktree becomes a retired home; a missing worktree is left as it is. Run again (a second
-// opening, the mark lost, another Hive having adopted one first), nothing is adopted twice. Release Slot… ends a carried
+// opening, the mark lost, another Combwork having adopted one first), nothing is adopted twice. Release Slot… ends a carried
 // lease. The workspace, its board and git are real; no session is started.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
@@ -128,8 +128,8 @@ describe("agents' worktrees become slots (#1441)", () => {
     expect(JSON.parse(meta('slot_migration')!)[projectId]).toBeTruthy()
   })
 
-  it("another Hive's adoption first (its own connection): this one adds no second carried lease", async () => {
-    // b5 gets a worktree now, adopted by another Hive before this one's migration runs again.
+  it("another Combwork's adoption first (its own connection): this one adds no second carried lease", async () => {
+    // b5 gets a worktree now, adopted by another Combwork before this one's migration runs again.
     sh(project, 'worktree', 'add', '-q', '-b', 'hive/hb5', wt('hb5'))
     const other = new SlotStore(fileSlotConn(boardFile(wsPath)), projectId)
     try {

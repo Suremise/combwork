@@ -18,7 +18,7 @@ describe('Codex hook trust', () => {
 })
 
 describe('Codex hooks', () => {
-  it('turns hook calls into Hive events', async () => {
+  it('turns hook calls into Combwork events', async () => {
     const { codex } = await import('../src/main/providers/codex/adapter')
     const h = (body: Record<string, unknown>) => codex.normalizeHook(body)
     expect(h({ hook_event_name: 'SessionStart', session_id: 's1', transcript_path: 'C:\\x\\r.jsonl', source: 'startup', permission_mode: 'default' })).toMatchObject({ event: { kind: 'start', source: 'startup' }, sessionId: 's1', transcriptPath: 'C:\\x\\r.jsonl', mode: null })
@@ -98,7 +98,7 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("pins the title's items for Hive's sessions, so a user's [tui].terminal_title can't hide it", async () => {
+  it("pins the title's items for Combwork's sessions, so a user's [tui].terminal_title can't hide it", async () => {
     const { rmSync } = await import('fs')
     const home = tempDir('hive-codex-home-')
     const before = process.env.CODEX_HOME
@@ -167,7 +167,7 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("reads a connection's trust of a workspace's folders as Codex 0.164.0 looked it up (HI-1870), with Hive's per-launch trust off", async () => {
+  it("reads a connection's trust of a workspace's folders as Codex 0.164.0 looked it up (HI-1870), with Combwork's per-launch trust off", async () => {
     const { mkdirSync, rmSync, writeFileSync } = await import('fs')
     const { codex } = await import('../src/main/providers/codex/adapter')
     const { advanced } = await import('../src/main/advanced')
@@ -201,7 +201,7 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("trusts each launch's own folder when Hive's per-launch trust is on (HI-1871, Darren: on by default): its -c, and nothing pending", async () => {
+  it("trusts each launch's own folder when Combwork's per-launch trust is on (HI-1871, Darren: on by default): its -c, and nothing pending", async () => {
     const { rmSync } = await import('fs')
     const { codex } = await import('../src/main/providers/codex/adapter')
     const { advanced } = await import('../src/main/advanced')
@@ -261,7 +261,7 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("pre-approves only Hive's own server's tools: a third-party one follows Codex's approval policy (#1166)", async () => {
+  it("pre-approves only Combwork's own server's tools: a third-party one follows Codex's approval policy (#1166)", async () => {
     const { rmSync } = await import('fs')
     const home = tempDir('hive-codex-home-')
     const before = process.env.CODEX_HOME
@@ -493,7 +493,7 @@ describe('Codex models', () => {
 })
 
 describe('Codex skill copies', () => {
-  it("replaces and removes only Hive's marked copies, and leaves the user's own folders alone", async () => {
+  it("replaces and removes only Combwork's marked copies, and leaves the user's own folders alone", async () => {
     const { mkdirSync, writeFileSync, existsSync, readFileSync } = await import('fs')
     const { join } = await import('path')
     const root = tempDir('hive-skills-')
@@ -513,7 +513,7 @@ describe('Codex skill copies', () => {
     writeFileSync(join(src, 'SKILL.md'), '# deploy v2')
     await sync([{ name: 'deploy', sourcePath: src }])
     expect(readFileSync(join(skills, 'cw-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v2')
-    // Disabled: Hive's copy goes, the user's folder stays.
+    // Disabled: Combwork's copy goes, the user's folder stays.
     await sync([])
     expect(existsSync(join(skills, 'cw-deploy'))).toBe(false)
     expect(existsSync(join(skills, 'hive-mine', 'SKILL.md'))).toBe(true)
@@ -522,7 +522,7 @@ describe('Codex skill copies', () => {
 
 describe('Codex permission menu (#396)', () => {
   // Codex's /permissions menu as rendered: 0.161.0's own (captured in a test home, with Read Only and with Ask for
-  // approval current), and 0.160's order (Read Only first) in the same layout, as Hive's earlier number picks assumed.
+  // approval current), and 0.160's order (Read Only first) in the same layout, as Combwork's earlier number picks assumed.
   // A line per row, however git checked the fixture out (CRLF on Windows).
   const screen = (name: string) => readText(joinPath(__dirname, 'fixtures', `codex-${name}.txt`), 'utf8').replace(/\r\n/g, '\n')
   const MODES = ['read-only', 'ask', 'approve-for-me', 'full-access'] as const

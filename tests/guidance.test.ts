@@ -795,7 +795,7 @@ describe('coordinator guidance', () => {
       expect(line('coordinate-agents', 'When the user decides something about a card')).toMatch(/in a loop wakes its builder and, while the card is in Review or Passed, its reviewer, unless the project turned its loop wakes off/)
       expect(line('coordinate-agents', '**With workflow rules off**')).toMatch(/Combwork enforces none of the project's rules/)
     })
-    it('describe the pool and Hive-owned lane lists, with no worktree, merge-point or junction leftovers', () => {
+    it('describe the pool and Combwork-owned lane lists, with no worktree, merge-point or junction leftovers', () => {
       const lanes = catalog.get('run-lanes')!.text
       expect(lanes).toMatch(/\*\*A shared pool\*\*: a lane has no reviewer of its own\. Combwork gives each submitted card to the next free reviewer/)
       for (const [name, body] of both()) expect(body, name).not.toMatch(/merge point|junction|worktree agents|agents in worktrees|only if the user (?:asked for it|agrees)/i)

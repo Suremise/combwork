@@ -91,7 +91,7 @@ describe("another's card isn't the watcher's loop: a card's stall is its own bui
   })
 })
 
-describe("what a loop agent with no watch owes, while Hive's loop wakes reach it (HI-1693)", () => {
+describe("what a loop agent with no watch owes, while Combwork's loop wakes reach it (HI-1693)", () => {
   const h = (what: string) => ({ at: '2026-10-26T11:00:00.000Z', by: 'HB1 (alpha)', what })
   const reach = { wakes: true, reviewerOf: () => 'r1' }
   const own = (over: Partial<TaskCard>) => card(1, { agent: 'b1', ...over })
@@ -431,7 +431,7 @@ describe('a follow-up its builder posted in Review or Passed that nobody checks 
     expect(loopStepWaitReason(passed(), [{ ...hb3, cards: [1420] }], bound, late)).toBeNull()
   })
   it("a change of place in its column isn't a move: the step still waits, its stall aged from its post (HR4's round 1 finding)", () => {
-    // Lines as Hive writes them: the words, and the message with its column.
+    // Lines as Combwork writes them: the words, and the message with its column.
     const line = (min: number, id: string, what: string, column: string, more: Record<string, string | number> = {}) => ({ at: at(min), by: 'HB3 (alpha)', what, whatText: { id: `tasks.history.${id}`, values: { column, ...more } } })
     const into = line(-90, 'moved', 'Moved to Approved', 'passed')
     const typed = (column: TaskCard['column'], ...after: ReturnType<typeof line>[]) => card(1419, { column, agent: 'b3', history: [line(-90, 'moved', `Moved to ${column}`, column), posted, ...after] })
@@ -456,7 +456,7 @@ describe('a follow-up its builder posted in Review or Passed that nobody checks 
   it('the column a step was posted in is kept on its line: a real move ends it, a change of place keeps it, with the lines before trimmed (#1495)', () => {
     const line = (min: number, id: string, what: string, column: string) => ({ at: at(min), by: 'You', what, whatText: { id: `tasks.history.${id}`, values: { column } } })
     // MAX_HISTORY keeps 300 lines: a long stay in Passed can trim its arrival before a follow-up is posted.
-    const earlier = Array.from({ length: 298 }, (_, i) => ({ at: at(-60), by: 'Hive', what: `Note ${i}` }))
+    const earlier = Array.from({ length: 298 }, (_, i) => ({ at: at(-60), by: 'Combwork', what: `Note ${i}` }))
     const keptIn = (column: string) => ({ ...posted, whatText: { id: 'tasks.history.loopStep', values: { step: 'followUp', text: 'Fixes: …', column } } })
     const trimmed = (column: string, ...after: ReturnType<typeof line>[]) => ({ history: [...earlier, keptIn(column), ...after] })
     // Into Review from Passed, at its top or bottom: the step ends (HR4's case on #1467: a phantom follow-up before).

@@ -1,5 +1,5 @@
 // Workspace notes (#1433, #873, SPEC §16.10.7): one shared note per workspace, delivered inline at each launch after
-// Hive's guidance, on every CLI and in any folder; a project's own section reaches only its agents; bounded at 4 KB
+// Combwork's guidance, on every CLI and in any folder; a project's own section reaches only its agents; bounded at 4 KB
 // (Settings → Advanced), cut with a pointer; off with the note empty or the switch.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -132,7 +132,7 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
   return {
     projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: `r-${Math.random()}`, sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
     resume: false, name: '', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
-    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
     env: { PATH: 'C:\\Windows' },
     ...over
   }
@@ -140,7 +140,7 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
 
 const NOTES = deliveredNotes('Node is C:\\tools\\node22\\node.exe here.').text
 
-describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
+describe('delivered at launch, on every CLI, after Combwork\'s guidance', () => {
   it("Claude Code: appended to the system prompt from the launch's file, after the Assistant's role", () => {
     expect(appendedInstructions(context({ notes: NOTES }))).toBe(NOTES)
     expect(appendedInstructions(context({ notes: NOTES, instructions: 'You are in Planner mode.' }))).toBe(`You are in Planner mode.\n\n${NOTES}`)
@@ -152,7 +152,7 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     expect(args(context({ notes: NOTES, resume: true, cliVersion: '2.1.305' })).join(' ')).toContain('--system-prompt-snapshot off')
   })
 
-  it("Claude Code: a conversation Hive gave instructions to before loses them on resume once they're off or emptied (HR5's rounds 1–2)", () => {
+  it("Claude Code: a conversation Combwork gave instructions to before loses them on resume once they're off or emptied (HR5's rounds 1–2)", () => {
     /** A launch's command: whether it renders the prompt fresh, and whether it appends. */
     const launch = (over: Partial<LaunchContext>) => {
       const args = claudeCode.buildCommand('C:\\bin\\claude.exe', context({ cliVersion: '2.1.305', mcpServers: {}, guidance: '', ...over })).args
@@ -160,7 +160,7 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     }
     // Started with notes.
     expect(launch({ notes: NOTES })).toEqual({ fresh: false, appends: true })
-    // Resumed with notes switched off or emptied (none given now), the conversation's record saying Hive gave some before
+    // Resumed with notes switched off or emptied (none given now), the conversation's record saying Combwork gave some before
     // (SessionRecord.promptAdded, by whichever agent): nothing appended, and the prompt rendered fresh, without the old note.
     expect(launch({ resume: true, notes: '', promptAddedBefore: true })).toEqual({ fresh: true, appends: false })
     // A conversation never given any: left as Claude Code keeps it.
@@ -193,7 +193,7 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     expect(file(none)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n`)
   })
 
-  it("Codex: in developer_instructions after the user's own and Hive's guidance; Codex unable to say, an agent's are left alone", async () => {
+  it("Codex: in developer_instructions after the user's own and Combwork's guidance; Codex unable to say, an agent's are left alone", async () => {
     const fake = join(__dirname, 'e2e', 'fake-codex', 'fake-codex.cmd')
     const home = join(base, 'developer-codex-home')
     const homeBefore = process.env.CODEX_HOME
@@ -208,11 +208,11 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
       return a ? (parseToml(a) as { developer_instructions: string }).developer_instructions : null
     }
     try {
-      expect(await developer({ notes: NOTES })).toBe(`Hive guidance\n\n${NOTES}`)
+      expect(await developer({ notes: NOTES })).toBe(`Combwork guidance\n\n${NOTES}`)
       writeFileSync(said, 'Mine.')
-      expect(await developer({ notes: NOTES })).toBe(`Mine.\n\nHive guidance\n\n${NOTES}`)
-      expect(await developer({ notes: NOTES, instructions: 'You are the Assistant.' })).toBe(`Mine.\n\nHive guidance\n\nYou are the Assistant.\n\n${NOTES}`)
-      // Hive's guidance off: the notes still come, after the user's own.
+      expect(await developer({ notes: NOTES })).toBe(`Mine.\n\nCombwork guidance\n\n${NOTES}`)
+      expect(await developer({ notes: NOTES, instructions: 'You are the Assistant.' })).toBe(`Mine.\n\nCombwork guidance\n\nYou are the Assistant.\n\n${NOTES}`)
+      // Combwork's guidance off: the notes still come, after the user's own.
       expect(await developer({ notes: NOTES, guidance: '' })).toBe(`Mine.\n\n${NOTES}`)
       writeFileSync(said, '!fail')
       expect(await developer({ notes: NOTES })).toBeNull()
@@ -267,7 +267,7 @@ describe("in a workspace: the launch's notes and the switch", () => {
     }
   })
 
-  it("remembers that a conversation was given Hive's instructions with the conversation itself: any agent, a restart, many newer ones", async () => {
+  it("remembers that a conversation was given Combwork's instructions with the conversation itself: any agent, a restart, many newer ones", async () => {
     const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
     const { closeAllBoards } = await import('../src/main/boardStore')
     const root = join(base, 'ws-prompted')

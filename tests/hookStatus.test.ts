@@ -50,7 +50,7 @@ function send(adapter: ProviderAdapter, a: Agent, ...bodies: Record<string, unkn
   for (const body of bodies) {
     const step = hookStep(adapter.normalizeHook(body).event, input(a, adapter.descriptor.capabilities.backgroundWakes))
     apply(a, step)
-    // SessionManager.carryOut: the compaction Hive asked for has begun, or is over (the step set the status).
+    // SessionManager.carryOut: the compaction Combwork asked for has begun, or is over (the step set the status).
     if (step.actions.includes('compactBegan')) a.compacting = 'started'
     if (step.actions.includes('compactEnded')) a.compacting = null
   }
@@ -94,7 +94,7 @@ const providers = async (): Promise<[string, ProviderAdapter, Record<string, Rec
   ]
 }
 
-describe("a prompt's text, for telling the user's replies from Hive's lines (#418)", () => {
+describe("a prompt's text, for telling the user's replies from Combwork's lines (#418)", () => {
   it('each provider reports what its CLI took; a Codex answer to its question loses its tag', async () => {
     for (const [name, adapter, h] of await providers()) expect(adapter.normalizeHook(h.prompt).event, name).toEqual({ kind: 'prompt', text: 'hi' })
     const { codex } = await import('../src/main/providers/codex/adapter')
@@ -151,7 +151,7 @@ describe('hook → status, for each provider', () => {
     }
   })
 
-  it('compaction Hive asked for: under way, then ready', async () => {
+  it('compaction Combwork asked for: under way, then ready', async () => {
     for (const [name, adapter, h] of await providers()) {
       const a = agent('working', { statusMessage: COMPACTING_MESSAGE, compacting: 'requested' })
       send(adapter, a, h.compactStart)
@@ -161,18 +161,18 @@ describe('hook → status, for each provider', () => {
     }
   })
 
-  it("compaction Hive asked for, its end unsaid: a new turn ends it, and a late end doesn't make the turn idle", async () => {
+  it("compaction Combwork asked for, its end unsaid: a new turn ends it, and a late end doesn't make the turn idle", async () => {
     for (const [name, adapter, h] of await providers()) {
       const a = send(adapter, agent('working', { statusMessage: COMPACTING_MESSAGE, compacting: 'requested' }), h.compactStart, h.prompt)
       expect([a.status, a.statusMessage, a.compacting], name).toEqual(['working', undefined, null])
       expect(a.actions, name).toEqual(['compactBegan', 'answered', 'prompted', 'compactEnded'])
-      // PostCompact after all, or Hive noticing the end (transcript, time limit): the turn stands.
+      // PostCompact after all, or Combwork noticing the end (transcript, time limit): the turn stands.
       expect(send(adapter, a, h.compactEnd).status, name).toBe('working')
       expect(compactionOver(a).next, name).toBeNull()
     }
   })
 
-  it("a prompt before the CLI begins Hive's compaction (it may be the /compact typed) leaves it under way", async () => {
+  it("a prompt before the CLI begins Combwork's compaction (it may be the /compact typed) leaves it under way", async () => {
     for (const [name, adapter, h] of await providers()) {
       const a = send(adapter, agent('working', { statusMessage: COMPACTING_MESSAGE, compacting: 'requested' }), h.prompt)
       expect([a.status, a.statusMessage, a.compacting], name).toEqual(['working', COMPACTING_MESSAGE, 'requested'])
@@ -181,7 +181,7 @@ describe('hook → status, for each provider', () => {
     }
   })
 
-  it('a compaction over by what Hive saw (no hook): ready only while it still shows', () => {
+  it('a compaction over by what Combwork saw (no hook): ready only while it still shows', () => {
     const shown = agent('working', { statusMessage: COMPACTING_MESSAGE })
     expect(applyStep(shown, compactionOver(shown))).toBe(true)
     expect([shown.status, shown.statusMessage]).toEqual(['ready', undefined])
@@ -201,7 +201,7 @@ describe('hook → status, for each provider', () => {
       // /compact typed while idle: working while it compacts, and ready (not stuck working) once done.
       const idle = send(adapter, agent('ready'), h.compactStart)
       expect([idle.status, idle.statusMessage], name).toEqual(['working', COMPACTING_MESSAGE])
-      // Watched for its end as Hive's own Compact is: nothing else may say so (#1115).
+      // Watched for its end as Combwork's own Compact is: nothing else may say so (#1115).
       expect(idle.actions, name).toEqual(['autoCompact', 'autoCompactIdle'])
       send(adapter, idle, h.compactEnd)
       expect([idle.status, idle.statusMessage], name).toEqual(['ready', undefined])
@@ -661,7 +661,7 @@ describe("Claude Code's prompt about a safeguard stop, answered (#606)", () => {
 describe("the CLI says it is idle at its prompt (Claude Code's idle_prompt, #612)", () => {
   const idle = { hook_event_name: 'Notification', notification_type: 'idle_prompt', message: 'Claude is waiting for your input' }
 
-  it("an agent Hive still shows working (its turn's end missed) is idle again, its claims released, and the log told", async () => {
+  it("an agent Combwork still shows working (its turn's end missed) is idle again, its claims released, and the log told", async () => {
     const [[, claude]] = await providers()
     const a = send(claude, agent('working'), idle)
     expect(a.status).toBe('ready')
@@ -672,7 +672,7 @@ describe("the CLI says it is idle at its prompt (Claude Code's idle_prompt, #612
     expect(hookStep({ kind: 'idle' }, input(agent('working', { tasks: 1 }), true)).next).toBe('background')
   })
 
-  it('changes nothing else: an idle, waiting or background agent, or one Hive is compacting', async () => {
+  it('changes nothing else: an idle, waiting or background agent, or one Combwork is compacting', async () => {
     const [[, claude]] = await providers()
     for (const status of ['ready', 'finished', 'watching', 'waiting', 'background', 'signin'] as SessionStatus[]) {
       const a = send(claude, agent(status), idle)
@@ -685,12 +685,12 @@ describe("the CLI says it is idle at its prompt (Claude Code's idle_prompt, #612
     const [[, claude, h]] = await providers()
     const a = send(claude, agent('working'), h.stop)
     expect(a.status).toBe('finished')
-    // The compaction: PreCompact (auto), SessionStart (compact), PostCompact; Hive's hooks have no SubagentStop.
+    // The compaction: PreCompact (auto), SessionStart (compact), PostCompact; Combwork's hooks have no SubagentStop.
     send(claude, a, { hook_event_name: 'PreCompact', trigger: 'auto' })
     expect([a.status, a.statusMessage]).toEqual(['working', COMPACTING_MESSAGE])
     send(claude, a, { hook_event_name: 'SessionStart', source: 'compact' }, { hook_event_name: 'PostCompact', trigger: 'auto' })
     expect([a.status, a.statusMessage]).toEqual(['ready', undefined])
-    // The recap sends no hook of Hive's; the idle notification a minute after the turn changes nothing either.
+    // The recap sends no hook of Combwork's; the idle notification a minute after the turn changes nothing either.
     send(claude, a, idle)
     expect(a.status).toBe('ready')
   })

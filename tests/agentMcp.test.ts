@@ -30,7 +30,7 @@ describe("an agent's choice", () => {
     expect(agentGetsMcp({ mcpServers: ['sandbox'] }, 'notes')).toBe(false)
     expect(agentGetsMcp({ mcpServers: ['sandbox'] }, 'sandbox')).toBe(true)
     expect(agentGetsMcp({ mcpServers: [] }, 'sandbox')).toBe(false)
-    // A value Hive can't read (a hand-edited project.json) gives none: never more than was asked for.
+    // A value Combwork can't read (a hand-edited project.json) gives none: never more than was asked for.
     expect(agentGetsMcp({ mcpServers: 'sandbox' as never }, 'sandbox')).toBe(false)
     expect([agentChoosesMcp({}), agentChoosesMcp({ mcpServers: [] })]).toEqual([false, true])
   })
@@ -72,7 +72,7 @@ describe('a launch', () => {
     mkdirSync(join(proj, '.combwork'), { recursive: true })
     mkdirSync(join(ws, '.combwork', 'mcp'), { recursive: true })
     for (const n of ['notes', 'sandbox', 'github', 'idle']) writeFileSync(join(ws, '.combwork', 'mcp', `${n}.json`), JSON.stringify(server(n)))
-    // A hand-made server under Hive's reserved name: the CLIs pre-approve hive's tools, so it never reaches a launch (#1166).
+    // A hand-made server under Combwork's reserved name: the CLIs pre-approve hive's tools, so it never reaches a launch (#1166).
     writeFileSync(join(ws, '.combwork', 'mcp', 'hive.json'), JSON.stringify({ command: 'impostor' }))
     // On in the workspace: notes, sandbox, github; github turned off in the project; idle off everywhere.
     writeFileSync(join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox', 'github', 'hive'] } }))
@@ -97,7 +97,7 @@ describe('a launch', () => {
       // only in it (a resolution reads the agent as saved, HI-1770, so an unsaved variant can't stand in for one).
       const sig = async (a: object) => sessions.signature(await sessions.effective(proj, a as never))
       expect(await sig(agents[0])).not.toBe(await sig(agents[1]))
-      // The Assistant gets Hive's own tools, not the projects' servers, whatever it is given: its own choices are
+      // The Assistant gets Combwork's own tools, not the projects' servers, whatever it is given: its own choices are
       // tests/assistantMcp.test.ts's (HI-1472), none until switched on.
       expect(Object.keys((await sessions.effective(w.assistantHome, { id: 'assistant', name: 'Assistant', mcpServers: ['notes'] } as never)).mcpServers).filter((n) => n !== 'hive')).toEqual([])
 
@@ -115,7 +115,7 @@ describe('a launch', () => {
       const claudeArgs = claudeCode.buildCommand(claudeCtx.executable, claudeCtx).args
       const claudeFile = claudeArgs[claudeArgs.indexOf('--mcp-config') + 1]
       expect(Object.keys(JSON.parse(readFileSync(claudeFile, 'utf8')).mcpServers)).toEqual(['sandbox'])
-      // Only Hive's file: the project's own .mcp.json and the user's servers stay out.
+      // Only Combwork's file: the project's own .mcp.json and the user's servers stay out.
       expect(claudeArgs).toContain('--strict-mcp-config')
 
       // Codex: its servers as -c overrides; one of the user's own of the same name as a server it wasn't given is off.

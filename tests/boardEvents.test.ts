@@ -115,7 +115,7 @@ describe('board events (#1011)', () => {
   async function doneCards(n: number): Promise<number[]> {
     const made: number[] = []
     for (let i = 0; i < n; i++) made.push((await run(() => tasks.createTask({ title: `Card ${i}`, project: 'alpha', column: 'done' }, user))).number)
-    // Each was told as it was saved (#1017: Hive's own writes tell the board, no folder watched).
+    // Each was told as it was saved (#1017: Combwork's own writes tell the board, no folder watched).
     expect(seen).toHaveLength(n)
     seen.length = 0
     return made
@@ -216,7 +216,7 @@ describe('board events (#1011)', () => {
     }
   })
 
-  it('a card changed by another process (another copy of Hive, a script) is told, and a burst of them a few times, not once a card', async () => {
+  it('a card changed by another process (another copy of Combwork, a script) is told, and a burst of them a few times, not once a card', async () => {
     const doc = (n: number) => ({ number: n, title: 'From outside', project: 'alpha', column: 'todo', order: n, history: [], comments: [] })
     writeCardOutside(wsPath, 9001, doc(9001))
     // Seen by the board's poll of its file (once a second), within a bound for a slow machine, not a time slept for.

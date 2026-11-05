@@ -34,7 +34,7 @@ async function passed(e: Env, key: string, reviewer = R1) {
 }
 
 describe('intents only where the compiled table has them', () => {
-  it('under Hive merges a report merge is refused, as is the translated `done` column move; the queue merges', async () => {
+  it('under Combwork merges a report merge is refused, as is the translated `done` column move; the queue merges', async () => {
     const e = (env = setup({ ...pairOpts, okBefore: { mode: 'labels', labels: ['release'] } }))
     const { card } = await startedIn(e, 'Release', 'r.txt', { labels: ['release'] })
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))

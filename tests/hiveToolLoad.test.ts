@@ -1,4 +1,4 @@
-// Hive's tools where a CLI defers MCP tools (HI-2229): each role's most used tools are marked to be sent in full, only
+// Combwork's tools where a CLI defers MCP tools (HI-2229): each role's most used tools are marked to be sent in full, only
 // tools that role is offered at every control level; and a refused call that guessed its arguments is told the tool's.
 import { describe, expect, it } from 'vitest'
 import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, assistantTools } from '../src/shared/assistantTools'

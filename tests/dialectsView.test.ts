@@ -138,7 +138,7 @@ describe('import tokens', () => {
 })
 
 describe('the Workspace file before it is made', () => {
-  it('is listed and opens empty, its first Save making it; Hive writes nothing until then', async () => {
+  it('is listed and opens empty, its first Save making it; Combwork writes nothing until then', async () => {
     const hive = join(base, `h-${++n}`)
     mkdirSync(join(hive, 'dialects', 'claude-code'), { recursive: true })
     writeFileSync(join(hive, 'dialects', 'claude-code', 'cli.json'), '{ "name": "Claude Code", "texts": {} }')

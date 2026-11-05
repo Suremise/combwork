@@ -1,4 +1,4 @@
-// A link in a skill that Windows won't let Hive make (a link to a file needs a privilege): the rest of the skill is
+// A link in a skill that Windows won't let Combwork make (a link to a file needs a privilege): the rest of the skill is
 // still copied for Claude Code, whatever order the files come in, and the launch says which links are missing; Codex's
 // swap is all or nothing, so an old copy stays whole. The refusal is injected: fs/promises' symlink fails for any link
 // with "denied" in its name, as Windows would.
@@ -45,7 +45,7 @@ function skill(name: string): string {
 const PLAIN = ['SKILL.md', 'references/a.md', 'references/z.md', 'references/deep/after.md']
 const DENIED = ['00-denied-link', 'references/denied-middle', 'references/deep/denied-nested']
 
-describe('a link Hive is refused', () => {
+describe('a link Combwork is refused', () => {
   it('copySkillTree copies every other file and link, and says which links it left out', async () => {
     const dest = join(base, 'tree-copy')
     const skipped = await copySkillTree(skill('tree'), dest)
@@ -75,7 +75,7 @@ describe('a link Hive is refused', () => {
     await sync({ cwd, skills: [{ name: 'codex-skill', sourcePath: src }] })
     const copy = join(cwd, '.agents', 'skills', 'cw-codex-skill')
     const v1 = await contentHash(copy)
-    // The skill gains a link Hive can't make, and a new SKILL.md.
+    // The skill gains a link Combwork can't make, and a new SKILL.md.
     writeFileSync(join(src, 'SKILL.md'), 'v2')
     symlinkSync(target, join(src, 'denied-ref'), 'junction')
     const out = await sync({ cwd, skills: [{ name: 'codex-skill', sourcePath: src }] })

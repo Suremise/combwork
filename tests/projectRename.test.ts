@@ -1,5 +1,5 @@
 // A project renamed or moved within its workspace (#514). Whose a record is goes by the project's stable id, never a
-// name alone: Hive records each project's names by id (.combwork/project-names.json: renames found by id, so a swap is two
+// name alone: Combwork records each project's names by id (.combwork/project-names.json: renames found by id, so a swap is two
 // renames, and a copy, given an id of its own, brings none of it along), handovers and kept comparisons are owned by id
 // (recorded as they are written, worked out once for older ones from what they say), and what keeps a project by its
 // folder's name or path follows each rename once (each place saves the last rename it followed with its data, so a
@@ -83,7 +83,7 @@ async function open(ws: string): Promise<WS> {
 }
 
 describe('a project renamed: found by its id (#514)', () => {
-  it('while Hive was closed, and while it runs: each recorded once, its old name kept by its id', async () => {
+  it('while Combwork was closed, and while it runs: each recorded once, its old name kept by its id', async () => {
     const ws = newWs()
     const alpha = project(ws, 'alpha')
     let w = await open(ws)
@@ -217,7 +217,7 @@ describe('what keeps a project by name or path follows a rename, once (#514)', (
   const prefs = (ws: string, p: string) => config.get().ui.skillsProvider?.[join(ws, p).toLowerCase()]
   const measured = (w: WS, p: string) => metrics.queryMetrics(w, { scope: { kind: 'project', project: p } }).projects[p]?.api.reduce((a, s) => a + s.count, 0) ?? 0
 
-  it('two projects that swapped names while Hive was closed keep their own preferences, runs, metrics and handovers', async () => {
+  it('two projects that swapped names while Combwork was closed keep their own preferences, runs, metrics and handovers', async () => {
     const ws = newWs()
     const alpha = project(ws, 'alpha')
     const beta = project(ws, 'beta')
@@ -386,7 +386,7 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     await disposeWorkspaceService(w)
     await move(alpha, join(ws, 'gamma'))
     project(ws, 'alpha')
-    // Not given owners before (a Hive from before, or written by hand meanwhile).
+    // Not given owners before (a Combwork from before, or written by hand meanwhile).
     oldHandover(ws, '2026-10-01-alpha-original.md', 'alpha', 'session-original')
     oldHandover(ws, '2026-10-02-alpha-unknown.md', 'alpha')
     oldHandover(ws, '2026-10-03-alpha-elsewhere.md', 'alpha', 'session-nowhere')
@@ -503,7 +503,7 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
       expect(owners()).toEqual({ [next]: id })
       expect(await handovers(w, 'gamma')).toEqual(next.endsWith('.txt') ? [] : [next])
     }
-    // Its case changed outside Hive (Explorer): the same file, still gamma's.
+    // Its case changed outside Combwork (Explorer): the same file, still gamma's.
     await move(join(dir, final), join(dir, final.toUpperCase().replace('.MD', '.md')))
     expect(await handovers(w, 'gamma')).toEqual([final.toUpperCase().replace('.MD', '.md')])
     await move(join(dir, final.toUpperCase().replace('.MD', '.md')), join(dir, final))

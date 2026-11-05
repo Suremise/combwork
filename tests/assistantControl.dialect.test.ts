@@ -1,5 +1,5 @@
 // The Assistant's change boundary in a dialect (HI-2450): what a change is called is data, said in the Assistant's chain
-// in the refusal it reads, and in the Default in the activity line Hive keeps (its panel, hive.log, the event stream).
+// in the refusal it reads, and in the Default in the activity line Combwork keeps (its panel, hive.log, the event stream).
 // With no chain, both read exactly as before.
 import { join } from 'path'
 import { mkdirSync } from 'fs'

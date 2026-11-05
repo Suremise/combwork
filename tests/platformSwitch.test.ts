@@ -147,8 +147,8 @@ describe('switching a project (#1419)', () => {
   it("an options save that waited behind a switch is refused, both platforms' options kept (HR3's round 1, finding 1)", async () => {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: 'pair', options: pair, presetAsked: 'chosen' } })
-    // The save reads the project as Git, then waits for its lock while another Hive on this workspace switches it to
-    // None (this Hive's own switch takes its turn after the save: workflowWrite, #1422), as its switch writes it.
+    // The save reads the project as Git, then waits for its lock while another Combwork on this workspace switches it to
+    // None (this Combwork's own switch takes its turn after the save: workflowWrite, #1422), as its switch writes it.
     const mutate = w.mutateProjectConfig.bind(w)
     let first = true
     w.mutateProjectConfig = async (path, fn) => {
@@ -225,7 +225,7 @@ describe('switching a project (#1419)', () => {
 })
 
 describe('OP-29: a project inside a larger repository (#1419)', () => {
-  it("Hive merges and the agent merges need the project's own target", async () => {
+  it("Combwork merges and the agent merges need the project's own target", async () => {
     const { w, repo } = await workspace({ platform: 'git', subfolder: true, workflow: { platform: 'git', preset: null, options: allOff('git') } })
     expect(platformOf(w, repo).detected).toMatchObject({ platform: 'git', subfolder: true })
     const { platform: _p, ...pair } = preset('git', 'pair')
@@ -306,7 +306,7 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
       expect(await e.queue({ subfolder: () => false }).drain('main')).toMatchObject([{ outcome: 'integrated' }])
     })
 
-    it("a target inherited from the workspace's or Hive's defaults pauses it too (HR3's round 1, finding 2)", async () => {
+    it("a target inherited from the workspace's or Combwork's defaults pauses it too (HR3's round 1, finding 2)", async () => {
       const { e, card } = await queued('main', false)
       expect(e.wf.rulesetOf(card).options).not.toHaveProperty('targetOwn')
       expect(await e.queue({ subfolder: () => true }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'subfolderTarget' }])

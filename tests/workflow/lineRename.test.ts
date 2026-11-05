@@ -74,7 +74,7 @@ describe("a card's line renamed by Repair (#1305)", () => {
     const to = `${line}-renamed`
     renameInGit(e, line, to)
     const since = facts(e, card.id).at(-1)!.seq
-    // The Hive started again: its own connection to the store, the pending rename still in project.json.
+    // The Combwork started again: its own connection to the store, the pending rename still in project.json.
     const restarted = e.another()
     pending([restarted], line, to)
     await reconcile(restarted, card)

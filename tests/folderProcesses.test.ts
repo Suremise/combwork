@@ -67,7 +67,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     expect(ownedBy(list, dir, 0, 14)).toEqual([11, 12])
   })
 
-  it("its Hive's tree: descendants only, a reused pid (started before its parent) never, and only while the same process", () => {
+  it("its Combwork's tree: descendants only, a reused pid (started before its parent) never, and only while the same process", () => {
     const list = [
       { pid: 100, parent: 1, started: 1000, commandLine: 'electron .' },
       { pid: 101, parent: 100, started: 1100, commandLine: 'pty host' },
@@ -78,12 +78,12 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     ]
     const tree = descendantsIn(list, 100)
     expect(tree.map((t) => t.pid).sort()).toEqual([101, 102, 103])
-    // Once Hive closed: 103 still runs, 102 ended, and 101's pid now belongs to another process.
+    // Once Combwork closed: 103 still runs, 102 ended, and 101's pid now belongs to another process.
     const after = [list[3], { pid: 101, parent: 7, started: 5000, commandLine: 'someone else' }, list[5]]
     expect(stillRunning(after, tree)).toEqual([103])
   })
 
-  it("what Hive lists as its agents' leftovers: those processes by pid and start time, never a pid given to another since (HI-2217)", () => {
+  it("what Combwork lists as its agents' leftovers: those processes by pid and start time, never a pid given to another since (HI-2217)", () => {
     // 2026-10-31T09:49:34.123Z as a FILETIME, and as ms.
     const at = Date.parse('2026-10-31T09:49:34.123Z')
     const ft = (ms: number, extra = 0n): string => String(BigInt(ms) * 10000n + 116444736000000000n + extra)
@@ -312,11 +312,11 @@ describe("a scenario's leftover processes (#542, #402)", () => {
   }, 60000)
 })
 
-// HI-1453: a test copy of Hive that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and
+// HI-1453: a test copy of Combwork that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and
 // the runner ends those still running as the processes recorded (pid and start time): nothing else, never by name or by a
 // command line (the Assistant's design call in round 3), never another process given the pid since. What only looks
 // like a copy is listed for a person. The real processes: the harnessleftovers e2e.
-describe("a suite's test copies of Hive (HI-1453)", () => {
+describe("a suite's test copies of Combwork (HI-1453)", () => {
   type Copy = { pid: number; started: number; profile?: string | null }
   const { COPIES_FILE, recordCopy, recordedCopies, copiesIn, lookLikeCopies, launchedCopy } = req('./e2e/folderProcesses.cjs') as {
     COPIES_FILE: string
@@ -469,7 +469,7 @@ describe('test tooling ends processes by identity, never by a remembered pid (#6
     readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) =>
       e.isDirectory() ? (['node_modules', 'fixtures'].includes(e.name) ? [] : files(join(dir, e.name))) : /\.(c|m)?[jt]s$/.test(e.name) ? [join(dir, e.name)] : []
     )
-  // And in Hive itself: hive-progress ends its command's tree by identity too (wrapper.ts endTree, #655).
+  // And in Combwork itself: hive-progress ends its command's tree by identity too (wrapper.ts endTree, #655).
   it('no process.kill on a pid (other than signal 0) and no taskkill, in tests, scripts or src', () => {
     const found: string[] = []
     for (const f of [...files('tests'), ...files('scripts'), ...files('src')]) {

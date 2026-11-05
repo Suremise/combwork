@@ -1,5 +1,5 @@
-// Hive's one way to the Recycle Bin (#414): every deletion goes through trash() in src/main/trash.ts, and a test copy of
-// Hive moves what it deletes into its own trash folder instead of the user's Recycle Bin.
+// Combwork's one way to the Recycle Bin (#414): every deletion goes through trash() in src/main/trash.ts, and a test copy of
+// Combwork moves what it deletes into its own trash folder instead of the user's Recycle Bin.
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, relative } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'

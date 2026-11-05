@@ -120,11 +120,11 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       // Narrow, so the doorbell wraps onto several rows (asked again until the terminal is that size).
       check(`${a.name}: its terminal is ${COLS} columns wide`, !!(await until(async () => (await inv('pty:resize', key, COLS, 30), (await inv('pty:size', key))?.cols === COLS), HUNG_MS)), JSON.stringify(await inv('pty:size', key)))
       const before = wakes(a).length
-      const held = logCount(/the line Hive typed is held before its Enter/)
+      const held = logCount(/the line Combwork typed is held before its Enter/)
       const putOff = logCount(/put off: It is no longer wanted/)
       fs.writeFileSync(hold, '')
       const left = leave(a, 'Rebase onto main.')
-      check(`${a.name}: its doorbell is typed, and held before its Enter`, !!(await until(() => logCount(/the line Hive typed is held before its Enter/) > held, HUNG_MS)))
+      check(`${a.name}: its doorbell is typed, and held before its Enter`, !!(await until(() => logCount(/the line Combwork typed is held before its Enter/) > held, HUNG_MS)))
       // The fake Codex doesn't draw its input: its line is checked by what it is sent (below).
       const draws = a.provider === 'claude-code'
       if (draws) check(`${a.name}: …it shows in its input, wrapped onto several rows`, !!(await until(async () => (await onScreen(a)) === 1, HUNG_MS)) && (await inv('pty:size', key))?.cols === COLS, await screen(a))
@@ -150,7 +150,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       `hive cw_wait_for_tasks ${JSON.stringify({ cards: [watched.key], changes: ['comment'], wake: true })}`, { live: () => live(claude.id) })
     check('burst: Claude watches the card', !!(await until(async () => (await live(claude.id))?.status === 'watching', HUNG_MS)))
     const burstBefore = wakes(claude).length
-    const burstHeld = logCount(/the line Hive typed is held before its Enter/)
+    const burstHeld = logCount(/the line Combwork typed is held before its Enter/)
     const burstPutOff = logCount(/put off: It is no longer wanted/)
     fs.writeFileSync(hold, '')
     const burstAt = Date.now()
@@ -159,14 +159,14 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       setTimeout(() => inv('tasks:comment', watched.number, `Burst comment ${i + 1}`).then(resolve, reject), after)
     })))
     console.log(`burst: four watched-card events posted in ${Date.now() - burstAt} ms`)
-    check('burst: one doorbell is typed and held before Enter', !!(await until(() => logCount(/the line Hive typed is held before its Enter/) > burstHeld, HUNG_MS)))
+    check('burst: one doorbell is typed and held before Enter', !!(await until(() => logCount(/the line Combwork typed is held before its Enter/) > burstHeld, HUNG_MS)))
     await inv('tasks:comment', unrelated.number, 'Another card changes while the wake is typed')
     await inv('tasks:comment', watched.number, 'The watched card changes again while the wake is typed')
     fs.rmSync(hold, { force: true })
     check('burst: the doorbell is sent and its inbox read', !!(await until(async () => wakes(claude).length > burstBefore && (await idle(claude.id)), HUNG_MS)))
     check('burst: one typed line, no repeated erase and retry',
-      logCount(/the line Hive typed is held before its Enter/) === burstHeld + 1 && logCount(/put off: It is no longer wanted/) === burstPutOff && wakes(claude).length === burstBefore + 1,
-      JSON.stringify({ typed: logCount(/the line Hive typed is held before its Enter/) - burstHeld, putOff: logCount(/put off: It is no longer wanted/) - burstPutOff, sent: wakes(claude).slice(burstBefore) }))
+      logCount(/the line Combwork typed is held before its Enter/) === burstHeld + 1 && logCount(/put off: It is no longer wanted/) === burstPutOff && wakes(claude).length === burstBefore + 1,
+      JSON.stringify({ typed: logCount(/the line Combwork typed is held before its Enter/) - burstHeld, putOff: logCount(/put off: It is no longer wanted/) - burstPutOff, sent: wakes(claude).slice(burstBefore) }))
 
     // A loop's card-event doorbell (the reported line): HI-2486 already stopped unrelated board events invalidating
     // it. Hold it across four such events, then withdraw a second review while its line is typed: that one must stop.
@@ -179,11 +179,11 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('loop burst: its lane names Claude as reviewer', !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === claude.id), HUNG_MS)))
     for (const withdraw of [false, true]) {
       const before = wakes(claude).length
-      const held = logCount(/the line Hive typed is held before its Enter/)
+      const held = logCount(/the line Combwork typed is held before its Enter/)
       const putOff = logCount(/put off: It is no longer wanted/)
       fs.writeFileSync(hold, '')
       await inv('tasks:update', loopCard.number, { column: 'review' })
-      check(`loop burst: ${withdraw ? 'second' : 'first'} review doorbell is typed before Enter`, !!(await until(() => logCount(/the line Hive typed is held before its Enter/) > held, HUNG_MS)))
+      check(`loop burst: ${withdraw ? 'second' : 'first'} review doorbell is typed before Enter`, !!(await until(() => logCount(/the line Combwork typed is held before its Enter/) > held, HUNG_MS)))
       for (let i = 1; i <= 4; i++) await inv('tasks:comment', unrelated.number, `Unrelated event ${i}, withdrawal ${withdraw}`)
       if (withdraw) {
         await inv('tasks:update', loopCard.number, { column: 'doing' })
@@ -194,8 +194,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       if (!withdraw) {
         check('loop burst: the card-event doorbell is sent and read', !!(await until(async () => wakes(claude).length > before && (await idle(claude.id)), HUNG_MS)))
         check('loop burst: unrelated events do not erase and retype the line',
-          logCount(/the line Hive typed is held before its Enter/) === held + 1 && logCount(/put off: It is no longer wanted/) === putOff && wakes(claude).length === before + 1 && wakes(claude)[before].includes('card event'),
-          JSON.stringify({ typed: logCount(/the line Hive typed is held before its Enter/) - held, putOff: logCount(/put off: It is no longer wanted/) - putOff, sent: wakes(claude).slice(before) }))
+          logCount(/the line Combwork typed is held before its Enter/) === held + 1 && logCount(/put off: It is no longer wanted/) === putOff && wakes(claude).length === before + 1 && wakes(claude)[before].includes('card event'),
+          JSON.stringify({ typed: logCount(/the line Combwork typed is held before its Enter/) - held, putOff: logCount(/put off: It is no longer wanted/) - putOff, sent: wakes(claude).slice(before) }))
         await inv('tasks:update', loopCard.number, { column: 'doing' })
       }
     }

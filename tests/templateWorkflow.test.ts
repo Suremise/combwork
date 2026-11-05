@@ -72,7 +72,7 @@ describe('a section read as untrusted', () => {
     expect(bad({ finish: 'hiveMerges' }, 'none')).toBeNull()
     expect(bad({}, 'none', 'pairAgent')).toBeNull()
     expect(bad({}, 'git', 'everything')).toBeNull()
-    // Hive merges with everyone in the project folder: a contradiction (§16.5.4).
+    // Combwork merges with everyone in the project folder: a contradiction (§16.5.4).
     expect(bad({ finish: 'hiveMerges', folder: 'project' })).toBeNull()
     expect(bad({ stageNames: { review: 'Todo' } })).toBeNull()
     expect(bad({ stageNames: { review: 'x'.repeat(40) } })).toBeNull()
@@ -85,7 +85,7 @@ describe('a section read as untrusted', () => {
     expect(team.options).toMatchObject({ focusedTests: true, finish: 'hiveMerges' })
     expect(JSON.stringify(team)).not.toContain('npm run')
     expect(readTemplateWorkflow(JSON.parse(JSON.stringify(team)), 'git')).toEqual(team)
-    // Only the runner's contradiction is the loading project's: Hive merging with everyone in the project folder still drops it.
+    // Only the runner's contradiction is the loading project's: Combwork merging with everyone in the project folder still drops it.
     expect(readTemplateWorkflow({ ...team, options: { ...team.options, folder: 'project' } }, 'git')).toBeNull()
     expect(readTemplateWorkflow({ preset: null, options: { focusedTests: true, finish: 'hiveMerges', folder: 'project' } }, 'git')).toBeNull()
     expect(readTemplateWorkflow({ preset: null, options: { focusedTests: 'yes' } }, 'git')).toBeNull()
@@ -182,7 +182,7 @@ describe("laid over another project's options", () => {
     const own = over({ [FOCUSED_RUN]: 'pnpm focused' })
     expect([own.options.commands[FOCUSED_RUN], own.missingCommands]).toEqual(['pnpm focused', []])
     expect(contradictions(own.options)).not.toContain('focusedNeedsRunner')
-    // Off, or where Hive doesn't merge, it needs no runner: nothing flagged.
+    // Off, or where Combwork doesn't merge, it needs no runner: nothing flagged.
     expect(overlayTemplateWorkflow({ ...team, options: { ...team.options, focusedTests: false } }, { platform: 'git', options: bOptions, own: {}, identity: null }).missingCommands).toEqual([])
     expect(overlayTemplateWorkflow({ ...team, options: { ...team.options, finish: 'agentMerges' } }, { platform: 'git', options: bOptions, own: {}, identity: null }).missingCommands).toEqual([])
   })
@@ -201,7 +201,7 @@ describe("laid over another project's options", () => {
   })
 })
 
-describe("Hive's own templates' sections", () => {
+describe("Combwork's own templates' sections", () => {
   it('each carries its preset for None and Git, each usable as a file’s would be; Team 6 + pool its pool', () => {
     for (const h of HIVE_TEMPLATES) {
       const w = h.template.workflow!

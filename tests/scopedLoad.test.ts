@@ -159,7 +159,7 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-describe("a load with an early part (HI-1681: Hive's sessions before the rest)", () => {
+describe("a load with an early part (HI-1681: Combwork's sessions before the rest)", () => {
   /** A view's state and its loads, the scope fixed unless `scope.now` changes. */
   function view() {
     let state: Scoped<string[]> = { scope: 'alpha', data: null, error: null, at: 0 }

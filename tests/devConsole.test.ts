@@ -9,7 +9,7 @@ import { say } from '../src/shared/agentText'
 import { SECRET_SAMPLES } from './secretSamples'
 
 // The developer console's capture (#636): bounded rings, kept only while a console watches, each raw event redacted
-// (the sensitive context following everything under it) and paired with what Hive made of it; who may read which
+// (the sensitive context following everything under it) and paired with what Combwork made of it; who may read which
 // source; replies bounded. The paths are only compared, never touched.
 const ws = join('C:\\', 'work')
 const alpha = join(ws, 'alpha')
@@ -511,7 +511,7 @@ describe('mayRead', () => {
     expect(mayRead(me, hiveSourceId(ws), wsOf)).toBe(false)
   })
 
-  it("the Assistant reads its workspace's sessions, its own and Hive's events there, and nothing elsewhere", () => {
+  it("the Assistant reads its workspace's sessions, its own and Combwork's events there, and nothing elsewhere", () => {
     const assistant = { kind: 'assistant' as const, workspace: ws.toLowerCase() }
     expect(mayRead(assistant, A1, wsOf)).toBe(true)
     expect(mayRead(assistant, sessionSourceId(beta, 'b1'), wsOf)).toBe(true)
@@ -548,7 +548,7 @@ describe('launches', () => {
 })
 
 describe('summaries', () => {
-  it('a hook: what came in, what Hive took it for, and what it did, in its own words', () => {
+  it('a hook: what came in, what Combwork took it for, and what it did, in its own words', () => {
     expect(hookSummary('PreToolUse', 'Edit', 'toolStart', 'working', [], true)).toBe('PreToolUse (Edit) → toolStart; working; replied')
     expect(hookSummary('Stop', undefined, 'stop', 'finished', ['notifyFinished', 'turnEnded'], false)).toBe('Stop → stop; finished; notifyFinished, turnEnded')
     // A name that isn't an identifier, or is too long, is not quoted.
@@ -556,7 +556,7 @@ describe('summaries', () => {
     expect(safeWord('x'.repeat(65))).toBe('<text: 65 chars>')
   })
 
-  it("a transcript read: its newest records next to what Hive read from them", () => {
+  it("a transcript read: its newest records next to what Combwork read from them", () => {
     const lines = Array.from({ length: 12 }, (_, i) => JSON.stringify({ type: 'event', n: i })).join('\n') + '\nnot json\n'
     const e = transcriptEvent('codex', lines, { modelId: 'gpt-5', planUsage: { provider: 'codex', plan: null, updatedAt: 'x', limits: [{ id: 'five_hour', label: '5-hour', windowMinutes: 300, usedPercent: 41.6, resetsAt: null }] } })
     const raw = e.raw as { records: number; newest: unknown[] }
@@ -581,8 +581,8 @@ describe('replies', () => {
   const source = { label: 'alpha · B1', kind: 'session', select: { agent: 'a-1', project: 'alpha' }, provider: 'claude-code', capturing: true, events: 2 }
 
   it('lists the sources a page at a time, with how to name each', () => {
-    const text = consoleSourcesText({ total: 2, offset: 0, sources: [source, { label: 'Hive', kind: 'hive', select: { source: 'hive' }, capturing: false, events: 0 }] })
-    expect(text).toBe('alpha · B1 (claude-code): captured, 2 events [agent="a-1" project="alpha"]\nHive: not captured [source="hive"]')
+    const text = consoleSourcesText({ total: 2, offset: 0, sources: [source, { label: 'Combwork', kind: 'hive', select: { source: 'hive' }, capturing: false, events: 0 }] })
+    expect(text).toBe('alpha · B1 (claude-code): captured, 2 events [agent="a-1" project="alpha"]\nCombwork: not captured [source="hive"]')
     // A name a display label cuts or masks is still given whole as the argument that reads it.
     const long = 'developer-console-capture-and-recording-contract-fixtures-project'
     expect(consoleSourcesText({ total: 1, offset: 0, sources: [{ ...source, label: long.slice(0, 40), select: { agent: 'a-9', project: long } }] })).toContain(`project="${long}"`)

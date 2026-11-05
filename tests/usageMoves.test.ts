@@ -444,7 +444,7 @@ describe('usageMoves.ts', () => {
     await settle()
     expect(connectionOf('busy')).toBe('c1')
     expect(S.quits).not.toContain(key('busy'))
-    // Hive restarted: the record (config.json) still keeps it for the period.
+    // Combwork restarted: the record (config.json) still keeps it for the period.
     expect(config.get().usageMoves?.a1?.seven_day?.handled['p-1/busy']).toBe('kept')
     S.running.add(key('busy'))
     await settle()

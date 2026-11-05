@@ -19,7 +19,7 @@ describe('shareRole', () => {
     expect(byCost.map((p) => p.cost)).toEqual([expect.closeTo(0.375, 9), expect.closeTo(1.125, 9)])
     expect(sum(byCost)).toBeCloseTo(1.5, 12)
     expect(byCost.map((p) => p.outputTokens)).toEqual([expect.closeTo(37.5, 9), expect.closeTo(112.5, 9)])
-    // A share is Hive's: ≈.
+    // A share is Combwork's: ≈.
     expect(byCost.every((p) => p.estimated && p.tokensEstimated)).toBe(true)
     const byTokens = shareRole(part, [
       { part: { ...emptyPart(), outputTokens: 10 }, held: 50 },

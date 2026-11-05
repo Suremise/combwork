@@ -70,7 +70,7 @@ const STATES: QueueState[] = [
   { state: 'merged' },
   { state: 'notYet' }
 ]
-/** What the tests pass in, which isn't Hive's wording: names, codes, paths and the queue's fixed words. */
+/** What the tests pass in, which isn't Combwork's wording: names, codes, paths and the queue's fixed words. */
 const VALUES = ['HI-7', 'HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', '—', 'line 3', 'lines 1, 2', ...FAILURES.flatMap((f) => f.files ?? [])]
 
 function queueTexts(): { name: string; text: string }[] {

@@ -3,7 +3,7 @@
 // record (`serverRan`) after. A run's markers go with it (its exit, a launch that failed); one whose record couldn't be
 // saved is kept (serverMarks.ts), retried after the host's next record write, dropped with its session, within a strict
 // bound: past 32 ids its host fails closed, a closing workspace's hosts with unsaved ids too, and past 16 such hosts every
-// read does, until Hive restarts. Never evicted back to Claude pricing.
+// read does, until Combwork restarts. Never evicted back to Claude pricing.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -67,7 +67,7 @@ describe('the unsaved markers kept (serverMarks.ts)', () => {
     // Nothing more is kept once every read fails closed.
     m.add('C:/w99/p', 'y')
     expect(m.size()).toEqual({ unsaved: 0, failClosedHosts: 0, everywhere: true })
-    expect(warned.at(-1)).toMatch(/^Every session's usage is read without its CLI's cost reports until Hive restarts/)
+    expect(warned.at(-1)).toMatch(/^Every session's usage is read without its CLI's cost reports until Combwork restarts/)
   })
 })
 

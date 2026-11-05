@@ -22,7 +22,7 @@ let nested = ''
 /** The project's agents, and their sessions' status by agent id. */
 let agents: { id: string; name: string; worktree?: { path: string; branch: string; base: string } }[] = []
 let live: Record<string, string> = {}
-/** Agents with input of Hive's on its way (#646 round 1): a prompt given and not taken, a line typed and not taken. */
+/** Agents with input of Combwork's on its way (#646 round 1): a prompt given and not taken, a line typed and not taken. */
 const pendingInput = new Set<string>()
 const typedWaiting = new Set<string>()
 let slots: MergeSlotInfo[] = []
@@ -124,7 +124,7 @@ function fresh(): void {
   mkdirSync(proj, { recursive: true })
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', remote])
   execFileSync('git', ['init', '-q', '-b', 'main', proj])
-  // No global identity in unit tests (noGlobalGit.ts): the repository's own, as Hive's annotated tags need one.
+  // No global identity in unit tests (noGlobalGit.ts): the repository's own, as Combwork's annotated tags need one.
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com']]) git(proj, 'config', k, v)
   commit(proj, 'a.txt')
   git(proj, 'remote', 'add', 'origin', remote)
@@ -570,7 +570,7 @@ describe('switching branch', () => {
     expect(await repo.switchBranch(proj, 'other')).toBe('Switched to other.')
   })
 
-  it("fences the project folder while git switches or pulls it, and only then: Hive's lines and starts there wait for it (#646)", async () => {
+  it("fences the project folder while git switches or pulls it, and only then: Combwork's lines and starts there wait for it (#646)", async () => {
     agents = [{ id: 'a1', name: 'B1' }]
     git(proj, 'branch', 'feature/y')
     // git's checkout is held: the folder is fenced (a subfolder too), another folder isn't; a start there waits.
@@ -597,7 +597,7 @@ describe('switching branch', () => {
     expect(steady).toBe(true)
     expect(fence.folderChanging(proj)).toBeNull()
     expect(lifted).toEqual([proj])
-    // An idle agent with input of Hive's on its way (a prompt given and not taken, a line typed and not taken) counts as
+    // An idle agent with input of Combwork's on its way (a prompt given and not taken, a line typed and not taken) counts as
     // working at the fenced check: its CLI may start that turn while git runs, and the fence can't take it back.
     live = { a1: 'ready' }
     pendingInput.add('a1')
@@ -1036,7 +1036,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     refDoor = d.door
     const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])
     await d.at
-    // Checked and about to go: a slot claims it, and the target moves to it, each as Hive does (lock, workflow write).
+    // Checked and about to go: a slot claims it, and the target moves to it, each as Combwork does (lock, workflow write).
     let claim = ''
     const claimed = slotTakes('hive/hb1', join(proj, '..', 'slot-b')).then((r) => (claim = r))
     let retargeted = false
@@ -1053,13 +1053,13 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(retargeted).toBe(true)
   }, 120_000)
 
-  it('deletes only at the commit it checked: a branch moved at the last moment by git outside Hive stays, with its commit (round 4)', async () => {
+  it('deletes only at the commit it checked: a branch moved at the last moment by git outside Combwork stays, with its commit (round 4)', async () => {
     const at = setUp()
     const d = door()
     refDoor = d.door
     const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])
     await d.at
-    // A plain git, which knows nothing of Hive's lock, moves hive/hb1 to a commit only it has.
+    // A plain git, which knows nothing of Combwork's lock, moves hive/hb1 to a commit only it has.
     const unseen = git(proj, 'commit-tree', '-p', at['hive/hb1'], '-m', 'unseen work', `${at['hive/hb1']}^{tree}`)
     git(proj, 'update-ref', 'refs/heads/hive/hb1', unseen)
     d.open()
@@ -1075,7 +1075,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     refDoor = d.door
     const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])
     await d.at
-    // Something outside Hive's discipline checks hive/hb1 out after the check: git refuses to delete it.
+    // Something outside Combwork's discipline checks hive/hb1 out after the check: git refuses to delete it.
     git(proj, 'worktree', 'add', '-q', join(proj, '..', 'outside'), 'hive/hb1')
     d.open()
     const said = await deleting
@@ -1084,10 +1084,10 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(branchNames(proj)).toContain('hive/hb1')
   }, 120_000)
 
-  it('a second Hive changing the target, with a turn of workflow writes of its own, waits for the delete on the shared repository lock (round 5)', async () => {
+  it('a second Combwork changing the target, with a turn of workflow writes of its own, waits for the delete on the shared repository lock (round 5)', async () => {
     const at = setUp()
     const { withRepoLocks } = await import('../src/main/repoLock')
-    // Another Hive's own queue of workflow writes: a second, independently loaded instance of the module.
+    // Another Combwork's own queue of workflow writes: a second, independently loaded instance of the module.
     const ours = await import('../src/main/workflow/writes')
     const otherHive = (await import(/* @vite-ignore */ `../src/main/workflow/writes?another-hive=${Date.now()}`)) as typeof ours
     expect(otherHive.workflowWrite).not.toBe(ours.workflowWrite)
@@ -1095,7 +1095,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     refDoor = d.door
     const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])
     await d.at
-    // Its target change as Hive writes one: the project's repository lock first, then its own turn.
+    // Its target change as Combwork writes one: the project's repository lock first, then its own turn.
     let retargeted = false
     const retarget = withRepoLocks([proj], () =>
       otherHive.workflowWrite(async () => {
@@ -1216,7 +1216,7 @@ describe('Update from <target> (HI-1180)', () => {
     expect(await repo.updateBranch(proj, 'card', 'merge')).toMatch(/^Merged main into card \([0-9a-f]{7}\)\.$/)
     expect(contains('card', main)).toBe(true)
     expect(git(wt, 'log', '-1', '--format=%s%n%P').split('\n')).toEqual(['Merge main into card', expect.stringMatching(/^[0-9a-f]+ [0-9a-f]+$/)])
-    // Clean as Hive's git sees it (its line endings, not this test's git's).
+    // Clean as Combwork's git sees it (its line endings, not this test's git's).
     expect((await repo.branchUpdatePlan(proj, 'card')).blocked).toBeNull()
     expect(asUser).toHaveBeenCalledWith(proj, 'card', expect.any(Function))
     expect(await repo.updateBranch(proj, 'card', 'merge')).toBe('card already has everything in main.')
@@ -1296,7 +1296,7 @@ describe('Update from <target> (HI-1180)', () => {
   const unlock = (folder: string): void => {
     const dir = git(folder, 'rev-parse', '--absolute-git-dir')
     rmSync(join(dir, 'index.lock'), { force: true })
-    // As Hive's git left the files (its line endings, not this test's git's).
+    // As Combwork's git left the files (its line endings, not this test's git's).
     if (existsSync(join(dir, 'MERGE_HEAD'))) execFileSync('git', ['merge', '--abort'], { cwd: folder })
   }
   const worktrees = (): string[] => git(proj, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).map((l) => l.slice('worktree '.length))

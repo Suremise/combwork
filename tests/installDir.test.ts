@@ -1,5 +1,5 @@
 // Electron refuses to start from a folder whose permissions name an AppContainer package but not ALL APPLICATION
-// PACKAGES (#431): reading those permissions (SDDL from icacls /save), what Hive does about them at start, with
+// PACKAGES (#431): reading those permissions (SDDL from icacls /save), what Combwork does about them at start, with
 // stand-ins for Windows' tools, and the command it gives the user.
 import { dirname, join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -148,7 +148,7 @@ describe('which folder', () => {
   })
 })
 
-describe("telling the user Hive can't start", () => {
+describe("telling the user Combwork can't start", () => {
   afterEach(() => vi.unstubAllEnvs())
 
   function ui(quiet: boolean, shows: boolean): MessageTools & { calls: string[] } {

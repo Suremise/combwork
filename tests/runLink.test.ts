@@ -308,7 +308,7 @@ describe('runs keep what they ran for (#1220)', () => {
     const linked = s.start(agent, { title: 'unit tests' }, { card: 1061, revision: id, testedCheckout: id, check: 'test', folder: PROJECT })
     expect(linked).toMatchObject({ card: 1061, revision: id, testedCheckout: id, check: 'test', folder: PROJECT })
     expect(publicRun(linked)).toMatchObject({ card: '#1061', revision: id, testedCheckout: id, check: 'test' })
-    // Its folder stays in Hive, as the log's path does.
+    // Its folder stays in Combwork, as the log's path does.
     expect(publicRun(linked)).not.toHaveProperty('folder')
     const old = s.start(agent, { title: 'e2e' })
     for (const k of ['card', 'revision', 'testedCheckout', 'check', 'folder']) {

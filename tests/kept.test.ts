@@ -82,7 +82,7 @@ describe('kept files', () => {
     expect(await read()).toEqual({ n: 1, list: ['a'] })
     expect(await read(true)).toEqual({ n: 1, list: ['a'] })
     expect(derived).toBe(3)
-    // Hive's own write is read at once.
+    // Combwork's own write is read at once.
     await writeKeptJson(f, { n: 2, list: ['b'] })
     expect(await read()).toEqual({ n: 2, list: ['b'] })
     age(f)
@@ -225,7 +225,7 @@ describe('kept files', () => {
     })
   }
 
-  // #1598: something outside Hive saving in place (truncate, then write) while Hive reads must never look like damage.
+  // #1598: something outside Combwork saving in place (truncate, then write) while Combwork reads must never look like damage.
   for (const sync of [false, true]) {
     it(`never sets aside a file being saved in place while it is read${sync ? ' (sync)' : ''}`, async () => {
       const f = join(dir, `save-${sync ? 'sync' : 'async'}.json`)

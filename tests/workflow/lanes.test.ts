@@ -50,7 +50,7 @@ describe('lanes', () => {
     expect(e.store.deliveries().filter((d) => d.kind === 'laneEnded')).toHaveLength(1)
   })
 
-  it("HI-1990: Hive starts a lane's next card for its builder; the builder's own start of it, racing Hive's, is that start", async () => {
+  it("HI-1990: Combwork starts a lane's next card for its builder; the builder's own start of it, racing Combwork's, is that start", async () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
     const [c1, c2] = [1, 2].map((n) => e.wf.createCard({ title: `Card ${n}` }))
     e.wf.startLane('L', [c1.id, c2.id], 'R1')
@@ -69,7 +69,7 @@ describe('lanes', () => {
     refusedBy(await e.wf.start(c3.key, B2), 'move.notFromHere')
   })
 
-  it("HI-2029: Hive's start of a lane's first card landing between its builder's own start's checks and its write is that start too", async () => {
+  it("HI-2029: Combwork's start of a lane's first card landing between its builder's own start's checks and its write is that start too", async () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
     const [c1, c2] = [1, 2].map((n) => e.wf.createCard({ title: `Card ${n}` }))
     e.wf.startLane('L', [c1.id, c2.id], 'R1')
@@ -166,7 +166,7 @@ describe('the upgrade', () => {
     await adopt(e.wf, doing, 'doing', { agent: 'B1', target: 'main' })
     await adopt(e.wf, review, 'review', { agent: 'B2', target: 'main' })
     await adopt(e.wf, passed, 'passed', { agent: 'B1', target: 'main' })
-    // The running lane, in Hive's list: Passed first, then Review, then Doing.
+    // The running lane, in Combwork's list: Passed first, then Review, then Doing.
     e.wf.startLane('L', [passed.id, review.id, doing.id], 'R1')
     expect(e.wf.laneNext('L')).toBe(passed.id)
     expect(e.wf.state(doing).stage).toBe('active')

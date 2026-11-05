@@ -1,6 +1,6 @@
 // The 1.0 upgrade's run (#1207, SPEC §16.17): a group of schema steps run as one (asked first, the file locked to one
 // connection, a copy kept for good, one transaction), and the board's side of it: read-only until the user says yes,
-// refused while another Hive has the workspace open (SQLite's lock, or a fresh presence marker), and Restore the 0.9
+// refused while another Combwork has the workspace open (SQLite's lock, or a fresh presence marker), and Restore the 0.9
 // Board Backup putting the copy back.
 import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -253,9 +253,9 @@ describe('a group of steps (db.ts)', () => {
     expect(during).toMatch(/locked/)
   })
 
-  it("a refusal before the copy (another Hive's marker) changes nothing and lets go of the file", () => {
+  it("a refusal before the copy (another Combwork's marker) changes nothing and lets go of the file", () => {
     const f = at09()
-    expect(() => openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true, beforeGroup: () => { throw new Error('another Hive') } })).toThrow('another Hive')
+    expect(() => openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true, beforeGroup: () => { throw new Error('another Combwork') } })).toThrow('another Combwork')
     expect(existsSync(f.backups)).toBe(false)
     const other = new DatabaseSync(f.file, { timeout: 100 })
     try {
@@ -327,7 +327,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     await close(w)
   })
 
-  it('is refused while another Hive has the file open, the board still read-only; goes ahead once it has closed', async () => {
+  it('is refused while another Combwork has the file open, the board still read-only; goes ahead once it has closed', async () => {
     const ws = await board09()
     const w = await open(ws)
     // A 0.9 Hive: a connection to the file, as every open workspace holds one.
@@ -354,11 +354,11 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     const own = readdirSync(dir)
     expect(own).toHaveLength(1)
     const other = join(dir, 'Hive-Dev-12345678.json')
-    // Running (this process's pid) and recent: another Hive.
+    // Running (this process's pid) and recent: another Combwork.
     writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Hive-Dev', hiveVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
     await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('close it first')
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
-    // Its heartbeat missed: a Hive that stopped without removing it.
+    // Its heartbeat missed: a Combwork that stopped without removing it.
     writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Hive-Dev', hiveVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date(Date.now() - STALE_MS - 1000).toISOString() }))
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
@@ -455,7 +455,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     expect(fileSchemaVersion(store.boardFile(ws2))).toBe(2)
   })
 
-  it('Restore is refused while another Hive has the file open, the 1.0 board left as it was', async () => {
+  it('Restore is refused while another Combwork has the file open, the 1.0 board left as it was', async () => {
     const ws = await board09()
     store.boardTestHooks.upgradeAnswer = 'yes'
     const w = await open(ws)
@@ -547,7 +547,7 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
       expect(await inWorkspace(w, () => keyProjects(w))).toEqual([])
       expect(await inWorkspace(w, () => tasks.archiveOldDone(w))).toEqual([])
       expect(await inWorkspace(w, () => tasks.endReviewsWithoutSession(w, () => false))).toEqual([])
-      // Refused (another Hive has the file open): not upgraded, nobody told.
+      // Refused (another Combwork has the file open): not upgraded, nobody told.
       const other = new DatabaseSync(store.boardFile(ws))
       other.prepare('SELECT count(*) FROM cards').get()
       await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('close it first')
@@ -576,7 +576,7 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     const { readTable } = await import('../src/main/storeTables')
     const ws = await board09()
     const w = await open(ws)
-    // What Hive logs meanwhile (to the console in an unpackaged build, as the tests are).
+    // What Combwork logs meanwhile (to the console in an unpackaged build, as the tests are).
     const lines: string[] = []
     const keep = (...a: unknown[]): void => void lines.push(a.map(String).join(' '))
     const spies = [vi.spyOn(console, 'log').mockImplementation(keep), vi.spyOn(console, 'error').mockImplementation(keep)]
@@ -652,7 +652,7 @@ describe("what services read before the database was replaced is read again (#12
   function writtenBy09(ws: string, scope: string, id: string, next: number, body: string): void {
     const raw = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
     try {
-      const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Hive' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
+      const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Combwork' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
       raw.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET doc = excluded.doc').run('deliveries', scope, id, 0, JSON.stringify(rec))
       raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run('deliveries', scope, 'next', String(next))
       raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO NOTHING').run('deliveries', scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: 1, file: null }))

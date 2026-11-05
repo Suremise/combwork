@@ -93,7 +93,7 @@ describe('the format and its check', () => {
     expect(text).toBe('{\n  "name": "N",\n  "model": "m",\n  "texts": {\n    "a.x": {\n      "text": "A",\n      "why": "w"\n    },\n    "b.x": {\n      "text": "B"\n    }\n  }\n}\n')
   })
 
-  it('this Hive’s schema is the extracted one, bundled into main', () => {
+  it('this Combwork’s schema is the extracted one, bundled into main', () => {
     const schema = agentTextSchema()
     expect(Object.keys(schema).length).toBeGreaterThan(10)
     expect(schema['contract.agent.host']).toEqual({ hasProject: 'select', project: 'plain' })
@@ -111,7 +111,7 @@ describe('model IDs', () => {
     const info = { catalog: { source: 'cli' as const, version: null, at: '', models: [{ value: 'opus', label: 'Opus', resolved: 'claude-opus-5-5' }] }, defaultModel: 'claude-sonnet-5-5' }
     expect(dialectModelId('claude-code', info, 'opus')).toBe('claude-opus-5-5')
     expect(dialectModelId('claude-code', info, 'claude-haiku-5-5')).toBe('claude-haiku-5-5')
-    // The CLI's default, when Hive knows it.
+    // The CLI's default, when Combwork knows it.
     expect(dialectModelId('claude-code', info, '')).toBe('claude-sonnet-5-5')
     // An alias the catalogue doesn't resolve, and no choice with no known default: unknown.
     expect(dialectModelId('claude-code', null, 'sonnet')).toBeNull()
@@ -189,7 +189,7 @@ describe('the chain', () => {
 
   it('an outdated override falls through to the layer below, for its id only, and is flagged', async () => {
     const dir = layered()
-    // The model file's a.named lost its placeholder (a Hive update changed it): the CLI's applies.
+    // The model file's a.named lost its placeholder (a Combwork update changed it): the CLI's applies.
     write(dir, 'claude-code/Opus 5.5.json', file({ 'a.plain': 'opus', 'a.named': 'no project', 'a.removed': 'gone' }, { name: 'Opus 5.5', model: 'claude-opus-5-5' }))
     const c = await resolveSessionChain(dir, { cli: 'claude-code', modelId: 'claude-opus-5-5' }, SCHEMA)
     expect(c.texts).toMatchObject({ 'a.plain': 'opus', 'a.named': 'cli {project}' })
@@ -297,7 +297,7 @@ describe('one file per model in a CLI folder', () => {
     expect(await saveDialect(dir, 'codex/Opus.json', file({}, { name: 'Opus', model: 'claude-opus-5-5' }), SCHEMA)).toBeNull()
   })
 
-  it('two files made outside Hive that claim one model: Auto takes the first by name, the other is marked', async () => {
+  it('two files made outside Combwork that claim one model: Auto takes the first by name, the other is marked', async () => {
     const dir = folder()
     write(dir, 'claude-code/Zed.json', file({}, { name: 'Zed', model: 'claude-opus-5-5' }))
     const set = await loadDialects(dir, SCHEMA)
@@ -384,7 +384,7 @@ describe('saving', () => {
     expect(existsSync(join(dir, 'workspace.json'))).toBe(false)
   })
 
-  it('writes a file that passes, in Hive’s form', async () => {
+  it('writes a file that passes, in Combwork’s form', async () => {
     expect(await saveDialect(dir, 'workspace.json', file({ 'a.named': 'At {project}.' }, { name: 'Workspace' }), SCHEMA)).toBeNull()
     expect(readFileSync(join(dir, 'workspace.json'), 'utf8')).toBe(dialectFileText(file({ 'a.named': 'At {project}.' }, { name: 'Workspace' })))
   })

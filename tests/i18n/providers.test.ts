@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { tempDir, tempRoot } from '../tempDir'
 
-// #797: the `providers` area, the provider adapters' user text. What Hive's own code and agents read stays English: a
+// #797: the `providers` area, the provider adapters' user text. What Combwork's own code and agents read stays English: a
 // provider's install info (readiness, notes) is kept in English, for GET /v1/status and /v1/providers, and the window is
 // sent it in its language (shownInstallInfo), again when the language changes; a transcript's notices are cached as data
 // and shown in the window's language; tool names, hook names, commands and status messages in the CLI's place stay as
@@ -74,7 +74,7 @@ describe('errors thrown at a launch (#842): English for the Agent API, as before
   }
   const fix = 'Fix it or remove it in Agent Settings or Settings → Claude Code.'
 
-  it('says each in English exactly as before, whatever language Hive shows, and in German to the window', async () => {
+  it('says each in English exactly as before, whatever language Combwork shows, and in German to the window', async () => {
     const { userSettings } = await import('../../src/main/providers/claude/launchSettings')
     const { shownError, windowError } = await import('../../src/main/hiveError')
     const { apiErrorReply } = await import('../../src/main/servers')
@@ -119,7 +119,7 @@ describe('errors thrown at a launch (#842): English for the Agent API, as before
   })
 })
 
-describe("a provider's install info: English for agents and Hive's own code, the window's language for the window", () => {
+describe("a provider's install info: English for agents and Combwork's own code, the window's language for the window", () => {
   it('reads as before in English', () => {
     expect(provider('claude-code').readiness(info({ found: false }))).toEqual([{ id: 'not-installed', level: 'error', message: 'Claude Code is not installed.', action: { label: 'Install', task: 'install' } }])
     expect(provider('codex').readiness(info({ provider: 'codex', loggedIn: false, updateAvailable: true }))).toEqual([
@@ -142,7 +142,7 @@ describe("a provider's install info: English for agents and Hive's own code, the
     expect(problems).toEqual([])
   })
 
-  it('a language change sends the windows each provider in it; what the API and Hive read stays English', () => {
+  it('a language change sends the windows each provider in it; what the API and Combwork read stays English', () => {
     const seen: { type: string; info?: Info }[] = []
     const off = onHiveEvent((e) => void seen.push(e as never))
     try {
@@ -167,7 +167,7 @@ describe('the transcript viewer', () => {
     return p.items
   }
 
-  it("Hive's notices are cached as data, in English, and shown in the language the window shows", () => {
+  it("Combwork's notices are cached as data, in English, and shown in the language the window shows", () => {
     const notice = parsed().at(-1)!
     expect(notice).toMatchObject({ kind: 'notice', text: 'Interrupted by you' })
     setLanguage('de', { 'providers.transcript.interrupted': 'Von dir unterbrochen' }, 'de-DE')
@@ -197,7 +197,7 @@ describe('the rest of the area', () => {
     expect(autoCompactOf([], {}, settingsScopes(cwd, join(cwd, 'home')), ['opus']).source).toBe('autoCompactWindow in .claude/settings.json des Projekts')
   })
 
-  it("a settings file Hive can't be sure of is a whole clause per file, so Chinese joins a Chinese name with no space (#917)", () => {
+  it("a settings file Combwork can't be sure of is a whole clause per file, so Chinese joins a Chinese name with no space (#917)", () => {
     const programFiles = tempDir('hive-i18n-pf-')
     mkdirSync(join(programFiles, 'ClaudeCode', 'managed-settings.json'), { recursive: true })
     const cwd = tempDir('hive-i18n-ac-')

@@ -16,8 +16,8 @@ describe('taskbar button', () => {
   })
 
   it('the title starts with the count when there is one', () => {
-    expect(windowTitle('alpha — work — Hive', 2)).toBe('(2) alpha — work — Hive')
-    expect(windowTitle('work — Hive', 0)).toBe('work — Hive')
+    expect(windowTitle('alpha — work — Combwork', 2)).toBe('(2) alpha — work — Combwork')
+    expect(windowTitle('work — Combwork', 0)).toBe('work — Combwork')
   })
 
   it('flashes when an agent comes to ask you something while the window is in the background, not on repeats', () => {

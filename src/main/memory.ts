@@ -138,7 +138,7 @@ export function memoryDiagnostics(profile: string): string[] {
   const kept = heapSnapshots(dir)
   return [
     `- Now: ${memoryLine()}`,
-    `- Memory snapshots: ${snapshotsOn ? 'on' : 'off'}; ${kept.length ? `${kept.length} in \`${dir}\`, the newest from ${new Date(kept[0].at).toISOString()} (${mb(kept[0].bytes)} MB): they hold what Hive had in memory, so never attached` : 'none kept'}`, // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    `- Memory snapshots: ${snapshotsOn ? 'on' : 'off'}; ${kept.length ? `${kept.length} in \`${dir}\`, the newest from ${new Date(kept[0].at).toISOString()} (${mb(kept[0].bytes)} MB): they hold what Combwork had in memory, so never attached` : 'none kept'}`, // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     ...(recent.length ? ['- Logged:', ...recent.map((l) => `  - ${l}`)] : [])
   ]
 }

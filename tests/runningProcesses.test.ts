@@ -1,4 +1,4 @@
-// What running agents had started, after Hive closed unexpectedly (#987): while a launch runs, runningProcesses() gives
+// What running agents had started, after Combwork closed unexpectedly (#987): while a launch runs, runningProcesses() gives
 // its job's processes, each by id and start time (for the running marker). At the next start (the module fresh, the old
 // helper gone as after a crash), stillRunningOf() keeps those still running as the same processes: not the CLI that
 // ended, not a record whose pid names another process by now (a stranger's, with another start time), and not one
@@ -24,7 +24,7 @@ const endHelper = (pid: number | null): number => (pid ? endExactly(identify([pi
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
 vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined }))
-// Hive's profile, where leftovers.json is kept: this file's own.
+// Combwork's profile, where leftovers.json is kept: this file's own.
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
@@ -78,7 +78,7 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
     expect(listed.map((p) => p.pid).sort()).toEqual([proc.pid!, a, b].sort())
     expect(listed.every((p) => /^\d+$/.test(p.created ?? ''))).toBe(true)
 
-    // Hive ends without quitting: its helper goes (its jobs close, ending nothing), and the CLI with its terminal.
+    // Combwork ends without quitting: its helper goes (its jobs close, ending nothing), and the CLI with its terminal.
     await mod.closeProcessTracking()
     proc.kill()
     await new Promise((r) => (proc.exitCode !== null ? r(null) : proc.once('exit', r)))
