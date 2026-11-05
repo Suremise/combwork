@@ -84,11 +84,11 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     // --- The Templates view: Combwork's six first, read-only, each suggesting a preset.
     await page.locator('.activitybar [aria-label="Templates"]').click()
     const sidebar = page.locator('.sidebar')
-    const combworkRows = sidebar.locator('.template-row[data-scope="hive"]')
+    const combworkRows = sidebar.locator('.template-row[data-scope="combwork"]')
     check("the Templates view lists Combwork's own: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool", !!(await until(async () => JSON.stringify(await combworkRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']), HUNG_MS)), JSON.stringify(await combworkRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))))
-    check('…and none of the 0.9 ones (still in the folders)', (await sidebar.locator('.template-row:not([data-scope="hive"])').count()) === 0)
-    await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
-    const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="hive"]')
+    check('…and none of the 0.9 ones (still in the folders)', (await sidebar.locator('.template-row:not([data-scope="combwork"])').count()) === 0)
+    await sidebar.locator('.template-row[data-scope="combwork"][aria-label="Team 3×3"]').click()
+    const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="combwork"]')
     await until(async () => (await detail.count()) === 1, HUNG_MS)
     const actions = await detail.locator('.template-detail-actions button').allInnerTexts()
     check("one of Combwork's own is read-only: Load, Duplicate and Export, no Edit, Rename or Delete", actions.map((t) => t.trim()).join() === 'Load into Project…,Duplicate…,Export…' && (await detail.locator('[aria-label="Delete template"]').count()) === 0, JSON.stringify(actions))
@@ -106,7 +106,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     fs.writeFileSync(sameFile, mine)
     await sidebar.locator('[aria-label="Refresh"]').click()
     await until(async () => (await sidebar.locator('.template-row[data-scope="workspace"][aria-label="Mine"]').count()) === 1, HUNG_MS)
-    await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
+    await sidebar.locator('.template-row[data-scope="combwork"][aria-label="Team 3×3"]').click()
     const exported = path.join(files, 'Team 3x3.combwork-template.json')
     await app.evaluate(({ dialog }, f) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: f })
@@ -122,7 +122,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     const copy = sidebar.locator('.template-row[data-scope="workspace"][aria-label="Team 3×3"]')
     check("Duplicate… copies Combwork's Team 3×3 into the workspace, as its own file", !!(await until(async () => (await copy.count()) === 1, HUNG_MS)) && fs.readdirSync(path.join(ws, '.combwork', 'templates')).some((f) => f !== 'team-3x3.json' && f.endsWith('.json') && JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'templates', f), 'utf8')).name === 'Team 3×3'), JSON.stringify(fs.readdirSync(path.join(ws, '.combwork', 'templates'))))
     check("…the workspace's own file of that name untouched", fs.readFileSync(sameFile, 'utf8') === mine)
-    await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
+    await sidebar.locator('.template-row[data-scope="combwork"][aria-label="Team 3×3"]').click()
     await until(async () => (await detail.count()) === 1, HUNG_MS)
 
     // --- A 0.9 file imported: refused, saying why; nothing written.

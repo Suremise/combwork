@@ -83,9 +83,9 @@ const commitIn = (dir, files, message, trailer) => {
     check("alpha's rules have the pool", (await inv('workflow:form', alpha))?.options?.reviewerMode === 'pool')
 
     // --- Combwork's Team 6 + pool, trimmed to two builders and its two reviewers; an either-role agent beside them.
-    const plan = await inv('templates:plan', alpha, 'hive', 'team-6-pool.json')
+    const plan = await inv('templates:plan', alpha, 'combwork', 'team-6-pool.json')
     check('Team 6 + pool suggests the pool', plan.reviewerMode === 'pool', JSON.stringify(plan.reviewerMode))
-    await inv('templates:load', alpha, 'hive', 'team-6-pool.json', plan.remove.map((a) => a.id))
+    await inv('templates:load', alpha, 'combwork', 'team-6-pool.json', plan.remove.map((a) => a.id))
     const agentsOf = async (p) => (await inv('workspace:refresh'))?.projects.find((x) => same(x.path, p))?.agents ?? []
     let agents = await agentsOf(alpha)
     const named = (re) => agents.filter((a) => re.test(a.name))
