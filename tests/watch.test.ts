@@ -606,7 +606,7 @@ describe('watches (main/watches.ts)', async () => {
       await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
       // A message left while it works waits for its next line.
       st.status = 'working'
-      expect((await messages.leaveMessage(alpha, 'a1', 'Builder', { kind: 'hive', name: 'Combwork' }, 'hello')).fate).toBe('queued')
+      expect((await messages.leaveMessage(alpha, 'a1', 'Builder', { kind: 'combwork', name: 'Combwork' }, 'hello')).fate).toBe('queued')
       st.status = 'watching'
       // The saves from here: the wake handed over (1), then the offer of the message and the wake together (2), held.
       holdAt = saves + 2
@@ -1939,27 +1939,6 @@ describe('watches (main/watches.ts)', async () => {
     expect(st.typed[0]).toMatch(/ \(m1 again: Combwork restarted while typing it, so it may repeat\.\)$/)
     // Received (its agent read it): the watch ends.
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
-    await disposeWorkspaceService(w)
-  })
-
-  it('a wake fired before HI-2463 ("[Hive] ", hive_ tools) is read back and handed over word for word: its prefix made current, a note on the old names (HR1, HI-2463)', async () => {
-    const { w, path, alpha } = await open()
-    const st = fake(alpha)
-    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Renamed', project: 'alpha' }, user))
-    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
-    await watches.settled()
-    // As an older build left it: fired, not handed over yet, in its own words.
-    const data = savedOf(path)
-    // Its latest comment, quoted, names the old tools: a person's words, never rewritten.
-    const words = `#${c.number} has news; latest comment by the user: "keep hive_inbox and hive-progress in the old example". Read it (hive_read_task), then watch again (hive_wait_for_tasks).`
-    data[0].fired = { line: `[Hive] ${words}`, at: new Date().toISOString(), cards: [c.number] }
-    await putSaved(path, data)
-    watches.forgetWatches(w)
-    watches.watchFor(alpha, 'a1')
-    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    await watches.settled()
-    expect(st.typed[0]).toMatch(/^\[CW\] New in your inbox: /)
-    expect(st.told[0]).toBe(`[CW] ${words} (Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__combwork__, and hive-progress is cw-progress.)`)
     await disposeWorkspaceService(w)
   })
 

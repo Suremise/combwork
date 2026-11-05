@@ -168,7 +168,7 @@ function AssistantSummary({ assistant }: { assistant: ProjectInfo }) {
   const { items, kept } = useSessions(assistant)
   const [period, setPeriod] = useState<Period>('all')
   const now = useNow(60000)
-  const hive = [...(items ?? []).filter((i) => i.source === 'hive'), ...kept]
+  const hive = [...(items ?? []).filter((i) => i.source === 'combwork'), ...kept]
   const t = sumUsage(hive, periodFrom(period, now))
   const tokens = t.input + t.cached + t.cacheWrite + t.output
   return (

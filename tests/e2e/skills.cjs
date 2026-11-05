@@ -173,14 +173,14 @@ const check = (name, ok, extra = '') => {
   check('Revert to default puts back the whole folder: builder.md as shipped', await becomes(async () => (await inv('skills:workspace')).find((s) => s.name === 'card-loop')?.bundled === 'same' && !fs.readFileSync(builderFile, 'utf8').includes('My builder note.')))
 
   // Adding from a .md (only that file) and a .zip (its folder, with the script).
-  const fromMd = await inv('skills:addFromFile', path.join(dump, 'release-notes.md'), 'release-notes', [{ kind: 'hive' }])
+  const fromMd = await inv('skills:addFromFile', path.join(dump, 'release-notes.md'), 'release-notes', [{ kind: 'combwork' }])
   const mdDir = path.join(skillsDir, 'release-notes')
   check('from .md: only SKILL.md, nothing else from its folder', JSON.stringify(fs.readdirSync(mdDir)) === '["SKILL.md"]', fs.readdirSync(mdDir).join(','))
   check('from .md: frontmatter added, described by its heading', fromMd.description === 'Write release notes', fromMd.description)
-  await inv('skills:addFromFile', path.join(dump, 'deploy.zip'), 'deploy', [{ kind: 'hive' }])
+  await inv('skills:addFromFile', path.join(dump, 'deploy.zip'), 'deploy', [{ kind: 'combwork' }])
   check('from .zip: unpacked with its script', fs.existsSync(path.join(skillsDir, 'deploy', 'SKILL.md')) && fs.existsSync(path.join(skillsDir, 'deploy', 'scripts', 'deploy.ps1')))
   let err = ''
-  await inv('skills:addFromFile', path.join(dump, 'deploy.zip'), 'deploy', [{ kind: 'hive' }]).catch((e) => (err = String(e)))
+  await inv('skills:addFromFile', path.join(dump, 'deploy.zip'), 'deploy', [{ kind: 'combwork' }]).catch((e) => (err = String(e)))
   check('adding a name twice is refused', /already exists/.test(err), err)
 
   // The notice for a skill that no longer exists (deleted outside Combwork while shown).

@@ -108,10 +108,10 @@ export const hiveTemplate = (file: string): HiveTemplate | undefined => CW_TEMPL
  * listed them in its own, which a change of language leaves behind), any other as saved.
  */
 export function templateTitle(t: { scope: string; file: string; name: string }): string {
-  const h = t.scope === 'hive' ? hiveTemplate(t.file) : undefined
+  const h = t.scope === 'combwork' ? hiveTemplate(t.file) : undefined
   return h ? tr(h.name) : t.name
 }
 export function templateDescription(t: { scope: string; file: string; description?: string }): string | undefined {
-  const h = t.scope === 'hive' ? hiveTemplate(t.file) : undefined
+  const h = t.scope === 'combwork' ? hiveTemplate(t.file) : undefined
   return h ? tr(h.description) : t.description
 }

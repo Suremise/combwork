@@ -65,7 +65,7 @@ const onDisk = (repo: string): Record<string, unknown> => JSON.parse(readFileSyn
 
 describe('writeWorkflow (#1417)', () => {
   it('sets the platform, preset and options, and keeps every other field', () => {
-    const now = { platform: 'git', preset: 'pair', options: { finish: 'hiveMerges' }, ...OTHERS } as never
+    const now = { platform: 'git', preset: 'pair', options: { finish: 'combworkMerges' }, ...OTHERS } as never
     expect(writeWorkflow(now, { platform: 'git', preset: null, options: { review: 'none' } })).toEqual({ platform: 'git', preset: null, options: { review: 'none' }, ...OTHERS })
     expect(writeWorkflow(undefined, { platform: 'none', preset: 'solo', options: {} })).toEqual({ platform: 'none', preset: 'solo', options: {} })
   })
@@ -80,7 +80,7 @@ describe("the workflow's writers keep its other fields", () => {
     // A preset chosen and saved.
     const { platform: _p, ...pair } = preset('git', 'pair')
     await form.setWorkflowOptions(w, repo, { preset: 'pair', options: pair })
-    expect(onDisk(repo)).toMatchObject({ preset: 'pair', options: { finish: 'hiveMerges' }, ...OTHERS })
+    expect(onDisk(repo)).toMatchObject({ preset: 'pair', options: { finish: 'combworkMerges' }, ...OTHERS })
     // A Paste: another project's copied options, saved as they came.
     const pasted = JSON.parse(JSON.stringify({ hiveWorkflow: 1, platform: 'git', preset: 'solo', options: preset('git', 'solo') }))
     const { platform: _q, ...solo } = pasted.options

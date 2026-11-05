@@ -200,6 +200,7 @@
   "service.nameUpgrade.boardNotFolded": "Combwork couldn't rename the board's file {file} to combwork.db: its log {log} still holds changes after it was closed. Close any other program using the workspace, then open it again. Nothing was lost.",
   "service.nameUpgrade.boardOrphan": "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back as hive.db beside it (from .combwork\\backups or another copy), then open the workspace again.",
   "service.nameUpgrade.failed": "Combwork couldn't finish renaming {what} from Hive's names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.",
+  "service.nameUpgrade.profileFailed": "Combwork couldn't convert {files} from Hive's names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.",
   "service.providers.keysStopped": "{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.",
   "service.providers.noSetup": "{cli} has no setup task.",
   "service.providers.notInstalled": "{cli} is not installed.",

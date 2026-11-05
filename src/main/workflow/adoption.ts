@@ -141,7 +141,7 @@ export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | n
           // unless the card's stage was set otherwise meanwhile.
           const move = (to: StageId): void => {
             if (to === card.stage) return
-            tx.append(card.id, { kind: 'Moved', actor: 'hive', source: 'recorded', ruleset: compiled.ruleset.id, data: { from: card.stage, to, cause: 'derived' } }) // i18n-ignore: a fact's kind and codes, not text
+            tx.append(card.id, { kind: 'Moved', actor: 'combwork', source: 'recorded', ruleset: compiled.ruleset.id, data: { from: card.stage, to, cause: 'derived' } }) // i18n-ignore: a fact's kind and codes, not text
             tx.setStage(card.id, to)
           }
           if (writeAdoption(tx, card, compiled.ruleset, x.column, x.at, x.inputs, move)) out.adopted++

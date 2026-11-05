@@ -56,6 +56,7 @@ import { agentText, englishText, listOf, shownText, withValues, type Text, type 
 import { msg, tr, type Msg } from '../shared/i18n'
 import { errorText, HiveError } from './hiveError'
 import { trash } from './trash'
+import { upgradedTemplate } from './nameUpgradeValues'
 import { withAgentNames, workspaceAgents } from './agentNames'
 import { AGENT_NAME_MAX, agentNameProblem, nameTaken, sameAgentName } from '../shared/agentNames'
 
@@ -101,7 +102,7 @@ const M = {
 }
 
 const checkScope = (scope: unknown): TemplateScope => {
-  if (scope !== 'workspace' && scope !== 'project' && scope !== 'hive') throw refusal(msg({ id: 'content.templates.scope', defaultMessage: 'Unknown scope "{scope}": hive, workspace or project.', description: 'An error: where a template is kept must be hive, workspace or project (keep those three words: they are the values to use).' }), { scope: String(scope) }, 'invalid')
+  if (scope !== 'workspace' && scope !== 'project' && scope !== 'combwork') throw refusal(msg({ id: 'content.templates.scope', defaultMessage: 'Unknown scope "{scope}": combwork, workspace or project.', description: 'An error: where a template is kept must be combwork, workspace or project (keep those three words: they are the values to use).' }), { scope: String(scope) }, 'invalid')
   return scope
 }
 
@@ -112,7 +113,7 @@ const checkScope = (scope: unknown): TemplateScope => {
  */
 function folder(d: TemplateDest): string {
   const scope = checkScope(d.scope)
-  if (scope === 'hive') throw refusal(M.hiveOnly, undefined, 'invalid')
+  if (scope === 'combwork') throw refusal(M.hiveOnly, undefined, 'invalid')
   if (scope === 'project') return join(workspace.assertProject(String(d.project ?? '')), CW_DIR, 'templates')
   const ws = d.project ? workspaceOf(d.project).path : workspace.path
   if (!ws) throw refusal(msg({ id: 'content.templates.noWorkspace', defaultMessage: 'Open a workspace first.', description: "An error: the workspace's templates need a workspace open." }))
@@ -120,7 +121,7 @@ function folder(d: TemplateDest): string {
 }
 
 /** The place a template is kept, as listed (a project's path only for a project's templates). */
-const place = (d: TemplateDest): TemplateDest => (d.scope === 'project' ? { scope: 'project', project: workspace.assertProject(String(d.project ?? '')) } : { scope: d.scope === 'hive' ? 'hive' : 'workspace' })
+const place = (d: TemplateDest): TemplateDest => (d.scope === 'project' ? { scope: 'project', project: workspace.assertProject(String(d.project ?? '')) } : { scope: d.scope === 'combwork' ? 'combwork' : 'workspace' })
 
 /** What a template suggests and pairs, and its workflow (HI-1910), as an entry carries it (#1436). */
 const extras = (t: Pick<AgentTemplate, 'suggestedPreset' | 'reviewerMode' | 'pairs' | 'workflow' | 'workflowDropped'>): Pick<TemplateEntry, 'suggestedPreset' | 'reviewerMode' | 'pairs' | 'workflow' | 'workflowDropped'> => ({
@@ -140,7 +141,7 @@ const isV09 = (raw: unknown): boolean => {
 /** One of Hive's own templates as listed (#1436): its name and description in the language Hive shows now. */
 function hiveEntry(h: HiveTemplate): TemplateEntry {
   const t = h.template
-  return { scope: 'hive', file: h.file, name: tr(h.name), savedAt: null, layout: t.layout, description: tr(h.description), agents: t.agents, ...extras(t) }
+  return { scope: 'combwork', file: h.file, name: tr(h.name), savedAt: null, layout: t.layout, description: tr(h.description), agents: t.agents, ...extras(t) }
 }
 
 /**
@@ -148,7 +149,7 @@ function hiveEntry(h: HiveTemplate): TemplateEntry {
  * with the 0.9 backup, and the file stays as it is, never listed, loaded, changed or deleted here).
  */
 async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry | null> {
-  if (d.scope === 'hive') {
+  if (d.scope === 'combwork') {
     const h = hiveTemplate(file)
     if (!h) throw refusal(M.gone, undefined, 'notFound')
     return hiveEntry(h)
@@ -168,7 +169,7 @@ async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry | n
 
 /** The templates kept in one place, by file name (Hive's own in their order). */
 async function listIn(d: TemplateDest): Promise<TemplateEntry[]> {
-  if (d.scope === 'hive') return CW_TEMPLATES.map(hiveEntry)
+  if (d.scope === 'combwork') return CW_TEMPLATES.map(hiveEntry)
   const files = (await readdir(folder(d)).catch(() => [] as string[])).filter(isTemplateFile).sort()
   const out: TemplateEntry[] = []
   for (const f of files) {
@@ -190,13 +191,13 @@ export async function listTemplates(projectPath: string): Promise<TemplateEntry[
   // Each usable one's agents named for this project (HI-1948), as its plan names them: the window's menu shows these,
   // never a key of its own that may not be read yet. No key yet: `{key}` stays.
   const key = (await keyFor(projectPath)) ?? '{key}'
-  return [...(await listIn({ scope: 'hive' })), ...out.sort(byName)].map((e) => (e.problem ? e : { ...e, agentNames: templateAgentNames(e.agents, key) }))
+  return [...(await listIn({ scope: 'combwork' })), ...out.sort(byName)].map((e) => (e.problem ? e : { ...e, agentNames: templateAgentNames(e.agents, key) }))
 }
 
 /** Every template of the workspace (the Templates view): Hive's own, the workspace's, then each project's, each by name. */
 export async function listAllTemplates(): Promise<TemplateEntry[]> {
   if (!workspace.path) return []
-  const out = [...(await listIn({ scope: 'hive' })), ...(await listIn({ scope: 'workspace' })).sort(byName)]
+  const out = [...(await listIn({ scope: 'combwork' })), ...(await listIn({ scope: 'workspace' })).sort(byName)]
   for (const p of await workspace.listProjectPaths()) out.push(...(await listIn({ scope: 'project', project: p })).sort(byName))
   return out
 }
@@ -204,7 +205,7 @@ export async function listAllTemplates(): Promise<TemplateEntry[]> {
 /** One template's file, after checking it is one Hive could have made (never a path) and is there. */
 function fileOf(ref: TemplateRef): string {
   if (!isTemplateFile(ref.file)) throw refusal(M.gone, undefined, 'notFound')
-  if (ref.scope === 'hive') {
+  if (ref.scope === 'combwork') {
     if (!hiveTemplate(ref.file)) throw refusal(M.gone, undefined, 'notFound')
     return ref.file
   }
@@ -419,6 +420,9 @@ export async function readImport(path: string): Promise<AgentTemplate> {
   } catch {
     throw refusal(msg({ id: 'content.templates.importNotJson', defaultMessage: "It isn't a Combwork agent template (not JSON).", description: "An error importing a template: the file isn't JSON." }))
   }
+  // A 1.0 export's sections under Hive's values (`finish: 'hiveMerges'`) as Combwork's, here only: mapped at import only
+  // because an existing 1.0 export would otherwise be lost (its git section dropped: HI-2598/s9 §6). Nothing else reads them.
+  raw = upgradedTemplate(raw) ?? raw
   const t = readTemplate(raw)
   // agent-text: readTemplate
   if (!isAgentTemplate(t)) throw new TemplateError(t)
@@ -598,7 +602,7 @@ async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' 
   const form = await workflowForm(workspaceOf(projectPath), projectPath)
   const sections = TEMPLATE_PLATFORMS.filter((p) => !!t.workflow?.[p])
   let section = t.workflow?.[form.platform] ?? null
-  if (section && t.scope === 'hive' && t.suggestedPreset) {
+  if (section && t.scope === 'combwork' && t.suggestedPreset) {
     const offered = form.presets.find((p) => p.id === t.suggestedPreset)?.options
     // Read again as any section is: what Hive makes goes through the same whitelist.
     // Their size as their Maximum agents (HI-2001): the team the template is.

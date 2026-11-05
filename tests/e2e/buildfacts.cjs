@@ -38,7 +38,7 @@ const succeeded = () => {
   fs.mkdirSync(path.join(repo, 'dist'), { recursive: true })
   fs.writeFileSync(path.join(repo, 'dist', 'build-info.json'), JSON.stringify({ version: '9.9.9-rc.1', head: head(), branch: 'main', builtAt: new Date().toISOString() }))
 }
-const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).rows.filter((r) => r.summary.startsWith('Built Combwork '))
+const builds = async (inv) => (await inv('journal:browse', { source: 'combwork' })).rows.filter((r) => r.summary.startsWith('Built Combwork '))
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
@@ -59,7 +59,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     const said = fakeBuild(api)
     check('a successful build is recorded through the Agent API', said === "Build recorded in Combwork's journal (baseline).", said)
     const rows = await lib.until(async () => ((await builds(inv)).length === 1 ? builds(inv) : null), HUNG_MS)
-    check('the journal has it as a fact by Combwork', !!rows && rows[0].summary === `Built Combwork 9.9.9-rc.1 (baseline) from ${head().slice(0, 8)} on main` && rows[0].source === 'hive', JSON.stringify(rows))
+    check('the journal has it as a fact by Combwork', !!rows && rows[0].summary === `Built Combwork 9.9.9-rc.1 (baseline) from ${head().slice(0, 8)} on main` && rows[0].source === 'combwork', JSON.stringify(rows))
     check('…with no marker left', !fs.existsSync(markers) || fs.readdirSync(markers).length === 0)
     const entry = rows ? await inv('journal:entry', rows[0].id) : null
     check("its detail names the installer, and it links the commit", !!entry && entry.detail.includes('Hive-Setup-9.9.9-rc.1.exe') && entry.links.some((l) => l.type === 'commit' && l.ref === head()), JSON.stringify(entry))

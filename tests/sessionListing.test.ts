@@ -123,7 +123,7 @@ describe('a session list (HI-1681)', () => {
 
   it("lists Combwork's sessions and the others; Combwork's alone when asked, without the CLIs' folders", async () => {
     const all = await run(() => sessions.list(p))
-    expect(all.filter((i) => i.source === 'hive').map((i) => i.id).sort()).toEqual([...own].sort())
+    expect(all.filter((i) => i.source === 'combwork').map((i) => i.id).sort()).toEqual([...own].sort())
     const ext = all.find((i) => i.id === outside)
     expect(ext?.source).toBe('external')
     expect(ext?.transcriptBytes).toBe(statSync(join(dir, `${outside}.jsonl`)).size)

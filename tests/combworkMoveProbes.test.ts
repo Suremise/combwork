@@ -51,6 +51,7 @@ vi.mock('fs/promises', async (orig) => {
 const base = tempDir('hi2462-probes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { MARK_FILE, MOVED_FILE, deriveMoves, finishMove, mapHash, moveFolders, movedFolders, movedPath, moveStats, moveTestHooks } = await import('../src/main/combworkMove')
+const { NAMES_VERSION } = await import('../src/main/nameUpgrade')
 const { cardsTestHooks, rewriteCards } = await import('../src/main/hiveMoveWorker')
 
 const json = (p: string, v: unknown): void => {
@@ -171,7 +172,7 @@ describe('HI-2510: an ordinary open looks at each host once', () => {
     const hosts = 2 + projects.length
     json(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'), {})
     // Its names upgraded (HI-2587): an ordinary open of a 1.1 workspace.
-    json(join(ws, '.combwork', 'combwork-names.json'), { version: 2 })
+    json(join(ws, '.combwork', 'combwork-names.json'), { version: NAMES_VERSION })
     for (const fresh of [true, false]) {
       if (!fresh) {
         // As a move leaves them: every host marked, the rewrites finished for the map.

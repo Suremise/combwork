@@ -38,6 +38,7 @@ import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
 import { MARKED_LOG } from '../shared/redact'
 import { APP_NAME, DEV_APP_NAME, appName, profileFolder } from '../shared/appName'
 import { chooseProfile, choiceLine, ProfileMoveRefused, setProfileChoices, type ProfileChoice } from './profileFolders'
+import { upgradeProfileFiles } from './nameUpgradeProfile'
 import { syncLoginItemAtStart } from './loginItem'
 import { startProfileNotices } from './profileNotices'
 import { PROVIDERS, dangerModes, labelList, projectProviderConfig, providerSettings } from '../shared/providers'
@@ -125,7 +126,7 @@ import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
 import { startLaunchSides } from './launchSides'
-import { checkInstallDir } from './installDir'
+import { checkInstallDir, setLanguageBeforeReady } from './installDir'
 import { exitBeforeProfile, exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, lastUnexpectedClose, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
 import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
@@ -192,6 +193,23 @@ else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app
 startCoverageEarly()
 // Every way out from here on is logged (#985).
 startExitLog()
+// The names upgrade's stored values in the profile (HI-2598), before any of its files is read. One it couldn't convert
+// (another program holds it, or the disk refused) refuses the start, changing nothing: read now, its old value would be
+// lost under no name, and saved over (HR1's round 1). The next start tries again.
+const unconverted = upgradeProfileFiles(app.getPath('userData'))
+if (unconverted.length) {
+  setLanguageBeforeReady()
+  const title = tr(msg({ id: 'main.nameUpgrade.profileTitle', defaultMessage: "Combwork can't start", description: "The title of an error box as Combwork starts: it couldn't convert its settings files from Hive's names (service.nameUpgrade.profileFailed)." }))
+  const text = tr(msg({ id: 'service.nameUpgrade.profileFailed', defaultMessage: "Combwork couldn't convert {files} from Hive's names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.", description: "An error box as Combwork starts, after an update from Hive: a settings file couldn't be rewritten with Combwork's names (HI-2598), so Combwork doesn't start rather than lose the settings. {files} lists the files' paths; {n} is how many." }), { files: fmt.list(unconverted, 'unit'), n: unconverted.length })
+  if (!testQuiet()) {
+    try {
+      dialog.showErrorBox(title, text)
+    } catch {
+      // nothing more can be told before the app is ready
+    }
+  }
+  exitBy('process.exit', "Combwork couldn't convert its profile's files from Hive's names", () => process.exit(1))
+}
 
 // Hardware acceleration off (#676): Settings → Advanced's value, read from advanced.json before the app is ready, or
 // --disable-gpu for this start.
@@ -1099,7 +1117,7 @@ app.whenReady().then(async () => {
       }
     }
     const url = assistantApiUrl()
-    if (!s.enabled || !s.provideHiveMcp || !url) return null
+    if (!s.enabled || !s.provideCombworkMcp || !url) return null
     return {
       command: process.execPath,
       args: [hiveMcpScript()],

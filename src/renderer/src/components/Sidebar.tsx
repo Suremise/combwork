@@ -717,7 +717,7 @@ function SkillsPanel() {
 
   const add = async (mode: 'new' | 'file'): Promise<void> => {
     if (!workspace) return notify('warning', tr(M.openFirst))
-    const s = await addSkill(mode, { kind: 'hive' })
+    const s = await addSkill(mode, { kind: 'combwork' })
     if (s) set({ selectedSkill: s.path })
   }
 
@@ -741,7 +741,7 @@ function SkillsPanel() {
         <SearchInput style={{ height: 24 }} placeholder={tr(M.filterSkills)} value={filter} onChange={setFilter} />
       </div>
       <div className="pane-body">
-        <Section title={tr(M.hiveGroup)} count={skills.length - missing} tip={SKILL_LEVEL_TIP.hive}>
+        <Section title={tr(M.hiveGroup)} count={skills.length - missing} tip={SKILL_LEVEL_TIP.combwork}>
           {!workspace && <div className="pane-empty">{tr(M.noWorkspaceSkills)}</div>}
           {workspace && error && loaded.data && <StaleNote what={tr(M.skillsRefreshTarget)} error={error} at={loaded.at} onRetry={reload} />}
           {workspace && error && !loaded.data && <LoadFailed inline what={tr(M.skillsLoadTarget)} error={error} onRetry={reload} />}
@@ -830,7 +830,7 @@ function McpPanel() {
     load()
   }
 
-  const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideHiveMcp && api?.running)
+  const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideCombworkMcp && api?.running)
   const shown = servers.filter((m) => mcpServerShown(m, query, filter))
 
   return (

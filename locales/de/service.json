@@ -200,6 +200,7 @@
   "service.nameUpgrade.boardNotFolded": "Combwork konnte die Datei des Boards {file} nicht in combwork.db umbenennen: Ihr Protokoll {log} enthält nach dem Schließen noch Änderungen. Schließe alle anderen Programme, die den Arbeitsbereich verwenden, und öffne ihn dann erneut. Es ging nichts verloren.",
   "service.nameUpgrade.boardOrphan": "Die Datei des Boards im Arbeitsbereich fehlt, aber {file} daneben enthält Änderungen, die vielleicht nur dort vorhanden sind. Combwork legt darüber kein leeres Board an. Schließe Combwork, lege die Datei des Boards als hive.db daneben zurück (aus .combwork\\backups oder einer anderen Kopie) und öffne den Arbeitsbereich dann erneut.",
   "service.nameUpgrade.failed": "Combwork konnte die Umbenennung von {what} von den Namen von Hive zu denen von Combwork nicht abschließen: {error} Öffne den Arbeitsbereich erneut, um sie abzuschließen. Es ging nichts verloren.",
+  "service.nameUpgrade.profileFailed": "Combwork konnte {files} nicht von den Namen von Hive zu denen von Combwork umstellen: Möglicherweise {n, plural, one {hat ein anderes Programm die Datei} other {hat ein anderes Programm die Dateien}} geöffnet. Schließe dieses Programm und starte Combwork erneut. Es wurde nichts geändert.",
   "service.providers.keysStopped": "{task}: Combwork gibt dort keine Tasten mehr ein, da {why}. Schließe es im Terminal ab.",
   "service.providers.noSetup": "Für {cli} gibt es keine Einrichtung.",
   "service.providers.notInstalled": "{cli} ist nicht installiert.",

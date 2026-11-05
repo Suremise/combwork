@@ -195,7 +195,7 @@ const beta = path.join(fx.ws, 'beta')
     const started = await waitHung(async () => (await h.facts(nx)).find((x) => x.kind === 'Started') ?? null)
     // Its slot prepared (BX placed there), the work committed in it.
     if (started?.data?.folder && (await waitHung(async () => (await h.facts(nx)).some((x) => x.kind === 'BuilderPlaced')))) commitIn(started.data.folder, 'nx.txt', 'Next card')
-    check("the lane's next card, started after the change, keeps the lane's ruleset: old rules", started?.actor === 'hive' && started?.data?.builder === bx.id && !!started?.ruleset && started.ruleset === (await h.facts(m.n)).find((x) => x.kind === 'Started')?.ruleset && !!(await waitHung(async () => (await badge(nx))?.oldRules === true)), JSON.stringify({ started }))
+    check("the lane's next card, started after the change, keeps the lane's ruleset: old rules", started?.actor === 'combwork' && started?.data?.builder === bx.id && !!started?.ruleset && started.ruleset === (await h.facts(m.n)).find((x) => x.kind === 'Started')?.ruleset && !!(await waitHung(async () => (await badge(nx))?.oldRules === true)), JSON.stringify({ started }))
 
     // Apply to cards in flight clears one card's mark (another change, given to the Review card).
     const third = { ...changed, okBefore: { mode: 'labels', labels: ['ui', 'design', 'docs'] } }

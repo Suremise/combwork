@@ -102,13 +102,11 @@ export class AdvancedStore {
           if (!def || !cliFacing(def)) continue
           const was = parsed.madeFor[id]
           const installed = this.cli[def.group as ProviderId] ?? null
-          // A record of no version yet takes the one Hive knows now.
+          // A record of no version yet takes the one Combwork knows now.
           made[id] = was && JSON.stringify(was.value) === JSON.stringify(value) ? (was.version || !installed ? was : { version: installed, value }) : { version: installed, value }
         }
         this.madeFor = made
-        // Old hive.* ids read as their cw.* ones (HI-2518) are written back under the new ids, in the same queued write.
-        this.recordsDue = JSON.stringify(made) !== JSON.stringify(parsed.madeFor) || parsed.renamed.length > 0
-        if (parsed.renamed.length) log.info(`advanced.json: moved ${parsed.renamed.length} setting(s) to their cw.* ids (${parsed.renamed.join(', ')})`)
+        this.recordsDue = JSON.stringify(made) !== JSON.stringify(parsed.madeFor)
         if (this.unknown.length) log.warn(`advanced.json names settings this Combwork doesn't know: ${this.unknown.join(', ')}`)
       }
     }

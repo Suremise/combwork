@@ -252,7 +252,7 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
  */
 function InboxAvailableNote() {
   const api = useStore((s) => s.settings?.agentApi)
-  const on = !!api?.enabled && !!api.provideHiveMcp
+  const on = !!api?.enabled && !!api.provideCombworkMcp
   return (
     <div className="advanced-note" data-note="inbox-available">
       <Icon name="info" />{' '}

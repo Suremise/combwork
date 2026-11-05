@@ -23,7 +23,6 @@ import { sessions } from './sessions'
 import { adoptInstalledRun, ownsResume } from './restartResume'
 import { inWorkspace, openWorkspaces, workspaceOf } from './workspace'
 import { dataFolder } from './hiveFolder'
-import { upgradeRunMarkerFile } from './nameUpgradeProfile'
 
 /**
  * Hive closing unexpectedly (#984, shared/unexpectedClose.ts): the marker in the profile while Hive runs, and at the next
@@ -32,7 +31,7 @@ import { upgradeRunMarkerFile } from './nameUpgradeProfile'
  * agents resumed only if Settings → Sessions says so. Nothing is stopped unless the user says so.
  */
 const log = createLogger('lastRun')
-const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /** What the last run left, found at this start: null when it quit normally (or this is the first run). */
 export interface UnexpectedClose {
@@ -89,8 +88,7 @@ const markerFile = (): string => join(app.getPath('userData'), RUN_MARKER)
 export function checkLastRun(file = markerFile()): UnexpectedClose | null {
   found = null
   if (!existsSync(file)) return null
-  // A 1.0 or RC run's marker names its version under the old key (HI-2587): renamed first.
-  upgradeRunMarkerFile(file)
+  // A 1.0 or RC run's marker named its version under the old key: renamed at start (nameUpgradeProfile.ts, HI-2587).
   let text = ''
   let at = new Date().toISOString()
   try {

@@ -38,7 +38,7 @@ export function lastActive(s: SessionListItem): number | null {
 
 /** The sessions an action takes regardless of age (the branch actions' rule): archive only Hive's own, not archived yet. */
 export function cleanupTakes(s: SessionListItem, action: CleanupAction): boolean {
-  return action === 'delete' || (!s.archived && s.source === 'hive')
+  return action === 'delete' || (!s.archived && s.source === 'combwork')
 }
 
 /**

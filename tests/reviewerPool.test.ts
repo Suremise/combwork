@@ -212,7 +212,7 @@ const pass = (e: Env, agents?: AgentDef[]): Promise<void> => settleReviewerPool(
 const pending = (e: Env): { kind: string; agent?: unknown }[] => e.store.pendingActions().map((a) => ({ kind: a.kind, agent: a.payload.agent }))
 
 /** Pair's options with these, made to hold together: Combwork merges in slots, Committed is done in the project folder. */
-const optionsFor = (reviewers: 1 | 2, reviewerMode: 'lane' | 'pool', folder: 'slots' | 'project'): WorkflowOptions => ({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: 'main', reviewers, reviewerMode, folder, slotsUpToDate: folder === 'slots', finish: folder === 'slots' ? 'hiveMerges' : 'committed', identity: null, stopOwnRuns: false })
+const optionsFor = (reviewers: 1 | 2, reviewerMode: 'lane' | 'pool', folder: 'slots' | 'project'): WorkflowOptions => ({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: 'main', reviewers, reviewerMode, folder, slotsUpToDate: folder === 'slots', finish: folder === 'slots' ? 'combworkMerges' : 'committed', identity: null, stopOwnRuns: false })
 
 describe('the option G17 (#1443)', () => {
   it('is reviewerMode, lane or pool: one per lane in every Git preset, none for None', () => {

@@ -442,7 +442,7 @@ describe('"not found" kept for 30 s from when git said it (HI-2189, the user\'s 
 
   it.each(['approved', 'review'] as const)('a second reconcile pass over an unchanged %s card not merged yet starts no git (the measurement of HI-2189)', async (stage) => {
     vi.useFakeTimers({ toFake: ['Date'] })
-    const e = setup({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'main', okBefore: { mode: 'every', labels: [] } })
+    const e = setup({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'main', okBefore: { mode: 'every', labels: [] } })
     try {
       const card = e.wf.createCard({ title: 'Waiting' })
       moved(await e.wf.start(card.key, B1))

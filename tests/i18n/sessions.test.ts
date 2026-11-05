@@ -20,10 +20,10 @@ afterEach(() => setLanguage('en', {}))
 const pseudo = (s: string): boolean => s.includes('[') && !/\b(?:the|and|of|in|its|it|agent|session|sessions|folder|removed|path|itself)\b/.test(s)
 
 const origins = () => [
-  sessionOrigin(PROJECT, [{ id: 'a-1', name: 'Coder' }], { source: 'hive', agentId: 'a-1', agentName: 'Coder', cwd: PROJECT } as never)!,
-  sessionOrigin(PROJECT, [], { source: 'hive', agentId: 'a-2', agentName: 'Helper', cwd: 'C:\\ws\\hive-wt\\b1', branch: 'cw/b1' } as never)!,
-  sessionOrigin(PROJECT, [], { source: 'hive', agentId: 'a-3', cwd: PROJECT } as never)!,
-  sessionOrigin(PROJECT, [], { source: 'hive', cwd: PROJECT } as never)!
+  sessionOrigin(PROJECT, [{ id: 'a-1', name: 'Coder' }], { source: 'combwork', agentId: 'a-1', agentName: 'Coder', cwd: PROJECT } as never)!,
+  sessionOrigin(PROJECT, [], { source: 'combwork', agentId: 'a-2', agentName: 'Helper', cwd: 'C:\\ws\\hive-wt\\b1', branch: 'cw/b1' } as never)!,
+  sessionOrigin(PROJECT, [], { source: 'combwork', agentId: 'a-3', cwd: PROJECT } as never)!,
+  sessionOrigin(PROJECT, [], { source: 'combwork', cwd: PROJECT } as never)!
 ]
 
 describe('the sessions area', () => {

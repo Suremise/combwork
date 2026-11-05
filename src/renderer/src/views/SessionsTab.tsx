@@ -124,7 +124,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   }, [searchKey, searchTry, loadSearch])
 
   // The Assistant's list is its own conversations (and what they started).
-  const shown = useMemo(() => (items ?? []).filter((i) => !assistant || i.source === 'hive' || !!i.sub?.parentId), [items, assistant])
+  const shown = useMemo(() => (items ?? []).filter((i) => !assistant || i.source === 'combwork' || !!i.sub?.parentId), [items, assistant])
   const byId = useMemo(() => new Map((items ?? []).map((i) => [i.id, i])), [items])
   const hitsById = new Map((results ?? []).map((r) => [r.sessionId, r]))
   const low = q.toLowerCase()
@@ -220,7 +220,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
       title: tr(msg({ id: 'sessions.delete.title', defaultMessage: '{kind, select, conversation {Delete conversation?} other {Delete session?}}', description: "Title of the confirmation before deleting a session (the Combwork Assistant's: a conversation) from Combwork." }), { kind }),
       message: tr(msg({ id: 'sessions.delete.message', defaultMessage: 'Delete "{name}" from Combwork?', description: 'The confirmation before deleting a session from Combwork: its name ({name}).' }), { name: sessionName(s) }),
       detail:
-        s.source === 'hive'
+        s.source === 'combwork'
           ? tr(msg({ id: 'sessions.delete.detailCombwork', defaultMessage: "Combwork's copies of its transcript go to the Recycle Bin and it no longer shows here; what it used stays in the totals. {cli} keeps its own transcript, so {cli}'s own resume list still has it.", description: "What deleting a session Combwork started does: Combwork's copies go to the Recycle Bin, its usage stays counted, and the CLI ({cli}: \"Claude Code\") keeps its own transcript." }), { cli: who })
           : tr(msg({ id: 'sessions.delete.detailExternal', defaultMessage: "Combwork stops listing it. {cli} keeps its transcript, so {cli}'s own resume list still has it.", description: 'What deleting a session started outside Combwork does: Combwork stops listing it, and the CLI ({cli}: "Claude Code") keeps its transcript.' }), { cli: who }),
       confirmLabel: tr(msg({ id: 'sessions.delete.button', defaultMessage: 'Delete', description: 'Button: deletes the session from Combwork. Keep it short.' })),
@@ -262,7 +262,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   const branchName = (n: TreeNode): string => (n.kind === 'session' ? `"${sessionName(n.item)}"` : n.kind === 'agent' ? `${n.label} (${providerName(n.provider)})` : n.label)
   const bulkList = (n: TreeNode, action: SessionBulkAction): SessionListItem[] =>
     // Archiving keeps Hive's copy: only Hive's own sessions have one (a sub-session started outside Hive goes with its session).
-    sessionsIn(n).filter((s) => (action === 'delete' ? true : action === 'archive' ? !s.archived && s.source === 'hive' : !!s.archived))
+    sessionsIn(n).filter((s) => (action === 'delete' ? true : action === 'archive' ? !s.archived && s.source === 'combwork' : !!s.archived))
   const runBulk = async (n: TreeNode, action: SessionBulkAction): Promise<void> => {
     const list = bulkList(n, action)
     if (!list.length) return
@@ -337,11 +337,11 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
       entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block || !!busy, detail: block ?? (busy ? startingLabel(busy) : s.fresh ? freshShort() : undefined), onClick: () => void actions.resumeSession(project.path, s) })
     }
     if (s.source === 'external' && !s.sub) entries.push({ label: tr(ADOPT), icon: 'add', onClick: () => void actions.attempt(tr(ADOPT_FAILED), () => call('session:adopt', project.path, s.id)).then(reload) })
-    if (s.source === 'hive') entries.push({ label: tr(msg({ id: 'sessions.menu.rename', defaultMessage: 'Rename…', description: 'Menu item on a session: renames it.' })), icon: 'tag', keybinding: 'F2', onClick: () => void rename(s) })
+    if (s.source === 'combwork') entries.push({ label: tr(msg({ id: 'sessions.menu.rename', defaultMessage: 'Rename…', description: 'Menu item on a session: renames it.' })), icon: 'tag', keybinding: 'F2', onClick: () => void rename(s) })
     entries.push({ separator: true })
-    if (s.source === 'hive' && !live) entries.push({ label: s.archived ? tr(UNARCHIVE) : tr(ARCHIVE), icon: s.archived ? 'unarchive' : 'archive', onClick: () => void archive(s, !s.archived) })
+    if (s.source === 'combwork' && !live) entries.push({ label: s.archived ? tr(UNARCHIVE) : tr(ARCHIVE), icon: s.archived ? 'unarchive' : 'archive', onClick: () => void archive(s, !s.archived) })
     entries.push({ label: tr(msg({ id: 'sessions.menu.delete', defaultMessage: '{kind, select, conversation {Delete Conversation…} other {Delete Session…}}', description: "Menu item on a session (the Combwork Assistant's: a conversation): deletes it from Combwork, after a confirmation." }), { kind }), icon: 'trash', keybinding: formatKeybinding('Del'), danger: true, disabled: live, onClick: () => void remove(s) }) // i18n-ignore: a key's id, which formatKeybinding names
-    if (s.source === 'hive') entries.push({ label: tr(msg({ id: 'sessions.menu.purge', defaultMessage: "Purge Combwork's Files…", description: "Menu item on a session: lists, then removes, everything Combwork keeps of it (its backups, attachments, old usage), never the coding agent's own files." })), icon: 'trash', danger: true, disabled: live, onClick: () => setPurging(s) })
+    if (s.source === 'combwork') entries.push({ label: tr(msg({ id: 'sessions.menu.purge', defaultMessage: "Purge Combwork's Files…", description: "Menu item on a session: lists, then removes, everything Combwork keeps of it (its backups, attachments, old usage), never the coding agent's own files." })), icon: 'trash', danger: true, disabled: live, onClick: () => setPurging(s) })
     if (n.children.length) entries.push({ separator: true }, ...branchEntries(n))
     entries.push({ separator: true }, { label: tr(msg({ id: 'sessions.menu.copyId', defaultMessage: 'Copy Session ID', description: "Menu item on a session: copies its id (the CLI's session id) to the clipboard." })), icon: 'copy', onClick: () => copyText(s.id) })
     return entries
@@ -412,7 +412,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
     } else if (ev.key === 'Enter' && cur) {
       if (node && node.kind !== 'session') toggle(node)
       else activate(cur)
-    } else if (ev.key === 'F2' && node?.kind === 'session' && node.item.source === 'hive') void rename(node.item)
+    } else if (ev.key === 'F2' && node?.kind === 'session' && node.item.source === 'combwork') void rename(node.item)
     else if (ev.key === 'Delete' && node) {
       if (node.kind === 'session') {
         if (!isLive(node.item.id)) void remove(node.item)
@@ -555,7 +555,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                 onContextMenu={onContextMenu}
                 buttons={
                   <>
-                    {s.source === 'hive' && <IconButton icon="tag" title={tr(RENAME)} onClick={() => void rename(s)} />}
+                    {s.source === 'combwork' && <IconButton icon="tag" title={tr(RENAME)} onClick={() => void rename(s)} />}
                     {!isLive(s.id) && <IconButton icon="trash" title={tr(DELETE_ONE, { kind })} onClick={() => void remove(s)} />}
                     <IconButton icon="ellipsis" title={tr(MORE_ACTIONS)} onClick={more} />
                   </>
@@ -584,8 +584,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                     {tr(ADOPT)}
                   </button>
                 )}
-                {selected.source === 'hive' && <IconButton icon="tag" title={tr(RENAME)} onClick={() => void rename(selected)} />}
-                {selected.source === 'hive' && !isLive(selected.id) && (
+                {selected.source === 'combwork' && <IconButton icon="tag" title={tr(RENAME)} onClick={() => void rename(selected)} />}
+                {selected.source === 'combwork' && !isLive(selected.id) && (
                   <IconButton icon={selected.archived ? 'unarchive' : 'archive'} title={selected.archived ? tr(UNARCHIVE) : tr(ARCHIVE)} onClick={() => void archive(selected, !selected.archived)} />
                 )}
                 {!isLive(selected.id) && <IconButton icon="trash" title={tr(DELETE_ONE, { kind })} onClick={() => void remove(selected)} />}

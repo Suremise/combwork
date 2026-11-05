@@ -47,7 +47,7 @@ const log = createLogger('loopWakes')
 
 /** Hive's own deliveries come from it. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
-const HIVE = { kind: 'hive', name: 'Combwork' } as const
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const
 /** The user's answer comes from them, as a decision does (decisionWakes.ts). */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const USER = { kind: 'user', name: 'the user' } as const

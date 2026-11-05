@@ -27,7 +27,7 @@ const check = (name, ok, extra = '') => {
 }
 
 /** §16.6.3's Pair (Combwork merges) at P7's values, as project.json keeps it: G15 On, so the start's one-time G15 step (#1445) leaves it as it is. */
-const PAIR = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'hiveMerges', style: 'merge', target: 'main', strict: false, mergeChecks: [], mergeInstall: 'onManifestChange', okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
+const PAIR = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'combworkMerges', style: 'merge', target: 'main', strict: false, mergeChecks: [], mergeInstall: 'onManifestChange', okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
 
 /** A project's project.json, as Combwork keeps it, with `workflow` as given. */
 function projectJson(dir, platform, workflow) {

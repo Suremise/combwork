@@ -23,14 +23,14 @@ import { skillLinkTarget } from '@shared/skillLinks'
  */
 
 const LEVEL_LABEL: Record<SkillLevel, Msg> = {
-  hive: msg({ id: 'assistant.skills.levelCombwork', defaultMessage: 'Combwork', description: "A skill's kind, on a badge: one of the workspace's Combwork skills. Usually kept as Combwork." }),
+  combwork: msg({ id: 'assistant.skills.levelCombwork', defaultMessage: 'Combwork', description: "A skill's kind, on a badge: one of the workspace's Combwork skills. Usually kept as Combwork." }),
   machine: msg({ id: 'assistant.skills.levelUser', defaultMessage: 'User', description: "A skill's kind, on a badge: one in the user's own profile (~/.claude/skills)." }),
   plugin: msg({ id: 'assistant.skills.levelPlugin', defaultMessage: 'Plugin', description: "A skill's kind, on a badge: one from a Claude Code plugin." }),
   local: msg({ id: 'assistant.skills.levelLocal', defaultMessage: 'Local (User Managed)', description: "A skill's kind, on a badge: one in the project's folder, which the user manages." })
 }
 
 const LEVEL_TIP: Record<SkillLevel, Msg> = {
-  hive: msg({ id: 'assistant.skills.tipCombwork', defaultMessage: "Combwork skills live in the workspace (.combwork/skills). Each goes to the project agents (every agent in every project, of every provider), to the Assistant, or to both, as the audience in its SKILL.md says (the project agents if it says none). Combwork copies them for each session when it starts, so edits reach new sessions. Add, edit and delete them in the Skills view.", description: 'Tooltip on the Combwork skills. Keep .combwork/skills, SKILL.md and audience as they are.' }),
+  combwork: msg({ id: 'assistant.skills.tipCombwork', defaultMessage: "Combwork skills live in the workspace (.combwork/skills). Each goes to the project agents (every agent in every project, of every provider), to the Assistant, or to both, as the audience in its SKILL.md says (the project agents if it says none). Combwork copies them for each session when it starts, so edits reach new sessions. Add, edit and delete them in the Skills view.", description: 'Tooltip on the Combwork skills. Keep .combwork/skills, SKILL.md and audience as they are.' }),
   machine: msg({ id: 'assistant.skills.tipUser', defaultMessage: "Skills in your user profile (~/.claude/skills for Claude Code, ~/.codex/skills for Codex). That provider's agents always load them, in every project. Listed for reference; manage them outside Combwork.", description: "Tooltip on the user's own skills. Keep the paths as they are." }),
   plugin: msg({ id: 'assistant.skills.tipPlugin', defaultMessage: "Skills from Claude Code plugins you've installed. Claude Code agents always load them. Listed for reference; manage plugins in Claude Code.", description: "Tooltip on Claude Code plugins' skills." }),
   local: msg({ id: 'assistant.skills.tipLocal', defaultMessage: "Skills in the project folder for one provider (.claude/skills for Claude Code, .agents/skills for Codex). That provider's agents load them in this project. You manage them: add, edit and delete them here.", description: "Tooltip on a project's own skills. Keep the paths as they are." })
@@ -38,8 +38,8 @@ const LEVEL_TIP: Record<SkillLevel, Msg> = {
 
 /** Each kind of skill, as its tooltip explains it: read when shown, so it follows a change of language. */
 export const SKILL_LEVEL_TIP: Record<SkillLevel, string> = {
-  get hive() {
-    return tr(LEVEL_TIP.hive)
+  get combwork() {
+    return tr(LEVEL_TIP.combwork)
   },
   get machine() {
     return tr(LEVEL_TIP.machine)
@@ -112,7 +112,7 @@ const AUDIENCE_LABEL: Record<SkillAudience, Msg> = {
   all: msg({ id: 'assistant.skills.audienceAll', defaultMessage: 'Agents + Assistant', description: "A Combwork skill's badge: the project agents and the Combwork Assistant get it. Keep it short." })
 }
 
-export const SKILL_ICON: Record<SkillLevel, string> = { hive: 'sparkle', machine: 'account', plugin: 'extensions', local: 'folder' }
+export const SKILL_ICON: Record<SkillLevel, string> = { combwork: 'sparkle', machine: 'account', plugin: 'extensions', local: 'folder' }
 
 /** Over the Hive skills view and a Hive skill being edited there: these skills steer the agents. */
 export function HiveSkillsWarning() {
@@ -163,7 +163,7 @@ export function AudienceBadge({ audience, small }: { audience: SkillAudience | u
 const NAME_RULE = (v: string): string | null => (/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(v.trim()) ? null : tr(M.nameRule))
 
 function where(target: SkillTarget): string {
-  return target.kind === 'hive' ? tr(M.whereHive) : tr(M.whereLocal, { provider: providerDescriptor(target.provider).name })
+  return target.kind === 'combwork' ? tr(M.whereHive) : tr(M.whereLocal, { provider: providerDescriptor(target.provider).name })
 }
 
 /** "Claude Code agents", or "The agents" for a skill of no provider, in a message's select. */
@@ -204,7 +204,7 @@ export async function addSkill(mode: 'new' | 'file', target: SkillTarget, also?:
 }
 
 export async function deleteSkill(s: SkillInfo): Promise<boolean> {
-  const hive = s.level === 'hive'
+  const hive = s.level === 'combwork'
   const ok = await confirm({
     title: tr(M.deleteTitle),
     message: tr(M.deleteMessage, { name: s.name }),
@@ -277,8 +277,8 @@ export function SkillRow({ skill, selected, onSelect, actionsFor, delivered }: {
             {skill.name} {skill.plugin && <span className="desc">· {skill.plugin}</span>}
           </span>
           {missing && <span className="badge">{tr(M.deletedBadge)}</span>}{skill.updateAvailable && <span className="badge accent">{tr(M.updateBadge)}</span>}
-          {skill.level === 'hive' && skill.problem && <ProblemBadge problem={skillProblem(skill) ?? ''} small />}
-          {skill.level === 'hive' && !skill.problem && skill.audience && skill.audience !== 'agents' && <AudienceBadge audience={skill.audience} small />}
+          {skill.level === 'combwork' && skill.problem && <ProblemBadge problem={skillProblem(skill) ?? ''} small />}
+          {skill.level === 'combwork' && !skill.problem && skill.audience && skill.audience !== 'agents' && <AudienceBadge audience={skill.audience} small />}
         </div>
         {skill.description && (
           <OneLineDesc text={skillDescription(skill)} />
@@ -332,7 +332,7 @@ export function SkillDetail({ skill, where: place, projectPath, onDeleted, onRes
   const workspace = useStore((s) => s.workspace)
   const editRequest = useStore((s) => s.skillEdit)
   const missing = skill.bundled === 'missing'
-  const editable = !missing && ((skill.level === 'hive' && place === 'workspace') || skill.level === 'local')
+  const editable = !missing && ((skill.level === 'combwork' && place === 'workspace') || skill.level === 'local')
   // "Edit in workspace" is for the Skills view's page: the project tab's, showing the same skill, leaves it be.
   const forMe = place === 'workspace' && editRequest === skill.path
   const [editing] = useState(() => forMe)
@@ -383,17 +383,17 @@ export function SkillDetail({ skill, where: place, projectPath, onDeleted, onRes
         onLink={onLink}
         readOnly={!editable || !workspace}
         defaultPreview={!editing}
-        editingNote={skill.level === 'hive' && place === 'workspace' ? <HiveSkillsWarning /> : undefined}
+        editingNote={skill.level === 'combwork' && place === 'workspace' ? <HiveSkillsWarning /> : undefined}
         toolbarExtra={
           <>
             <Tooltip content={SKILL_LEVEL_TIP[skill.level]}>
-              <span className={cx('badge', skill.level === 'hive' ? 'accent' : '')}>
+              <span className={cx('badge', skill.level === 'combwork' ? 'accent' : '')}>
                 {tr(LEVEL_LABEL[skill.level])}
-                {skill.provider && skill.level !== 'hive' ? ` · ${providerDescriptor(skill.provider).name}` : ''}
+                {skill.provider && skill.level !== 'combwork' ? ` · ${providerDescriptor(skill.provider).name}` : ''}
                 {skill.plugin ? ` · ${skill.plugin}` : ''}
               </span>
             </Tooltip>
-            {skill.level === 'hive' && (skill.problem ? <ProblemBadge problem={skillProblem(skill) ?? ''} /> : <AudienceBadge audience={skill.audience} />)}
+            {skill.level === 'combwork' && (skill.problem ? <ProblemBadge problem={skillProblem(skill) ?? ''} /> : <AudienceBadge audience={skill.audience} />)}
             {missing && (
               <>
                 <span className="badge warn">{tr(M.deletedHere)}</span>
@@ -416,14 +416,14 @@ export function SkillDetail({ skill, where: place, projectPath, onDeleted, onRes
                 </Tooltip>
               </>
             )}
-            {skill.level === 'hive' && place === 'project' && (
+            {skill.level === 'combwork' && place === 'project' && (
               <Tooltip content={tr(M.editTip)}>
                 <button className="btn small subtle" onClick={() => editInWorkspace(skill)}>
                   <Icon name="go-to-file" /> {tr(M.edit)}
                 </button>
               </Tooltip>
             )}
-            {skill.level !== 'hive' && workspace && (
+            {skill.level !== 'combwork' && workspace && (
               <Tooltip content={tr(M.copyTip)}>
                 <button className="btn small subtle" onClick={() => void copyToWorkspace(skill)}>
                   <Icon name="cloud-upload" /> {tr(M.copy)}

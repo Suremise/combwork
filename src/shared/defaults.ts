@@ -109,7 +109,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   agentApi: {
     enabled: true,
     port: DEFAULT_API_PORT,
-    provideHiveMcp: true,
+    provideCombworkMcp: true,
     allowSessionInput: false,
     devConsole: false
   },

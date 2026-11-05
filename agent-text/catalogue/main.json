@@ -365,13 +365,13 @@
     "audience": "both"
   },
   "main.nameUpgrade.what.files": {
-    "text": "the workspace's .gitignore, README and MCP definitions",
-    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): files in the workspace's .combwork folder. Keep .gitignore, README and MCP as they are.",
+    "text": "the workspace's settings, templates, .gitignore, README and MCP definitions",
+    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): files in the workspace's .combwork folder (its workspace.json settings and its templates, HI-2598). Keep .gitignore, README and MCP as they are.",
     "audience": "both"
   },
   "main.nameUpgrade.what.projects": {
-    "text": "the projects' skill copies, git exclude lines and refs",
-    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…).",
+    "text": "the projects' settings, templates, skill copies, git exclude lines and refs",
+    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): values in the projects' project.json settings and templates (HI-2598), markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…).",
     "audience": "both"
   },
   "main.outage.gaveUpBody": {

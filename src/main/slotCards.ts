@@ -1273,7 +1273,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
     if ('ok' in r) {
       await crashAt('inPrepare')
       const fact: FactData['SlotPrepared'] = { lease: l.id, line: st.line!, revision: r.revision }
-      await wf.write(card.card, null, 'hive', (w) => {
+      await wf.write(card.card, null, 'combwork', (w) => {
         const now = cycleIn(w.tx.facts(n))
         if (now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared) w.fact('SlotPrepared', fact) // i18n-ignore: a fact's kind and codes, not text
       })
@@ -1285,7 +1285,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
       failed.add(key)
       log.warn(`Slot ${userText(st.slot)} couldn't be prepared for #${n}: ${userText(r.error)}`)
       startEnded(projectPath, builder, `#${n}`, { failed: inDefaultDialect(() => say(T.notReady, { slot: st.slot, error: r.error })) })
-      await wf.write(card.card, null, 'hive', (w) => {
+      await wf.write(card.card, null, 'combwork', (w) => {
         const english = inDefaultDialect(() => say(T.notReadyFor, { slot: st.slot, card: card.card.key, error: r.error }))
         w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
         wf.wake(w, st.builder, english)
@@ -1459,7 +1459,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
   const claim = now.cycle.claimed
   const mine = !!claim && claim.pid === me.pid && claim.started === me.started
   if (claim && !mine && (await holder.alive(claim.pid, claim.started)) !== false) return 'done'
-  const took = await wf.write(now.card, null, 'hive', (w) => {
+  const took = await wf.write(now.card, null, 'combwork', (w) => {
     const c = cycleIn(w.tx.facts(n))
     if (!c || c.seq !== cycle.seq || c.placed || (c.claimed?.seq ?? null) !== (claim?.seq ?? null)) return false
     if (!mine) w.fact('PlacementClaimed', { lease: l.id, pid: me.pid, started: me.started }) // i18n-ignore: a fact's kind and codes, not text
@@ -1577,7 +1577,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       const prompt = brief ? `${cardPrompt}\n\n${brief}` : cardPrompt
       // How it is placed kept with it (HI-2134): a later pass finding it made records the placement as this one made it.
       // agent-protocol: the sender is the product's name, Hive
-      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Combwork' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
+      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'combwork' as const, name: 'Combwork' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
       // Its builder can't take a line now (HI-2191: its input blocked, a line of Hive's being typed, watching, working):
       // it waits for that builder's next status (place's nextLook), making no delivery. One made and called off each
       // pass wrote the lane each time, which ran the next pass: HB3's every second. Said once for each reason.
@@ -1604,7 +1604,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     if (e instanceof GaveUp || e instanceof Waits) return 'wait'
     throw e
   }
-  await wf.write(now.card, null, 'hive', (w) => {
+  await wf.write(now.card, null, 'combwork', (w) => {
     const c = cycleIn(w.tx.facts(n))
     if (c?.seq === cycle.seq && !c.placed) w.fact('BuilderPlaced', { lease: l.id, delivery, how }) // i18n-ignore: a fact's kind and codes, not text
   })
@@ -1624,7 +1624,7 @@ class BuilderBusy extends Waits {}
 
 /** A placement's notice on its card, and its builder woken with the English (as a preparation's failure is). */
 async function tellCard(wf: Workflow, card: Parameters<Workflow['write']>[0], builder: string, shown: ReturnType<typeof workflowText>, english: string): Promise<void> {
-  await wf.write(card, null, 'hive', (w) => {
+  await wf.write(card, null, 'combwork', (w) => {
     w.action('notify', { text: english, shown })
     wf.wake(w, builder, english)
   })
@@ -1687,7 +1687,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
       if (!before || before.some((w) => w.branch === line) || !allowed()) return false
       // The intent, durably, before anything is removed: from here a crash is settled by the next pass.
       const intent: FactData['LineDeleting'] = { line, revision: head }
-      const meant = await wf.write(card, null, 'hive', (w) => {
+      const meant = await wf.write(card, null, 'combwork', (w) => {
         const now = cycleIn(w.tx.facts(n))
         if (!now || now.seq !== c.seq || now.deleted || unsettledDeletions(w.tx.facts(n)).length) return false
         w.fact('LineDeleting', intent) // i18n-ignore: a fact's kind and codes, not text
@@ -1713,7 +1713,7 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
   const head = await G.lineHead(projectPath, d.line)
   if (isUnknown(head)) return false
   if (head) {
-    await wf.write(card, null, 'hive', (w) => {
+    await wf.write(card, null, 'combwork', (w) => {
       if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleteUndone', { ...d, why: 'notDeleted' }) // i18n-ignore: a fact's kind and codes, not text
     })
     return false
@@ -1729,13 +1729,13 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
       return false
     }
     log.warn(`${userText(d.line)} was checked out as it was deleted: put back at ${d.revision.slice(0, 7)} and kept`)
-    await wf.write(card, null, 'hive', (w) => {
+    await wf.write(card, null, 'combwork', (w) => {
       if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleteUndone', { ...d, why: 'checkedOut' }) // i18n-ignore: a fact's kind and codes, not text
     })
     return false
   }
   log.info(`Deleted ${userText(d.line)} (#${n}, merged)`)
-  await wf.write(card, null, 'hive', (w) => {
+  await wf.write(card, null, 'combwork', (w) => {
     if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleted', { line: d.line, revision: d.revision, why: 'merged' }) // i18n-ignore: a fact's kind and codes, not text
   })
   return true

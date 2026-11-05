@@ -346,7 +346,7 @@
   "board.forYou.approve": "Zatwierdź",
   "board.forYou.asDecision": "Zapisz jako decyzję",
   "board.forYou.asDecisionTip": "Zapisuje Twoją odpowiedź jako jedną z decyzji karty, których jej agenci muszą odtąd przestrzegać, i odpowiada nią na pytanie.",
-  "board.forYou.asked": "{who, select, hive {Pyta Combwork} other {Pyta {who}}} · {when}",
+  "board.forYou.asked": "{who, select, combwork {Pyta Combwork} other {Pyta {who}}} · {when}",
   "board.forYou.checklist": "Do sprawdzenia:",
   "board.forYou.chip": "Dla Ciebie",
   "board.forYou.chipTip": "{n, plural, one {Czeka na Ciebie: {requests}} few {# prośby czekają na Ciebie: {requests}} many {# próśb czeka na Ciebie: {requests}} other {# prośby czeka na Ciebie: {requests}}}",

@@ -19,8 +19,8 @@ export function writeWorkflow(current: ProjectWorkflow | null | undefined, next:
   const { commitMessageChosen: was, ...rest } = current ?? {}
   if (next.platform !== 'git') return { ...rest, ...(was ? { commitMessageChosen: was } : {}), platform: next.platform, preset: next.preset, options: next.options }
   const before = current?.platform === 'git' ? current.options?.commitMessage : undefined
-  const hive = next.options.commitMessage === 'hive'
-  const chosen = hive && (was || before !== 'hive')
+  const hive = next.options.commitMessage === 'combwork'
+  const chosen = hive && (was || before !== 'combwork')
   return { ...rest, ...(chosen ? { commitMessageChosen: true as const } : {}), platform: next.platform, preset: next.preset, options: next.options }
 }
 

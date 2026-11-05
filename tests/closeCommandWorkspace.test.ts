@@ -78,7 +78,7 @@ describe("a switch whose old workspace's close is held", () => {
       // The switch opens the next workspace, once, with nothing of the old close left to run.
       await w.open(wsB)
       expect(w.path).toBe(wsB)
-      await expect(runQuitCommand({ list: [{ id: 'c-0000000f', name: 'Quit', command: 'backup all' }], onQuit: { run: [{ scope: 'hive', id: 'c-0000000f' }] } }, 'quit', null, 'left')).resolves.toBe('leftSaving')
+      await expect(runQuitCommand({ list: [{ id: 'c-0000000f', name: 'Quit', command: 'backup all' }], onQuit: { run: [{ scope: 'combwork', id: 'c-0000000f' }] } }, 'quit', null, 'left')).resolves.toBe('leftSaving')
       expect(started).toEqual([])
     } finally {
       WorkspaceService.closingTasks.delete(task)

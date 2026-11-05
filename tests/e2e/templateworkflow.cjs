@@ -319,7 +319,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const confirmLate = page.locator('.dialog', { hasText: 'Save' }).last()
     await until(async () => (await confirmLate.getByRole('button', { name: 'Save', exact: true }).count()) === 1)
     await confirmLate.getByRole('button', { name: 'Save', exact: true }).click()
-    check("…saved as Team, with gitb's target and command, never Late's rounds", !!(await until(() => workflowOf(gitb)?.preset === 'team' && saved().finish === 'hiveMerges')) && saved().target === 'main' && saved().commands?.lint === 'pnpm lint' && saved().loopRounds !== 7, JSON.stringify(workflowOf(gitb)))
+    check("…saved as Team, with gitb's target and command, never Late's rounds", !!(await until(() => workflowOf(gitb)?.preset === 'team' && saved().finish === 'combworkMerges')) && saved().target === 'main' && saved().commands?.lint === 'pnpm lint' && saved().loopRounds !== 7, JSON.stringify(workflowOf(gitb)))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

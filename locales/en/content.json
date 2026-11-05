@@ -408,8 +408,8 @@
     "description": "Why a template can't be loaded: the agent {agent} it would replace is running."
   },
   "content.templates.scope": {
-    "defaultMessage": "Unknown scope \"{scope}\": hive, workspace or project.",
-    "description": "An error: where a template is kept must be hive, workspace or project (keep those three words: they are the values to use)."
+    "defaultMessage": "Unknown scope \"{scope}\": combwork, workspace or project.",
+    "description": "An error: where a template is kept must be combwork, workspace or project (keep those three words: they are the values to use)."
   },
   "content.templates.started": {
     "defaultMessage": "An agent started meanwhile: nothing was changed. Stop it first.",

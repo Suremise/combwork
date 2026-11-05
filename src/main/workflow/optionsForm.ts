@@ -379,9 +379,9 @@ export function mergeChoiceOf(ws: WorkspaceService, projectName: string): MergeC
   if (!v) return null
   try {
     const r = JSON.parse(v) as Partial<MergeChoiceRecord>
-    return takesOption('style', r.style) && takesOption('commitMessage', r.commitMessage) ? (r as MergeChoiceRecord) : { style: 'merge', commitMessage: 'hive', at: '', pending: false }
+    return takesOption('style', r.style) && takesOption('commitMessage', r.commitMessage) ? (r as MergeChoiceRecord) : { style: 'merge', commitMessage: 'combwork', at: '', pending: false }
   } catch {
-    return { style: 'merge', commitMessage: 'hive', at: '', pending: false }
+    return { style: 'merge', commitMessage: 'combwork', at: '', pending: false }
   }
 }
 
@@ -503,7 +503,7 @@ async function closeAsked(ws: WorkspaceService, projectPath: string): Promise<vo
   if (!wf) return
   for (const id of await askedCards(ws, projectPath)) {
     const rec = wf.store.card(id)
-    await wf.write(rec, wf.rulesetOf(rec), 'hive', (w) => {
+    await wf.write(rec, wf.rulesetOf(rec), 'combwork', (w) => {
       for (const r of w.state().requests.filter((x) => x.gate === MERGE_CHOICE_GATE)) w.fact('RequestClosed', { request: r.request, why: 'done' }) // i18n-ignore: a fact's kind and codes, not text
     })
   }

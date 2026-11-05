@@ -173,8 +173,8 @@ describe('listing', () => {
       // One listing (it reads git for every worktree): each is looked up in it.
       const list = await listOf()
       const of = (path: string): UnusedWorktree => list.find((x) => placeKey(x.path) === placeKey(path))!
-      expect(of(ran.path).origin).toEqual({ madeBy: 'hive', agentName: 'B4' })
-      expect(of(hive.path).origin).toEqual({ madeBy: 'hive' })
+      expect(of(ran.path).origin).toEqual({ madeBy: 'combwork', agentName: 'B4' })
+      expect(of(hive.path).origin).toEqual({ madeBy: 'combwork' })
       expect(of(other.path).origin).toEqual({ madeBy: 'other' })
       expect(originLabel(of(ran.path))).toBe('was B4')
       expect(originLabel(of(hive.path))).toBe('made by Combwork')

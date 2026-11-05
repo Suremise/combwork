@@ -31,7 +31,7 @@
   "hooks.receiver": "pelo hook {form} do Combwork",
   "hooks.refresh": "Atualizar",
   "hooks.response": "{response, select, none {Nada a dizer} context {Contexto enviado} allowed {Permitido} warned {Permitido, com um aviso} asked {Perguntou a você} blocked {Bloqueado} error {Erro} other {Desconhecido}}",
-  "hooks.source": "{source, select, hive {Combwork} managed {Configurações gerenciadas} cli {Linha de comando} project {Projeto} local {Projeto (local)} user {Usuário} plugin {Plugin} other {Outro}}",
+  "hooks.source": "{source, select, combwork {Combwork} managed {Configurações gerenciadas} cli {Linha de comando} project {Projeto} local {Projeto (local)} user {Usuário} plugin {Plugin} other {Outro}}",
   "hooks.stale": "O agente reiniciou desde esta leitura: isto mostra a sessão anterior dele.",
   "hooks.status": "{status, select, passed {Fornecido pelo Combwork} trusted {Confiável} untrusted {Não confiável: não vai executar} modified {Alterado desde que foi confiado: não vai executar} unverified {Configurado · carregamento não verificado} disabled {Desativado} notLoaded {Não carregado} unsupported {Forma desconhecida} other {Desconhecido}}",
   "hooks.timeSpan": "{from}–{to}",

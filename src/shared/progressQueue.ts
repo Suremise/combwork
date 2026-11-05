@@ -114,7 +114,7 @@ export const justMerged = (v: QueueView, now: number): QueueRecent[] => v.recent
  * None with an old Git ruleset's cards in flight) the old queue stays, controllable, until its last outcome is seen.
  */
 export function queueShown(v: QueueView, now: number): boolean {
-  return !!v.testing || v.queued.length > 0 || !!v.paused || !!v.runBy || v.inFlight.length > 0 || v.hiveMerges || shownReturns(v, now).length > 0 || justMerged(v, now).length > 0
+  return !!v.testing || v.queued.length > 0 || !!v.paused || !!v.runBy || v.inFlight.length > 0 || v.combworkMerges || shownReturns(v, now).length > 0 || justMerged(v, now).length > 0
 }
 
 /** The queues that show, by project (its name) then target. */
@@ -152,12 +152,12 @@ export const queuedCount = (views: readonly QueueView[]): number => views.reduce
  */
 export function queueEstimate(v: QueueView, runs: readonly ProgressRun[]): number | null {
   const results = new Map<string, number>()
-  for (const r of v.recent) if (r.outcome === 'merged' && r.by === 'hive' && r.result) results.set(r.result, at(r.at))
+  for (const r of v.recent) if (r.outcome === 'merged' && r.by === 'combwork' && r.result) results.set(r.result, at(r.at))
   if (!results.size) return null
   const project = v.projectPath.toLowerCase()
   const groups = new Map<string, ProgressRun[]>()
   for (const r of runs) {
-    if (r.source !== 'hive' || !r.revision || !results.has(r.revision) || r.projectPath?.toLowerCase() !== project) continue
+    if (r.source !== 'combwork' || !r.revision || !results.has(r.revision) || r.projectPath?.toLowerCase() !== project) continue
     groups.set(r.revision, [...(groups.get(r.revision) ?? []), r])
   }
   const spans = [...groups.entries()]
@@ -180,7 +180,7 @@ export function returnRun(v: QueueView, r: QueueRecent, runs: readonly ProgressR
   if (r.reason !== 'checks' || !r.logPath) return null
   const project = v.projectPath.toLowerCase()
   const log = r.logPath.toLowerCase()
-  return runs.find((x) => x.source === 'hive' && x.card === r.card && x.projectPath?.toLowerCase() === project && x.logPath?.toLowerCase() === log) ?? null
+  return runs.find((x) => x.source === 'combwork' && x.card === r.card && x.projectPath?.toLowerCase() === project && x.logPath?.toLowerCase() === log) ?? null
 }
 
 /** The check a return names: the one its outcome recorded, else its run's (null: none known). */

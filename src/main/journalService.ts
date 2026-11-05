@@ -15,7 +15,7 @@ const log = createLogger('journal')
 // The windows showing a workspace's journal browser (#1033) follow its changes: its Assistant home is `<workspace>/.combwork/assistant`.
 onJournalChange((home) => emit({ type: 'journal-changed', workspacePath: join(home, '..', '..') }))
 // agent-protocol: who a journal entry or delivery is from: Combwork's own name (HI-2463)
-const HIVE = { kind: 'hive', name: 'Combwork' } as const
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const
 
 /**
  * The journal as a workspace has it (#1031): its settings (workspace.json `journal`, Settings → Assistant → Journal),
@@ -139,7 +139,7 @@ export async function journalFactAt(workspacePath: string, fact: Fact): Promise<
   const s = journalSettings(saved.journal)
   if (!s.enabled || !inScope(s, 'event')) return
   try {
-    leaveEntry(join(workspacePath, CW_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
+    leaveEntry(join(workspacePath, CW_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['combwork', ...(fact.tags ?? [])] }, 'combwork')
   } catch (e) {
     log.warn('recording a fact in the journal', e)
   }
@@ -155,9 +155,9 @@ export function journalFact(ws: WorkspaceService | null | undefined, fact: Fact,
   const s = journalSettingsOf(ws)
   if (!s.enabled || !inScope(s, 'event')) return false
   try {
-    const input = { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }
-    if (once) writeEntryOnce(ws.assistantHome, s, input, 'hive', once)
-    else writeEntry(ws.assistantHome, s, input, 'hive')
+    const input = { kind: 'event', ...fact, tags: ['combwork', ...(fact.tags ?? [])] }
+    if (once) writeEntryOnce(ws.assistantHome, s, input, 'combwork', once)
+    else writeEntry(ws.assistantHome, s, input, 'combwork')
     return true
   } catch (e) {
     log.warn('recording a fact in the journal', e)

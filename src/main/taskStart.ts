@@ -112,7 +112,7 @@ function availability(p: string, agentId: string, agentName: string, actor: Task
 /** Who a Start's task is from (#649): the Assistant's launch (its permission worked out again at every step), an agent, or the user. */
 function senderOf(actor: TaskActor): DeliverySender {
   if (actor.kind === 'assistant') return { kind: 'assistant', name: 'the Assistant', workspace: workspace.path!, launch: sessions.liveFor(workspace.assistantHome, ASSISTANT_AGENT_ID)?.runId ?? '' } // i18n-ignore: who a delivery is from, as agents read it
-  if (actor.kind === 'agent') return { kind: 'hive', name: actor.name }
+  if (actor.kind === 'agent') return { kind: 'combwork', name: actor.name }
   return { kind: 'user', name: 'the user' } // i18n-ignore: who a delivery is from, as agents read it
 }
 

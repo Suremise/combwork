@@ -160,7 +160,7 @@ export const VALUE_TEXT = {
     exact: msg({ id: 'workflow.value.sameness.exact', defaultMessage: 'Exact revision only', description: 'A value of the workflow option “A pass survives a clean rebase” (glossary 2.6, G4).' })
   },
   finish: {
-    hiveMerges: msg({ id: 'workflow.value.finish.combworkMerges', defaultMessage: 'Combwork merges', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
+    combworkMerges: msg({ id: 'workflow.value.finish.combworkMerges', defaultMessage: 'Combwork merges', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Combwork checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     committed: msg({ id: 'workflow.value.finish.committed', defaultMessage: 'Committed is done', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' })
@@ -171,7 +171,7 @@ export const VALUE_TEXT = {
     rebase: msg({ id: 'workflow.value.style.rebase', defaultMessage: 'Rebase and fast-forward', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Combwork’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit.' })
   },
   commitMessage: {
-    hive: msg({ id: 'workflow.value.commitMessage.cw', defaultMessage: 'Combwork’s: the card’s key and title, with trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Combwork’s trailers (Combwork-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.' }),
+    combwork: msg({ id: 'workflow.value.commitMessage.cw', defaultMessage: 'Combwork’s: the card’s key and title, with trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Combwork’s trailers (Combwork-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.' }),
     branch: msg({ id: 'workflow.value.commitMessage.branch', defaultMessage: 'The branch’s own, with no card key or trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Combwork’s trailers. Trailers: git’s “Key: value” lines at a message’s end.' })
   },
   mergeInstall: {

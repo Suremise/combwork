@@ -231,7 +231,7 @@ describe('workflow scenarios, Git', () => {
       const write = e.wf.write.bind(e.wf)
       let raced = false
       e.wf.write = (async (...args: Parameters<typeof e.wf.write>) => {
-        if (!raced && args[2] === 'hive' && e.wf.state(card).stale && e.wf.state(card).head === rev) {
+        if (!raced && args[2] === 'combwork' && e.wf.state(card).stale && e.wf.state(card).head === rev) {
           raced = true
           sh(folder, 'reset', '-q', '--hard', other)
           await reconcile(e.wf, card)
@@ -312,7 +312,7 @@ describe('workflow scenarios, Git', () => {
       const write = e.wf.write.bind(e.wf)
       let raced = false
       e.wf.write = (async (...args: Parameters<typeof e.wf.write>) => {
-        if (!raced && args[2] === 'hive' && !e.wf.state(card).stale && e.wf.state(card).head === rev) {
+        if (!raced && args[2] === 'combwork' && !e.wf.state(card).stale && e.wf.state(card).head === rev) {
           raced = true
           sh(folder, 'reset', '-q', '--hard', other)
           await reconcile(e.wf, card)
@@ -369,7 +369,7 @@ describe('workflow scenarios, Git', () => {
       const e = pair()
       const { card } = await approved(e)
       const entry = e.wf.state(card).entries.at(-1)!
-      await e.wf.write(e.wf.store.card(card.id), e.wf.rulesetOf(e.wf.store.card(card.id)), 'hive', (w) => {
+      await e.wf.write(e.wf.store.card(card.id), e.wf.rulesetOf(e.wf.store.card(card.id)), 'combwork', (w) => {
         w.fact('IntegrationStarted', { entry: entry.id, expected: 'x', result: 'y' })
       })
       refusedBy(await e.wf.loopStep(card.key, B1, 'followUp', 'One more', reviewer), 'loop.followUpMerging')
@@ -524,7 +524,7 @@ describe('workflow scenarios, Git', () => {
     const e = pair()
     const { card } = await started(e)
     // Pair: Combwork merges it, so the refusal names the queue (#1354) rather than an intent the agent can't use.
-    const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'merge.hiveMerges')
+    const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'merge.combworkMerges')
     expect(r.next).toBe('Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.')
     const ask = await e.wf.move(card.key, 'done', 'user')
     expect(ask).toMatchObject({ ask: true })
@@ -912,7 +912,7 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     expect(s.staleSince).toBeTruthy()
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why === `${card.key}: its pass is stale: it is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)} (changed since). Submit ${now.slice(0, 7)} for review (cw_submit). Or put its branch back at ${passed.slice(0, 7)}.`)).toBe(true)
     expect(e.wf.queueLineOf(card.key)).toContain(`Its pass is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)}`)
-    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe(`Its pass is stale: its line changed since it passed review (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once it passes again.`)
+    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.combworkMerges').next).toBe(`Its pass is stale: its line changed since it passed review (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once it passes again.`)
     expect(await e.queue().runOnce('main')).toBeNull()
   })
 })

@@ -278,7 +278,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       const h = join(base, 'journal-ws', '.combwork', 'assistant')
       const out = admitted(join(base, 'journal-ws'))
       try {
-        const id = journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['hive', ...(started.tags ?? [])] }, 'hive')
+        const id = journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['combwork', ...(started.tags ?? [])] }, 'combwork')
         journalStore.closeJournal(h)
         const raw = new DatabaseSync(journalStore.journalFile(h), { readOnly: true })
         try {

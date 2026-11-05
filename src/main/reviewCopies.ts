@@ -347,7 +347,7 @@ function reviewCopiesOff(): Reason | null {
  */
 export async function tellReviewer(projectPath: string, agent: Reviewer, card: number, text: () => string): Promise<void> {
   // agent-protocol: the sender is the product's name, Hive
-  await leaveMessage(projectPath, agent.id, agent.name, { kind: 'hive', name: 'Combwork' }, inDialectOf({ projectPath, agentId: agent.id }, text), card) // i18n-ignore: the sender's name agents read
+  await leaveMessage(projectPath, agent.id, agent.name, { kind: 'combwork', name: 'Combwork' }, inDialectOf({ projectPath, agentId: agent.id }, text), card) // i18n-ignore: the sender's name agents read
 }
 
 /** A project's review copies in a workspace (made on first use, for the workspace's life). */

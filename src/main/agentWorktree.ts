@@ -78,7 +78,7 @@ export async function moveCardFolders(projectPath: string, from: string, to: str
   for (const card of wf.store.cards()) {
     if (!on(wf.state(card).started?.folder)) continue
     // Checked again under the write's lock: a card another observer has already moved gets no second fact.
-    await wf.write(card, null, 'hive', (w) => {
+    await wf.write(card, null, 'combwork', (w) => {
       if (on(w.state().started?.folder)) w.fact('FolderMoved', { from, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
     })
   }

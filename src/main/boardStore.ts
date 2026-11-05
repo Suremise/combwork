@@ -14,6 +14,7 @@ import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, curre
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { NAMES_STEP } from './schema/namesStep'
+import { VALUES_STEP } from './schema/valuesStep'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
@@ -313,7 +314,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
   },
   {
     // HI-2587, the names upgrade: what the board kept under Hive's names takes Combwork's (comments' `hive_text` column,
-    // the 0.9 import's record's old version key). The 1.0 group's last step: a board 1.0 or an RC upgraded takes it
+    // the 0.9 import's record's old version key). In the 1.0 group, near its end: a board 1.0 or an RC upgraded takes it
     // unasked (as HI-1718's later steps), a 0.9 board with its upgrade.
     version: 25,
     name: NAMES_STEP.name,
@@ -323,6 +324,18 @@ export const BOARD_MIGRATIONS: Migration[] = [
       const cols = (db.prepare("SELECT name FROM pragma_table_info('card_comments')").all() as { name: string }[]).map((c) => c.name) // i18n-ignore: SQL
       if (cols.includes('hive_text')) for (const sql of NAMES_STEP.ddl) db.exec(sql)
       db.exec("UPDATE board_meta SET value = json_remove(json_set(value, '$.appVersion', json_extract(value, '$.hiveVersion')), '$.hiveVersion') WHERE key = 'imported' AND json_valid(value) AND json_type(value, '$.hiveVersion') IS NOT NULL") // i18n-ignore: SQL
+    }
+  },
+  {
+    // HI-2598, the names upgrade's stored values (its design HI-2598/s9 §2): what 1.0 and the release candidates stored
+    // under Hive's names (a fact's actor, who merges, the rulesets compiled from it, a lane's builder, Combwork's own
+    // deliveries…) takes Combwork's, once (schema/valuesStep.ts). The 1.0 group's last step: taken unasked as 25 is.
+    version: 26,
+    name: VALUES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      const changed = VALUES_STEP.up(db)
+      if (Object.keys(changed).length) log.info(`names: values converted ${JSON.stringify(changed)}`)
     }
   }
 ]

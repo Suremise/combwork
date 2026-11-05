@@ -310,6 +310,13 @@ const steps = {
     const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, 'hive.db')) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)
     let card = null
     if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, TREE_BEFORE, 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
+    // Stored values under Hive's names (HI-2598): the project's Git workflow options as the release before writes them
+    // ("Hive merges", Hive's commit message), for the upgrade to convert to Combwork's.
+    if (made) {
+      const pj = path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')
+      const cfg = readJson(pj) ?? {}
+      fs.writeFileSync(pj, JSON.stringify({ ...cfg, workflow: { platform: 'none', preset: null, options: {}, kept: { git: { preset: null, options: { finish: 'hiveMerges', commitMessage: 'hive' } } } } }, null, 2) + '\n')
+    }
     // A skill copy as the release before marks it (HI-2587), for the upgrade to rename its marker.
     fs.mkdirSync(path.join(KEPT_WS, COPY), { recursive: true })
     fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), '---\nname: cw-sandbox-check\n---\n')
@@ -541,6 +548,11 @@ const steps = {
     const card = Array.isArray(cards) ? cards.find((x) => x.title === KEPT_CARD) : null
     res.facts.keptCard = card ? { number: card.number, description: card.description } : cards
     check('4.workspace-card', 'Its card is on the board, its path now into .combwork', !!card && card.description === `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`, JSON.stringify(res.facts.keptCard))
+    // HI-2598: the stored values converted once: the project's kept Git options, and the card's facts' actors.
+    const keptGit = readJson(path.join(KEPT_WS, 'demo', '.combwork', 'project.json'))?.workflow?.kept?.git?.options ?? null
+    check('4.values-options', "The project's kept Git options say Combwork's (combworkMerges, Combwork's commit message), no Hive value left", keptGit?.finish === 'combworkMerges' && keptGit?.commitMessage === 'combwork', JSON.stringify(keptGit))
+    const facts = card ? await inv('tasks:facts', card.number).catch(() => null) : null
+    check('4.values-facts', "No fact of the card made before names Hive as its actor", Array.isArray(facts) && !facts.some((x) => x.actor === 'hive' || x.data?.by === 'hive'), JSON.stringify(facts?.map((x) => [x.kind, x.actor])))
     // HI-2587: the names upgrade. The board's file and its copies, the log, the workspace's files, the skill copy's marker:
     // Combwork's names, nothing of the old left, the record written; from 1.0 and from an RC alike.
     const dir = path.join(KEPT_WS, '.combwork')
@@ -555,7 +567,7 @@ const steps = {
     try { gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8') } catch { /* below */ }
     check('4.workspace-files', "The workspace's .gitignore is Combwork's, for combwork.db, keeping the names upgrade's record out", /\(added by Combwork, #1017\)/.test(gitignore.split(/\r?\n/)[0]) && /^combwork\.db\r?$/m.test(gitignore) && /^combwork-names\.json\r?$/m.test(gitignore) && !/^hive\.db/m.test(gitignore), gitignore.slice(0, 600))
     check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes('.hive-copy') && readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))?.hash === 'h', JSON.stringify(res.facts.names.copy))
-    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === 2, JSON.stringify(res.facts.names.combwork))
+    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === 3, JSON.stringify(res.facts.names.combwork))
     const oldNames = [...res.facts.names.combwork.filter((n) => /^hive/i.test(n)), ...res.facts.names.logs.filter((n) => /^hive/i.test(n))]
     check('4.no-old-names', "No file under Hive's names left in the workspace's .combwork or the profile's logs", oldNames.length === 0, JSON.stringify(oldNames))
     if (!FROM_RC) {

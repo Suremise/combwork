@@ -27,7 +27,7 @@ const view = (over: Partial<QueueView> = {}): QueueView => ({
   returns: [],
   returnsMore: 0,
   pauses: [],
-  hiveMerges: false,
+  combworkMerges: false,
   inFlight: [],
   ...over
 })
@@ -44,7 +44,7 @@ const run = (over: Partial<ProgressRun> = {}): ProgressRun =>
     agentName: 'Combwork (merge queue)',
     defaultName: 'mergeQueue',
     provider: null,
-    source: 'hive',
+    source: 'combwork',
     title: 'HI-61 · unit · 9e1f0aa',
     command: 'npm test',
     total: null,
@@ -80,7 +80,7 @@ describe('which merge queues show (#1356 item 0)', () => {
   })
 
   it('shows, empty, while the current options have Combwork merge into it', () => {
-    expect(queueShown(view({ hiveMerges: true }), NOW)).toBe(true)
+    expect(queueShown(view({ combworkMerges: true }), NOW)).toBe(true)
   })
 
   it('shows for its state whatever the current options: testing, queued, paused, a lease, a card in flight under its old ruleset', () => {
@@ -99,23 +99,23 @@ describe('which merge queues show (#1356 item 0)', () => {
   })
 
   it('a merge shows for a few seconds, then the old queue goes', () => {
-    const r = recent({ result: '9e1f0aa' + 'c'.repeat(33), by: 'hive', at: iso(NOW - 1_000) })
+    const r = recent({ result: '9e1f0aa' + 'c'.repeat(33), by: 'combwork', at: iso(NOW - 1_000) })
     expect(queueShown(view({ recent: [r] }), NOW)).toBe(true)
     expect(justMerged(view({ recent: [r] }), NOW + JUST_MERGED_MS)).toEqual([])
     expect(queueShown(view({ recent: [r] }), NOW + JUST_MERGED_MS)).toBe(false)
   })
 
   it('in order: by project, then target; hidden ones left out', () => {
-    const views = [view({ project: 'beta', projectPath: 'D:\\ws\\beta', hiveMerges: true }), view({ target: 'release', hiveMerges: true }), view({ hiveMerges: true }), view({ target: 'old' })]
+    const views = [view({ project: 'beta', projectPath: 'D:\\ws\\beta', combworkMerges: true }), view({ target: 'release', combworkMerges: true }), view({ combworkMerges: true }), view({ target: 'old' })]
     expect(shownQueues(views, NOW).map((v) => `${v.project}/${v.target}`)).toEqual(['alpha/main', 'alpha/release', 'beta/main'])
   })
 
   it('All projects: an inactive project\'s queue only while it is busy (HI-2165)', () => {
-    const idle = view({ project: 'beta', projectPath: 'D:\\ws\\beta', hiveMerges: true, runBy: 'Combwork' })
+    const idle = view({ project: 'beta', projectPath: 'D:\\ws\\beta', combworkMerges: true, runBy: 'Combwork' })
     const active = new Set(['d:\\ws\\alpha'])
     const shown = (v: QueueView, now = NOW): boolean => allProjectsQueues([v], active, now).length > 0
     // The project being worked on: its idle queue shows; another's doesn't, even run and merged into by Combwork.
-    expect(shown(view({ hiveMerges: true }))).toBe(true)
+    expect(shown(view({ combworkMerges: true }))).toBe(true)
     expect(queueBusy(idle, NOW)).toBe(false)
     expect(shown(idle)).toBe(false)
     expect(shown({ ...idle, testing })).toBe(true)
@@ -282,7 +282,7 @@ describe('what a queue card says', () => {
 })
 
 describe('the estimate (#1356 item 1)', () => {
-  const merged = (result: string, minsAgo: number): QueueRecent => recent({ entry: `HI-${result}/e1`, result, by: 'hive', at: iso(NOW - minsAgo * 60_000) })
+  const merged = (result: string, minsAgo: number): QueueRecent => recent({ entry: `HI-${result}/e1`, result, by: 'combwork', at: iso(NOW - minsAgo * 60_000) })
 
   it('none without earlier merges, or without their runs', () => {
     expect(queueEstimate(view({ testing }), [])).toBeNull()

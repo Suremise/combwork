@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
-  cfg.settings.agentApi = { enabled: true, port: Number(PORT), provideHiveMcp: true, allowSessionInput: true }
+  cfg.settings.agentApi = { enabled: true, port: Number(PORT), provideCombworkMcp: true, allowSessionInput: true }
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 

@@ -72,7 +72,7 @@ function steer(fx, mode, say, maxMs) {
  * The options "Combwork merges" into integration, with the one merge check (G9), set as the project's (no preset: #1355's).
  * Combwork's commit message chosen (G19: the branch's own is every preset's since HI-1997), so each merge names its card.
  */
-const queueOptions = (fx, over = {}) => ({ review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', commitMessage: 'hive', preChecks: [], mergeChecks: ['quick'], commands: { quick: `"${fx.tool}"` }, identity: fx.identity, okBefore: { mode: 'never', labels: [] }, ...over })
+const queueOptions = (fx, over = {}) => ({ review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', commitMessage: 'combwork', preChecks: [], mergeChecks: ['quick'], commands: { quick: `"${fx.tool}"` }, identity: fx.identity, okBefore: { mode: 'never', labels: [] }, ...over })
 
 /**
  * Launches Combwork on the fixture (its profile, a port, CLAUDE_CONFIG_DIR) and opens the workspace; sets the options

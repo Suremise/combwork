@@ -31,7 +31,7 @@ vi.mock('../src/main/closeCommand/runs', async (orig) => {
 const { closeCommandState, closeWithCommand, dontWait, quitRunsAny, runQuitCommand } = await import('../src/main/closeCommand/closeCommands')
 const { fillCommand } = await import('../src/shared/commands')
 /** Combwork's commands with When Combwork quits running `command` (none: nothing), as Settings saves them (HI-1954). */
-const hive = (command: string, onUpdate = false) => ({ list: command ? [{ id: 'c-0000000f', name: 'Quit', command }] : [], onQuit: { run: command ? [{ scope: 'hive' as const, id: 'c-0000000f' }] : [], ...(onUpdate ? { onUpdate } : {}) } })
+const hive = (command: string, onUpdate = false) => ({ list: command ? [{ id: 'c-0000000f', name: 'Quit', command }] : [], onQuit: { run: command ? [{ scope: 'combwork' as const, id: 'c-0000000f' }] : [], ...(onUpdate ? { onUpdate } : {}) } })
 const { EventEmitter } = await import('events')
 
 let windows = 0

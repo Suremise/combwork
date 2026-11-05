@@ -111,9 +111,9 @@ function briefs(): { name: string; text: string }[] {
   const builders = [{ name: 'B1', folder: 'D:/hive/b1', branch: 'cw/b1' }, { name: 'B1', folder: 'D:/hive/b1', branch: null }, { name: 'B1', folder: null, branch: null }, { name: 'B1', folder: null, branch: null, slot: 'slot-b' }]
   const reviewers: Partial<LaneBriefInput>[] = [{}, { reviewer: null }, { reviewer: null, pool: [] }, { reviewer: null, pool: ['R1', 'R2', 'R3'] }]
   for (const [i, builder] of builders.entries()) for (const [j, r] of reviewers.entries()) for (const role of ['builder', 'reviewer'] as const) out.push({ name: `brief ${i} ${j} ${role}`, text: laneBrief(input({ builder, ...r }), role) })
-  out.push({ name: 'brief no target, no note', text: laneBrief(input({ options: { review: 'none', preChecks: [], finish: 'hiveMerges', okBefore: { mode: 'none' } } as never, note: '' }), 'builder') })
+  out.push({ name: 'brief no target, no note', text: laneBrief(input({ options: { review: 'none', preChecks: [], finish: 'combworkMerges', okBefore: { mode: 'none' } } as never, note: '' }), 'builder') })
   for (const review of ['none', 'agent', 'agentThenYou', 'you'] as const)
-    for (const finish of ['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept'] as const)
+    for (const finish of ['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept'] as const)
       for (const okBefore of [{ mode: 'every' }, { mode: 'labels', labels: ['ui'] }])
         out.push({ name: `rules ${review} ${finish} ${okBefore.mode}`, text: laneRules({ review, finish, preChecks: ['lint'], okBefore, target: 'main' } as never).join('\n') })
   out.push({ name: 'rules off', text: laneRules(null).join('\n') })

@@ -17,7 +17,7 @@ import { COLUMN_TEXT, columnLabel, columnName, TASK_COLUMNS } from '../../src/sh
 afterEach(() => setLanguage('en', {}))
 
 const REVIEWS: ReviewBy[] = ['none', 'agent', 'agentThenYou', 'you']
-const FINISHERS: Finisher[] = ['hiveMerges', 'agentMerges', 'committed', 'notChecked']
+const FINISHERS: Finisher[] = ['combworkMerges', 'agentMerges', 'committed', 'notChecked']
 const FOLDERS: FolderMode[] = ['slots', 'project']
 
 /**
@@ -28,8 +28,8 @@ const FOLDERS: FolderMode[] = ['slots', 'project']
 function expected(o: WorkflowOptions): StageId[] {
   const review = o.review !== 'none'
   const git = o.platform === 'git'
-  const approved = git ? (review || o.okBefore.mode !== 'never') && ['hiveMerges', 'agentMerges', 'notChecked'].includes(o.finish) : o.review === 'agentThenYou'
-  return STAGE_ORDER.filter((s) => s === 'hold' || s === 'todo' || s === 'active' || s === 'done' || (s === 'review' && review) || (s === 'approved' && approved) || (s === 'merging' && git && o.finish === 'hiveMerges'))
+  const approved = git ? (review || o.okBefore.mode !== 'never') && ['combworkMerges', 'agentMerges', 'notChecked'].includes(o.finish) : o.review === 'agentThenYou'
+  return STAGE_ORDER.filter((s) => s === 'hold' || s === 'todo' || s === 'active' || s === 'done' || (s === 'review' && review) || (s === 'approved' && approved) || (s === 'merging' && git && o.finish === 'combworkMerges'))
 }
 
 describe("the stages the options produce (§16.5.2's table)", () => {
@@ -57,7 +57,7 @@ describe("the stages the options produce (§16.5.2's table)", () => {
     const ids = (o: WorkflowOptions): string => mustCompile(o).stages.map((s) => s.id).join(' ')
     expect(ids({ ...allOff('git'), finish: 'agentMerges', folder: 'slots' })).toBe('hold todo active done')
     // G10's OK approves the work too: the card waits for it in Approved.
-    expect(ids({ ...allOff('git'), finish: 'hiveMerges', folder: 'slots', okBefore: { mode: 'every', labels: [] } })).toBe('hold todo active approved merging done')
+    expect(ids({ ...allOff('git'), finish: 'combworkMerges', folder: 'slots', okBefore: { mode: 'every', labels: [] } })).toBe('hold todo active approved merging done')
     expect(ids({ ...allOff('git'), finish: 'agentMerges', folder: 'slots', okBefore: { mode: 'labels', labels: ['ui'] } })).toBe('hold todo active approved done')
     expect(ids({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' })).toBe('hold todo active review approved done')
     expect(ids({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' })).toBe('hold todo active review done')
@@ -173,8 +173,8 @@ describe('stage names (N5, OP-30)', () => {
     expect(checkSettingValue(e, { active: 3 })).toMatchObject({ error: expect.stringMatching(/an object of stage id/) })
     expect(checkSettingValue(e, null)).toEqual({ value: null })
     const patch = settingPatch(e, { active: 'Building' })
-    const cfg = { version: 2, platform: 'git', workflow: { platform: 'git', preset: 'pair', options: { finish: 'hiveMerges' }, presetAsked: 'chosen', later: 1 } }
-    expect('project' in patch && patch.project(cfg as never)).toEqual({ workflow: { platform: 'git', preset: 'pair', options: { finish: 'hiveMerges', stageNames: { active: 'Building' } }, presetAsked: 'chosen', later: 1 } })
+    const cfg = { version: 2, platform: 'git', workflow: { platform: 'git', preset: 'pair', options: { finish: 'combworkMerges' }, presetAsked: 'chosen', later: 1 } }
+    expect('project' in patch && patch.project(cfg as never)).toEqual({ workflow: { platform: 'git', preset: 'pair', options: { finish: 'combworkMerges', stageNames: { active: 'Building' } }, presetAsked: 'chosen', later: 1 } })
   })
 })
 

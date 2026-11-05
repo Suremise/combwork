@@ -11,7 +11,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -128,7 +128,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.done.contained.next', defaultMessage: 'Merge {revision} into {target}, then report the merge again.', description: 'The next step after a refused report of a merge.' }),
     msg({ id: 'workflow.refused.done.contained.change', defaultMessage: 'This rule is set in Version Control → Who merges.', description: 'Where the rule that checks a merge is changed.' })
   ),
-  'merge.hiveMerges': r(
+  'merge.combworkMerges': r(
     msg({ id: 'workflow.refused.merge.combworkMerges.message', defaultMessage: "Combwork merges {card}: agents don't merge it or report its merge.", description: "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Combwork merges it (the merge queue). {card} is a card key like AM-12." }),
     // Its next step is the card's place in the queue (QUEUE_NEXT, by its `queue` value).
     msg({ id: 'workflow.refused.merge.combworkMerges.next', defaultMessage: 'Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.', description: "The next step after a refused merge of a card Combwork merges, when it isn't in the merge queue yet." }),
@@ -275,7 +275,7 @@ export const WHY = {
 } satisfies Record<string, Msg>
 
 /**
- * The next step of `merge.hiveMerges` by the card's place in the merge queue (its `queue` value: queueState.ts's state);
+ * The next step of `merge.combworkMerges` by the card's place in the merge queue (its `queue` value: queueState.ts's state);
  * one not listed (not queued yet, or left it) is the rule's own next.
  */
 export const QUEUE_NEXT = {
@@ -416,7 +416,7 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   // The {why} of a rule with several reasons is the whole sentence of its `cause`.
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })
   const paused = values.queue === 'paused' && typeof values.waits === 'string' && Object.hasOwn(PAUSED_NEXT, values.waits) ? PAUSED_NEXT[values.waits as keyof typeof PAUSED_NEXT] : null
-  const queued = rule === 'merge.hiveMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
+  const queued = rule === 'merge.combworkMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
   const side = rule === 'move.notFromHere' && typeof values.whose === 'string' && Object.hasOwn(SIDE_NEXT, values.whose) ? SIDE_NEXT[values.whose as keyof typeof SIDE_NEXT] : null
   const user = f.forUser ? FOR_USER[rule] : undefined
   const done = rule === 'move.notFromHere' && values.stage === 'done' && (values.move === 'start' || values.move === 'submit') ? DONE_NEXT : null

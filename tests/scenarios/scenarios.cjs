@@ -337,7 +337,7 @@ async function inReview(c, pool = false, description = 'greet.js returns "Hello,
  * can't load: its imports name no extension), Pair's target being the repository's branch, set by the scenario.
  */
 const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
-const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'hiveMerges', style: 'merge', mergeChecks: [], mergeInstall: 'onManifestChange', folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane', commands: {} }
+const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'combworkMerges', style: 'merge', mergeChecks: [], mergeInstall: 'onManifestChange', folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane', commands: {} }
 /**
  * A card of the rules' slots moved into Doing as the user moves it (HI-2225): Combwork gives it to its builder (`key`) in its
  * slot, starting it with the card's line (BuilderPlaced). A scenario whose subject is someone else (the Assistant) waits

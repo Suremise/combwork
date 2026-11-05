@@ -445,8 +445,8 @@
     "audience": "both"
   },
   "content.templates.scope": {
-    "text": "Unknown scope \"{scope}\": hive, workspace or project.",
-    "note": "An error: where a template is kept must be hive, workspace or project (keep those three words: they are the values to use).",
+    "text": "Unknown scope \"{scope}\": combwork, workspace or project.",
+    "note": "An error: where a template is kept must be combwork, workspace or project (keep those three words: they are the values to use).",
     "audience": "both"
   },
   "content.templates.started": {

@@ -249,7 +249,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await shoot('1-step-pair', { loc: page.locator('.vc-view') })
     check('Choose → Use Pair: the header reads "Workflow: Git · Pair"', await choose('Pair'), await workflowLine())
     const options = projectJson(alpha).workflow?.options ?? {}
-    check("…saved: Combwork merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'hiveMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
+    check("…saved: Combwork merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'combworkMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
     const identity = options.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
     // Pair, its Maximum agents raised to 3 as a user would (HI-2131, as HI-2091): G14's builder B2 below is alpha's third.
@@ -406,7 +406,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     fs.writeFileSync(fx.go, 'go')
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
-    check("…Integrated by Combwork at the approved revision: a merge commit of B1's line", i1?.data?.by === 'hive' && git(alpha, 'rev-parse', 'main^2') === rev1, JSON.stringify(i1))
+    check("…Integrated by Combwork at the approved revision: a merge commit of B1's line", i1?.data?.by === 'combwork' && git(alpha, 'rev-parse', 'main^2') === rev1, JSON.stringify(i1))
     await toTab('alpha')
     await section('branches')
     const later = await send(b2, dep, 'start')

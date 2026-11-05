@@ -106,7 +106,7 @@
   "content.templates.provider": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive)} off {{provider} is turned off (Settings → Providers)} other {{provider} isn't installed (Provider Setup)}}",
   "content.templates.restoring": "Undo is putting this project's agents back as they were before a template was loaded",
   "content.templates.running": "{agent} is running or starting: stop it first.",
-  "content.templates.scope": "Unknown scope \"{scope}\": hive, workspace or project.",
+  "content.templates.scope": "Unknown scope \"{scope}\": combwork, workspace or project.",
   "content.templates.started": "An agent started meanwhile: nothing was changed. Stop it first.",
   "content.templates.taken": "{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}.",
   "content.templates.takenNothing": "{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}. Nothing was changed.",

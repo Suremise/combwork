@@ -722,7 +722,7 @@ export class MergeQueue {
   /** Whether the project's options push the target after merging, as they are now (G18 isn't a rule: never a ruleset's). */
   private pushes(): boolean {
     const o = this.wf.cfg.options()
-    return o.platform === 'git' && o.finish === 'hiveMerges' && o.pushTarget === true
+    return o.platform === 'git' && o.finish === 'combworkMerges' && o.pushTarget === true
   }
 
   /** The message of Hive's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
@@ -892,7 +892,7 @@ export class MergeQueue {
 
   private async write<T>(card: CardRecord, fn: (w: Write) => T): Promise<T> {
     const s = this.wf.state(card)
-    return this.wf.write(card, this.wf.rulesetOf(card, s), 'hive', fn)
+    return this.wf.write(card, this.wf.rulesetOf(card, s), 'combwork', fn)
   }
 
   /**
@@ -1070,7 +1070,7 @@ export class MergeQueue {
       // only: decided again in IntegrationStarted's write, in the lock.
       if (folder && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(this.wf.state(card), entry.id, expected, result)) return this.askAdvance(card, entry, target, expected, result, folder)
       const method = methodOf(this.wf.rulesetOf(card, s).options.style, s.started?.target, target)
-      const integrate = (): Promise<void> => this.integrated(card, entry, revision, target, result, method, 'hive')
+      const integrate = (): Promise<void> => this.integrated(card, entry, revision, target, result, method, 'combwork')
       const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder, integrate) : await this.advanceRef(card, entry, target, expected, result)
       // Settled in the lock: a pause, the terminal state, the ask.
       if (typeof adv === 'object' && 'outcome' in adv) return adv.outcome
@@ -1401,7 +1401,7 @@ export class MergeQueue {
   private async mergeChecks(card: CardRecord, result: string, entry: QueueEntry, expected: string): Promise<ChecksOutcome> {
     const o = this.wf.rulesetOf(card).options
     // G20 runs with no G9 checks too (HI-1367), after the same install.
-    const focused = o.focusedTests && o.finish === 'hiveMerges'
+    const focused = o.focusedTests && o.finish === 'combworkMerges'
     if (!o.mergeChecks.length && !focused) return { kind: 'green' }
     const f = this.cfg.folder
     const ctx: CheckContext = { card: card.key, number: card.id, revision: result }
@@ -1881,16 +1881,16 @@ export class MergeQueue {
   }
 
   /** `Integrated` → Done; the slot released, the lane ended if done; a decision recorded after the advance began → For you. */
-  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'hive' | 'outside'): Promise<void> {
+  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'combwork' | 'outside'): Promise<void> {
     await this.write(card, (w) => {
       // One Integrated per cycle, whoever writes it (the queue, or another Hive's recovery or observation).
       const st = w.state()
       if (st.integrated) return
       const startedAt = this.wf.store.facts(card.id).filter((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === entry.id).at(-1)?.seq ?? Infinity
-      const f = w.tx.append(card.id, { kind: 'Integrated', actor: 'hive', source: 'recorded', dedupe: `cycle:${st.cycle}`, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data: { entry: entry.id, revision, target, result, method, by } }) // i18n-ignore: a fact's kind and codes, not text
+      const f = w.tx.append(card.id, { kind: 'Integrated', actor: 'combwork', source: 'recorded', dedupe: `cycle:${st.cycle}`, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data: { entry: entry.id, revision, target, result, method, by } }) // i18n-ignore: a fact's kind and codes, not text
       w.written.push(f)
       w.move('done', 'derived')
-      if (by === 'hive') this.owePush(w, entry.id, target, result)
+      if (by === 'combwork') this.owePush(w, entry.id, target, result)
       if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', workflowText(FOR_YOU.decidedAfterMerge, { card: card.key }))
     })
   }
@@ -1942,7 +1942,7 @@ export class MergeQueue {
           // How it landed, as an advance records it, by the style its entry was queued with (HR2's #1184 round 1).
           const requested = this.wf.store.facts(card.id).find((x) => x.kind === 'IntegrationRequested' && (x.data as FactData['IntegrationRequested']).entry === e.id)?.data as FactData['IntegrationRequested'] | undefined
           const method = methodOf(requested?.style ?? this.wf.rulesetOf(card, s).options.style, s.started?.target, e.target)
-          const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method, by: 'hive' } }) // i18n-ignore: a fact's kind and codes, not text
+          const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method, by: 'combwork' } }) // i18n-ignore: a fact's kind and codes, not text
           if (!f) return
           // Its finish reads what this write recorded (HI-2014): the merge, verified.
           w.written.push(f as Fact)

@@ -138,7 +138,7 @@ const check = (name, ok, extra = '') => {
     for (const a of [cl, cx]) {
       const h = await inv('session:hooks', alpha, a.id)
       const rows = h?.listing.rows ?? []
-      const hive = rows.filter((r) => r.source === 'hive')
+      const hive = rows.filter((r) => r.source === 'combwork')
       const user = rows.filter((r) => r.source === 'user')
       check(`${a.name}: Combwork's hooks listed as passed and observed`, hive.length >= 5 && hive.every((r) => r.status === 'passed' && r.observed) && hive.some((r) => r.event === 'PreToolUse'), JSON.stringify(hive.map((r) => [r.event, r.status])))
       check(`${a.name}: the user's hook listed, not observed by Combwork`, user.length === 1 && !user[0].observed && /user-(claude|codex)-stop/.test(user[0].command) && user[0].status === (a === cx ? 'trusted' : 'unverified'), JSON.stringify(user))
@@ -159,7 +159,7 @@ const check = (name, ok, extra = '') => {
     const cxNotes = async () => (await inv('session:hooks', alpha, cx.id)).listing
     await inv('advanced:set', 'codex.hooks.listMethod', 'hooks/nope')
     let listed = await cxNotes()
-    check("with another listing request, Codex's answer (an error) is said, Combwork's own still listed", listed.notes.some((n) => n.kind === 'cliUnknown' && /unknown method: hooks\/nope/.test(n.why)) && listed.rows.filter((r) => r.source === 'hive').length >= 5 && !listed.rows.some((r) => r.source === 'user'), JSON.stringify(listed.notes))
+    check("with another listing request, Codex's answer (an error) is said, Combwork's own still listed", listed.notes.some((n) => n.kind === 'cliUnknown' && /unknown method: hooks\/nope/.test(n.why)) && listed.rows.filter((r) => r.source === 'combwork').length >= 5 && !listed.rows.some((r) => r.source === 'user'), JSON.stringify(listed.notes))
     await inv('advanced:set', 'codex.hooks.listMethod', 'hooks/list')
     fs.writeFileSync(path.join(codexHome, 'fake-hooks-list-hang.txt'), 'x')
     await inv('advanced:set', 'codex.hooks.listSeconds', 2)

@@ -28,7 +28,7 @@ import { pausedFor } from './teamPause'
  * the wait.
  */
 const log = createLogger('outage')
-const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 const M = {
   waiting: msg({ id: 'session.status.waitingForConnection', defaultMessage: 'Waiting for the connection…', description: "An agent's status while Combwork waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)." }),

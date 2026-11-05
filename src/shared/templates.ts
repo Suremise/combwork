@@ -23,7 +23,7 @@ export const TEMPLATE_NAME_MAX = 60
  * Where a template is kept: Hive's own (#1436, read-only: shipped with Hive, copied to the workspace or a project to
  * change), for every project of the workspace, or for one project (its .combwork, private to it).
  */
-export type TemplateScope = 'hive' | 'workspace' | 'project'
+export type TemplateScope = 'combwork' | 'workspace' | 'project'
 /** The places templates are written to (Hive's own are never changed). */
 export const TEMPLATE_SCOPES: readonly TemplateScope[] = ['workspace', 'project']
 /** The preset a template suggests for the project it is loaded into (#1436: offered, never applied silently). */

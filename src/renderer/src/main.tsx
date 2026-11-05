@@ -24,7 +24,7 @@ if (!isConsole) startWindowHealth()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ErrorBoundary view={isConsole ? 'devConsole' : 'hive'} root>
+    <ErrorBoundary view={isConsole ? 'devConsole' : 'combwork'} root>
       {isConsole ? <ConsoleApp /> : <App />}
     </ErrorBoundary>
   </StrictMode>

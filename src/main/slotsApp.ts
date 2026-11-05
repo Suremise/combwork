@@ -157,7 +157,7 @@ export function appRunner(ws: WorkspaceService, projectPath: string, root: strin
     // A copy's run is credited to the agent whose lease holds it (HI-1710), named as the project names it now.
     const holder = r.of === 'copy' && r.holder ? r.holder : null
     const reviewer = holder ? { agentId: holder, agentName: (await ws.projectConfig(projectPath).then((c) => projectAgents(c).find((a) => a.id === holder)?.name, () => undefined)) ?? holder } : null
-    const caller = { source: 'hive' as const, workspacePath, projectPath, ...(r.of === 'copy' ? { copy: r.slot, ...(reviewer ? { reviewer } : {}) } : { slot: r.slot }) }
+    const caller = { source: 'combwork' as const, workspacePath, projectPath, ...(r.of === 'copy' ? { copy: r.slot, ...(reviewer ? { reviewer } : {}) } : { slot: r.slot }) }
     let id: string | null = null
     if (workspacePath && progressGate.on()) {
       try {
@@ -682,7 +682,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
       return { key: cardKeyOf(ws, c.number)?.key ?? `#${c.number}`, merged }
     })
     const st = sessions.liveFor(projectPath, w.agent)
-    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'hive', name: 'Combwork' }, body: inDialectOf({ projectPath, agentId: w.agent }, () => laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards)), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
+    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'combwork', name: 'Combwork' }, body: inDialectOf({ projectPath, agentId: w.agent }, () => laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards)), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
     await offerNow(projectPath, w.agent)
     return r.id
   }

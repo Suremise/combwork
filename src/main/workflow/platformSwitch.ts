@@ -52,7 +52,7 @@ async function queueInFlight(ws: WorkspaceService, projectPath: string): Promise
   if (!wf) return false
   return wf.store.cards().some((c) => {
     const s = wf.state(c)
-    return !!s.started && s.stage !== 'todo' && s.stage !== 'done' && wf.rulesetOf(c, s).options.finish === 'hiveMerges'
+    return !!s.started && s.stage !== 'todo' && s.stage !== 'done' && wf.rulesetOf(c, s).options.finish === 'combworkMerges'
   })
 }
 

@@ -32,7 +32,7 @@ export function removedAgentName(name: string | null | undefined): string {
  * `folders`: the project's slots and retired homes (ProjectInfo.folders), which name a folder by its slot or home.
  */
 export function sessionOrigin(projectPath: string, agents: readonly { id: string; name: string }[], s: Recorded, folders: readonly NamedFolder[] = []): SessionOrigin | null {
-  if (s.source !== 'hive') return null
+  if (s.source !== 'combwork') return null
   const folder = s.cwd || projectPath
   const inWorktree = folder.toLowerCase() !== projectPath.toLowerCase()
   const named = inWorktree ? folders.find((f) => samePath(f.path, folder)) : undefined

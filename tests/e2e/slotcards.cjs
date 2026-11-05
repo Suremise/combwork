@@ -94,13 +94,13 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms) => lib.until(fn, ms, 250)
     // Pair with Combwork merges into integration (checked out nowhere), cards in slots, slots brought up to date (G15).
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     // G15 on, written into project.json as the Version Control tab will offer it (#1445; this version doesn't yet).
     const pj = path.join(alpha, '.combwork', 'project.json')
     const raw = JSON.parse(fs.readFileSync(pj, 'utf8'))
     const own = (function find(o) {
       if (!o || typeof o !== 'object') return null
-      if (o.folder === 'slots' && o.finish === 'hiveMerges') return o
+      if (o.folder === 'slots' && o.finish === 'combworkMerges') return o
       for (const v of Object.values(o)) {
         const f = find(v)
         if (f) return f

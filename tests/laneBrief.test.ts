@@ -66,7 +66,7 @@ describe("a lane's brief (#1280)", () => {
 
   it("each option's line", () => {
     const o = input().options!
-    expect(laneRules({ ...o, review: 'none', preChecks: [], finish: 'hiveMerges', okBefore: { mode: 'never', labels: [] } })).toEqual(['No review is needed.', 'Combwork merges each approved card.'])
+    expect(laneRules({ ...o, review: 'none', preChecks: [], finish: 'combworkMerges', okBefore: { mode: 'never', labels: [] } })).toEqual(['No review is needed.', 'Combwork merges each approved card.'])
     expect(laneRules({ ...o, review: 'agentThenYou', preChecks: ['unit'], finish: 'committed', okBefore: { mode: 'every', labels: [] } })).toEqual(['A reviewer agent reviews each card, then the user does, before it is merged.', 'Checks that pass before review: unit. Run each as `cw-progress --check <name> --card "<key>"` before submitting.', 'A card is done once its work is committed.', "Every card waits for the user's OK before it is merged (Combwork asks them)."])
     expect(laneRules({ ...o, review: 'you', finish: 'accept', preChecks: [], okBefore: { mode: 'labels', labels: [] } })).toEqual(['The user reviews each card before it is merged.', 'An approved card is accepted where it is (no merge).'])
   })

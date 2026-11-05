@@ -942,7 +942,7 @@ export function attachmentText(a: AttachmentReply): string {
 export interface SkillRow {
   name: string
   description: string
-  level: 'hive' | 'machine' | 'plugin' | 'local'
+  level: 'combwork' | 'machine' | 'plugin' | 'local'
   provider?: string
   plugin?: string
   audience?: 'agents' | 'assistant' | 'all'
@@ -950,7 +950,7 @@ export interface SkillRow {
   problem?: string
 }
 
-const SKILL_LEVEL: Record<SkillRow['level'], AgentMsg> = { hive: R.levelHive, machine: R.levelMachine, plugin: R.levelPlugin, local: R.levelLocal }
+const SKILL_LEVEL: Record<SkillRow['level'], AgentMsg> = { combwork: R.levelHive, machine: R.levelMachine, plugin: R.levelPlugin, local: R.levelLocal }
 
 /** "work-on-card (Hive, for agents): Carry a card…", a line per skill. */
 export function skillListText(rows: SkillRow[]): string {
@@ -1141,7 +1141,7 @@ export function journalRecallText(rows: JournalRow[], query?: string): string {
   if (!rows.length) return query ? say(R.journalNoMatch, { query }) : say(R.journalNone)
   return rows
     .map((r) => {
-      const marks = [r.importance >= 3 ? say(R.markEssential) : r.importance === 2 ? say(R.markImportant) : '', r.source === 'hive' ? say(R.markByHive) : '', r.hasDetail ? say(R.markDetail) : '', r.supersededBy ? say(R.markSuperseded, { id: r.supersededBy }) : ''].filter(Boolean)
+      const marks = [r.importance >= 3 ? say(R.markEssential) : r.importance === 2 ? say(R.markImportant) : '', r.source === 'combwork' ? say(R.markByHive) : '', r.hasDetail ? say(R.markDetail) : '', r.supersededBy ? say(R.markSuperseded, { id: r.supersededBy }) : ''].filter(Boolean)
       return `#${r.id} ${r.at.slice(0, 10)} ${r.kind}${r.project ? ` · ${r.project}` : ''}: ${r.summary}${marks.length ? ` [${marks.join(', ')}]` : ''}`
     })
     .join('\n')
@@ -1160,7 +1160,7 @@ export interface JournalEntryDetail extends JournalRow {
 
 export function journalEntryText(e: JournalEntryDetail): string {
   return [
-    say(R.journalHead, { id: e.id, kind: e.kind, hasProject: yn(e.project), project: e.project ?? '', at: e.at, byHive: yn(e.source === 'hive'), importance: e.importance, changed: yn(e.updatedAt), updatedAt: e.updatedAt ?? '' }),
+    say(R.journalHead, { id: e.id, kind: e.kind, hasProject: yn(e.project), project: e.project ?? '', at: e.at, byHive: yn(e.source === 'combwork'), importance: e.importance, changed: yn(e.updatedAt), updatedAt: e.updatedAt ?? '' }),
     e.summary,
     e.why ? say(R.journalWhy, { why: e.why }) : '',
     e.detail ?? '',

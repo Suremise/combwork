@@ -200,6 +200,7 @@
   "service.nameUpgrade.boardNotFolded": "Combwork 无法把看板的文件 {file} 重命名为 combwork.db：关闭后其日志 {log} 中仍有更改。请关闭使用该工作区的其他程序，然后再次打开它。没有丢失任何内容。",
   "service.nameUpgrade.boardOrphan": "工作区的看板文件不见了，但其原位置旁的 {file} 中有可能只存在于此处的更改。Combwork 不会在其上新建一个空看板。请关闭 Combwork，把看板文件以 hive.db 的名称放回其旁边（来自 .combwork\\backups 或其他副本），然后再次打开工作区。",
   "service.nameUpgrade.failed": "Combwork 未能把 {what} 从 Hive 的名称改完为 Combwork 的名称：{error} 再次打开工作区即可完成。没有丢失任何内容。",
+  "service.nameUpgrade.profileFailed": "Combwork 无法将 {files} 从 Hive 的名称转换为 Combwork 的名称：可能有其他程序{n, plural, other {正在打开它}}。请关闭该程序，然后重新启动 Combwork。没有任何更改。",
   "service.providers.keysStopped": "{task}：由于{why}，Combwork 已停止向其输入。请在终端中完成。",
   "service.providers.noSetup": "{cli} 没有配置任务。",
   "service.providers.notInstalled": "{cli} 未安装。",

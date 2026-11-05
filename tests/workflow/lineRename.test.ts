@@ -102,7 +102,7 @@ describe("a card's line renamed by Repair (#1305)", () => {
     await reconcile(e.wf, card, {
       afterRead: async () => {
         renameInGit(e, line, to)
-        await other.write(other.store.card(card.id), null, 'hive', (w) => w.fact('LineRenamed', { from: line, to, why: 'repair' }))
+        await other.write(other.store.card(card.id), null, 'combwork', (w) => w.fact('LineRenamed', { from: line, to, why: 'repair' }))
       }
     })
     expect(gone(e, card.id)).toEqual([])

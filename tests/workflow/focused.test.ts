@@ -348,7 +348,7 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
     const [o] = await queue(e).drain('main')
     expect(o).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
     const req = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
-    for (const who of ['assistant', 'user', 'hive', B1] as const) expect(isRefusal(await e.wf.focusedSkip(card.key, who, req.request, true, 'not theirs')), who).toBe(true)
+    for (const who of ['assistant', 'user', 'combwork', B1] as const) expect(isRefusal(await e.wf.focusedSkip(card.key, who, req.request, true, 'not theirs')), who).toBe(true)
     expect(e.wf.state(card).approvals).toEqual([])
     expect(isRefusal(await e.wf.focusedSkip(card.key, R1, `${card.key}/r999`, true, 'no such request'))).toBe(true)
   })

@@ -971,7 +971,7 @@ export class CodexAdapter implements ProviderAdapter {
     if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
     const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
-    const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }
+    const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveCombworkTools'), trusted: ctx.trustedHiveTools }
     for (const [name, def] of Object.entries(ctx.mcpServers)) {
       const { table, warning } = codexMcpServer(name, def, hive)
       if (warning) log.warn(warning)
@@ -1016,7 +1016,7 @@ export class CodexAdapter implements ProviderAdapter {
     this.configByRun.delete(ctx.runId)
     const command = hookCommand(ctx.hookUrl, ctx.hookAuthFile)
     const secrets = [ctx.hookAuthFile, ctx.env.CW_HOOK_TOKEN ?? '']
-    const hive: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'hive', type: 'command', command: withoutHiveAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
+    const hive: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'combwork', type: 'command', command: withoutHiveAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
     const listing: HookListing = { basis: 'cli', rows: hive, notes: [] }
     return {
       listing,

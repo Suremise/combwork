@@ -727,7 +727,7 @@ export function HandOverDialog() {
   // Who carries on: the agent itself (self), the chosen one (other), or one not chosen yet (none).
   const who = self ? 'self' : chosen ? 'other' : 'none'
   const names = { from: from.name, other: chosen?.name ?? '', who }
-  const hiveTools = settings?.agentApi.provideHiveMcp !== false
+  const hiveTools = settings?.agentApi.provideCombworkMcp !== false
 
   const go = (): void => {
     if (!chosen) return

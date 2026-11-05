@@ -346,7 +346,7 @@
   "board.forYou.approve": "Aprobar",
   "board.forYou.asDecision": "Registrar como decisión",
   "board.forYou.asDecisionTip": "Registra tu respuesta como una de las decisiones de la tarjeta, que sus agentes deben seguir a partir de ahora, y responde con ella a la pregunta.",
-  "board.forYou.asked": "{who, select, hive {Combwork pregunta} other {{who} pregunta}} · {when}",
+  "board.forYou.asked": "{who, select, combwork {Combwork pregunta} other {{who} pregunta}} · {when}",
   "board.forYou.checklist": "Qué probar:",
   "board.forYou.chip": "Para ti",
   "board.forYou.chipTip": "{n, plural, one {Te espera: {requests}} many {# solicitudes te esperan: {requests}} other {# solicitudes te esperan: {requests}}}",

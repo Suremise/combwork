@@ -184,7 +184,7 @@ export interface QueueView {
   /** Its latest pauses, newest first, at most QUEUE_LOG_MAX (HI-1924; the window's model only). */
   pauses: QueuePauseLogged[]
   /** The project's current options have Hive merge into this target (#1356; the window's model only). */
-  hiveMerges: boolean
+  combworkMerges: boolean
   /**
    * The project's cards in flight (started, not Done) whose own ruleset has Hive merge into this target, by number
    * (#1356; the window's model only): an old ruleset's queue stays shown while they are.
@@ -196,7 +196,7 @@ export interface QueueView {
  * A queue as the Agent API gives it (GET /v1/queue, cw_queue): no folder (a stuck advance's folder neither), and whether
  * an outcome has a log, not the log.
  */
-export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'returns' | 'returnsMore' | 'paused' | 'hiveMerges' | 'inFlight' | 'pauses'> & {
+export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'returns' | 'returnsMore' | 'paused' | 'combworkMerges' | 'inFlight' | 'pauses'> & {
   paused: (Omit<QueuePauseInfo, 'stuck' | 'message'> & { stuck?: Omit<QueueStuck, 'folder'> }) | null
   recent: (Omit<QueueRecent, 'log' | 'seen' | 'revision' | 'tookMs' | 'push' | 'logPath'> & { hasLog?: true })[]
 }

@@ -303,7 +303,7 @@ export class CopilotAdapter implements ProviderAdapter {
     // do with them. The Assistant only the ones its Control settings let it use without asking (trustedHiveTools).
     // Copilot's patterns: <server> for all its tools, <server>(<tool>) for one (#468).
     // Switched off (#1281), none: Copilot asks per its own mode.
-    if (ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, COPILOT, 'preApproveHiveTools')) {
+    if (ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, COPILOT, 'preApproveCombworkTools')) {
       if (ctx.trustedHiveTools) for (const t of ctx.trustedHiveTools) args.push(`--allow-tool=${TOOLS_SERVER}(${t})`)
       else args.push(`--allow-tool=${TOOLS_SERVER}`)
     }
@@ -438,7 +438,7 @@ export class CopilotAdapter implements ProviderAdapter {
   launchHooks(ctx: LaunchContext): LaunchHooks {
     const token = ctx.env.CW_HOOK_TOKEN ?? ''
     const hive = rowsOfHooksTable(copilotHooks(ctx.hookUrl, token).hooks, { source: 'plugin', status: 'passed', observed: true }, [token])
-    const rows = hive.rows.map((r) => ({ ...r, source: 'hive' as const }))
+    const rows = hive.rows.map((r) => ({ ...r, source: 'combwork' as const }))
     return { listing: { basis: 'launch', rows, notes: [{ kind: 'othersUnread' }] }, receivers: Object.fromEntries(rows.map((r) => [r.event, r.type])) }
   }
 

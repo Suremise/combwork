@@ -69,11 +69,11 @@ describe('a section read as untrusted', () => {
     const bad = (options: Record<string, unknown>, platform: 'git' | 'none' = 'git', chosen: unknown = null) => readTemplateWorkflow({ preset: chosen, options }, platform)
     expect(bad({ review: 'everyone' })).toBeNull()
     expect(bad({ identity: { name: 'Someone', email: 's@example.com' } })).toBeNull()
-    expect(bad({ finish: 'hiveMerges' }, 'none')).toBeNull()
+    expect(bad({ finish: 'combworkMerges' }, 'none')).toBeNull()
     expect(bad({}, 'none', 'pairAgent')).toBeNull()
     expect(bad({}, 'git', 'everything')).toBeNull()
     // Combwork merges with everyone in the project folder: a contradiction (§16.5.4).
-    expect(bad({ finish: 'hiveMerges', folder: 'project' })).toBeNull()
+    expect(bad({ finish: 'combworkMerges', folder: 'project' })).toBeNull()
     expect(bad({ stageNames: { review: 'Todo' } })).toBeNull()
     expect(bad({ stageNames: { review: 'x'.repeat(40) } })).toBeNull()
     expect(readTemplateWorkflow('not a section', 'git')).toBeNull()
@@ -82,19 +82,19 @@ describe('a section read as untrusted', () => {
 
   it('G20 (HI-1367): a section with focused tests on reads without a runner, the loading project’s own; every other contradiction still drops it', () => {
     const team = templateWorkflowOf(preset('git', 'team', { quick: ['lint'], tests: ['unit'], focused: { run: 'npm run focused', pick: 'npm run pick' } }), 'team')
-    expect(team.options).toMatchObject({ focusedTests: true, finish: 'hiveMerges' })
+    expect(team.options).toMatchObject({ focusedTests: true, finish: 'combworkMerges' })
     expect(JSON.stringify(team)).not.toContain('npm run')
     expect(readTemplateWorkflow(JSON.parse(JSON.stringify(team)), 'git')).toEqual(team)
     // Only the runner's contradiction is the loading project's: Combwork merging with everyone in the project folder still drops it.
     expect(readTemplateWorkflow({ ...team, options: { ...team.options, folder: 'project' } }, 'git')).toBeNull()
-    expect(readTemplateWorkflow({ preset: null, options: { focusedTests: true, finish: 'hiveMerges', folder: 'project' } }, 'git')).toBeNull()
+    expect(readTemplateWorkflow({ preset: null, options: { focusedTests: true, finish: 'combworkMerges', folder: 'project' } }, 'git')).toBeNull()
     expect(readTemplateWorkflow({ preset: null, options: { focusedTests: 'yes' } }, 'git')).toBeNull()
     // None has no merging, so no G20: a None section naming it can't be used.
     expect(readTemplateWorkflow({ preset: null, options: { focusedTests: true } }, 'none')).toBeNull()
   })
 
   it('keeps a usable section beside one dropped, and says which was dropped', () => {
-    const r = readTemplateWorkflows({ git: good, none: { preset: null, options: { finish: 'hiveMerges' } }, mercurial: good })
+    const r = readTemplateWorkflows({ git: good, none: { preset: null, options: { finish: 'combworkMerges' } }, mercurial: good })
     expect(r.workflow).toEqual({ git: good })
     expect(r.dropped).toEqual(['none'])
   })
@@ -139,13 +139,13 @@ describe('a section read as untrusted', () => {
 describe("laid over another project's options", () => {
   const section = templateWorkflowOf(projectA, 'team')
   /** Project B: Git, its own target, commands for one of A's checks, its own identity and folders. */
-  const bOptions: WorkflowOptions = { ...allOff('git'), target: 'main', commands: { lint: 'pnpm lint' }, excluded: ['build'], pushTarget: false, commitMessage: 'hive' }
+  const bOptions: WorkflowOptions = { ...allOff('git'), target: 'main', commands: { lint: 'pnpm lint' }, excluded: ['build'], pushTarget: false, commitMessage: 'combwork' }
   const base = (identity: WorkflowBase['identity']): WorkflowBase => ({ platform: 'git', options: bOptions, own: { target: 'main', commands: { lint: 'pnpm lint' } }, identity })
 
   it("sets the carried rules; B's target, commands, folders and merge message stay B's; a check B has no command for is flagged", () => {
     const o = overlayTemplateWorkflow(section, base({ name: 'B Person', email: 'b@example.com' }))
     expect(o.preset).toBe('team')
-    expect(o.options).toMatchObject({ review: 'agent', okBefore: { mode: 'labels', labels: ['ui', 'release'] }, preChecks: ['lint', 'unit'], target: 'main', commands: { lint: 'pnpm lint' }, excluded: ['build'], pushTarget: false, commitMessage: 'hive' })
+    expect(o.options).toMatchObject({ review: 'agent', okBefore: { mode: 'labels', labels: ['ui', 'release'] }, preChecks: ['lint', 'unit'], target: 'main', commands: { lint: 'pnpm lint' }, excluded: ['build'], pushTarget: false, commitMessage: 'combwork' })
     expect(o.own).toMatchObject({ target: 'main', commands: { lint: 'pnpm lint' }, review: 'agent' })
     expect(o.missingCommands).toEqual(['unit'])
     // The identity on is B's own, never A's.

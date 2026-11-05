@@ -84,7 +84,7 @@ describe('a build fact', () => {
   // #1534 round 1, finding 4: the window shows a build's line in the user's language (stored and recalled in English).
   it("shows a build's line and detail in every language, and any other entry as written", () => {
     const f = buildFactOf({ ...fact, by: 'release', kind: 'rc' }) as Exclude<ReturnType<typeof buildFactOf>, { error: string }>
-    const e = { source: 'hive' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
+    const e = { source: 'combwork' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
     // Stored in English as agents read it; the window says it in the user's language (here English: the same line).
     expect(journalSummary(e)).toBe(e.summary)
     // An old entry's "Built Hive …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
@@ -236,7 +236,7 @@ describe('Combwork records a build in the journal', () => {
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, name), typeof body === 'string' ? body : JSON.stringify(body))
   }
-  const facts = (): { summary: string; tags?: string[] }[] => (existsSync(journal.journalFile(w.assistantHome)) ? journal.recall(w.assistantHome, { limit: 50 }).filter((r) => r.source === 'hive') : [])
+  const facts = (): { summary: string; tags?: string[] }[] => (existsSync(journal.journalFile(w.assistantHome)) ? journal.recall(w.assistantHome, { limit: 50 }).filter((r) => r.source === 'combwork') : [])
   beforeAll(async () => {
     advanced.load(join(base, 'profile'))
     mkdirSync(join(wsPath, 'alpha', '.combwork'), { recursive: true })
@@ -275,10 +275,10 @@ describe('Combwork records a build in the journal', () => {
   it("keeps a long detail's entry once too (kept compressed)", () => {
     const long = { kind: 'event', summary: 'A fact with a long detail', detail: 'x'.repeat(5000), links: [{ type: 'commit', ref: 'abcdef1' }] }
     const settings = service.journalSettingsOf(w)
-    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'hive', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
-    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'hive', { type: 'commit', ref: 'abcdef1' })).toBeNull()
+    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'combwork', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'combwork', { type: 'commit', ref: 'abcdef1' })).toBeNull()
     // Another detail, or by the Assistant, is another entry.
-    expect(journal.writeEntryOnce(w.assistantHome, settings, { ...long, detail: 'y'.repeat(5000) }, 'hive', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(journal.writeEntryOnce(w.assistantHome, settings, { ...long, detail: 'y'.repeat(5000) }, 'combwork', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
     expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'assistant', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
   })
 

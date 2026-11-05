@@ -28,7 +28,7 @@ const M = {
   tipMore: msg({ id: 'board.forYou.tipMore', defaultMessage: '{n, plural, one {and # more request} other {and # more requests}}', description: "In the tooltip of a card's For you chip, after the first requests shown: how many more wait for the user ({n})." }),
   tipOpen: msg({ id: 'board.forYou.tipOpen', defaultMessage: 'Click to open the card and answer under For you.', description: "The last line of the tooltip of a card's For you chip: a click opens the card, whose For you section shows each request in full with its answers. Glossary: For you." }),
   heading: msg({ id: 'board.forYou.heading', defaultMessage: 'For you', description: "A heading in the card dialog, above what on the card waits for the user (approvals, decisions, questions). Glossary: For you." }),
-  asked: msg({ id: 'board.forYou.asked', defaultMessage: '{who, select, hive {Combwork asks} other {{who} asks}} · {when}', description: "Under a request for the user in the card dialog: who asks (Combwork, or an agent: its name {who}) and when ({when}: \"5 min ago\"). Keep the select keys as they are." }),
+  asked: msg({ id: 'board.forYou.asked', defaultMessage: '{who, select, combwork {Combwork asks} other {{who} asks}} · {when}', description: "Under a request for the user in the card dialog: who asks (Combwork, or an agent: its name {who}) and when ({when}: \"5 min ago\"). Keep the select keys as they are." }),
   approve: msg({ id: 'board.forYou.approve', defaultMessage: 'Approve', description: "A button under a request for the user's approval (For you): approves it. Glossary: approve." }),
   decline: msg({ id: 'board.forYou.decline', defaultMessage: 'Decline…', description: "A button under a request for the user's approval (For you): declines it, asking why first (…). For the user's review, the card goes back to its builder as a round." }),
   declineTitle: msg({ id: 'board.forYou.declineTitle', defaultMessage: 'Decline: {request}', description: 'Title of the question when the user declines a request (For you); {request} is what it asks.' }),
@@ -207,7 +207,7 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
   const reasonOf = (x: { kind: AskActionKind; reason?: string }): string => reasons[x.kind] ?? x.reason ?? ''
   const action = useBusy()
   const text = requestText(item)
-  const who = item.asker ? (agents?.find((a) => a.id === item.asker)?.name ?? item.asker) : 'hive'
+  const who = item.asker ? (agents?.find((a) => a.id === item.asker)?.name ?? item.asker) : 'combwork'
   const answer = async (name: string, a: ForYouAnswer): Promise<void> => {
     let failed: string | null = null
     setAnswering(true)
@@ -316,9 +316,9 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
             <label className="flex">
               {tr(OPTION_TEXT.commitMessage!.title)}
               <select className="select" data-option="commitMessage" value={message} onChange={(e) => setMessage(e.target.value as CommitMessage)}>
-                {(['hive', 'branch'] as const).map((v) => (
+                {(['combwork', 'branch'] as const).map((v) => (
                   <option key={v} value={v}>
-                    {tr(M.todayValue, { value: tr(VALUE_TEXT.commitMessage[v]), today: v === 'hive' ? 'yes' : 'no' })}
+                    {tr(M.todayValue, { value: tr(VALUE_TEXT.commitMessage[v]), today: v === 'combwork' ? 'yes' : 'no' })}
                   </option>
                 ))}
               </select>

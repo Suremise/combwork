@@ -1388,7 +1388,7 @@
     "description": "Tooltip of the Record as Decision button under a question for the user (For you): what it does. Glossary: decision."
   },
   "board.forYou.asked": {
-    "defaultMessage": "{who, select, hive {Combwork asks} other {{who} asks}} · {when}",
+    "defaultMessage": "{who, select, combwork {Combwork asks} other {{who} asks}} · {when}",
     "description": "Under a request for the user in the card dialog: who asks (Combwork, or an agent: its name {who}) and when ({when}: \"5 min ago\"). Keep the select keys as they are."
   },
   "board.forYou.checklist": {

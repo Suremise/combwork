@@ -59,7 +59,7 @@ describe('messages left for agents (#530, #647)', async () => {
   deliveries.setSenderCheckForTests((from) => (from.kind === 'assistant' ? why : null))
   const asst: DeliverySender = { kind: 'assistant', name: 'the Assistant', workspace: 'C:/ws', launch: 'a1' }
   const leave = (text: string) => messages.leaveMessage(alpha, 'b1', 'HR2', asst, text)
-  const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
+  const hive: DeliverySender = { kind: 'combwork', name: 'Combwork' }
   /** A wake for b1 (#649: a card event, as a watch or a loop wake hands it over), offered now: whether a line was typed. */
   const wake = async (body: string): Promise<boolean> => {
     await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body })

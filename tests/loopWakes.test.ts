@@ -709,7 +709,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     const wf = (await workflowFor(w, alpha))!
     const rec = wf.store.card(c)
     const submission = wf.store.facts(c).findLast((f) => f.kind === 'LoopStep')!.seq
-    await wf.write(rec, null, 'hive', (x) => void x.fact('ReviewerAssigned', { reviewer: 'r1', submission, design: true }))
+    await wf.write(rec, null, 'combwork', (x) => void x.fact('ReviewerAssigned', { reviewer: 'r1', submission, design: true }))
     expect((await loopReviewerOf(w, await inWorkspace(w, () => tasks.getTask(c, w))))?.id).toBe('r1')
     return { c, id }
   }
@@ -895,7 +895,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     const queueReturnWake = async (w: Awaited<ReturnType<typeof open>>['w'], alpha: string, c: number, text: string) => {
       const card = await inWorkspace(w, () => tasks.getTask(c, w))
       const since = card.history.at(-1)!
-      await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1 (alpha)', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, card: c, body: `[CW] #${c}: ${text}`, source: 'loop', ref: `#${c}`, replace: true, meta: { n: c, kind: 'note', agentName: 'B1 (alpha)', sinceAt: since.at, sinceId: since.id ?? '', text } })
+      await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1 (alpha)', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, card: c, body: `[CW] #${c}: ${text}`, source: 'loop', ref: `#${c}`, replace: true, meta: { n: c, kind: 'note', agentName: 'B1 (alpha)', sinceAt: since.at, sinceId: since.id ?? '', text } })
     }
 
     it("HI-1694's sequence: the builder's watch told it the pass; the return comes, and a watch for Done begins before it reads it: the return is still given, and the builder told of the conflict", async () => {
@@ -1219,7 +1219,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
       // The pool's own assignment, as reviewerPool.ts writes it (its pass isn't running here).
       const wf = (await workflowFor(w, alpha))!
       const submission = wf.store.facts(c).findLast((f) => f.kind === 'Submitted')!.seq
-      await wf.write(wf.store.card(c), null, 'hive', (x) => void x.fact('ReviewerAssigned', { reviewer: 'r1', submission }))
+      await wf.write(wf.store.card(c), null, 'combwork', (x) => void x.fact('ReviewerAssigned', { reviewer: 'r1', submission }))
     }
     await intent(r1, { kind: 'startReview' })
     await drained()

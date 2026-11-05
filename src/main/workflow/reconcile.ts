@@ -154,7 +154,7 @@ async function followRename(wf: Workflow, card: CardRecord, s: CardState): Promi
   if (old !== null) return 'unchanged'
   const head = await G.lineHead(wf.cfg.project, to)
   if (head === null || isUnknown(head)) return 'unknown'
-  await wf.write(card, null, 'hive', (w) => {
+  await wf.write(card, null, 'combwork', (w) => {
     if (!sameCycle(w, s) || w.state().started?.line !== line) return
     w.fact('LineRenamed', { from: line, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
   })
@@ -183,7 +183,7 @@ async function followFolder(wf: Workflow, card: CardRecord, s: CardState): Promi
     // follows both (followRename moves its line after). A rename pending to another name: undecided too.
     const renamed = on && line ? await wf.cfg.pendingRename?.(line) : null
     if (on && (on.toLowerCase() === line!.toLowerCase() || on.toLowerCase() === renamed?.toLowerCase())) {
-      await wf.write(card, null, 'hive', (w) => {
+      await wf.write(card, null, 'combwork', (w) => {
         if (!sameCycle(w, s) || w.state().started?.folder !== folder) return
         w.fact('FolderMoved', { from: folder, to: now.path, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
       })
@@ -334,7 +334,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       // Back at exactly the approved revision: the reviewer passed that commit. The return is recorded once per head
       // observation (it clears the stale pass), before any effects of the stale pass not applied yet.
       const from = s.stale.current ?? approved.revision
-      await wf.write(card, r, 'hive', (w) => {
+      await wf.write(card, r, 'combwork', (w) => {
         if (!newest(w) || !w.state().stale) return
         // What follows from it, with the rules enforced (P3 records only).
         if (observed(w, 'CarriedOver', `back:${s.cycle}:${s.lastHeadFact}`, { from, to: approved.revision, toBase: approved.base, how: 'sameRevision' }) && wf.cfg.reconcileActs) holdsAgain(wf, w)
@@ -344,7 +344,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // At the approved revision with its pass holding, a card the queue let go of for a stale pass is queued again:
     // idempotent, so a return recorded while the rules were off is acted on once they're on, from the head as it is then.
     if (wf.ownLine(s) && s.head === approved.revision && !s.stale && wf.cfg.reconcileActs && requeueable(s, r, card.stage, card.labels)) {
-      await wf.write(card, r, 'hive', (w) => newest(w) && ensureQueued(wf, w))
+      await wf.write(card, r, 'combwork', (w) => newest(w) && ensureQueued(wf, w))
       return
     }
     // A stale pass whose effects weren't applied (recorded while the rules weren't enforced): applied now, once.
@@ -358,7 +358,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       const b2 = !isUnknown(th) && th ? await G.mergeBase(project, th, s.head) : null
       const same = o.sameness === 'change' && !!b2 && !isUnknown(b2) && (await G.sameChange(project, approved, { base: b2, revision: s.head }))
       const head = s.head
-      await wf.write(card, r, 'hive', (w) => {
+      await wf.write(card, r, 'combwork', (w) => {
         // Only while the head observation it follows is still the newest (a newer one is read by the next run).
         if (!sameCycle(w, s) || w.state().lastHeadFact !== s.lastHeadFact) return
         // Observed once per head observation (§16.17): two Hives seeing the same new revision write one fact, and a line
@@ -519,7 +519,7 @@ function staleEffects(w: Write, back: StageId | null, why: string): void {
  */
 function requeueable(s: CardState, r: Ruleset | null, stage: StageId, labels: string[]): boolean {
   const last = s.entries.at(-1)
-  return !!r && r.options.finish === 'hiveMerges' && stage === 'approved' && last?.state === 'cancelled' && last.cancelled === 'stale' && !s.step && !notApproved(s, r, labels)
+  return !!r && r.options.finish === 'combworkMerges' && stage === 'approved' && last?.state === 'cancelled' && last.cancelled === 'stale' && !s.step && !notApproved(s, r, labels)
 }
 
 /** Queues a requeueable card again, in the write's transaction, and tells its builder it needn't submit again. */

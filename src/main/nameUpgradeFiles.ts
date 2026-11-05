@@ -1,6 +1,7 @@
 import { lstat, mkdir, readdir, readFile, rm, rmdir } from 'original-fs/promises'
 import { join } from 'path'
 import { writeTextAtomic } from './fsutil'
+import { ifAbsent } from './fsPresence'
 
 /**
  * The names upgrade's rewrites of files Combwork keeps in a workspace (HI-2587, nameUpgrade.ts): text Hive wrote under
@@ -93,7 +94,7 @@ async function rewrite(file: string, f: (t: string) => string | null): Promise<v
  * error thrown, so a folder that can't be read fails the step (and the upgrade isn't recorded done) rather than reading
  * as empty.
  */
-export const ifAbsent = <T>(value: T) => (e: NodeJS.ErrnoException): T | Promise<never> => (e?.code === 'ENOENT' ? value : Promise.reject(e))
+export { ifAbsent }
 
 const mcpFiles = async (dir: string): Promise<string[]> => (await readdir(join(dir, 'mcp')).catch(ifAbsent([] as string[]))).filter((f) => f.endsWith('.json')).map((f) => join(dir, 'mcp', f))
 

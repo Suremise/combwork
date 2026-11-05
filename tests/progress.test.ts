@@ -1147,12 +1147,12 @@ describe('progress history (#352): Recent kept across restarts', () => {
 })
 
 describe("Combwork's set-up runs in review copies (HI-1710)", () => {
-  const hive = (extra: Partial<Extract<ProgressCaller, { source: 'hive' }>> = {}): ProgressCaller => ({ source: 'hive', workspacePath: WS, projectPath: alfie.projectPath, ...extra })
+  const hive = (extra: Partial<Extract<ProgressCaller, { source: 'combwork' }>> = {}): ProgressCaller => ({ source: 'combwork', workspacePath: WS, projectPath: alfie.projectPath, ...extra })
 
   it("are credited to the agent whose lease held the copy, in that copy, else to one 'Combwork (review copies)'", () => {
     const s = store()
     const held = s.start(hive({ copy: 'copy-1', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })
-    expect(held).toMatchObject({ source: 'hive', agentId: 'r-6', agentName: 'HR6', copy: 'copy-1' })
+    expect(held).toMatchObject({ source: 'combwork', agentId: 'r-6', agentName: 'HR6', copy: 'copy-1' })
     expect(held.defaultName).toBeUndefined()
     expect(runAgentName(held, tr)).toBe('HR6')
     expect(runDetailsText(held, 'alpha', now)).toContain('copy-1')
@@ -1168,7 +1168,7 @@ describe("Combwork's set-up runs in review copies (HI-1710)", () => {
   })
 
   it('keep their reviewer across a save; older "Hive (copy copy-1)" runs fold into "Combwork (review copies)"', () => {
-    const ended = { state: 'passed', startedAt: 1, finishedAt: 2, source: 'hive', projectPath: alfie.projectPath }
+    const ended = { state: 'passed', startedAt: 1, finishedAt: 2, source: 'combwork', projectPath: alfie.projectPath }
     const records = [
       { ...ended, id: 'c1', title: 'npm ci', copy: 'copy-1', agentId: 'r-6', agentName: 'HR6' },
       { ...ended, id: 'c2', title: 'npm ci', copy: 'copy-1', agentName: 'Hive (copy copy-1)', defaultName: 'copy' },

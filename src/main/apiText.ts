@@ -191,8 +191,8 @@ export const API = {
     notReadable: agentMsg({ id: 'api.console.notReadable', text: 'Not a developer console source you can read' }),
     off: agentMsg({ id: 'api.console.off', text: 'Reading the developer console is off: the user can turn it on in Settings → Agent API → Let agents read the developer console' }),
     projectWithAgent: agentMsg({ id: 'api.console.projectWithAgent', text: 'project is required with agent' }),
-    saySource: agentMsg({ id: 'api.console.saySource', text: 'Say which source: agent (and project), source=assistant or source=hive' }),
-    sourceArg: agentMsg({ id: 'api.console.sourceArg', text: 'source is hive or assistant; name an agent with agent (and project)' }),
+    saySource: agentMsg({ id: 'api.console.saySource', text: 'Say which source: agent (and project), source=assistant or source=combwork' }),
+    sourceArg: agentMsg({ id: 'api.console.sourceArg', text: 'source is combwork or assistant; name an agent with agent (and project)' }),
     unknownKinds: agentMsg({ id: 'api.console.unknownKinds', text: 'Unknown event kinds: {kinds} (kinds are {known})' })
   },
   delivery: {

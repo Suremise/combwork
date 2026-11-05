@@ -108,7 +108,7 @@ const lines = (file) => {
     const first = await inv('lanes:start', alpha, { builder: b1.id, reviewer: null, pool: true, cards: [c1] })
     check('the lane is lent slot-a', first.slot === 'slot-a', JSON.stringify(first))
     const warm = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.defaultName === 'slot' && r.slot === 'slot-a'), HUNG_MS)
-    check("slot-a's setup is a run of Combwork's for slot-a", !!warm && warm.source === 'hive', JSON.stringify(warm))
+    check("slot-a's setup is a run of Combwork's for slot-a", !!warm && warm.source === 'combwork', JSON.stringify(warm))
     await page.locator('.progress-rail').click().catch(() => undefined)
     const panel = page.locator('.progress-panel')
     await until(async () => (await panel.count()) === 1, HUNG_MS)
@@ -164,7 +164,7 @@ const lines = (file) => {
     check("the check ran in copy-1, linked to the card and its revision", !!checkRun && checkRun.revision === rev && same(lines(checkLog).at(-1), copy), JSON.stringify({ checkRun, ran: lines(checkLog) }))
     await tab('runs').click()
     // HI-1710: copy-1's set-up run is R1's (its lease held the copy), never "Combwork (copy copy-1)".
-    const copyWarm = (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.copy === 'copy-1')
+    const copyWarm = (await inv('progress:snapshot')).runs.find((r) => r.source === 'combwork' && r.copy === 'copy-1')
     check("copy-1's set-up run is credited to R1, in copy-1", !!copyWarm && copyWarm.agentId === r1.id && copyWarm.agentName === 'R1' && !copyWarm.defaultName, JSON.stringify(copyWarm))
     check('the Runs tab’s Agent filter has "Combwork (slot slot-a)" and R1 once, and no "Combwork (copy …)"', !!(await until(async () => {
         const choices = await agentChoices()

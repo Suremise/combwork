@@ -90,6 +90,73 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
     version: 2,
     name: 'summary text', // agent-protocol: a migration's name, recorded in schema_version
     up: (db) => db.exec('ALTER TABLE entries ADD COLUMN summary_text TEXT')
+  },
+  {
+    // Names (HI-2598): Combwork's own entries were source 'hive', tagged 'hive'; now 'combwork'. A CHECK can't be altered,
+    // so `entries` is made again (SQLite's way, lang_altertable.html#otheralter): every row and its id kept, so the
+    // contentless FTS index (by rowid, not rebuilt) stays right. The step runs in a transaction with foreign keys on,
+    // which can't be turned off there, and dropping `entries` would cascade into `links` and `tags`: they are kept aside
+    // first, dropped, and made again after it. Dropping a table fires no trigger, and its triggers go with it.
+    version: 3,
+    name: 'names: combwork', // agent-protocol: a migration's name, recorded in schema_version
+    up: (db) =>
+      db.exec(`
+        CREATE TEMP TABLE links_kept AS SELECT entry_id, type, ref FROM links;
+        CREATE TEMP TABLE tags_kept AS SELECT entry_id, tag FROM tags;
+        DROP TABLE links;
+        DROP TABLE tags;
+        CREATE TABLE entries_new (
+          id            INTEGER PRIMARY KEY,
+          at            TEXT    NOT NULL,
+          kind          TEXT    NOT NULL CHECK (kind IN (${JOURNAL_KINDS.map((k) => `'${k}'`).join(', ')})),
+          project       TEXT,
+          summary       TEXT    NOT NULL,
+          detail        TEXT,
+          detail_z      BLOB,
+          why           TEXT,
+          source        TEXT    NOT NULL CHECK (source IN ('combwork', 'assistant')),
+          importance    INTEGER NOT NULL DEFAULT 1 CHECK (importance BETWEEN 0 AND 3),
+          superseded_by INTEGER REFERENCES entries_new(id) ON DELETE SET NULL,
+          digest_of     TEXT,
+          updated_at    TEXT,
+          summary_text  TEXT
+        ) STRICT;
+        INSERT INTO entries_new (id, at, kind, project, summary, detail, detail_z, why, source, importance, superseded_by, digest_of, updated_at, summary_text)
+          SELECT id, at, kind, project, summary, detail, detail_z, why, CASE source WHEN 'hive' THEN 'combwork' ELSE source END, importance, superseded_by, digest_of, updated_at, summary_text FROM entries;
+        DROP TABLE entries;
+        ALTER TABLE entries_new RENAME TO entries;
+        CREATE INDEX entries_at ON entries(at);
+        CREATE INDEX entries_kind ON entries(kind, at);
+        CREATE INDEX entries_project ON entries(project, at);
+        CREATE INDEX entries_everyday ON entries(at) WHERE importance < ${KEPT_IMPORTANCE} AND kind <> 'digest';
+        CREATE TABLE links (
+          entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+          type     TEXT    NOT NULL CHECK (type IN (${LINK_TYPES.map((k) => `'${k}'`).join(', ')})),
+          ref      TEXT    NOT NULL,
+          PRIMARY KEY (entry_id, type, ref)
+        ) STRICT, WITHOUT ROWID;
+        CREATE INDEX links_ref ON links(type, ref);
+        CREATE TABLE tags (
+          entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+          tag      TEXT    NOT NULL,
+          PRIMARY KEY (entry_id, tag)
+        ) STRICT, WITHOUT ROWID;
+        CREATE INDEX tags_tag ON tags(tag);
+        INSERT INTO links (entry_id, type, ref) SELECT entry_id, type, ref FROM links_kept;
+        INSERT OR IGNORE INTO tags (entry_id, tag) SELECT entry_id, CASE tag WHEN 'hive' THEN 'combwork' ELSE tag END FROM tags_kept;
+        DROP TABLE links_kept;
+        DROP TABLE tags_kept;
+        CREATE TRIGGER entries_ai AFTER INSERT ON entries BEGIN
+          INSERT INTO entries_fts(rowid, summary, detail, why) VALUES (new.id, new.summary, journal_text(new.detail, new.detail_z), coalesce(new.why, ''));
+        END;
+        CREATE TRIGGER entries_ad AFTER DELETE ON entries BEGIN
+          DELETE FROM entries_fts WHERE rowid = old.id;
+        END;
+        CREATE TRIGGER entries_au AFTER UPDATE OF summary, detail, detail_z, why ON entries BEGIN
+          DELETE FROM entries_fts WHERE rowid = old.id;
+          INSERT INTO entries_fts(rowid, summary, detail, why) VALUES (new.id, new.summary, journal_text(new.detail, new.detail_z), coalesce(new.why, ''));
+        END;
+      `)
   }
 ]
 
@@ -744,7 +811,7 @@ function filterSql(f: JournalFilter): { where: string[]; args: (string | number)
   }
   if (f.project === '') add('e.project IS NULL')
   else if (f.project) add('e.project = ? COLLATE NOCASE', f.project)
-  if (f.source === 'hive' || f.source === 'assistant') add('e.source = ?', f.source)
+  if (f.source === 'combwork' || f.source === 'assistant') add('e.source = ?', f.source)
   const since = isoOrFail('since', f.since)
   const until = isoOrFail('until', f.until)
   if (since) add('e.at >= ?', since)

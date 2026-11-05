@@ -17,7 +17,7 @@ vi.mock('../src/main/events', async (orig) => ({ ...(await orig<object>()), toas
 const base = tempDir('nameupgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { MOVE_LOCK_FILE, finishMove, moveFolders, recordNewWorkspace } = await import('../src/main/combworkMove')
-const { NAMES_DONE_FILE, projectNamesDone } = await import('../src/main/nameUpgrade')
+const { NAMES_DONE_FILE, NAMES_VERSION, projectNamesDone } = await import('../src/main/nameUpgrade')
 const { boardMoveTestHooks } = await import('../src/main/boardFileMove')
 const { contentHash } = await import('../src/main/fsutil')
 const { stubTestHooks } = await import('../src/main/nameUpgradeFiles')
@@ -123,7 +123,7 @@ function expectUpgraded(w: { ws: string; alpha: string; slot: string }): void {
   expect(exclude.split('\n').filter((l) => l.startsWith('/.agents/'))).toEqual(['/.agents/skills/cw-*/', '/.agents/skills/.cw-*/'])
   const head = git(w.alpha, 'rev-parse', 'HEAD').trim()
   expect(git(w.alpha, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/hive', 'refs/cw').trim().split('\n').sort()).toEqual([`refs/cw/cards/AL-1/1 ${head}`, `refs/cw/queue/AL-1-e1 ${head}`])
-  expect(JSON.parse(readFileSync(join(dir, NAMES_DONE_FILE), 'utf8')).version).toBe(2)
+  expect(JSON.parse(readFileSync(join(dir, NAMES_DONE_FILE), 'utf8')).version).toBe(NAMES_VERSION)
 }
 
 /** An open's move: the folders, then (a 1.0 workspace) its late phases, as the workspace's open runs them. */
@@ -216,7 +216,7 @@ describe('the names upgrade at the open', () => {
     // A read-only definition can't be replaced: the files step fails.
     const def = join(w.ws, '.combwork', 'mcp', 'srv.json')
     chmodSync(def, 0o444)
-    await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the workspace's .gitignore, README and MCP definitions/)
+    await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the workspace's settings, templates, .gitignore, README and MCP definitions/)
     expect(existsSync(join(w.ws, '.combwork', NAMES_DONE_FILE))).toBe(false)
     chmodSync(def, 0o644)
     await open(w.ws)
@@ -230,7 +230,7 @@ describe('the names upgrade at the open', () => {
     const { renameSync, rmSync } = await import('fs')
     renameSync(skills, `${skills}.kept`)
     writeFileSync(skills, 'not a folder')
-    await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the projects' skill copies, git exclude lines and refs/)
+    await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the projects' settings, templates, skill copies, git exclude lines and refs/)
     expect(existsSync(join(w.ws, '.combwork', NAMES_DONE_FILE))).toBe(false)
     rmSync(skills)
     renameSync(`${skills}.kept`, skills)
@@ -247,7 +247,7 @@ describe('the names upgrade at the open', () => {
       return lstat(p)
     }
     try {
-      await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the workspace's \.gitignore, README and MCP definitions/)
+      await expect(open(w.ws)).rejects.toThrow(/couldn't finish renaming the workspace's settings, templates, \.gitignore, README and MCP definitions/)
     } finally {
       stubTestHooks.stat = undefined
     }

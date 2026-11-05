@@ -11,7 +11,7 @@ import { englishText } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import type { WorkspaceService } from './workspace'
-import { currentToolName, CW_TOOLS } from '../shared/assistantTools'
+import { CW_TOOLS } from '../shared/assistantTools'
 import { PROVIDERS } from '../shared/providers'
 import {
   addTiming,
@@ -237,9 +237,7 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     const t = readTimed(s)
     const sizes = readCounts(s, ['chars', 'bytes'] as const)
     if (!t || !sizes || (s.role !== 'agent' && s.role !== 'assistant') || (s.mode !== 'compact' && s.mode !== 'detail') || (s.outcome !== 'ok' && s.outcome !== 'error')) return
-    // A series stored before HI-2463 under hive_<tool> is read as cw_<tool> (currentToolName): merged with the new one,
-    // added once (each stored series is read once), rather than lost into "(other)".
-    const tool = inSet(TOOLS, typeof s.tool === 'string' ? currentToolName(s.tool) : s.tool)
+    const tool = inSet(TOOLS, s.tool)
     const key = `${tool} ${s.role} ${s.mode} ${s.outcome}`
     const had = part.mcp[key] ?? (room() ? (part.mcp[key] = { tool, role: s.role, mode: s.mode, outcome: s.outcome, ...emptyTimed(), chars: 0, bytes: 0 }) : null)
     if (!had) return

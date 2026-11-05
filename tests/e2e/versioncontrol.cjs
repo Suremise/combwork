@@ -176,7 +176,7 @@ function board(sql, ...args) {
     // --- The queues, from models main gives in place of its own (#1416's round 1): alpha's queue paused; plain's (None)
     // as each step sets it. A read of plain's can be held, to see what shows meanwhile.
     await app.evaluate(({ ipcMain }, d) => {
-      const view = (p, over = {}) => ({ project: p === d.alpha ? 'alpha' : 'plain', projectPath: p, target: 'main', paused: null, runBy: null, runHere: false, testing: null, queued: [], recent: [], returns: [], returnsMore: 0, pauses: [], hiveMerges: false, inFlight: [], ...over })
+      const view = (p, over = {}) => ({ project: p === d.alpha ? 'alpha' : 'plain', projectPath: p, target: 'main', paused: null, runBy: null, runHere: false, testing: null, queued: [], recent: [], returns: [], returnsMore: 0, pauses: [], combworkMerges: false, inFlight: [], ...over })
       globalThis.__vc = { hold: false, held: [], asked: 0, plain: [] }
       ipcMain.removeHandler('queue:list')
       ipcMain.handle('queue:list', (_e, p) => {

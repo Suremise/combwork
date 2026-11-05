@@ -151,7 +151,7 @@ describe('the settings catalog', () => {
 
   it("marks what the Assistant can't change: permissions, what runs, the Agent API, its own settings", () => {
     const ro = (id: string) => !!entry(id).sensitive
-    for (const id of ['agentApi.enabled', 'agentApi.port', 'agentApi.allowSessionInput', 'agentApi.provideHiveMcp', 'assistant.control', 'assistant.typingPause', 'claude-code.enableDangerousMode', 'claude-code.executablePath', 'codex.executablePath', 'project.worktreeSetup', 'claude-code.allowBackgroundSessions']) expect(ro(id), id).toBe(true)
+    for (const id of ['agentApi.enabled', 'agentApi.port', 'agentApi.allowSessionInput', 'agentApi.provideCombworkMcp', 'assistant.control', 'assistant.typingPause', 'claude-code.enableDangerousMode', 'claude-code.executablePath', 'codex.executablePath', 'project.worktreeSetup', 'claude-code.allowBackgroundSessions']) expect(ro(id), id).toBe(true)
     for (const id of ['general.progressPanel', 'sessions.transcriptWarnMB', 'workflow.git.fileLocks', 'copilot.checkUpdatesOnLaunch', 'project.compactSuggestTokens', 'assistant.panelSide', 'assistant.compactSuggestTokens']) expect(ro(id), id).toBe(false)
     expect(settingReadOnly(entry('assistant.control'))).toMatch(/only the user can change it, in Settings → Assistant → Control/)
   })
@@ -164,10 +164,10 @@ describe('the settings catalog', () => {
       expect(entry(id).docs, id).toBe(id.endsWith('commands') ? 'commands' : 'close-commands')
       expect(settingDefault(entry(id)), id).toEqual([])
     }
-    const settings = { ...DEFAULT_SETTINGS, commands: { list: [{ id: 'c-0000000a', name: 'Backup', command: 'backup.cmd' }], onQuit: { run: [{ scope: 'hive' as const, id: 'c-0000000a' }], onUpdate: true } } }
+    const settings = { ...DEFAULT_SETTINGS, commands: { list: [{ id: 'c-0000000a', name: 'Backup', command: 'backup.cmd' }], onQuit: { run: [{ scope: 'combwork' as const, id: 'c-0000000a' }], onUpdate: true } } }
     expect(settingValue(entry('general.commands'), settings)).toEqual(['Backup'])
     expect(settingValue(entry('general.onQuit'), settings)).toEqual(['Backup'])
-    const ws = { commands: { list: [{ id: 'c-0000000b', name: 'Serve', command: 'serve' }], onOpen: { run: [{ scope: 'workspace' as const, id: 'c-0000000b' }, { scope: 'hive' as const, id: 'c-0000000a' }, { scope: 'hive' as const, id: 'c-0000000c' }] }, onClose: { run: [] } } }
+    const ws = { commands: { list: [{ id: 'c-0000000b', name: 'Serve', command: 'serve' }], onOpen: { run: [{ scope: 'workspace' as const, id: 'c-0000000b' }, { scope: 'combwork' as const, id: 'c-0000000a' }, { scope: 'combwork' as const, id: 'c-0000000c' }] }, onClose: { run: [] } } }
     expect(settingValue(entry('workspace.onOpen'), settings, null, ws)).toEqual(['Serve', 'Backup', '(deleted)'])
     expect(settingValue(entry('workspace.onClose'), settings, null, {})).toEqual([])
   })

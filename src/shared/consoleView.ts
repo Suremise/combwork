@@ -96,7 +96,7 @@ export interface SourceGroup {
 /** The source picker's groups: Combwork and its Assistant first, then each project's agents, by name. */
 export function sourceGroups(sources: readonly ConsoleSource[]): SourceGroup[] {
   const byName = (a: string, b: string): number => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
-  const own = sources.filter((s) => s.kind !== 'session').sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'hive' ? -1 : 1))
+  const own = sources.filter((s) => s.kind !== 'session').sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'combwork' ? -1 : 1))
   const projects = new Map<string, ConsoleSource[]>()
   for (const s of sources) {
     if (s.kind !== 'session') continue

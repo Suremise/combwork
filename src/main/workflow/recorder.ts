@@ -93,14 +93,13 @@ export function recordingByRuntime<T>(fn: () => Promise<T>, moved: number | null
 /** The reads made for a card not made yet (tasks.ts' createTask), before its number is taken. */
 const NEW_CARD = 0
 
-/** A fact's actor (§16.4.1): the user, the Assistant, an agent by its id, or Hive itself. */
+/** A fact's actor (§16.4.1): the user, the Assistant, an agent by its id, or Combwork itself. */
 export function actorOf(a: ChangeActor | undefined): Actor {
-  if (!a) return 'hive'
+  if (!a) return 'combwork'
   if (a.kind === 'user') return 'user'
   if (a.kind === 'assistant') return 'assistant'
   if (a.self) return agentActor(a.self.agentId)
-  // Combwork's own name (HI-2463), and Hive, which history written before it holds.
-  return a.name === 'Combwork' || a.name === 'Hive' || a.name === 'Repair' ? 'hive' : agentActor(a.name)
+  return a.name === 'Combwork' || a.name === 'Repair' ? 'combwork' : agentActor(a.name)
 }
 
 /** The stage a column stands for (P3: a move is to the column's stage). */
@@ -442,7 +441,7 @@ function roundLimit(tx: Tx, n: number, key: string, ruleset: { ruleset?: string 
   const shown = workflowText(FOR_YOU.roundLimit, { card: key, rounds: s.rounds })
   // agent-stored: storedForAgents says a request again for each reader (its forYou rows, a lane wake's detail; HI-2464)
   const text = workflowEnglish(shown)
-  const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'hive', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
+  const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'combwork', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
   tx.action(n, 'notify', { text, shown }, asked.seq)
 }
 
@@ -484,7 +483,7 @@ function loopWakes(tx: Tx, n: number, by: Actor, after: TaskCard, f: { submitted
 function causeOf(a: ChangeActor | undefined): 'intent' | 'user' | 'derived' {
   if (!a) return 'derived'
   if (a.kind === 'user') return 'user'
-  return actorOf(a) === 'hive' ? 'derived' : 'intent'
+  return actorOf(a) === 'combwork' ? 'derived' : 'intent'
 }
 
 /**

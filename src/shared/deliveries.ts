@@ -7,7 +7,7 @@
  */
 import type { InboxBrief, InboxSummary } from './types'
 import { agentMsg, say } from './agentText'
-import { inboxNotice, withCurrentNames } from './doorbell'
+import { inboxNotice } from './doorbell'
 import { cardRef } from './projectKeys'
 
 /** What a delivery is: a task, a re-brief (a message for the work it is on), a card event, the user's answer, a handover, a control notice. */
@@ -47,7 +47,7 @@ export type DeliveryState = (typeof DELIVERY_STATES)[number]
  * has ended sends nothing more (#645). Hive's own (board events) and the user's need no more. An agent's (HI-1866: its
  * request for the Assistant on a card) names its project and id, so whoever reads it knows which agent asked.
  */
-export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'hive'; name: string } | { kind: 'user'; name: string } | { kind: 'agent'; name: string; project: string; agentId: string }
+export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'combwork'; name: string } | { kind: 'user'; name: string } | { kind: 'agent'; name: string; project: string; agentId: string }
 
 export interface DeliveryRecord {
   /** Short and unique in its project ("m12"): what the agent acks. */
@@ -187,8 +187,7 @@ export interface InboxItem {
 /**
  * The unread deliveries as the inbox lists them, oldest first: a card's events in one item, where its first one was;
  * with them, those received in a conversation its agent left for a fresh one (`carriedFrom`, HI-2463), shown again.
- * Combwork's own text keeps every word as written (it may quote a person's or an agent's): one from before HI-2463 that
- * names an old tool or command gets a note on how the names map (withCurrentNames).
+ * Every text is handed out as stored (the names upgrade made Combwork's own from before HI-2463 current, HI-2598).
  */
 export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
   const out: InboxItem[] = []
@@ -208,10 +207,10 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
       out.push(item)
       continue
     }
-    out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.from.kind === 'hive' ? withCurrentNames(r.body) : r.body, at: r.created })
+    out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.body, at: r.created })
   }
   // A card's events quote people's and agents' comments, kept as written.
-  for (const { item, events } of byCard.values()) item.text = withCurrentNames(coalesced(events))
+  for (const { item, events } of byCard.values()) item.text = coalesced(events)
   return out
 }
 
@@ -337,7 +336,7 @@ function readSender(v: unknown): DeliverySender | null {
   if (!str(s.name, 200) || !s.name) return null
   if (s.kind === 'assistant') return str(s.workspace, 1024) && s.workspace && str(s.launch, 200) ? { kind: 'assistant', name: s.name, workspace: s.workspace, launch: s.launch } : null
   if (s.kind === 'agent') return str(s.project, 300) && s.project && str(s.agentId, 128) && s.agentId ? { kind: 'agent', name: s.name, project: s.project, agentId: s.agentId } : null
-  if (s.kind === 'hive' || s.kind === 'user') return { kind: s.kind, name: s.name }
+  if (s.kind === 'combwork' || s.kind === 'user') return { kind: s.kind, name: s.name }
   return null
 }
 

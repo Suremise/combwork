@@ -76,7 +76,7 @@ export async function adoptionInputs(project: string, platform: PlatformId, colu
  */
 export function writeAdoption(tx: Tx, card: CardRecord, ruleset: Ruleset, column: InFlight, at: AdoptionAt, inp: AdoptionInputs, move: (to: StageId) => void): boolean {
   const data: FactData['Adopted'] = { folder: at.worktree ? join(at.worktree) : 'project', line: inp.line, base: inp.base, head: inp.head, target: at.target, builder: at.agent, cardKind: card.kind, adoptedFrom: column, ...(column === 'passed' ? { passedBefore1_0: true } : {}) }
-  if (!tx.appendObserved(card.id, { kind: 'Adopted', actor: 'hive', source: 'observed', ruleset: ruleset.id, dedupe: 'adopted', data })) return false // i18n-ignore: a fact's kind and codes, not text
+  if (!tx.appendObserved(card.id, { kind: 'Adopted', actor: 'combwork', source: 'observed', ruleset: ruleset.id, dedupe: 'adopted', data })) return false // i18n-ignore: a fact's kind and codes, not text
   if (column === 'review') tx.appendObserved(card.id, { kind: 'Submitted', actor: `agent:${at.agent}`, source: 'observed', ruleset: ruleset.id, dedupe: 'adopted', data: { revision: inp.head, base: inp.base, head: inp.head, key: inp.key, files: inp.files, round: 1, generation: 0, sameRevision: false, summary: '', adopted: true } }) // i18n-ignore: a fact's kind and codes, not text
   move(column === 'doing' ? 'active' : column === 'review' ? 'review' : 'approved')
   return true
@@ -87,7 +87,7 @@ export async function adopt(wf: Workflow, card: CardRecord, column: InFlight, at
   const inp = await adoptionInputs(wf.cfg.project, 'git', column, at)
   const r = wf.currentRuleset()
   wf.store.saveRuleset(r)
-  await wf.write(card, r, 'hive', (w) => {
+  await wf.write(card, r, 'combwork', (w) => {
     writeAdoption(w.tx, card, r, column, at, inp, (to) => w.move(to, 'derived'))
   })
 }

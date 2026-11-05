@@ -612,7 +612,7 @@ describe('agent watches (main/watches.ts)', async () => {
       expect(await inboxText()).not.toContain('PRIVATE while revoked')
 
       // One made before a restart (another run of Combwork): given while replies are told, not once they are off.
-      await deliveries.createDelivery(home, { agentId: 'assistant', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, body: '[CW] User replied to Reviewer (alpha): "EARLIER RUN".', source: 'reply', ref: 'reply:1', meta: { generation: 0, run: 'an-earlier-run' } })
+      await deliveries.createDelivery(home, { agentId: 'assistant', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, body: '[CW] User replied to Reviewer (alpha): "EARLIER RUN".', source: 'reply', ref: 'reply:1', meta: { generation: 0, run: 'an-earlier-run' } })
       config.settings.assistant.tellReplies = false
       expect(await inboxText()).not.toContain('EARLIER RUN')
     } finally {

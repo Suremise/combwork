@@ -31,7 +31,7 @@ const ASSISTANT = { id: 'assistant', name: 'Assistant' }
 /** advanced.json with the old switch as given (undefined: not set), read again. */
 function legacySwitch(on: boolean | undefined): void {
   mkdirSync(profile, { recursive: true })
-  writeFileSync(join(profile, 'advanced.json'), JSON.stringify({ format: 1, values: on === undefined ? {} : { 'hive.assistant.otherMcpServers': on } }))
+  writeFileSync(join(profile, 'advanced.json'), JSON.stringify({ format: 1, values: on === undefined ? {} : { 'cw.assistant.otherMcpServers': on } }))
   advanced.load(profile)
 }
 
@@ -121,11 +121,11 @@ describe("the Assistant's MCP servers move from the old Advanced switch (HI-1472
     }
     // Another setting changed meanwhile: the old one is kept as it was, and not listed as unknown.
     await advanced.set('cw.mcp.replySeconds', 30)
-    expect(json(join(profile, 'advanced.json')).values['hive.assistant.otherMcpServers']).toBe(true)
-    expect(advanced.state(null).unknown).not.toContain('hive.assistant.otherMcpServers')
-    expect(advanced.legacy('hive.assistant.otherMcpServers')).toBe(true)
+    expect(json(join(profile, 'advanced.json')).values['cw.assistant.otherMcpServers']).toBe(true)
+    expect(advanced.state(null).unknown).not.toContain('cw.assistant.otherMcpServers')
+    expect(advanced.legacy('cw.assistant.otherMcpServers')).toBe(true)
     await advanced.resetAll()
-    expect(json(join(profile, 'advanced.json')).values['hive.assistant.otherMcpServers']).toBe(true)
+    expect(json(join(profile, 'advanced.json')).values['cw.assistant.otherMcpServers']).toBe(true)
   })
 
   it('an Assistant launch worked out while the move is held waits for it, and gets what it moves', async () => {

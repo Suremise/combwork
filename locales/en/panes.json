@@ -864,7 +864,7 @@
     "description": "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")."
   },
   "panes.template.heading": {
-    "defaultMessage": "{template} · {scope, select, hive {Combwork} workspace {workspace} other {this project}}",
+    "defaultMessage": "{template} · {scope, select, combwork {Combwork} workspace {workspace} other {this project}}",
     "description": "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Combwork: one of Combwork's own templates, #1436)."
   },
   "panes.template.layout": {
@@ -888,7 +888,7 @@
     "description": "Menu item (+ Add ▾ → Templates): saves this project's agents and layout as a template."
   },
   "panes.template.scopeHeading": {
-    "defaultMessage": "{scope, select, hive {Combwork's templates} workspace {Workspace templates} other {This project's templates}}",
+    "defaultMessage": "{scope, select, combwork {Combwork's templates} workspace {Workspace templates} other {This project's templates}}",
     "description": "A heading in + Add ▾ → Templates above Combwork's own templates (#1436), those kept in the workspace, or in this project."
   },
   "panes.terminal.exited": {

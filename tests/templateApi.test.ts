@@ -143,7 +143,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
   })
 
   it('finds a template by file or name; several of one name are refused naming each, an unknown one too', async () => {
-    expect((await find(alpha, 'team-3x3.json')).scope).toBe('hive')
+    expect((await find(alpha, 'team-3x3.json')).scope).toBe('combwork')
     expect((await find(alpha, 'Git only')).file).toBe('git-only.json')
     await expect(find(alpha, 'same')).rejects.toThrow(/Several templates are called "same": name one by scope and file \(workspace: same\.json; project alpha: same\.json\)/)
     expect((await find(alpha, 'Same', 'project')).scope).toBe('project')

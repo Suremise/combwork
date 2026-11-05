@@ -275,7 +275,7 @@ const until = async (fn, ms = 10000) => {
   r = await call(workspaceToken, 'GET', '/v1/skills?project=beta')
   check("…the workspace token can, and listings carry no folder paths", r.status === 200 && r.body.some((s) => s.name === 'beta-secret') && !JSON.stringify(r.body).includes(JSON.stringify(ws).slice(1, -1)), JSON.stringify(r).slice(0, 300))
   r = await as('GET', '/v1/skills?project=alpha')
-  check('its own project\'s skills are open to it', r.status === 200 && r.body.some((s) => s.name === 'work-on-card' && s.level === 'hive'), JSON.stringify(r).slice(0, 300))
+  check('its own project\'s skills are open to it', r.status === 200 && r.body.some((s) => s.name === 'work-on-card' && s.level === 'combwork'), JSON.stringify(r).slice(0, 300))
   r = await as('GET', '/v1/status')
   check('the status says who it is to Combwork', r.status === 200 && r.body.caller?.role === 'agent' && r.body.caller.project === 'alpha' && r.body.caller.agent === 'Alfie' && r.body.api?.version >= 2, JSON.stringify(r.body?.caller))
 

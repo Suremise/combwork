@@ -55,7 +55,7 @@ describe('lanes', () => {
     const [c1, c2] = [1, 2].map((n) => e.wf.createCard({ title: `Card ${n}` }))
     e.wf.startLane('L', [c1.id, c2.id], 'R1')
     await finish(e, c1.key, 'one.txt')
-    const byHive = await e.wf.start(c2.key, 'hive', { builder: 'B1' })
+    const byHive = await e.wf.start(c2.key, 'combwork', { builder: 'B1' })
     moved(byHive)
     const again = await e.wf.start(c2.key, B1)
     moved(again)
@@ -78,7 +78,7 @@ describe('lanes', () => {
       beforeWrite: async (move) => {
         if (move !== 'start') return
         e.wf.cfg.hooks = {}
-        hive.start = await e.wf.start(c1.key, 'hive', { builder: 'B1' })
+        hive.start = await e.wf.start(c1.key, 'combwork', { builder: 'B1' })
       }
     }
     const own = await e.wf.start(c1.key, B1)

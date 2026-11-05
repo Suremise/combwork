@@ -218,7 +218,7 @@ describe.runIf(process.platform === 'win32')('a board whose -shm another process
     const first = await open(ws)
     const home = first.assistantHome
     const settings = journalSettings({ enabled: true })
-    journal.writeEntry(home, settings, { kind: 'event', summary: 'Kept in the journal' }, 'hive')
+    journal.writeEntry(home, settings, { kind: 'event', summary: 'Kept in the journal' }, 'combwork')
     await disposeWorkspaceService(first)
     const file = journal.journalFile(home)
     await leftByAKill(file)

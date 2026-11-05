@@ -107,7 +107,7 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'proje
     check('the Assistant has its token', !!assistant)
     await inv('settings:update', { assistant: { control: 'look' } })
     const listed = await list('alpha', assistant)
-    check("at Look and advise it lists alpha's templates: Combwork's own and the workspace's", listed.status === 200 && listed.body?.templates?.some((t) => t.scope === 'hive' && t.file === 'team-3x3.json' && t.agents === 6) && listed.body.templates.some((t) => t.scope === 'workspace' && t.name === 'Git only' && t.workflow.join() === 'git'), JSON.stringify(listed.body))
+    check("at Look and advise it lists alpha's templates: Combwork's own and the workspace's", listed.status === 200 && listed.body?.templates?.some((t) => t.scope === 'combwork' && t.file === 'team-3x3.json' && t.agents === 6) && listed.body.templates.some((t) => t.scope === 'workspace' && t.name === 'Git only' && t.workflow.join() === 'git'), JSON.stringify(listed.body))
     const looked = await plan('alpha', { template: 'team-3x3.json' }, assistant)
     check('…plans a load', looked.status === 200 && looked.body?.remove?.join() === 'Ann,Rob' && looked.body.create?.length === 6, JSON.stringify(looked.body))
     const lookLoad = await load('alpha', { template: 'team-3x3.json' }, assistant)

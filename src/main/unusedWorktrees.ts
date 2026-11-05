@@ -353,8 +353,8 @@ async function unreferencedCommits(path: string, except?: string): Promise<numbe
  */
 export function worktreeOrigin(path: string, sessions: readonly Pick<SessionRecord, 'cwd' | 'agentName' | 'agentId' | 'lastActiveAt'>[], hiveFolder: string | null): UnusedWorktreeOrigin {
   const ran = sessions.filter((s) => s.cwd && key(s.cwd) === key(path) && (s.agentId || s.agentName)).sort((a, b) => (a.lastActiveAt < b.lastActiveAt ? 1 : -1))[0]
-  if (ran) return ran.agentName ? { madeBy: 'hive', agentName: ran.agentName } : { madeBy: 'hive' }
-  return hiveFolder && contains(hiveFolder, path) ? { madeBy: 'hive' } : { madeBy: 'other' }
+  if (ran) return ran.agentName ? { madeBy: 'combwork', agentName: ran.agentName } : { madeBy: 'combwork' }
+  return hiveFolder && contains(hiveFolder, path) ? { madeBy: 'combwork' } : { madeBy: 'other' }
 }
 
 async function describe(projectPath: string, w: Candidate, origin: UnusedWorktreeOrigin, reads: wt.RepoReads, pool: SlotPool | null): Promise<UnusedWorktree> {

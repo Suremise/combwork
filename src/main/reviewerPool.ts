@@ -185,7 +185,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   for (const a of poolAssignments([...cards.values()], pool, reviewersNow(wf, known))) {
     if (!workflowEnforced() || ws.lifetime.aborted) return
     const c = cards.get(a.card)!
-    const given = await wf.write(c.rec, null, 'hive', (w) => {
+    const given = await wf.write(c.rec, null, 'combwork', (w) => {
       // In this write, as combwork.db has it now (another Hive's or connection's change committed before it is seen): the
       // same submission still waiting, and the agent still free of it, of every other card of the project in Review
       // (whatever its lane: none, ended, another's) and of any dispatch lease.
@@ -291,7 +291,7 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
       : `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''} is in Review${c.loose ? ', outside a lane: you review it' : ': you review it from the pool'}. Review its latest submission with the review-agent-work skill; your verdict frees you for the next card.` // i18n-ignore: agent-facing (HI-2228: the skill, not its steps, which a model took for the whole review)
   )
   // agent-protocol: who a delivery is from: Combwork's own name (HI-2463)
-  const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'hive' as const, name: 'Combwork' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
+  const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'combwork' as const, name: 'Combwork' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
   log.info(`Telling ${userText(agent.name)} of #${c.card} ${c.loose ? 'outside a lane' : 'from the pool'} (${st ? 'typed' : 'started'})`)
   const r = st
     ? // As a wake (HI-2333): a reviewer watching a card in its loop takes it, and its watch carries on (`free` would
@@ -347,7 +347,7 @@ function retrySoon(ws: WorkspaceService, projectPath: string): void {
 /** A pool's assignment given up (`ReviewerReleased`) while it is still the submission's and not started; the pass again. */
 async function release(ws: WorkspaceService, projectPath: string, wf: Workflow, c: PassCard, reviewer: string, why: FactData['ReviewerReleased']['why']): Promise<void> {
   const known = (): boolean => true
-  const done = await wf.write(c.rec, null, 'hive', (w) => {
+  const done = await wf.write(c.rec, null, 'combwork', (w) => {
     const s = w.state()
     if (c.design ? !stillWaits(s, c) : s.latest?.id !== c.submission || (s.reviewing[c.submission] ?? []).includes(reviewer)) return false
     if (submissionReviewers(w.tx.facts(c.card), c.submission, known).reviewing !== reviewer) return false

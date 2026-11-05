@@ -22,10 +22,10 @@ describe('what is saved', () => {
   })
 
   it("a point keeps its refs once, in order; Combwork's quit point only Combwork's; onUpdate only where it applies", () => {
-    const w = cleanWorkspace({ onOpen: { run: [{ scope: 'workspace', id: B }, { scope: 'hive', id: A }, { scope: 'workspace', id: B }], onUpdate: true }, onClose: { run: [{ scope: 'other', id: A }], onUpdate: true } })
-    expect(w.onOpen).toEqual({ run: [{ scope: 'workspace', id: B }, { scope: 'hive', id: A }] })
+    const w = cleanWorkspace({ onOpen: { run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }, { scope: 'workspace', id: B }], onUpdate: true }, onClose: { run: [{ scope: 'other', id: A }], onUpdate: true } })
+    expect(w.onOpen).toEqual({ run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }] })
     expect(w.onClose).toEqual({ run: [], onUpdate: true })
-    expect(cleanHive({ onQuit: { run: [{ scope: 'workspace', id: A }, { scope: 'hive', id: B }] } }).onQuit).toEqual({ run: [{ scope: 'hive', id: B }] })
+    expect(cleanHive({ onQuit: { run: [{ scope: 'workspace', id: A }, { scope: 'combwork', id: B }] } }).onQuit).toEqual({ run: [{ scope: 'combwork', id: B }] })
   })
 
   it('new ids are well formed and differ', () => {
@@ -60,7 +60,7 @@ describe("HI-1368's single commands adopted (one way, the same again)", () => {
     const cfg = migrateConfig(mergeDefaults(structuredClone(DEFAULT_APP_CONFIG), raw), raw)
     const id = migratedId('onQuit', 'sync.cmd {reason}')
     expect(cfg.settings.commands.list).toEqual([{ id, name: 'Quit command', command: 'sync.cmd {reason}' }])
-    expect(cfg.settings.commands.onQuit).toEqual({ run: [{ scope: 'hive', id }], onUpdate: true })
+    expect(cfg.settings.commands.onQuit).toEqual({ run: [{ scope: 'combwork', id }], onUpdate: true })
     expect(cfg.settings.general.onQuit).toBeUndefined()
   })
 })
@@ -69,7 +69,7 @@ describe('points and versions', () => {
   it("a point resolves in order, from its scopes' lists; a ref to a deleted command is null", () => {
     const hive = [{ id: A, name: 'H', command: 'h' }]
     const workspace = [{ id: B, name: 'W', command: 'w' }]
-    const r = resolvePoint({ run: [{ scope: 'workspace', id: B }, { scope: 'hive', id: A }, { scope: 'hive', id: B }] }, { hive, workspace })
+    const r = resolvePoint({ run: [{ scope: 'workspace', id: B }, { scope: 'combwork', id: A }, { scope: 'combwork', id: B }] }, { hive, workspace })
     expect(r.map((x) => x.command?.name ?? null)).toEqual(['W', 'H', null])
   })
 

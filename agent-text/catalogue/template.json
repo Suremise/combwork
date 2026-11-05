@@ -60,7 +60,7 @@
     "note": "A template call named none."
   },
   "template.find.scope": {
-    "text": "scope is hive, workspace or project",
+    "text": "scope is combwork, workspace or project",
     "note": "A template call's scope isn't one of the three. They are the argument's values."
   },
   "template.find.several": {

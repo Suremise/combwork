@@ -101,7 +101,7 @@
   "content.templates.overMax": "它有 {count, number} 个智能体，而此项目的工作流程最多允许 {max, plural, other {# 个智能体}}：请先在“版本控制”→“工作流程”中调高“最大智能体数”，或连同它的工作流程一起加载。未做任何更改。",
   "content.templates.restoring": "撤销正在把此项目的智能体恢复为加载模板之前的样子",
   "content.templates.running": "{agent} 正在运行或启动：请先停止它。",
-  "content.templates.scope": "未知的范围“{scope}”：应为 hive、workspace 或 project。",
+  "content.templates.scope": "未知的范围“{scope}”：应为 combwork、workspace 或 project。",
   "content.templates.started": "期间有智能体启动了：未做任何更改。请先停止它。",
   "content.templates.taken": "{projects} 中已有名为 {names} 的{count, plural, =1 {智能体} other {智能体}}：智能体名称在整个工作区中必须唯一，请为{count, plural, =1 {它} other {它们}}改名。",
   "content.templates.takenNothing": "{projects} 中已有名为 {names} 的{count, plural, =1 {智能体} other {智能体}}：智能体名称在整个工作区中必须唯一，请为{count, plural, =1 {它} other {它们}}改名。未做任何更改。",

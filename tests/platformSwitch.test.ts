@@ -78,11 +78,11 @@ const platformOf = (w: WS, repo: string) => w.info()!.projects.find((p) => p.pat
 
 describe('setKept (#1419)', () => {
   it('keeps the platform left and restores the one chosen, every other field kept', () => {
-    const inGit = { platform: 'git' as const, preset: 'pair' as const, options: { finish: 'hiveMerges' as const }, presetAsked: 'chosen' as const, later: 1 }
+    const inGit = { platform: 'git' as const, preset: 'pair' as const, options: { finish: 'combworkMerges' as const }, presetAsked: 'chosen' as const, later: 1 }
     const none = setKept(inGit as never, 'none')
-    expect(none).toEqual({ platform: 'none', preset: null, options: {}, kept: { git: { preset: 'pair', options: { finish: 'hiveMerges' }, presetAsked: 'chosen' } }, later: 1 })
+    expect(none).toEqual({ platform: 'none', preset: null, options: {}, kept: { git: { preset: 'pair', options: { finish: 'combworkMerges' }, presetAsked: 'chosen' } }, later: 1 })
     const back = setKept({ ...none, preset: 'solo', options: { review: 'none' } }, 'git')
-    expect(back).toEqual({ platform: 'git', preset: 'pair', options: { finish: 'hiveMerges' }, presetAsked: 'chosen', kept: { none: { preset: 'solo', options: { review: 'none' } } }, later: 1 })
+    expect(back).toEqual({ platform: 'git', preset: 'pair', options: { finish: 'combworkMerges' }, presetAsked: 'chosen', kept: { none: { preset: 'solo', options: { review: 'none' } } }, later: 1 })
     // A platform left with nothing of its own isn't kept; the same platform is no change.
     expect(setKept(none, 'git')).toEqual(inGit)
     expect(setKept(inGit as never, 'git')).toBe(inGit)
@@ -230,7 +230,7 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
     expect(platformOf(w, repo).detected).toMatchObject({ platform: 'git', subfolder: true })
     const { platform: _p, ...pair } = preset('git', 'pair')
     const merges = { ...pair, target: '' }
-    for (const finish of ['hiveMerges', 'agentMerges'] as const) {
+    for (const finish of ['combworkMerges', 'agentMerges'] as const) {
       const c = await form.checkWorkflowChange(w, repo, { preset: null, options: { ...merges, finish } })
       expect(c.problems).toContainEqual({ kind: 'contradiction', id: 'subfolderTarget' })
     }

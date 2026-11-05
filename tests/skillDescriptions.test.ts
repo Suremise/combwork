@@ -19,7 +19,7 @@ describe('shipped skill descriptions', () => {
   })
 
   it("work-on-card (HI-1585): an untouched copy is recognised by its SKILL.md words and shown with the board's stage names; an edited one as written", () => {
-    const skill = { name: 'work-on-card', description: shipped['work-on-card'] ?? '', level: 'hive', bundled: 'x' }
+    const skill = { name: 'work-on-card', description: shipped['work-on-card'] ?? '', level: 'combwork', bundled: 'x' }
     expect(skill.description).toMatch(/from Doing to Review/)
     const m = shippedSkillDescription(skill)
     expect(m?.id).toBe('assistant.skills.shipped.workOnCard')
@@ -35,6 +35,6 @@ describe('shipped skill descriptions', () => {
       setLanguage('en', {})
     }
     // Each other skill is still recognised by its message's English.
-    for (const [name, d] of Object.entries(shipped)) expect(shippedSkillDescription({ name, description: d ?? '', level: 'hive', bundled: 'x' })?.id).toBe(SHIPPED_SKILL_DESCRIPTIONS[name].id)
+    for (const [name, d] of Object.entries(shipped)) expect(shippedSkillDescription({ name, description: d ?? '', level: 'combwork', bundled: 'x' })?.id).toBe(SHIPPED_SKILL_DESCRIPTIONS[name].id)
   })
 })

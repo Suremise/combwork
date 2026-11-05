@@ -237,6 +237,7 @@ interface HiveMessageValues {
   'main.nameUpgrade.boardBothTitle': { folder: string | number }
   'main.nameUpgrade.boardLeftBody': undefined
   'main.nameUpgrade.boardLeftTitle': { file: string | number }
+  'main.nameUpgrade.profileTitle': undefined
   'main.nameUpgrade.what.board': undefined
   'main.nameUpgrade.what.files': undefined
   'main.nameUpgrade.what.projects': undefined

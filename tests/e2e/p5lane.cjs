@@ -83,7 +83,7 @@ const ancestor = (x, y) => {
     await save.waitFor({ timeout: HUNG_MS })
     await save.getByRole('button', { name: 'Save', exact: true }).click()
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
-    const options = await waitHung(() => (projectJson().workflow?.options?.finish === 'hiveMerges' && projectJson().workflow.options.strict === true && projectJson().workflow.options.commitMessage === 'hive' ? projectJson().workflow.options : null))
+    const options = await waitHung(() => (projectJson().workflow?.options?.finish === 'combworkMerges' && projectJson().workflow.options.strict === true && projectJson().workflow.options.commitMessage === 'combwork' ? projectJson().workflow.options : null))
     check("Pair (Combwork merges) saved from the form, strict on: Combwork merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity",!!options && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email,JSON.stringify(projectJson().workflow))
     await page.keyboard.press('Escape')
     const identity = options?.identity ?? fx.identity
@@ -330,7 +330,7 @@ const ancestor = (x, y) => {
     await retoken()
     // One in Todo, or already Active on B1: Combwork starts a lane's card on its builder itself once its turn is over (HI-1990),
     // which a slow run can see before the window is shot (HI-2103).
-    const oneShown = async () => (await onBoard('Todo', c1)) || ((await onBoard('Active', c1)) && (await factsOf(c1, 'Started')).some((f) => f.actor === 'hive'))
+    const oneShown = async () => (await onBoard('Todo', c1)) || ((await onBoard('Active', c1)) && (await factsOf(c1, 'Started')).some((f) => f.actor === 'combwork'))
     await shoot('1-laneA-started', 'lanes', async () => (await oneShown()) && /B1 \/ R1/.test(await laneText(a?.id)))
 
     // --- One: merged by the queue at the approved revision; the next card waits for it.
@@ -354,11 +354,11 @@ const ancestor = (x, y) => {
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
     const msg1 = git(alpha, 'log', '-1', '--format=%B', 'main')
-    check("…Integrated by Combwork at the approved revision: a merge commit of One's line, Combwork's trailers", i1?.data?.by === 'hive' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Combwork-Card: ${k1}`) && msg1.includes(`Combwork-Revision: ${one.rev}`), JSON.stringify(i1))
+    check("…Integrated by Combwork at the approved revision: a merge commit of One's line, Combwork's trailers", i1?.data?.by === 'combwork' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Combwork-Card: ${k1}`) && msg1.includes(`Combwork-Revision: ${one.rev}`), JSON.stringify(i1))
     const main1 = head()
     // HI-1990: nobody starts Two. Once One is Done and B1's turn is over, Combwork starts it on B1 as the lane's next card, and
     // B1 is given it in its slot; B1's own start then is that start (it raced Combwork's), with the same folder and line.
-    const byHive = await waitHung(async () => (await factsOf(c2, 'Started')).find((f) => f.actor === 'hive') ?? null)
+    const byHive = await waitHung(async () => (await factsOf(c2, 'Started')).find((f) => f.actor === 'combwork') ?? null)
     check('Combwork starts Two on B1 itself once One is Done, with no prompt from the user or the Assistant', !!byHive && byHive.data?.builder === b1.id && (await card(c2))?.agent === b1.id, JSON.stringify({ byHive, card: await card(c2) }))
     check('…and gives it to B1 in its slot (placed there)', !!(await waitHung(async () => (await kinds(c2)).includes('BuilderPlaced'))), JSON.stringify(await kinds(c2)))
     const s2 = await start(c2)
@@ -386,7 +386,7 @@ const ancestor = (x, y) => {
       slot3 = { head: gitNow(wt, 'rev-parse', 'HEAD'), status: gitNow(wt, 'status', '--porcelain'), branch: gitNow(wt, 'branch', '--show-current') }
       if (slot3.head === null || slot3.status === null || slot3.branch === null) return null
       if (slot3.head === two.was.head && slot3.status === two.was.status) return 'untouched'
-      started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'hive')?.data ?? null
+      started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'combwork')?.data ?? null
       prep3 = (await factsOf(c3, 'SlotPrepared')).at(-1)?.data ?? null
       return asThree(slot3) ? 'asThree' : null
     })
@@ -484,7 +484,7 @@ const ancestor = (x, y) => {
     await round(c7, 'seven.txt')
     check('Seven merged: Done, its change only its own', (await done(c7)) && (await submittedFiles(c7)) === JSON.stringify(['seven.txt']), await submittedFiles(c7))
     const again6 = await waitHung(async () => ((await factsOf(c6, 'Started')).length >= 2 ? (await factsOf(c6, 'Started')).at(-1) : null))
-    check('…then Combwork starts Six again', !!again6 && again6.actor === 'hive', JSON.stringify(again6))
+    check('…then Combwork starts Six again', !!again6 && again6.actor === 'combwork', JSON.stringify(again6))
     const s6b = await start(c6)
     check('…on its own line, with its work', s6b.s.status === 200 && s6b.line === s6.line && ancestor(six, git(wt, 'rev-parse', 'HEAD')), JSON.stringify(s6b))
   } catch (e) {

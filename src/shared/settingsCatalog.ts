@@ -160,7 +160,7 @@ export interface SettingEntry extends Omit<Row, 'title' | 'desc' | 'tip' | 'opti
   /** Sensitive: permissions, what runs, the Agent API, the Assistant's own settings (readOnly says which). */
   sensitive?: boolean
   /** Who takes a change only when restarted: running agents' sessions, the Assistant, or Hive itself (#676). */
-  restart?: 'sessions' | 'assistant' | 'hive'
+  restart?: 'sessions' | 'assistant' | 'combwork'
   /** The id of the user guide's heading about it (Help → User Guide; #1535). */
   docs: string
   /** A project setting that can inherit Hive's (null, or the 'inherit' option). */
@@ -487,7 +487,7 @@ const APP_ROWS: Row[] = [
   { section: 'agentApi', key: 'status', title: msg({ id: 'settings.agentApi.status.title', defaultMessage: 'Status', description: "A setting's title (Settings → Agent API)." }), tip: msg({ id: 'settings.agentApi.status.tip', defaultMessage: 'Whether the Agent API is listening.', description: 'The info tip of the setting "Status" (Settings → Agent API): more on what it does and when it applies.' }), type: 'custom' },
   { section: 'agentApi', key: 'enabled', title: msg({ id: 'settings.agentApi.enabled.title', defaultMessage: 'Enable Agent API', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.enabled.desc', defaultMessage: 'Run a local HTTP API that agents and scripts can use to talk to Combwork.', description: 'What the setting "Enable Agent API" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.enabled.tip', defaultMessage: 'Listens on 127.0.0.1 only and requires the bearer token below. See Help → Agent API Reference. Turned off, the port still answers the Assistant alone (it has its own token, and Settings → Assistant → Control decides what it may do).', description: 'The info tip of the setting "Enable Agent API" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'agentApi', key: 'port', title: msg({ id: 'settings.agentApi.port.title', defaultMessage: 'Port', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.port.desc', defaultMessage: 'Local port for the Agent API.', description: 'What the setting "Port" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.port.tip', defaultMessage: 'Change this if the port is used by another program.', description: 'The info tip of the setting "Port" (Settings → Agent API): more on what it does and when it applies.' }), type: 'number', min: 1024, max: 65535 },
-  { section: 'agentApi', key: 'provideHiveMcp', title: msg({ id: 'settings.agentApi.provideCombworkMcp.title', defaultMessage: 'Provide Combwork tools to sessions', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.provideCombworkMcp.desc', defaultMessage: 'Add the built-in "combwork" MCP server to every session.', description: 'What the setting "Provide Combwork tools to sessions" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.provideCombworkMcp.tip', defaultMessage: 'Gives agents tools for shared notes, handovers, project status and notifications.', description: 'The info tip of the setting "Provide Combwork tools to sessions" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
+  { section: 'agentApi', key: 'provideCombworkMcp', title: msg({ id: 'settings.agentApi.provideCombworkMcp.title', defaultMessage: 'Provide Combwork tools to sessions', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.provideCombworkMcp.desc', defaultMessage: 'Add the built-in "combwork" MCP server to every session.', description: 'What the setting "Provide Combwork tools to sessions" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.provideCombworkMcp.tip', defaultMessage: 'Gives agents tools for shared notes, handovers, project status and notifications.', description: 'The info tip of the setting "Provide Combwork tools to sessions" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
   {
     section: 'agentApi',
     key: 'allowSessionInput',
@@ -699,7 +699,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('preChecks', 'custom'),
     option('commands', 'custom'),
     option('sameness', 'select', [['change', V.sameness.change], ['exact', V.sameness.exact]]),
-    option('finish', 'select', [['hiveMerges', V.finish.hiveMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
+    option('finish', 'select', [['combworkMerges', V.finish.combworkMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
     option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash], ['rebase', V.style.rebase]]),
     option('target', 'text'),
     option('mergeChecks', 'custom'),
@@ -707,7 +707,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
     option('strict', 'boolean'),
     option('pushTarget', 'boolean'),
-    option('commitMessage', 'select', [['hive', V.commitMessage.hive], ['branch', V.commitMessage.branch]]),
+    option('commitMessage', 'select', [['combwork', V.commitMessage.combwork], ['branch', V.commitMessage.branch]]),
     option('okBefore', 'custom'),
     option('folder', 'select', [['slots', V.folder.slots], ['project', V.folder.project]]),
     option('slotsUpToDate', 'boolean'),
@@ -904,7 +904,7 @@ const READ_ONLY: [RegExp, AgentMsg][] = [[/^keybindings\./, agentMsg({ id: 'sett
 
 const RESTART: [RegExp, NonNullable<SettingEntry['restart']>][] = [
   [/^(project\.)?[\w-]+\.(executablePath|defaultModel|defaultEffort|model|effort|extraArgs|use200kContext|allowBackgroundSessions|defaultPermissionMode|permissionMode)$/, 'sessions'],
-  [/^general\.progressCommands$|^agentApi\.(provideHiveMcp|devConsole)$/, 'sessions'],
+  [/^general\.progressCommands$|^agentApi\.(provideCombworkMcp|devConsole)$/, 'sessions'],
   [/^assistant\.(control|changeSettings|provider|mode)$|^assistant\.provider:|^assistant\.[\w-]+\.\w+$/, 'assistant']
 ]
 
@@ -1030,7 +1030,7 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
   const action = ACTIONS.has(id)
   const value = row.type === 'custom' ? CUSTOM_VALUES[id] : undefined
   const applies = row.advanced ? advancedDef(row.advanced.id)?.applies : undefined
-  const restart = row.advanced ? (applies === 'sessions' ? 'sessions' : applies === 'restart' ? 'hive' : undefined) : RESTART.find(([re]) => re.test(id))?.[1]
+  const restart = row.advanced ? (applies === 'sessions' ? 'sessions' : applies === 'restart' ? 'combwork' : undefined) : RESTART.find(([re]) => re.test(id))?.[1]
   const { title, desc, tip, options, off, confirmOn, englishTitle, ...rest } = row
   const text: SettingEntry['text'] = { title, desc: desc ?? null, tip: tip ?? null, ...(off ? { off } : {}), ...(confirmOn ? { confirmOn } : {}), ...(englishTitle ? { englishTitle } : {}) }
   return {

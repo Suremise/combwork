@@ -90,13 +90,13 @@ export const EMPTY_WORKSPACE: CommandsWorkspace = { list: [], onOpen: { run: [] 
 /** Hive's commands as saved (settings.commands). */
 export function cleanHive(v: unknown): CommandsHive {
   const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
-  return { list: cleanList(c.list), onQuit: cleanPoint(c.onQuit, ['hive'], true) }
+  return { list: cleanList(c.list), onQuit: cleanPoint(c.onQuit, ['combwork'], true) }
 }
 
 /** A workspace's commands as saved (workspace.json's commands): its points may use its own and Hive's. */
 export function cleanWorkspace(v: unknown): CommandsWorkspace {
   const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
-  return { list: cleanList(c.list), onOpen: cleanPoint(c.onOpen, ['workspace', 'hive'], false), onClose: cleanPoint(c.onClose, ['workspace', 'hive'], true) }
+  return { list: cleanList(c.list), onOpen: cleanPoint(c.onOpen, ['workspace', 'combwork'], false), onClose: cleanPoint(c.onClose, ['workspace', 'combwork'], true) }
 }
 
 /** HI-1368's single command ({ command, onUpdate }), if it had one: its text as saved, and its box. */
@@ -130,13 +130,13 @@ export function migrateWorkspaceCommands(raw: { commands?: unknown; onClose?: un
 /** Hive's commands from what settings hold, HI-1368's `general.onQuit` adopted. */
 export function migrateHiveCommands(raw: { commands?: unknown; onQuit?: unknown }, name: string): CommandsHive {
   const now = cleanHive(raw.commands)
-  const { commands, point } = adopt(now, now.onQuit, raw.onQuit, 'onQuit', name, 'hive')
+  const { commands, point } = adopt(now, now.onQuit, raw.onQuit, 'onQuit', name, 'combwork')
   return { ...commands, onQuit: point }
 }
 
 /** A point's commands in order, each found in its scope's list; a ref to one no longer there is null. */
 export function resolvePoint(point: CommandPoint, lists: { hive: readonly CustomCommand[]; workspace?: readonly CustomCommand[] }): { ref: CommandRef; command: CustomCommand | null }[] {
-  return point.run.map((ref) => ({ ref, command: (ref.scope === 'hive' ? lists.hive : (lists.workspace ?? [])).find((c) => c.id === ref.id) ?? null }))
+  return point.run.map((ref) => ({ ref, command: (ref.scope === 'combwork' ? lists.hive : (lists.workspace ?? [])).find((c) => c.id === ref.id) ?? null }))
 }
 
 /** A scope's version: a hash of its commands and points, for a change proposed against them (HI-1954/s21). */

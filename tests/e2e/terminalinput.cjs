@@ -43,7 +43,7 @@ const check = (name, ok, extra = '') => {
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   // No hive tools, so a card the user starts on a running agent is typed into its CLI as their input (#650).
-  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideHiveMcp: false, allowSessionInput: true }
+  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideCombworkMcp: false, allowSessionInput: true }
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
@@ -180,7 +180,7 @@ const check = (name, ok, extra = '') => {
 
     // Off again: Combwork's again, at once.
     await inv('advanced:set', CTRL_CV, false)
-    check("off again: the pane's Ctrl+C and Ctrl+V are Combwork's at once", !!(await lib.until(async () => (await ctrlCV()) === 'hive', HUNG_MS, 100)), await ctrlCV())
+    check("off again: the pane's Ctrl+C and Ctrl+V are Combwork's at once", !!(await lib.until(async () => (await ctrlCV()) === 'combwork', HUNG_MS, 100)), await ctrlCV())
     await setClip('AGAIN')
     r = await reads()
     from = readsOfInput().length

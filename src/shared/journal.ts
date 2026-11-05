@@ -20,7 +20,7 @@ export const LINK_TYPES = ['card', 'commit', 'note', 'artifact', 'session', 'age
 export type LinkType = (typeof LINK_TYPES)[number]
 
 /** Who wrote an entry: Hive's own facts, or the Assistant. */
-export type JournalSource = 'hive' | 'assistant'
+export type JournalSource = 'combwork' | 'assistant'
 
 /** The journal's settings, per workspace (Settings → Assistant → Journal). */
 export interface JournalSettings {

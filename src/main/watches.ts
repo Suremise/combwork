@@ -39,7 +39,7 @@ import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
 import { forYouOfCards } from './workflow/cardWork'
 import type { ForYouItem } from '../shared/workflow/workView'
-import { currentPrefix, LEGACY_NOTICE_PREFIX, NOTICE_PREFIX } from '../shared/doorbell'
+import { NOTICE_PREFIX } from '../shared/doorbell'
 import { agentMsg, inDialectOf, say, type AgentMsg, type DialectSession } from '../shared/agentText'
 
 /**
@@ -633,7 +633,7 @@ function readRecord(v: unknown): WatchRecord | null {
   if (r.fired !== undefined) {
     const f = r.fired as Record<string, unknown> | null
     const cards = Array.isArray(f?.cards) ? f.cards.filter((n): n is number => cond.cards.includes(n as number)) : null
-    if (!f || typeof f.line !== 'string' || jsonBytes(f.line) > MAX_LINE_BYTES || !(f.line.startsWith(NOTICE_PREFIX) || f.line.startsWith(LEGACY_NOTICE_PREFIX)) || !time(f.at) || !cards || (f.sending !== undefined && !time(f.sending)) || (f.delivery !== undefined && !(typeof f.delivery === 'string' && /^m\d{1,15}$/.test(f.delivery)))) return null
+    if (!f || typeof f.line !== 'string' || jsonBytes(f.line) > MAX_LINE_BYTES || !f.line.startsWith(NOTICE_PREFIX) || !time(f.at) || !cards || (f.sending !== undefined && !time(f.sending)) || (f.delivery !== undefined && !(typeof f.delivery === 'string' && /^m\d{1,15}$/.test(f.delivery)))) return null
     const told = Array.isArray(f.agents) && agentMarks ? f.agents.filter((k): k is string => typeof k === 'string' && k in agentMarks!) : undefined
     // A lane watch's pending marks (#649): each as a lane watch's own marks are read.
     let pendingLanes: Record<string, LaneMark> | undefined
@@ -646,9 +646,7 @@ function readRecord(v: unknown): WatchRecord | null {
         pendingLanes[id] = mark
       }
     }
-    // A line fired before HI-2463 keeps its words (it may quote a comment): only its leading prefix is made current. The
-    // inbox adds the note on the old names when it hands it out (withCurrentNames).
-    fired = { line: currentPrefix(f.line), at: f.at, cards, ...(told?.length ? { agents: told } : {}), ...(f.lanes === true && lanes ? { lanes: true as const } : {}), ...(f.replies === true ? { replies: true as const } : {}), ...(f.delivery ? { delivery: f.delivery as string } : {}), ...(pendingLanes ? { laneMarks: pendingLanes } : {}), ...(f.again === true ? { again: true as const } : {}), ...(f.sending ? { sending: f.sending as string } : {}), ...(f.limit === true ? { limit: true as const } : {}) }
+    fired = { line: f.line, at: f.at, cards, ...(told?.length ? { agents: told } : {}), ...(f.lanes === true && lanes ? { lanes: true as const } : {}), ...(f.replies === true ? { replies: true as const } : {}), ...(f.delivery ? { delivery: f.delivery as string } : {}), ...(pendingLanes ? { laneMarks: pendingLanes } : {}), ...(f.again === true ? { again: true as const } : {}), ...(f.sending ? { sending: f.sending as string } : {}), ...(f.limit === true ? { limit: true as const } : {}) }
   }
   // Where its view of each card ended (every card, or none from before #224), and whose own changes aren't news.
   let seen: Record<string, Seen> | undefined
@@ -2206,7 +2204,7 @@ function toldOf(projectPath: string, agentId: string, n: number): { h: string | 
 
 /** Hive's own deliveries come from it. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
-const HIVE = { kind: 'hive', name: 'Combwork' } as const
+const HIVE = { kind: 'combwork', name: 'Combwork' } as const
 
 /** A watch's wake's key among its deliveries: the watch and when it fired (a restart finds the one it made). */
 const wakeRef = (rec: WatchRecord): string => `${rec.id}@${rec.fired?.at ?? ''}`

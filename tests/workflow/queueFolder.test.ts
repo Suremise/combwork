@@ -28,7 +28,7 @@ afterEach(() => {
 })
 
 // Combwork's commit message (G19, chosen: the branch's own is every preset's since HI-1997), so each merge names its card.
-const pair = (): Env => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], commitMessage: 'hive' }))
+const pair = (): Env => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], commitMessage: 'combwork' }))
 
 async function queued(e: Env, title = 'A', file = 'a.txt', content = `${title}\n`) {
   const card = e.wf.createCard({ title })

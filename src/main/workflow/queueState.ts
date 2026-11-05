@@ -89,7 +89,7 @@ export type QueueState =
 
 /** The card's queue state when its own ruleset says Hive merges it, else null (the agent merges, or nobody checks). */
 export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.state(card)): QueueState | null {
-  if (wf.rulesetOf(card, s).options.finish !== 'hiveMerges') return null
+  if (wf.rulesetOf(card, s).options.finish !== 'combworkMerges') return null
   if (s.stage === 'done') return { state: 'merged' }
   const open = openEntry(s)
   if (open) {

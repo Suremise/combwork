@@ -1,5 +1,4 @@
-import { existsSync } from 'original-fs'
-import { lstat, mkdir, readFile, readdir, realpath, rename, writeFile } from 'original-fs/promises'
+import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'original-fs/promises'
 import { createHash, randomUUID } from 'crypto'
 import { join, resolve } from 'path'
 import { Worker } from 'worker_threads'
@@ -9,6 +8,7 @@ import { LEGACY_HIVE_DIR, movedExcludeText, movedPathOf, rewriteMovedPaths, type
 import { msg, tr, type Msg } from '../shared/i18n'
 import { toast } from './events'
 import { readKeptJson, realPath, writeKeptJson, writeTextAtomic } from './fsutil'
+import { ifAbsent, lstatOrNullAsync, present } from './fsPresence'
 import { git } from './git'
 import { HiveError, errorText, hiveError } from './hiveError'
 import { excludeLine, gitDirOf, vcsOf } from './hiveVcs'
@@ -101,7 +101,7 @@ const under = (p: string, root: string): boolean => {
 
 /** A host's own folder, not a link (a symlink or junction) to somewhere else: its real place is inside the host's. */
 async function plainFolder(host: string, dir: string): Promise<boolean> {
-  const st = await lstat(dir).catch(() => null)
+  const st = await lstatOrNullAsync(dir)
   if (!st || st.isSymbolicLink() || !st.isDirectory()) return false
   return realPath(dir).toLowerCase() === join(realPath(host), LEGACY_HIVE_DIR).toLowerCase()
 }
@@ -119,16 +119,20 @@ const markText = (id: string): string => JSON.stringify({ kind: MARK_KIND, versi
  */
 async function movedHost(host: string): Promise<boolean> {
   const dir = current(host)
+  // No marker, or one that isn't Combwork's: not moved. One that can't be read now fails the step (presence.ts).
+  const text = await readFile(join(dir, MARK_FILE), 'utf8').catch(ifAbsent(null))
+  if (text === null) return false
+  let m: { kind?: unknown; version?: unknown; id?: unknown } | null
   try {
-    const m = JSON.parse(await readFile(join(dir, MARK_FILE), 'utf8')) as { kind?: unknown; version?: unknown; id?: unknown }
-    if (!(m.kind === MARK_KIND && m.version === 1 && typeof m.id === 'string' && m.id.length > 0)) return false
-    const st = await lstat(dir)
-    if (st.isSymbolicLink() || !st.isDirectory()) return false
-    const [realDir, realHost] = await Promise.all([realpath(dir), realpath(host)])
-    return realDir.toLowerCase() === join(realHost, CW_DIR).toLowerCase()
+    m = JSON.parse(text) as typeof m
   } catch {
     return false
   }
+  if (!(m && m.kind === MARK_KIND && m.version === 1 && typeof m.id === 'string' && m.id.length > 0)) return false
+  const st = await lstatOrNullAsync(dir)
+  if (!st || st.isSymbolicLink() || !st.isDirectory()) return false
+  const [realDir, realHost] = await Promise.all([realpath(dir), realpath(host)])
+  return realDir.toLowerCase() === join(realHost, CW_DIR).toLowerCase()
 }
 
 /** A host as one look at it saw it (HI-2510): whether its `.combwork` was Combwork's move, looked at once per step. */
@@ -146,7 +150,7 @@ async function lookAt(hosts: { host: string; kind: HostKind }[]): Promise<Looked
   const out: Looked[] = []
   let next = 0
   const lane = async (): Promise<void> => {
-    for (let i = next++; i < hosts.length; i = next++) out[i] = { ...hosts[i], marked: existsSync(current(hosts[i].host)) && (await movedHost(hosts[i].host)) }
+    for (let i = next++; i < hosts.length; i = next++) out[i] = { ...hosts[i], marked: present(current(hosts[i].host)) && (await movedHost(hosts[i].host)) }
   }
   await Promise.all(Array.from({ length: Math.min(LOOK_AT_ONCE, hosts.length) }, lane))
   return out
@@ -156,8 +160,8 @@ async function lookAt(hosts: { host: string; kind: HostKind }[]): Promise<Looked
 export async function classify(ws: string, host: string, kind: HostKind, marked?: boolean): Promise<HostState> {
   const oldDir = legacy(host)
   const newDir = current(host)
-  const hasOld = existsSync(oldDir)
-  const hasNew = existsSync(newDir)
+  const hasOld = present(oldDir)
+  const hasNew = present(newDir)
   if (hasNew && (marked ?? (await movedHost(host)))) return 'moved'
   if (!hasOld) return 'current'
   // The workspace's own folder is the workspace; a project or the Assistant's home must really be inside it.
@@ -170,7 +174,7 @@ export async function classify(ws: string, host: string, kind: HostKind, marked?
 /** The hosts the workspace has: itself, its Assistant's home (in its tree in use), and every folder it lists as a project (hidden ones too). */
 export async function hostsOf(ws: string): Promise<{ host: string; kind: HostKind }[]> {
   const out: { host: string; kind: HostKind }[] = [{ host: ws, kind: 'workspace' }, { host: join(treeOf(ws), ASSISTANT_DIR), kind: 'assistant' }]
-  const entries = await readdir(ws, { withFileTypes: true }).catch(() => null)
+  const entries = await readdir(ws, { withFileTypes: true }).catch(ifAbsent(null))
   for (const e of entries ?? []) if (e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('$')) out.push({ host: join(ws, e.name), kind: 'project' })
   return out
 }
@@ -181,9 +185,9 @@ export async function hostsOf(ws: string): Promise<{ host: string; kind: HostKin
  */
 export function treeOf(ws: string): string {
   const now = join(ws, CW_DIR)
-  if (existsSync(now)) return now
+  if (present(now)) return now
   const old = join(ws, LEGACY_HIVE_DIR)
-  return existsSync(old) && ours(old, 'workspace') ? old : now
+  return present(old) && ours(old, 'workspace') ? old : now
 }
 
 /**
@@ -338,7 +342,7 @@ function warn(host: string, state: HostState): void {
 
 /** A `.hive` made again beside a moved `.combwork` (an older Hive opened it since): said once, left as it is. */
 async function warnRecreated(hosts: Looked[]): Promise<void> {
-  for (const h of hosts) if (h.marked && existsSync(legacy(h.host)) && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
+  for (const h of hosts) if (h.marked && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
 }
 
 const lockBusy = (h: { profile: string }): HiveError => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' })
@@ -420,7 +424,7 @@ export async function excludeMoveLock(ws: string): Promise<void> {
     if (!gd) return
     const f = join(gd, 'info', 'exclude')
     const line = excludeLine(found.root, ws).replace(/\/\.combwork\/$/, `/${MOVE_LOCK_FILE}`)
-    const text = await readFile(f, 'utf8').catch(() => '')
+    const text = await readFile(f, 'utf8').catch(ifAbsent(''))
     if (text.split(/\r?\n/).some((l) => l.trim() === line)) return
     await mkdir(join(gd, 'info'), { recursive: true })
     await writeTextAtomic(f, `${text}${text && !text.endsWith('\n') ? '\n' : ''}# Combwork's folder move lock (added by Combwork)\n${line}\n`) // i18n-ignore: a line in git's exclude file, which stays English
@@ -501,11 +505,11 @@ export async function moveExcludeLine(host: string): Promise<boolean> {
   const gd = await gitDirOf(found.root)
   if (!gd) return false
   const f = join(gd, 'info', 'exclude')
-  const text = await readFile(f, 'utf8').catch(() => null)
+  const text = await readFile(f, 'utf8').catch(ifAbsent(null))
   if (text === null) return false
   const newLine = excludeLine(found.root, host)
   const oldLine = newLine.replace(/\/\.combwork\/$/, `/${LEGACY_HIVE_DIR}/`)
-  const next = movedExcludeText(text, oldLine, newLine, !existsSync(legacy(host)))
+  const next = movedExcludeText(text, oldLine, newLine, !present(legacy(host)))
   if (next === text) return false
   await writeTextAtomic(f, next)
   return true
@@ -523,7 +527,7 @@ export async function repairWorktrees(host: string, moves: FolderMove[]): Promis
   const fixed: string[] = []
   for (const p of paths) {
     const to = movedPathOf(p, moves)
-    if (to && existsSync(to)) fixed.push(to)
+    if (to && present(to)) fixed.push(to)
   }
   if (!fixed.length) return 0
   const rep = await git(host, ['worktree', 'repair', ...fixed])
@@ -533,11 +537,11 @@ export async function repairWorktrees(host: string, moves: FolderMove[]): Promis
 
 /** The shared notes and handovers' paths into moved folders, each file written whole, only those that change. */
 export async function rewriteNotes(dir: string, moves: FolderMove[]): Promise<number> {
-  if (!moves.length || !existsSync(dir)) return 0
+  if (!moves.length || !present(dir)) return 0
   let n = 0
   const walk = async (d: string, depth: number): Promise<void> => {
     if (depth > 8) return
-    const entries = await readdir(d, { withFileTypes: true }).catch(() => null)
+    const entries = await readdir(d, { withFileTypes: true }).catch(ifAbsent(null))
     for (const e of entries ?? []) {
       const p = join(d, e.name)
       if (e.isDirectory() && !e.isSymbolicLink()) await walk(p, depth + 1)
@@ -571,7 +575,7 @@ export function checkpointOffMain(file: string): Promise<CheckpointAnswer> {
 
 /** The folders the board's skill copies records name, read in the worker (HI-2587's marker step); none without a board. */
 export async function copyFoldersOffMain(file: string): Promise<string[]> {
-  if (!existsSync(file)) return []
+  if (!present(file)) return []
   const job: CopyFolders = { kind: 'copyFolders', file }
   const a = await inMoveWorker<CopyFoldersAnswer>(job, async () => (await import('./hiveMoveWorker')).copyFolders(job))
   if (!a.ok) throw new Error(a.error)
@@ -663,7 +667,7 @@ export async function followMovedLink(p: string, workspaces: readonly string[], 
   let q: string | null = null
   for (const ws of workspaces) if ((q = await movedPath(ws, p))) break
   const at = q ?? p
-  if (q && existsSync(q)) return q
+  if (q && present(q)) return q
   return (await movedAttachment(at)) ?? q
 }
 

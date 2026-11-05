@@ -803,6 +803,10 @@
     "defaultMessage": "Combwork couldn't finish renaming {what} from Hive's names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.",
     "description": "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names Hive stored (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence."
   },
+  "service.nameUpgrade.profileFailed": {
+    "defaultMessage": "Combwork couldn't convert {files} from Hive's names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.",
+    "description": "An error box as Combwork starts, after an update from Hive: a settings file couldn't be rewritten with Combwork's names (HI-2598), so Combwork doesn't start rather than lose the settings. {files} lists the files' paths; {n} is how many."
+  },
   "service.providers.keysStopped": {
     "defaultMessage": "{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.",
     "description": "A notification: Combwork stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")."

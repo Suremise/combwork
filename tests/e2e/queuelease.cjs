@@ -98,7 +98,7 @@ const queueFolders = () =>
     fs.writeFileSync(fx.go, 'go')
     check('…and the card is merged: Done', !!(await waitHung(async () => (await b.card(one.n))?.column === 'done')), JSON.stringify(await b.kinds(one.n)))
     const integrated = (await b.facts(one.n)).filter((x) => x.kind === 'Integrated')
-    check('…merged once: one Integrated, by Combwork, one merge commit on integration', integrated.length === 1 && integrated[0].data.by === 'hive' && integrated[0].data.result === q.head(fx) && lib.git(fx.alpha, ['rev-list', '--merges', '--count', 'main..integration']).trim() === '1', JSON.stringify(integrated))
+    check('…merged once: one Integrated, by Combwork, one merge commit on integration', integrated.length === 1 && integrated[0].data.by === 'combwork' && integrated[0].data.result === q.head(fx) && lib.git(fx.alpha, ['rev-list', '--merges', '--count', 'main..integration']).trim() === '1', JSON.stringify(integrated))
     check("B's Merges tab no longer names another runner", !!(await waitHung(async () => !(await tab.text('integration')).includes('Run by'))), await tab.text('integration'))
     await b.page.mouse.move(5, 5)
     await b.page.screenshot({ path: path.join(fx.shots, 'queuelease-2-taken-over.png') })
