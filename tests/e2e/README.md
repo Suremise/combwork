@@ -723,7 +723,7 @@ so nothing needs deleting before a rerun (#304): `require('./tests/e2e/lib.cjs')
 `hive-test\scratch\<what>-<date>-<time>-<random>`, which the clean-up prunes by age; or a new folder of your own in your
 scratchpad (Claude Code's session scratchpad, or `%TEMP%`). Never in the lanes or logs. A folder that has to be reused
 is emptied from Node with `npm run e2e -- --clear-dir <folder>` (`clearDir` in `evidence.cjs`): only inside a Claude
-Code scratchpad, a `hive…` folder in `%TEMP%`, or `hive-test\scratch` or `e2e` outside the lanes and logs; never an area
+Code scratchpad, a `cw…` folder in `%TEMP%`, or `hive-test\scratch` or `e2e` outside the lanes and logs; never an area
 itself, a CLI test home, a link or what a card cites. Cite evidence a card needs by its full path: it stays until the
 card is Done.
 
