@@ -107,7 +107,7 @@ function evidenceProblems(report) {
   if (typeof s1.banner !== 'string') problems.push('s1: fact banner missing')
   if (!Array.isArray(s1.setupTabs)) problems.push('s1: fact setupTabs missing')
   if (!s1.version) problems.push('s1: fact version missing')
-  if (!Array.isArray(s6.hive)) problems.push('s6: fact hive (the new workspace\'s .combwork) missing')
+  if (!Array.isArray(s6.workspaceTree)) problems.push('s6: fact workspaceTree (the new workspace\'s .combwork) missing')
   if (!s6.views || typeof s6.views !== 'object') problems.push('s6: fact views missing')
   if (!s6.workspaceJson) problems.push('s6: fact workspaceJson missing')
   const st = f['s1-state']
@@ -121,7 +121,7 @@ function freshSide(report) {
   const s1 = f.s1.facts
   const s6 = f.s6.facts
   const sub = name => {
-    const e = s6.hive.find(x => typeof x === 'object' && x && Object.prototype.hasOwnProperty.call(x, name))
+    const e = s6.workspaceTree.find(x => typeof x === 'object' && x && Object.prototype.hasOwnProperty.call(x, name))
     return e && Array.isArray(e[name]) ? e[name] : []
   }
   const shared = Object.fromEntries(sub('shared').filter(x => typeof x === 'object').map(x => { const [k, v] = Object.entries(x)[0]; return [k, (Array.isArray(v) ? v : []).filter(n => n !== 'README.md')] }))

@@ -436,7 +436,7 @@ test('a view counts as loaded only on its own loaded markers, however long its l
     // Never loaded within the bound: null, so the view isn't counted as shown.
     assert.strictEqual(await ready.viewReady(view, async () => 0, 30, 1), null, view.name)
   }
-  assert.deepStrictEqual(ready.VIEWS.map((v: Json) => v.slug), ['workspace-overview', 'task-board', 'shared-notes', 'skills', 'mcp-servers', 'hive-assistant'])
+  assert.deepStrictEqual(ready.VIEWS.map((v: Json) => v.slug), ['workspace-overview', 'task-board', 'shared-notes', 'skills', 'mcp-servers', 'assistant'])
 })
 
 test('every view marker the driver waits for is in Combwork\'s window: its classes and attributes in the renderer, its text in English', () => {

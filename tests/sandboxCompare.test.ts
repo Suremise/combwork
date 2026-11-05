@@ -46,7 +46,7 @@ const report = (): Json => ({
   files: {
     s1: { ...finished('s1'), facts: { version: '0.6.0', gitMissing: true, banner: 'No coding agents are turned on.\nChoose providers', setupTabs: ['Claude Code\n(off)', 'Codex\n(off)', 'GitHub Copilot\n(off)'] } },
     's1-state': { git: false, node: false },
-    s6: { ...finished('s6'), facts: { hive: [{ skills: [{ handover: ['SKILL.md'] }, { 'my-own': ['SKILL.md'] }] }, { personas: ['planner.md'] }, { mcp: [] }, { shared: [{ handovers: ['README.md'] }] }, 'workspace.json'], workspaceJson: { mcp: { enabled: [] } }, projects: [{ name: 'demo' }], views: { Skills: 'SKILLS\nHIVE\n2' } } }
+    s6: { ...finished('s6'), facts: { workspaceTree: [{ skills: [{ handover: ['SKILL.md'] }, { 'my-own': ['SKILL.md'] }] }, { personas: ['planner.md'] }, { mcp: [] }, { shared: [{ handovers: ['README.md'] }] }, 'workspace.json'], workspaceJson: { mcp: { enabled: [] } }, projects: [{ name: 'demo' }], views: { Skills: 'SKILLS\nHIVE\n2' } } }
   }
 })
 const cli = (s: { dir: string }, rep: Json, ws: string) => {

@@ -106,7 +106,7 @@ LangString combworkInstallerBusy 2052 "另一个 Combwork 安装程序仍在运�
 ;    running now is waited for (at most CW_LEGACY_WAIT_MS). WAIT_ABANDONED counts as taken. electron-builder's
 ;    uninstaller never takes its installer's mutex (ALLOW_ONLY_ONE_INSTALLER_INSTANCE is the installer's), so Combwork
 ;    Desktop's uninstaller, run below, isn't held up by it. Any failing call: nothing changed (exit 4).
-; 2. hiveUpgrade.ps1: the apps of both installations asked to close (askToClose.ps1, HI-1707: they record their
+; 2. legacyUpgrade.ps1: the apps of both installations asked to close (askToClose.ps1, HI-1707: they record their
 ;    agents and resume them at the next start) and checked to have exited, Hive Desktop removed with its data kept, and
 ;    the profile folders moved (with the installer's record, HI-2461). It says why it stopped: an app still running
 ;    (exit 5, nothing changed) or Hive Desktop not removed (exit 6, the profile folders untouched); the installer stops
@@ -175,8 +175,8 @@ LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 C
     ; 2. The upgrade.
     InitPluginsDir
     File "/oname=$PLUGINSDIR\askToClose.ps1" "${CW_BUILD_DIR}\askToClose.ps1"
-    File "/oname=$PLUGINSDIR\hiveUpgrade.ps1" "${CW_BUILD_DIR}\hiveUpgrade.ps1"
-    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\hiveUpgrade.ps1" -InstallDir "$INSTDIR" -WorkDir "$PLUGINSDIR"'
+    File "/oname=$PLUGINSDIR\legacyUpgrade.ps1" "${CW_BUILD_DIR}\legacyUpgrade.ps1"
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\legacyUpgrade.ps1" -InstallDir "$INSTDIR" -WorkDir "$PLUGINSDIR"'
     Pop $0
     DetailPrint "The upgrade from Hive Desktop: $0"
     ${If} $0 == "5"

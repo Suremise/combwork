@@ -1,7 +1,7 @@
 appId: it.surmise.combwork
 # The displayed name (#443, HI-2458: Combwork) and the install identity (HI-2460): app ID it.surmise.combwork, installed as
 # Combwork.exe in %LOCALAPPDATA%\Programs\Combwork (from executableName). Its installer removes Hive Desktop (appId
-# com.hive.desktop) and moves its profile folders (build/installer.nsh, hiveUpgrade.ps1); main sets the profile folder
+# com.hive.desktop) and moves its profile folders (build/installer.nsh, legacyUpgrade.ps1); main sets the profile folder
 # (shared/appName.ts).
 productName: Combwork
 copyright: Copyright © 2026 Darren Marshall

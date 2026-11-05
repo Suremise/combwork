@@ -28,7 +28,7 @@ const { _electron } = require(process.env.PW_CORE || 'C:\\tools\\playwright')
 const [step, prefix] = process.argv.slice(2)
 const OUT = 'C:\\out'
 // The installed app (HI-2460): Combwork's when it is installed, else Hive Desktop's (1.0, before an upgrade). Its
-// profile: Combwork's folder when it is there, else Hive's (HI-2461's fallback, and 1.0's own).
+// profile: Combwork's folder when it is there, else Hive's (1.0's own, before the upgrade moves it).
 const COMBWORK_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Combwork', 'Combwork.exe')
 const HIVE1_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Hive', 'Hive.exe')
 const CW_EXE = fs.existsSync(COMBWORK_EXE) ? COMBWORK_EXE : HIVE1_EXE
@@ -255,14 +255,14 @@ const steps = {
     }
     // Recorded once Combwork has set the workspace up: its status names it with its Combwork skills, which it replies with only
     // once the open has brought the bundled skills and modes up to date. Not set up within the bound: the check fails,
-    // and what is there is kept apart (hiveNotSetUp), never recorded as the workspace's.
+    // and what is there is kept apart (workspaceNotSetUp), never recorded as the workspace's.
     const status = await workspaceSetUp(() => api('/v1/status'), ws)
     const now = tree(path.join(ws, '.combwork'), 3)
-    if (status) res.facts.hive = now
-    else res.facts.hiveNotSetUp = now
-    res.facts.projectHive = tree(path.join(ws, 'demo', '.combwork'), 1)
+    if (status) res.facts.workspaceTree = now
+    else res.facts.workspaceNotSetUp = now
+    res.facts.projectTree = tree(path.join(ws, 'demo', '.combwork'), 1)
     try { res.facts.workspaceJson = JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'workspace.json'), 'utf8')) } catch { /* recorded as missing */ }
-    check('6.hive-folder', 'Combwork creates the workspace\'s .combwork folder and sets it up (its status lists its Combwork skills)', status && Array.isArray(res.facts.hive), status ? 'no .combwork folder' : `Combwork didn't say the workspace was set up within 60 s (GET /v1/status): ${JSON.stringify(now).slice(0, 300)}`)
+    check('6.combwork-folder', 'Combwork creates the workspace\'s .combwork folder and sets it up (its status lists its Combwork skills)', status && Array.isArray(res.facts.workspaceTree), status ? 'no .combwork folder' : `Combwork didn't say the workspace was set up within 60 s (GET /v1/status): ${JSON.stringify(now).slice(0, 300)}`)
     res.facts.status = status && { workspace: status.workspace, workspaces: status.workspaces, providers: status.providers && Object.keys(status.providers) }
     res.facts.projects = await api('/v1/projects').catch(e => ({ error: String(e) }))
     res.facts.views = {}
