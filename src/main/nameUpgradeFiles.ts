@@ -1,6 +1,6 @@
 import { lstat, mkdir, readdir, readFile, rm, rmdir } from 'original-fs/promises'
 import { join } from 'path'
-import { contentHash, SwapAbandoned, swapOut, withFileLock, writeJsonAtomic, writeTextAtomic } from './fsutil'
+import { cleanSwaps, contentHash, SwapAbandoned, swapOut, SwapUnreadable, withFileLock, writeJsonAtomic, writeTextAtomic } from './fsutil'
 import { ifAbsent, lstatOrNullAsync } from './fsPresence'
 import { createLogger, userText } from './logger'
 import HISTORY from './bundledHistory.json'
@@ -192,8 +192,23 @@ export async function retireRenamedSkills(dir: string, o: RetireOps = {}): Promi
     log.warn(`${what}; the names upgrade tries again at the next open`, e)
     settled = false
   }
+  const skills = join(dir, 'skills')
+  // An old-name copy a swapOut moved aside and couldn't put back (an earlier run's failure, HR2 on HI-2611) is put back
+  // first, by the bundled sync's own rule (cleanSwaps: a leftover that is a version Combwork shipped holds nothing of the
+  // user's), so this run retires it. One still aside leaves the run unsettled: not retired, so not done.
+  const asideOf = (names: string[]): boolean => names.some((n) => Object.keys(RENAMED_SKILLS).some((id) => n.startsWith(`.${id}.cw-`)))
+  const list = (): Promise<string[]> => readdir(skills).catch(ifAbsent([] as string[]))
+  try {
+    if (asideOf(await list())) {
+      await cleanSwaps(skills, async (old, name) => (history.skills[name] ?? []).includes(await contentHash(old)))
+      if (asideOf(await list())) throw new Error('An old copy set aside as it was being removed could not be put back') // i18n-ignore: an error for the log
+    }
+  } catch (e) {
+    later('Could not put back a renamed skill set aside by an earlier run', e)
+    return settled
+  }
   for (const id of Object.keys(RENAMED_SKILLS)) {
-    const dest = join(dir, 'skills', id)
+    const dest = join(skills, id)
     try {
       if (await look(dest)) {
         const copy = await hash(dest)
@@ -203,7 +218,9 @@ export async function retireRenamedSkills(dir: string, o: RetireOps = {}): Promi
         log.info(`Removed the bundled skill ${userText(id)}: it ships as ${userText(RENAMED_SKILLS[id])} now`)
       }
     } catch (e) {
-      if (e instanceof SwapAbandoned) log.info(`Kept the skill ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
+      // Changed as it was being removed: the user's now, kept. One swapOut couldn't read again as it went (SwapUnreadable,
+      // HI-2612) is put back too, but isn't the user's change: unsettled, so the next open retires it.
+      if (e instanceof SwapAbandoned && !(e instanceof SwapUnreadable)) log.info(`Kept the skill ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
       else later(`Could not look at or remove the renamed skill ${userText(id)}`, e)
       continue
     }

@@ -2,13 +2,23 @@
 // names upgrade's files step (nameUpgradeFiles.ts retireRenamedSkills), not by every sync of the bundled items: a copy
 // Hive shipped, unchanged, goes with its entry in bundled.json; one the user changed stays; a second run does nothing.
 // Only a confirmed absence is gone: a copy or manifest it couldn't look at is left, unsettled, for the next open (HR1's
-// round 1). And a workspace an RC recorded done (version 3) runs it at its next open, once.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+// round 1). And a workspace an RC recorded done (version 3) runs it at its next open, once. swapOut's later checks
+// failing to read (SwapUnreadable, HI-2612), or a copy an earlier run left set aside, never record it done (HR2).
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { contentHash } from '../src/main/fsutil'
 import HISTORY from '../src/main/bundledHistory.json'
 import { tempDir } from './tempDir'
+
+/** Paths matching a pattern whose calls (`call`'s alone, when named) fail once `pass` of them have gone through. */
+const faults: { match: RegExp; code: string; pass: number; call?: string }[] = []
+const failing = (p: unknown, call: string): string | undefined => {
+  const f = faults.find((x) => x.match.test(String(p)) && (!x.call || x.call === call))
+  if (!f) return undefined
+  if (f.pass > 0) return void f.pass--
+  return f.code
+}
 
 const OLD = "---\nname: use-hive-api\ndescription: Hive's HTTP API.\n---\n\nAs shipped.\n"
 const base = tempDir('nameupgrade-skills-')
@@ -25,6 +35,15 @@ beforeAll(async () => {
   history.skills['use-hive-api'] = [...(history.skills['use-hive-api'] ?? []), await contentHash(shipped)]
   vi.resetModules()
   vi.doMock('../src/main/bundledHistory.json', () => ({ default: history }))
+  vi.doMock('original-fs/promises', async () => {
+    const real = await import('fs/promises')
+    const wrap = <F extends (...a: any[]) => Promise<any>>(fn: F, call: string): F =>
+      ((p: unknown, ...rest: unknown[]) => {
+        const code = failing(p, call)
+        return code ? Promise.reject(Object.assign(new Error(`${code}: refused, '${String(p)}' (test)`), { code })) : fn(p, ...rest)
+      }) as F
+    return { ...real, default: real, open: wrap(real.open, 'open'), readFile: wrap(real.readFile, 'readFile'), lstat: wrap(real.lstat, 'lstat'), rename: wrap(real.rename, 'rename') }
+  })
   vi.doMock('../src/main/events', async (orig) => ({ ...(await orig<object>()), toast: () => undefined }))
   const electron = await import('electron')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -131,4 +150,71 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
     expect(existsSync(join(dir, 'skills', 'use-hive-api'))).toBe(false)
     expect(JSON.parse(readFileSync(join(dir, names.NAMES_DONE_FILE), 'utf8')).version).toBe(names.NAMES_VERSION)
   })
+
+  // swapOut checks the copy again as it removes it (before the rename, then twice once it is moved aside). A read failing
+  // at any of those is put back, but isn't the user's change: the record stays at 3, and the next open retires it.
+  // `pass`: the reads of SKILL.md let through before the failing one, at its place (the first is the hash) or aside.
+  const LATER = [
+    { check: 'the check before it moves', at: /[\\/]use-hive-api[\\/]SKILL\.md$/, pass: 1 },
+    { check: 'the first check once moved aside', at: /\.use-hive-api\.cw-old-[^\\/]+[\\/]SKILL\.md$/, pass: 0 },
+    { check: 'the last check once moved aside', at: /\.use-hive-api\.cw-old-[^\\/]+[\\/]SKILL\.md$/, pass: 1 }
+  ]
+  const record = (dir: string): number => JSON.parse(readFileSync(join(dir, names.NAMES_DONE_FILE), 'utf8')).version
+  const atV3 = (): { dir: string; ws: string } => {
+    const dir = workspace(OLD)
+    writeFileSync(join(dir, names.NAMES_DONE_FILE), JSON.stringify({ version: 3 }))
+    return { dir, ws: join(dir, '..') }
+  }
+  for (const code of ['EACCES', 'EPERM', 'EIO']) {
+    for (const l of LATER) {
+      it(`${code} at ${l.check}: put back, not recorded done; released, the next open retires it`, async () => {
+        const { dir, ws } = atV3()
+        faults.push({ match: l.at, code, pass: l.pass })
+        try {
+          await move.moveFolders(ws)
+          expect(faults[0].pass).toBe(0)
+        } finally {
+          faults.length = 0
+        }
+        expect(readFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), 'utf8')).toBe(OLD)
+        expect(readdirSync(join(dir, 'skills'))).toEqual(['use-hive-api'])
+        expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+        expect(record(dir)).toBe(3)
+        expect(await names.workspaceNeeds(ws)).toBe(true)
+        await move.moveFolders(ws)
+        expect(readdirSync(join(dir, 'skills'))).toEqual([])
+        expect(manifest(dir).skills).toEqual({ handover: { from: 'y' } })
+        expect(record(dir)).toBe(names.NAMES_VERSION)
+      })
+    }
+  }
+
+  it('a copy an earlier run left set aside (its put-back failed): put back and retired before the record is written', async () => {
+    const { dir, ws } = atV3()
+    renameSync(join(dir, 'skills', 'use-hive-api'), join(dir, 'skills', '.use-hive-api.cw-old-1-1'))
+    await move.moveFolders(ws)
+    expect(readdirSync(join(dir, 'skills'))).toEqual([])
+    expect(manifest(dir).skills).toEqual({ handover: { from: 'y' } })
+    expect(record(dir)).toBe(names.NAMES_VERSION)
+  })
+
+  for (const code of ['EACCES', 'EPERM', 'EIO']) {
+    it(`${code} putting back a copy an earlier run left set aside: nothing removed or recorded; released, the next open finishes`, async () => {
+      const { dir, ws } = atV3()
+      const aside = join(dir, 'skills', '.use-hive-api.cw-old-1-1')
+      renameSync(join(dir, 'skills', 'use-hive-api'), aside)
+      faults.push({ match: /\.use-hive-api\.cw-old-1-1$/, code, pass: 0, call: 'rename' })
+      try {
+        await move.moveFolders(ws)
+      } finally {
+        faults.length = 0
+      }
+      expect(readdirSync(join(dir, 'skills'))).toEqual(['.use-hive-api.cw-old-1-1'])
+      expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+      expect(record(dir)).toBe(3)
+      await move.moveFolders(ws)
+      expect(readdirSync(join(dir, 'skills'))).toEqual([])
+      expect(record(dir)).toBe(names.NAMES_VERSION)
+    })
+  }
 })
