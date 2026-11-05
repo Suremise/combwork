@@ -77,6 +77,40 @@ test('a folder: names and text files searched, logs apart, a profile\'s binaries
   assert.strictEqual(t.places.roaming.scanned, 0)
 })
 
+test('a folder or file that can\'t be read is counted against its place, with why (HR1, round 1)', () => {
+  const dir = tempDir('sandbox-clean-unread-')
+  const ws = path.join(dir, 'Clean')
+  write(path.join(ws, 'demo', 'README.md'), '# demo\n')
+  write(path.join(ws, 'locked', 'inside.txt'), 'Hive, unseen')
+  write(path.join(ws, 'demo', 'busy.json'), '{"hive":1}')
+  write(path.join(ws, 'logs', 'busy.log'), 'hive.log')
+  // As Windows answers a folder it may not list, and files another process holds open without sharing.
+  const { readdirSync, openSync } = fs
+  const deny = (p: unknown, what: string): never => { throw Object.assign(new Error(`EPERM: operation not permitted, ${what} '${String(p)}'`), { code: 'EPERM' }) }
+  fs.readdirSync = ((p: fs.PathLike, o?: unknown) => (String(p) === path.join(ws, 'locked') ? deny(p, 'scandir') : (readdirSync as (a: unknown, b?: unknown) => unknown)(p, o))) as typeof fs.readdirSync
+  fs.openSync = ((p: fs.PathLike, ...rest: unknown[]) => (/busy\./.test(String(p)) ? deny(p, 'open') : (openSync as (...a: unknown[]) => number)(p, ...rest))) as typeof fs.openSync
+  const t = tally()
+  try {
+    scanTree(t, 'workspace', ws, { binary: 'scan' })
+  } finally {
+    fs.readdirSync = readdirSync
+    fs.openSync = openSync
+  }
+  assert.strictEqual(t.places.workspace.count, 0)
+  assert.strictEqual(t.places.workspace.unread, 2)
+  assert.strictEqual(t.places.logs.unread, 1)
+  assert.deepStrictEqual(t.skipped.map((s: Json) => [s.category, path.relative(ws, s.place)]).sort(), [['logs', path.join('logs', 'busy.log')], ['workspace', 'locked'], ['workspace', path.join('demo', 'busy.json')]].sort())
+  // Its check fails, naming each with why, though nothing that was read had a hit.
+  const scan = { places: t.places, asar: [{ place: 'app.asar', count: 0 }], skipped: t.skipped }
+  for (const c of CATEGORIES) if (!scan.places[c.id].scanned) scanText(t, c.id, `${c.id} place`, 'Combwork')
+  const failed = collect(scan).filter((c) => !c.ok)
+  assert.deepStrictEqual(failed.map((c) => c.id), ['9.no-hive-workspace', '9.no-hive-logs'])
+  assert.match(failed[0].detail, /^2 not read: /)
+  assert.match(failed[0].detail, /locked \(EPERM: operation not permitted, scandir /)
+  assert.match(failed[0].detail, /busy\.json \(EPERM: operation not permitted, open /)
+  assert.doesNotMatch(failed[0].detail, /hit/)
+})
+
 // reg query HKCU /f hive /s, as reg.exe prints it: before the install, Windows' own entries, one only "archive".
 const REG_BEFORE = [
   'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Archive',
@@ -224,6 +258,15 @@ test('what the clean step relies on is still there, and it hands the scan the fi
   }
   // Logs are found inside the folders it searches (clean.cjs scanTree): none at all fails 9.no-hive-logs.
   for (const c of CATEGORIES.filter((x: Json) => x.id !== 'logs')) assert.ok(scan.includes(`'${c.id}'`), `clean-scan.cjs searches ${c.id}`)
+})
+
+test('the report: a place with something unread fails, and the report lists it with why', () => {
+  const scan = cleanScan()
+  scan.places.local.unread = 1
+  scan.skipped = [{ category: 'local', place: 'C:\\Users\\u\\AppData\\Local\\Combwork\\combwork.db', why: 'EBUSY: resource busy or locked' }]
+  const r = report(scan)
+  assert.deepStrictEqual(r.checks.filter((c: Json) => !c.ok).map((c: Json) => c.detail), ['1 not read: C:\\Users\\u\\AppData\\Local\\Combwork\\combwork.db (EBUSY: resource busy or locked)'])
+  assert.match(markdown(r), /### Not read: 1\n\n\| Place \| Why \|\n\|---\|---\|\n\| C:\\Users\\u\\AppData\\Local\\Combwork\\combwork\.db \| EBUSY: resource busy or locked \|/)
 })
 
 test('the report: a clean run whose scan or driver is missing fails, never a silent gap', () => {

@@ -4,7 +4,7 @@
  *   C:\tools\node\node.exe C:\tools\hive-tests\sandbox\inside\clean-scan.cjs scan <prefix>       after drive.cjs clean
  * baseline keeps what HKCU says of "hive" before anything is installed (C:\out\<prefix>-reg-before.txt), so the scan
  * counts only what the install and the app added. scan searches every place of ../clean.cjs CATEGORIES for "hive" and
- * writes C:\out\<prefix>-scan.json ({ places: { <id>: { scanned, count, hits, why? } }, asar, skipped, at }), which
+ * writes C:\out\<prefix>-scan.json ({ places: { <id>: { scanned, count, hits, unread, why? } }, asar, skipped, at }; skipped: what couldn't be read, which fails its place), which
  * the host's report turns into checks (report.cjs, clean.cjs cleanChecks). What the driver kept for it: C:\out\<prefix>.json
  * (its facts: the workspace and the export's folder), <prefix>-window.json, -diagnostics.txt and -agent-env.txt.
  */
@@ -102,7 +102,7 @@ function scan() {
   if (!facts.exportDir || !scanTree(t, 'export', facts.exportDir, { binary: 'scan' })) why.export = `no exported board (${facts.exportDir ?? 'the driver named none'})`
 
   for (const [k, w] of Object.entries(why)) t.places[k].why = w
-  const res = { at: new Date().toISOString(), places: t.places, asar: t.asar, skipped: t.skipped.slice(0, 50) }
+  const res = { at: new Date().toISOString(), places: t.places, asar: t.asar, skipped: t.skipped.slice(0, 200) }
   fs.writeFileSync(out('scan.json'), JSON.stringify(res, null, 2))
   const counts = Object.entries(t.places).map(([k, p]) => `${k} ${p.count}/${p.scanned}`).join(', ')
   console.log(`hits/searched: ${counts}; app.asar ${t.asar.reduce((s, a) => s + a.count, 0)}`)

@@ -73,9 +73,18 @@ function binaryHits(buf) {
   return [...hiveHits(buf.toString('latin1')), ...hiveHits(buf.toString('utf16le'))]
 }
 
-/** A new tally: { [category]: { scanned, count, hits: [{ place, text }] } }, and app.asar's apart. */
+/**
+ * A new tally: { [category]: { scanned, count, hits: [{ place, text }], unread } }, app.asar's apart, and what couldn't be
+ * read ({ category, place, why }), which fails its place: an unread file or folder could hold a hit.
+ */
 function tally() {
-  return { places: Object.fromEntries(CATEGORIES.map((c) => [c.id, { scanned: 0, count: 0, hits: [] }])), asar: [], skipped: [] }
+  return { places: Object.fromEntries(CATEGORIES.map((c) => [c.id, { scanned: 0, count: 0, hits: [], unread: 0 }])), asar: [], skipped: [] }
+}
+
+/** Something in a place that couldn't be read: counted against the place, and kept with why. */
+function unread(t, category, place, why) {
+  t.places[category].unread = (t.places[category].unread || 0) + 1
+  t.skipped.push({ category, place, why: String(why) })
 }
 
 /** Counts one thing searched in a category, and its hits ({ text }), each named by place. */
@@ -112,7 +121,7 @@ function scanTree(t, category, root, { binary = 'skip', skip = () => false } = {
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true })
     } catch (e) {
-      t.skipped.push({ place: dir, why: String(e.message) })
+      unread(t, category, dir, e.message)
       return
     }
     for (const e of entries) {
@@ -127,7 +136,11 @@ function scanTree(t, category, root, { binary = 'skip', skip = () => false } = {
       }
       if (!e.isFile()) continue
       if (/\.asar$/i.test(e.name)) {
-        t.asar.push({ place: full, count: fileHits(full, 'scan').length })
+        try {
+          t.asar.push({ place: full, count: fileHits(full, 'scan').length })
+        } catch (err) {
+          unread(t, category, full, err.message)
+        }
         continue
       }
       if (skip(rel.replace(/\\/g, '/'))) continue
@@ -136,7 +149,7 @@ function scanTree(t, category, root, { binary = 'skip', skip = () => false } = {
       try {
         hits = fileHits(full, binary)
       } catch (err) {
-        t.skipped.push({ place: full, why: String(err.message) })
+        unread(t, where, full, err.message)
         continue
       }
       if (hits) record(t, where, full, hits)
@@ -196,7 +209,8 @@ function newRegistryHits(before, after) {
 
 /**
  * The report's checks for a scan (C:\out\<prefix>-scan.json, inside/clean-scan.cjs): one a place, which passes with
- * something searched there and no hit, and app.asar's count, which never fails while there is an app.asar to count.
+ * something searched there, nothing there left unread (a folder or file that couldn't be read might hold a hit) and no
+ * hit; and app.asar's count, which never fails while there is an app.asar to count.
  * add(id, name, ok, detail) is report.cjs's. Returns app.asar's hits, for the report's note.
  */
 function cleanChecks(scan, add) {
@@ -209,7 +223,11 @@ function cleanChecks(scan, add) {
       continue
     }
     const shown = p.hits.slice(0, 15).map((h) => `${h.place}: ${h.text}`).join('; ')
-    add(id, `No "hive" in ${c.title} (${p.scanned} searched)`, p.count === 0, `${p.count} hit${p.count === 1 ? '' : 's'}: ${shown}${p.count > 15 ? '; …' : ''}`)
+    const hits = p.count ? `${p.count} hit${p.count === 1 ? '' : 's'}: ${shown}${p.count > 15 ? '; …' : ''}` : ''
+    // Unread there: the count is the place's own; what is listed, the scan's record of them (kept up to its limit).
+    const notRead = [].concat(scan?.skipped || []).filter((s) => s.category === c.id)
+    const unreadText = p.unread ? `${p.unread} not read: ${notRead.slice(0, 10).map((s) => `${s.place} (${s.why})`).join('; ')}${p.unread > 10 ? '; …' : ''}` : ''
+    add(id, `No "hive" in ${c.title} (${p.scanned} searched)`, p.count === 0 && !p.unread, [hits, unreadText].filter(Boolean).join('; '))
   }
   const asar = [].concat(scan?.asar || [])
   const total = asar.reduce((s, a) => s + (a.count || 0), 0)
@@ -227,6 +245,13 @@ function hitsMarkdown(scan) {
     lines.push(`### ${c.title}: ${p.count}`, '', '| Place | Text |', '|---|---|')
     for (const h of p.hits) lines.push(`| ${esc(h.place)} | ${esc(h.text)} |`)
     if (p.count > p.hits.length) lines.push(`| … | ${p.count - p.hits.length} more |`)
+    lines.push('')
+  }
+  // What couldn't be read, each with why: those places fail too.
+  const notRead = [].concat(scan?.skipped || [])
+  if (notRead.length) {
+    lines.push(`### Not read: ${notRead.length}`, '', '| Place | Why |', '|---|---|')
+    for (const s of notRead) lines.push(`| ${esc(s.place)} | ${esc(s.why)} |`)
     lines.push('')
   }
   return lines
