@@ -1408,7 +1408,7 @@ class SessionManager {
     if (l.hiveTools !== 'connecting') return true
     l.hiveTools = 'connected'
     this.recheckTools(liveId(projectPath, agentId))
-    log.info(`${userText(agentId)}'s hive tools connected${l.readyAt === undefined ? '' : ` ${Date.now() - l.readyAt} ms after it became ready`}`)
+    log.info(`${userText(agentId)}'s Combwork tools connected${l.readyAt === undefined ? '' : ` ${Date.now() - l.readyAt} ms after it became ready`}`)
     this.emitState(l.state)
     return true
   }
@@ -2658,7 +2658,7 @@ class SessionManager {
           await mkdir(dirname(dest), { recursive: true })
           if (isGz(backup)) await decompressTo(backup, dest)
           else await copyFile(backup, dest)
-          log.info(`Restored transcript for ${sessionId} from Hive backup`)
+          log.info(`Restored transcript for ${sessionId} from Combwork's backup`)
         }
       }
       // A session restarted before anything was typed has no transcript: start it fresh under the same id
@@ -2709,7 +2709,7 @@ class SessionManager {
     const pinned = l.dialect?.chain
     const dialectEnv: Record<string, string> = pinned?.hash
       ? ((await writeDialectFile(hookAuth.dir, pinned).catch((e) => {
-          log.warn(`${userText(this.label(state))}: its dialect file couldn't be written, so its hive tools and hive-progress speak the Default`, e)
+          log.warn(`${userText(this.label(state))}: its dialect file couldn't be written, so its Combwork tools and cw-progress speak the Default`, e)
           return null
         }))?.env ?? {})
       : {}
@@ -3093,7 +3093,7 @@ class SessionManager {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l) return null
     const key = this.key(projectPath, agentId)
-    if (this.delivering.has(key)) return 'Hive is typing into it' // i18n-ignore: a reason for the log
+    if (this.delivering.has(key)) return 'Combwork is typing into it' // i18n-ignore: a reason for the log
     if (this.lineBlocked(l)) return "a line Combwork typed isn't taken yet" // i18n-ignore: a reason for the log
     if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there' // i18n-ignore: a reason for the log
     const u = this.userInput.get(key)
@@ -3460,7 +3460,7 @@ class SessionManager {
     try {
       if (this.fact(l.state, { composer: this.composerOf(l, key) })) this.emitState(l.state)
     } catch (e) {
-      log.warn('could not report whether Hive holds an input', e)
+      log.warn('could not report whether Combwork holds an input', e)
     }
   }
 
@@ -3996,7 +3996,7 @@ class SessionManager {
           check()
           box = await press('\x7f', 'A Backspace', box)
           probe = false
-          if (box !== '') throw notCleared(`the letter Hive typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
+          if (box !== '') throw notCleared(`the letter Combwork typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
           check()
           l.unanswered = 0
           return
@@ -4212,7 +4212,7 @@ class SessionManager {
       // A hook should follow it (#1336), unless it is a command of the CLI's own.
       if (l && !line.startsWith('/')) this.notePrompt(l)
       // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
-      devConsole.capture([sessionSourceId(projectPath, agentId)], () => ({ kind: 'input', name: 'Hive typed a line', provider: l?.state.provider, raw: { text: line }, made: { bracketedPaste: !!l?.screen?.bracketedPaste(), confirm: !!opts.confirm }, summary: `Hive typed a line (${line.length} chars) and Enter` }))
+      devConsole.capture([sessionSourceId(projectPath, agentId)], () => ({ kind: 'input', name: 'Combwork typed a line', provider: l?.state.provider, raw: { text: line }, made: { bracketedPaste: !!l?.screen?.bracketedPaste(), confirm: !!opts.confirm }, summary: `Combwork typed a line (${line.length} chars) and Enter` }))
       // confirm: until the CLI reports the prompt submitted. One just resumed and still drawing its conversation can
       // drop the Enter, or take it as a new line (#334): Enter again, which an empty prompt ignores. Still not
       // reported (a CLI that doesn't report prompts), it counts as sent: typing it again could send it twice.
@@ -4222,7 +4222,7 @@ class SessionManager {
         while (!taken() && Date.now() - t < 3000) await new Promise((r) => setTimeout(r, 100))
         if (taken()) break
         if (i === 2) {
-          log.warn(`${userText(this.label(l!.state))}: the CLI didn't report Hive's prompt submitted`)
+          log.warn(`${userText(this.label(l!.state))}: the CLI didn't report Combwork's prompt submitted`)
           break
         }
         // Never an Enter that would send what the user has begun typing, or into a session that got busy.
@@ -6556,7 +6556,7 @@ class SessionManager {
     this.noteTurn(l)
     if (hook.event.kind !== 'ignore' || ids.turn) {
       // i18n-ignore: the log and the hook journal (English)
-      const verdict = took.verdict === 'apply' ? (took.note ?? '') : took.verdict === 'stale' ? `stale: ${took.why}` : 'carried on by Hive'
+      const verdict = took.verdict === 'apply' ? (took.note ?? '') : took.verdict === 'stale' ? `stale: ${took.why}` : 'carried on by Combwork'
       hookJournal(`run=${st.runId} seq=${ledger.seq} ${String(body.hook_event_name ?? '?').slice(0, 40)} turn=${ids.turn ?? '-'} call=${ids.call ?? '-'}${ids.sub ? ` sub=${ids.sub}` : ''}${ids.continued ? ' continued' : ''} ${before}→${st.status}${verdict ? ` (${verdict})` : ''}`)
     }
   }
@@ -6601,7 +6601,7 @@ class SessionManager {
     // i18n-ignore: the log and the hook journal (English)
     if (rec && reconciles(l.ledger, rec.turn, Date.parse(rec.at))) return `${l.adapter.descriptor.name} recorded the end of turn ${rec.turn} at ${rec.at}`
     // i18n-ignore: the log and the hook journal (English)
-    if (unheardStop(l.ledger, l.stopsAnswered ?? [])) return `${l.adapter.descriptor.name} recorded a Stop of its running turn answered at ${new Date(l.stopsAnswered!.at(-1)!).toISOString()} that never reached Hive`
+    if (unheardStop(l.ledger, l.stopsAnswered ?? [])) return `${l.adapter.descriptor.name} recorded a Stop of its running turn answered at ${new Date(l.stopsAnswered!.at(-1)!).toISOString()} that never reached Combwork`
     return null
   }
 
@@ -7621,7 +7621,7 @@ class SessionManager {
     const ms = performance.now() - started
     if (ms > SLOW_LIST_MS) {
       const s = (x: number): string => `${(x / 1000).toFixed(1)} s`
-      log.info(`listing the sessions of ${userText(projectPath)} took ${s(ms)}: Hive's ${own.length} session(s) ${s(ownMs)}, the other sessions in ${others.folders} folder(s) ${s(othersMs)}, read at the same time`)
+      log.info(`listing the sessions of ${userText(projectPath)} took ${s(ms)}: Combwork's ${own.length} session(s) ${s(ownMs)}, the other sessions in ${others.folders} folder(s) ${s(othersMs)}, read at the same time`)
     }
     return items.sort((a, b) => (b.lastActivity ?? '').localeCompare(a.lastActivity ?? ''))
   }

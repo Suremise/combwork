@@ -299,7 +299,7 @@ function watchHolder(h: Host, wf: Workflow): void {
     if (!alive(h)) return endWatch(key, w)
     if (!gone || h.running) return schedule()
     endWatch(key, w)
-    log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))}: its runner${lease ? ` (${userText(lease.profile)}, process ${lease.pid})` : ''} has gone, so this Hive runs it`)
+    log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))}: its runner${lease ? ` (${userText(lease.profile)}, process ${lease.pid})` : ''} has gone, so this Combwork runs it`)
     void kickQueue(h.ws, h.projectPath, h.target)
   }
   const schedule = (): void => {

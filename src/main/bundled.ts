@@ -229,7 +229,7 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
         } catch (e) {
           // The user changed it meanwhile: it is theirs now, as the next scan will see; the manifest isn't changed.
           if (e instanceof SwapAbandoned) {
-            log.info(`Left the bundled ${itemWord(kind)} ${userText(id)} as it is: it changed while Hive was ${action === 'add' ? 'adding' : 'updating'} it`)
+            log.info(`Left the bundled ${itemWord(kind)} ${userText(id)} as it is: it changed while Combwork was ${action === 'add' ? 'adding' : 'updating'} it`)
             return
           }
           log.warn(`Could not ${action === 'add' ? 'add' : 'update'} the bundled ${itemWord(kind)} ${userText(id)}; trying again next time`, e)
@@ -311,7 +311,7 @@ async function retirePersonas(m: Manifest): Promise<void> {
         await swapOut(dest, copy)
         log.info(`Removed the retired persona ${userText(id)}: it is now the ${userText(mode)} mode`)
       } catch (e) {
-        if (e instanceof SwapAbandoned) log.info(`Kept the retired persona ${userText(id)}: it changed while Hive was removing it, so it is the user's`)
+        if (e instanceof SwapAbandoned) log.info(`Kept the retired persona ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
         else log.warn(`Could not remove the retired persona ${userText(id)}; trying again next time`, e)
         continue
       }

@@ -458,7 +458,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // Its board's steps: skipped while the board waits for its upgrade to 1.0, and run again once it is upgraded.
     boardSteps(contextWorkspace()!, false, after)
     // Builds of Hive left for it while it was closed (#1534), into the journal once.
-    void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Hive', e))) // i18n-ignore: a part of a log line's timing
+    void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Combwork', e))) // i18n-ignore: a part of a log line's timing
     // What failed or interrupted saves and the project-id migration left in the .combwork folders (#1016).
     void after.track('leftovers', sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))) // i18n-ignore: a part of a log line's timing
     // Its open point's commands (HI-1954), in its window, its agents held until they're done (the gate reserved as it opened).

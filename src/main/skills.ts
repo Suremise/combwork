@@ -258,7 +258,7 @@ export async function hiveSkills(withMissing = false, role?: 'agent' | 'assistan
     entries = list.entries
     if (list.more && !warnedFull.has(workspace.skillsDir)) {
       warnedFull.add(workspace.skillsDir)
-      log.warn(`The workspace's skills folder has more than ${MAX_SKILL_FOLDERS} entries; Hive uses the first ${MAX_SKILL_FOLDERS} it lists`)
+      log.warn(`The workspace's skills folder has more than ${MAX_SKILL_FOLDERS} entries; Combwork uses the first ${MAX_SKILL_FOLDERS} it lists`)
     }
   } catch {
     entries = []

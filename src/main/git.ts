@@ -330,7 +330,7 @@ class GitThread {
 }
 
 /** A command's outcome when git's worker ended while it was under way: one that couldn't start (never git's answer). */
-const lostOutcome = (why: string): GitOutcome => ({ stdout: new Uint8Array(), stderr: Buffer.from(`Hive's git worker ended (${why})`), error: { code: 'ERR_GIT_WORKER', killed: false, signal: null }, cwdExists: true }) // i18n-ignore: git's error text, for the log and the caller's message
+const lostOutcome = (why: string): GitOutcome => ({ stdout: new Uint8Array(), stderr: Buffer.from(`Combwork's git worker ended (${why})`), error: { code: 'ERR_GIT_WORKER', killed: false, signal: null }, cwdExists: true }) // i18n-ignore: git's error text, for the log and the caller's message
 
 /** The observer's read of a repository's refs (observe.ts), off main's thread: see GitThread.refs. */
 export const readRefsOffMain = (common: string, max: number): Promise<RepoRefs> => thread.refs(common, max)

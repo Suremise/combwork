@@ -726,7 +726,7 @@ export async function untilBoardOpenable(path: string, signal: AbortSignal): Pro
   const onWait = (e: Error): void => {
     waiting = true
     boardTestHooks.openableWait?.(path)
-    log.warn(`the board of ${userText(path)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its ${DB_FILE}-shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
+    log.warn(`the board of ${userText(path)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its ${DB_FILE}-shm, as just after a Combwork ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
   }
   const waited = await untilOpenable(join(path, HIVE_DIR, DB_FILE), { onWait, signal })
   if (waiting) log.info(`the board of ${userText(path)}: ${signal.aborted ? 'its wait ended with its open' : 'openable'} after ${Math.round(waited)} ms`)
@@ -815,7 +815,7 @@ const RESTORE_FAMILY = `${FAMILY}-before-restore`
 /** Another profile's Hive has the workspace open, by its presence marker (a 1.0 Hive; a 0.9 one shows by SQLite's lock). */
 class OtherHiveError extends Error {
   constructor() {
-    super('another Hive has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.inUse
+    super('another Combwork has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.inUse
   }
 }
 
@@ -2055,7 +2055,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
       // Opened again as it was (read-only, its upgrade waiting); a failure there is the board's to tell.
       failures.delete(key)
       if (inUse(e)) {
-        log.info(`the board of ${userText(path)} wasn't upgraded: another Hive has it open`)
+        log.info(`the board of ${userText(path)} wasn't upgraded: another Combwork has it open`)
         boardOf(path)
         throw hiveError(M.inUse, undefined, { kind: 'conflict' })
       }

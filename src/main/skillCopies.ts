@@ -74,10 +74,10 @@ export async function removeCopiesIn(projectPath: string, folder: string, opts: 
   if (!ws || (!opts.always && !removesIn(folder, ws.isAssistantHome(projectPath) ? folder : projectPath))) return []
   try {
     const removed = await removeHiveCopies(folder, projectPath, copyBook(ws), () => busyIn(folder))
-    if (removed.length) log.info(`Removed Hive's skill copies from ${userText(folder)}${opts.why ? ` (${opts.why})` : ''}: ${removed.join(', ')}`)
+    if (removed.length) log.info(`Removed Combwork's skill copies from ${userText(folder)}${opts.why ? ` (${opts.why})` : ''}: ${removed.join(', ')}`)
     return removed
   } catch (e) {
-    log.warn(`Could not remove Hive's skill copies from ${userText(folder)}`, e)
+    log.warn(`Could not remove Combwork's skill copies from ${userText(folder)}`, e)
     return []
   }
 }
@@ -95,7 +95,7 @@ export async function sweepIdleCopies(ws: WorkspaceService): Promise<void> {
   try {
     folders = recordedFolders(ws)
   } catch (e) {
-    log.warn("Could not read Hive's record of its skill copies", e)
+    log.warn("Could not read Combwork's record of its skill copies", e)
     return
   }
   for (const f of folders) {
@@ -116,7 +116,7 @@ export function initSkillCopies(busy: (folder: string) => boolean): void {
   const sweep = (ws: WorkspaceService): void => {
     if (!ws.path) return
     const run = sweepIdleCopies(ws)
-      .catch((e) => log.warn("sweeping Hive's idle skill copies", e))
+      .catch((e) => log.warn("sweeping Combwork's idle skill copies", e))
       .finally(() => running.delete(run))
     running.add(run)
   }

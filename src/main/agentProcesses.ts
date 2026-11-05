@@ -1497,7 +1497,7 @@ export async function recordEndedLaunches(): Promise<void> {
   // records that were needed. A slot has one writer, so these are few.
   const keep = ended.filter((r) => writerRuns.has(r))
   endedRuns = [...new Set([...endedRuns, ...keep])].slice(-MAX_RUN_RECORDS)
-  if (keep.length || pending.size) log.info(`Kept ${keep.length} ended run(s) for their slot writers as Hive quits${pending.size ? `; ${pending.size} launch(es) not seen to end` : ''}`)
+  if (keep.length || pending.size) log.info(`Kept ${keep.length} ended run(s) for their slot writers as Combwork quits${pending.size ? `; ${pending.size} launch(es) not seen to end` : ''}`)
   persist()
 }
 
@@ -1646,7 +1646,7 @@ async function restore(): Promise<AgentLeftovers[]> {
     left.set(runId, { ...launch, processes, more: 0, since: l.since, restored: true })
     bound(launch)
     agents.set(agentKey(l.projectPath, l.agentId), { projectPath: l.projectPath, agentId: l.agentId })
-    log.info(`${userText(l.agentName)} left ${processes.length} process(es) running before Hive restarted: ${userText(processes.map((p) => p.label).join('; '))}`)
+    log.info(`${userText(l.agentName)} left ${processes.length} process(es) running before Combwork restarted: ${userText(processes.map((p) => p.label).join('; '))}`)
   }
   persist()
   const found = [...agents.values()].map((a) => leftoversOf(a.projectPath, a.agentId)).filter((l) => l.processes.length)

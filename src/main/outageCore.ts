@@ -109,7 +109,7 @@ export class OutageResume {
     this.resumes.set(a.key, recent)
     if (recent.length >= this.host.resumesPerHour()) {
       // The resumes are kept: until the hour since them has passed, another drop gives up again, never a fourth resume.
-      log.warn(`${userText(a.projectPath)} · ${a.agentId}: its connection dropped again after ${recent.length} resumes in an hour; Hive stops resuming it`)
+      log.warn(`${userText(a.projectPath)} · ${a.agentId}: its connection dropped again after ${recent.length} resumes in an hour; Combwork stops resuming it`)
       this.host.ended(a, { kind: 'gaveUp', resumes: recent.length })
       return
     }
@@ -158,7 +158,7 @@ export class OutageResume {
 
   private timedOut(w: Waiting): void {
     this.stop(w)
-    log.warn(`${userText(w.agent.projectPath)} · ${w.agent.agentId}: the connection didn't come back within the wait; Hive stops waiting`)
+    log.warn(`${userText(w.agent.projectPath)} · ${w.agent.agentId}: the connection didn't come back within the wait; Combwork stops waiting`)
     this.host.ended(w.agent, { kind: 'timedOut', minutes: Math.round(this.host.waitMs() / 60_000) })
   }
 

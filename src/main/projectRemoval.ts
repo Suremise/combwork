@@ -222,7 +222,7 @@ async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemo
     })
   }
   await ws.setHidden(name, 'removed')
-  log.info(`Removed ${userText(name)} from Hive (packed ${info.handovers.length} handovers and its cards)`)
+  log.info(`Removed ${userText(name)} from Combwork (packed ${info.handovers.length} handovers and its cards)`)
   return { warnings: [...keptWarnings(folders), ...warnings] }
 }
 

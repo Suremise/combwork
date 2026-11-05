@@ -245,15 +245,15 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
   const base = baseEntries().filter((e) => !inFlight.has(agentKey(e)))
   record = mergeSnapshot(record, base, reason)
   await save()
-  const enriched = await bounded(enrich(base).catch((e) => (log.warn('Reading the cards and lanes of the agents as Hive closes', e), null)), o.snapshotMs ?? 2000, null)
+  const enriched = await bounded(enrich(base).catch((e) => (log.warn('Reading the cards and lanes of the agents as Combwork closes', e), null)), o.snapshotMs ?? 2000, null)
   let snapshot = base
   if (enriched) {
     const narrowed = new Set(base.map(agentKey))
     record = mergeSnapshot({ version: 1, reason, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, enriched, reason)
     snapshot = enriched
     await save()
-  } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Hive closed: every running conversation is kept to resume`)
-  if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Hive closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of hive.log
+  } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Combwork closed: every running conversation is kept to resume`)
+  if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Combwork closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of hive.log
   if (reason !== 'quit' && snapshot.length) {
     const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: HIVE, body: inDialectOf({ projectPath: e.projectPath, agentId: e.agentId }, restartingLine) }))))
     await bounded(tell, o.tellMs ?? 1500, [])
@@ -273,7 +273,7 @@ export function adoptInstalledRun(agents: readonly RunningAgent[], from: string,
   if (!entries.length) return
   record = mergeSnapshot(record, entries, 'install')
   void save()
-  log.info(`The last run (Hive ${from}) was ended for an install without being asked to close: ${entries.length} agent(s) recorded to resume`)
+  log.info(`The last run (Combwork ${from}) was ended for an install without being asked to close: ${entries.length} agent(s) recorded to resume`)
 }
 
 // ---------------------------------------------------------------------------
@@ -801,7 +801,7 @@ function handleRequest(dir: string, onRequest: () => void): void {
     log.warn("Taking the installer's request to close", e)
     return
   }
-  log.info(`The installer asked Hive to close for an install (${userText(r.request.exe)}): closing`)
+  log.info(`The installer asked Combwork to close for an install (${userText(r.request.exe)}): closing`)
   onRequest()
 }
 

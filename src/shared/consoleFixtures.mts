@@ -333,6 +333,6 @@ export function diagnosticRecording(text: string, redact: (s: string) => string)
   const h = r.header
   const clis = h.clis.filter((c) => c.version).map((c) => `${c.provider} ${c.version}${c.tested ? ` (tested with ${c.tested})` : ''}`)
   const end = r.end ? `${r.end.events} events, ended (${r.end.reason})${r.end.dropped ? `, ${r.end.dropped} lost` : ''}` : `${r.events.length} events, not ended`
-  const summary = redact(`${h.capture ? `capture (${h.capture.trigger}: ${h.capture.what}) of a ` : ''}${h.source.kind} source${h.source.provider ? ` (${h.source.provider})` : ''}, started ${h.startedAt}, Hive ${h.hive}; ${end}; CLIs: ${clis.join(', ') || 'none found'}; redacted; the newest ${lines.length}`)
+  const summary = redact(`${h.capture ? `capture (${h.capture.trigger}: ${h.capture.what}) of a ` : ''}${h.source.kind} source${h.source.provider ? ` (${h.source.provider})` : ''}, started ${h.startedAt}, Combwork ${h.hive}; ${end}; CLIs: ${clis.join(', ') || 'none found'}; redacted; the newest ${lines.length}`)
   return { summary, lines }
 }

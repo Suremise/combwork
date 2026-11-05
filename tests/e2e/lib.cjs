@@ -1133,9 +1133,10 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
 }
 
 /**
- * Whether Combwork's log in a test profile (HIVE_USER_DATA) says an agent's hive tools connected (#865), at or after
+ * Whether Combwork's log in a test profile (HIVE_USER_DATA) says an agent's Combwork tools connected (#865), at or after
  * `since` (a line count from hiveLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
- * just-started Claude Code, as Combwork itself types nothing before it (sessions.hiveToolsSettled).
+ * just-started Claude Code, as Combwork itself types nothing before it (sessions.hiveToolsSettled). A build from before
+ * HI-2584 (a packaged suite's older build) logged it as "hive tools": both are read.
  */
 const hiveLogLines = (userData) => {
   try {
@@ -1144,7 +1145,7 @@ const hiveLogLines = (userData) => {
     return []
   }
 }
-const hiveToolsConnected = (userData, agentId, since = 0) => hiveLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s hive tools connected`))
+const hiveToolsConnected = (userData, agentId, since = 0) => hiveLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s Combwork tools connected`) || l.includes(`⁨${agentId}⁩'s hive tools connected`))
 
 /**
  * The longest a fake Claude Code's prompt waits to be taken, or its turn to end: a bound for a hung run, never how long

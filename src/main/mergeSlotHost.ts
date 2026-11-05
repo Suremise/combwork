@@ -213,7 +213,7 @@ export async function recoverMergeSlots(workspacePath: string): Promise<void> {
   // Each hold's cards as this workspace names them (HI-1661: by key); this runs outside any workspace's work.
   const named = ws ? cardNamesOf(ws) : cardRef
   for (const { hold: h, at } of gone) {
-    log.info(`Merge slot: Hive closed while ${userText(h.agentName)} held it for ${userText(h.branch)}`)
+    log.info(`Merge slot: Combwork closed while ${userText(h.agentName)} held it for ${userText(h.branch)}`)
     // The folder the merge was in (#984): the agent's own (its worktree), else the project's main checkout.
     // A folder inside a .hive that moved to .combwork since (HI-2462) is named where it is now.
     const folder = (h.cwd ? await movedPath(workspacePath, h.cwd) : null) ?? h.cwd ?? at ?? h.projectPath
