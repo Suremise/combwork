@@ -465,7 +465,12 @@ async function deliverSkill(s: LaunchContext['skills'][number], dest: string, fo
   }
 }
 
-/** Keeps Hive's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */
+/** The comment above Combwork's copies' lines in a repository's info/exclude (HI-2580). */
+export const COPIES_EXCLUDE_COMMENT = "# Combwork's copies of workspace skills for Codex and Copilot (added by Combwork)" // i18n-ignore: a line in git's exclude file, which stays English
+/** How that comment starts, now and as Hive wrote it before 1.1: either is already Combwork's own. */
+const COPIES_COMMENT_HEADS = ["# Combwork's copies of workspace skills", "# Hive's copies of workspace skills"] // i18n-ignore: lines in git's exclude file, which stay English
+
+/** Keeps Combwork's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */
 export async function excludeCopies(cwd: string): Promise<void> {
   const common = await git(cwd, ['rev-parse', '--git-common-dir'], undefined, undefined, { timeout: 5000 })
   const gitDir = common.ok ? common.out.trim() : ''
@@ -478,7 +483,7 @@ export async function excludeCopies(cwd: string): Promise<void> {
   const missing = ['/.agents/skills/cw-*/', '/.agents/skills/.cw-*/', '/.agents/skills/hive-*/', '/.agents/skills/.hive-*/'].filter((l) => !lines.includes(l))
   if (missing.length) {
     await mkdir(join(exclude, '..'), { recursive: true })
-    await appendFile(exclude, `${text && !text.endsWith('\n') ? '\n' : ''}${lines.some((l) => l.startsWith("# Hive's copies of workspace skills")) ? '' : "# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n"}${missing.join('\n')}\n`)
+    await appendFile(exclude, `${text && !text.endsWith('\n') ? '\n' : ''}${lines.some((l) => COPIES_COMMENT_HEADS.some((h) => l.startsWith(h))) ? '' : `${COPIES_EXCLUDE_COMMENT}\n`}${missing.join('\n')}\n`)
   }
 }
 
