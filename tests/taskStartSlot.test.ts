@@ -17,7 +17,7 @@ vi.mock('../src/main/slotCards', async (orig) => ({
   expectStartPrompt: () => (prompt: string | null) => void slot.offered.push(prompt)
 }))
 
-const base = tempDir('hive-startslot-')
+const base = tempDir('cw-startslot-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

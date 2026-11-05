@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-assistrevoke-')
+const base = tempDir('cw-assistrevoke-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -143,7 +143,7 @@ describe("the Assistant's queued board changes, revoked before they're written (
   it('a card with files, revoked after the card is made but before its files are written: no card, no attachment row or file', async () => {
     const w = await workspace()
     const before = cardCount(w)
-    const src = join(tempDir('hive-assistrevoke-src-'), 'shot.png')
+    const src = join(tempDir('cw-assistrevoke-src-'), 'shot.png')
     writeFileSync(src, 'png bytes')
     const real = await att.attachableSource(w, { kind: 'workspace' }, src)
     const staging = await att.stage(join(w.path!, 'p'), null, [{ path: real, name: 'shot.png' }])

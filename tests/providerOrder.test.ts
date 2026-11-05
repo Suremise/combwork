@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-provider-order-')
+const base = tempDir('cw-provider-order-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { config } = await import('../src/main/config')

@@ -36,7 +36,7 @@ function hideGit(): void {
 
 /** A repository on main with one worktree, `cw/wt`, merged and clean (removable while git runs). */
 async function project(): Promise<{ p: string; wt: { path: string; branch: string; base: string } }> {
-  root = tempDir('hive-gittool-')
+  root = tempDir('cw-gittool-')
   const p = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', p)
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
@@ -163,7 +163,7 @@ describe('the git Combwork starts', () => {
     for (const d of layouts.splice(0)) rmSync(d, { recursive: true, force: true })
   })
   function layout(mingw = 'mingw64'): { root: string; launcher: string; execPath: string; real: string } {
-    const top = tempDir('hive-gitexe-')
+    const top = tempDir('cw-gitexe-')
     layouts.push(top)
     const launcher = join(top, 'cmd', 'git.exe')
     const execPath = join(top, mingw, 'libexec', 'git-core')
@@ -194,7 +194,7 @@ describe('the git Combwork starts', () => {
 
   it("the real git's environment is the launcher's (git-wrapper.c): its MSYSTEM, PLINK_PROTOCOL, HOME, and its folders and ~\\bin before PATH", () => {
     const l = { pathFirst: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin', msystem: 'MINGW64' }
-    const top = tempDir('hive-gitenv-')
+    const top = tempDir('cw-gitenv-')
     layouts.push(top)
     const roaming = join(top, 'roaming')
     const local = join(top, 'local')

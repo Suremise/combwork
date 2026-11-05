@@ -159,7 +159,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   check('search lists the matches under their session', hits >= 4, String(hits))
   await page.locator('.search-hit', { hasText: 'timed out' }).click()
   check('jumping to a tool hit expands it', await becomes(async () => (await page.locator('.tx-tool.open').count()) >= 1))
-  const highlights = () => page.evaluate(() => CSS.highlights.get('hive-search')?.size ?? 0)
+  const highlights = () => page.evaluate(() => CSS.highlights.get('cw-search')?.size ?? 0)
   check('matches highlighted', await becomes(async () => (await highlights()) > 0), String(await highlights()))
   await page.screenshot({ path: path.join(shots, '5-search-this.png') })
 

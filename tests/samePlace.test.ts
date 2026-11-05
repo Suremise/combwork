@@ -14,7 +14,7 @@ import type { AgentDef } from '../src/shared/types'
 import { junction } from './pathAliases'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-places-')
+const base = tempDir('cw-places-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

@@ -159,7 +159,7 @@ describe('what an agent watch counts', () => {
 })
 
 describe('agent watches (main/watches.ts)', async () => {
-  const base = tempDir('hive-agentwatch-')
+  const base = tempDir('cw-agentwatch-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

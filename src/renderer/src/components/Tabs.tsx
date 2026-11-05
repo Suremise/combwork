@@ -42,7 +42,7 @@ const T = {
 }
 
 /** A tab's icon: a codicon by name, or the node given, hidden from screen readers (the tab's name says it: a CLI's icon names it again). */
-const tabIcon = (icon: TabItem['icon']): React.ReactNode => (typeof icon === 'string' ? <Icon name={icon} /> : icon ? <span className="hive-tab-icon" aria-hidden="true">{icon}</span> : null)
+const tabIcon = (icon: TabItem['icon']): React.ReactNode => (typeof icon === 'string' ? <Icon name={icon} /> : icon ? <span className="cw-tab-icon" aria-hidden="true">{icon}</span> : null)
 
 /** The ids a tab and its panel take: unique per row of tabs, so two on one page never share one. */
 export const tabIds = (base: string, id: string): { tab: string; panel: string } => ({ tab: `${base}-tab-${id}`, panel: `${base}-panel-${id}` })
@@ -87,8 +87,8 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
     listRef.current?.querySelector<HTMLElement>(`[data-tab="${CSS.escape(next)}"]`)?.focus()
   }
   return (
-    <div ref={rowRef} className="hive-tabs-row">
-      <div ref={listRef} className={cx('hive-tabs', icons && 'icons', className)} role="tablist" aria-label={label} onKeyDown={onKeyDown}>
+    <div ref={rowRef} className="cw-tabs-row">
+      <div ref={listRef} className={cx('cw-tabs', icons && 'icons', className)} role="tablist" aria-label={label} onKeyDown={onKeyDown}>
         {items.map((x) => {
           const selected = x.id === value
           const folded = icons && !selected && !!x.icon
@@ -96,14 +96,14 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
           const name = x.muted ? tr(T.withNote, { tab: named, note: x.muted }) : named
           return (
             <Tooltip key={x.id} content={x.tip ?? (folded ? name : (x.muted ?? null))}>
-              <button type="button" role="tab" id={tabIds(base, x.id).tab} aria-controls={tabIds(base, x.id).panel} aria-selected={selected} {...(x.unsaved || x.muted ? { 'aria-label': name } : {})} tabIndex={selected ? 0 : -1} data-tab={x.id} {...(x.muted ? { 'data-muted': '' } : {})} {...x.attrs} className={cx('hive-tab', selected && 'active', folded && 'icon-only', x.muted && 'muted')} onClick={() => onChange(x.id)}>
+              <button type="button" role="tab" id={tabIds(base, x.id).tab} aria-controls={tabIds(base, x.id).panel} aria-selected={selected} {...(x.unsaved || x.muted ? { 'aria-label': name } : {})} tabIndex={selected ? 0 : -1} data-tab={x.id} {...(x.muted ? { 'data-muted': '' } : {})} {...x.attrs} className={cx('cw-tab', selected && 'active', folded && 'icon-only', x.muted && 'muted')} onClick={() => onChange(x.id)}>
                 {tabIcon(x.icon)}
-                <span className="hive-tab-label">{x.label}</span>
-                {x.tag && <span className="hive-tab-tag">{x.tag}</span>}
-                {x.count !== undefined && <span className="hive-tab-count">{fmt.number(x.count)}</span>}
+                <span className="cw-tab-label">{x.label}</span>
+                {x.tag && <span className="cw-tab-tag">{x.tag}</span>}
+                {x.count !== undefined && <span className="cw-tab-count">{fmt.number(x.count)}</span>}
                 {x.unsaved && (
                   <Tooltip content={tr(T.unsaved)}>
-                    <span className="hive-tab-unsaved" data-unsaved="" />
+                    <span className="cw-tab-unsaved" data-unsaved="" />
                   </Tooltip>
                 )}
               </button>
@@ -113,13 +113,13 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
       </div>
       {fold && (
         // The tabs with every name, for measuring; the names are CSS content, so no text here repeats a tab's.
-        <div ref={measureRef} className="hive-tabs hive-tabs-measure" aria-hidden inert>
+        <div ref={measureRef} className="cw-tabs cw-tabs-measure" aria-hidden inert>
           {items.map((x) => (
-            <span key={x.id} className="hive-tab" data-label={x.label}>
+            <span key={x.id} className="cw-tab" data-label={x.label}>
               {tabIcon(x.icon)}
-              {x.tag && <span className="hive-tab-tag">{x.tag}</span>}
-              {x.count !== undefined && <span className="hive-tab-count">{fmt.number(x.count)}</span>}
-              {x.unsaved && <span className="hive-tab-unsaved" />}
+              {x.tag && <span className="cw-tab-tag">{x.tag}</span>}
+              {x.count !== undefined && <span className="cw-tab-count">{fmt.number(x.count)}</span>}
+              {x.unsaved && <span className="cw-tab-unsaved" />}
             </span>
           ))}
         </div>

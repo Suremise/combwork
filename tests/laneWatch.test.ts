@@ -392,7 +392,7 @@ describe("a running lane's next card its builder hasn't started (HI-1741's laneN
 })
 
 describe('lane watches (main/watches.ts, #531)', async () => {
-  const base = tempDir('hive-lanewatch-')
+  const base = tempDir('cw-lanewatch-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { contextWorkspace, createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

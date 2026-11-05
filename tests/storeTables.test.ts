@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { canonical, entryOfRows, moveStores, readEntries, rowsOfEntry, STORES_STEP, TABLE_DEFS, TABLE_STORES, type TableStore } from '../src/main/schema/storeCodec'
 
-const base = tempDir('hive-store-tables-')
+const base = tempDir('cw-store-tables-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 

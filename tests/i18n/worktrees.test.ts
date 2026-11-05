@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-const base = tempDir('hive-i18n-worktrees-')
+const base = tempDir('cw-i18n-worktrees-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')
@@ -91,7 +91,7 @@ describe('the worktrees area', () => {
 describe("agents' and worktrees' refusals: English for agents as before, the window's language for the window", () => {
   it('says each in English with the status it always had, and in German to the window', async () => {
     setLanguage('de', GERMAN)
-    const notRepo = tempDir('hive-not-a-repo-')
+    const notRepo = tempDir('cw-not-a-repo-')
     const cases: [Error, string | RegExp, number, string | RegExp | null][] = [
       [await caught(run(() => agents.addAgent(proj, { name: 'P', location: 'project', provider: 'nope' }))), 'Unknown provider "nope".', 400, 'Unbekannter Anbieter „nope“.'],
       // 1.0 (#1451): no agent is pinned to a worktree, new or existing.
@@ -122,7 +122,7 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
 
   it("keeps git's own words as they came, inside either language", async () => {
     setLanguage('de', GERMAN)
-    const notRepo = tempDir('hive-not-a-repo-')
+    const notRepo = tempDir('cw-not-a-repo-')
     const e = await caught(wt.checkedOutBranch(notRepo))
     const prefix = `git couldn't read the branch checked out in ${notRepo} (`
     expect(e.message.startsWith(prefix) && e.message.endsWith(')'), e.message).toBe(true)

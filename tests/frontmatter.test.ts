@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { skillListText } from '../src/shared/toolReplies'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-frontmatter-')
+const base = tempDir('cw-frontmatter-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 

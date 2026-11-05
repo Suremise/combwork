@@ -1072,7 +1072,7 @@ export interface MarkdownCards {
 }
 
 /**
- * Wraps the card references in rendered Markdown's text in links (`hive-card:N`), never inside a link, code or a code
+ * Wraps the card references in rendered Markdown's text in links (`cw-card:N`), never inside a link, code or a code
  * block. Done on the sanitized HTML, whose text nodes only gain links of Hive's own scheme.
  */
 function linkCards(html: string, cards: MarkdownCards): string {
@@ -1089,7 +1089,7 @@ function linkCards(html: string, cards: MarkdownCards): string {
     for (const m of found) {
       frag.append(text.slice(at, m.start))
       const a = doc.createElement('a')
-      a.setAttribute('href', `hive-card:${m.number}`)
+      a.setAttribute('href', `cw-card:${m.number}`)
       a.className = 'card-ref'
       const title = cards.title(m.number)
       if (title) a.setAttribute('title', title)
@@ -1129,7 +1129,7 @@ export function Markdown({ source, className, onLink, cards, breaks, images }: {
         if (!a) return
         const href = a.getAttribute('href') ?? ''
         e.preventDefault()
-        const card = /^hive-card:(\d+)$/.exec(href)
+        const card = /^cw-card:(\d+)$/.exec(href)
         if (card && cards) return cards.open(Number(card[1]))
         if (onLink?.(href)) return
         if (/^https?:/.test(href)) void window.combwork.invoke('app:openExternal', href)

@@ -35,7 +35,7 @@ const tp = await import('../src/main/teamPause')
 const { refuseWhileTeamPaused } = await import('../src/main/lanes')
 const { scanWorkspace } = await import('../src/main/teamParked')
 
-const base = tempDir('hive-teampause-')
+const base = tempDir('cw-teampause-')
 let n = 0
 /** A workspace with a project of two agents (alpha: B1, R1), as the pause reads it. */
 function workspace(): { path: string; info: () => unknown } {

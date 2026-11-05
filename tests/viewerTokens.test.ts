@@ -18,7 +18,7 @@ afterEach(() => {
 
 /** The viewer tokens module fresh, on an empty profile of its own (its tokens are kept in memory once read). */
 async function fresh() {
-  const profile = tempDir('hive-viewer-tokens-')
+  const profile = tempDir('cw-viewer-tokens-')
   dirs.push(profile)
   vi.resetModules()
   // Electron's mock as these fresh modules import it.

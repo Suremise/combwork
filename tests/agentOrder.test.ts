@@ -9,7 +9,7 @@ import { dropIndex, moveAgentTo, pageAgents, pageEndIndex, projectAgents, swapAg
 import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-order-')
+const base = tempDir('cw-order-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const ids = (list: { id: string }[]): string => list.map((a) => a.id).join('')

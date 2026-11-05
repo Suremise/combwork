@@ -13,7 +13,7 @@ import { SECRET_SAMPLES } from './secretSamples'
 // nothing after; the newest recording by when it started. Combwork's profile folder is a new temp folder of this file's.
 vi.mock('electron', async () => {
   const { tempDir } = await import('./tempDir')
-  const profile = tempDir('hive-recorder-')
+  const profile = tempDir('cw-recorder-')
   return { app: { getPath: () => profile, getVersion: () => '0.7.0-test' } }
 })
 // A file open can be made to fail once (a recordings folder Combwork can't write to), and a recording's writes can fail (a

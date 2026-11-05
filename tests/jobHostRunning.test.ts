@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 60_000
-const dir = tempDir('hive-jobhost-running-')
+const dir = tempDir('cw-jobhost-running-')
 const started: ChildProcessWithoutNullStreams[] = []
 let launches = 0
 const host = new JobHost({

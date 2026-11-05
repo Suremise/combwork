@@ -14,7 +14,7 @@ import { as09 } from './boardDb'
 import { TEMPLATE_VERSION } from '../src/shared/templates'
 import type { CombworkEvent } from '../src/shared/types'
 
-const base = tempDir('hive-upgrade-templates-')
+const base = tempDir('cw-upgrade-templates-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

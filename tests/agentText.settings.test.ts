@@ -85,7 +85,7 @@ describe('a dialect over the settings', () => {
 })
 
 describe('the canary dialect over the settings tools', async () => {
-  const base = tempDir('hive-agenttext-settings-')
+  const base = tempDir('cw-agenttext-settings-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')

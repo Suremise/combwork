@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 
 describe('carrying on: the inbox switches (#1432)', async () => {
-  const base = tempDir('hive-carrying-on-')
+  const base = tempDir('cw-carrying-on-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const dismiss = admitted(base)
   const deliveries = await import('../src/main/deliveries')

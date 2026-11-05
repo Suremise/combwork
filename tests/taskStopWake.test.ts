@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-taskstop-wake-')
+const base = tempDir('cw-taskstop-wake-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { sessions } = await import('../src/main/sessions')

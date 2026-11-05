@@ -79,9 +79,9 @@ export function CombworkVcsNotice({ project, dismissible = false }: { project: P
     }
   }
   return (
-    <div className="banner warn hive-vcs-notice">
+    <div className="banner warn cw-vcs-notice">
       <Icon name="warning" />
-      <span className="hive-vcs-text">
+      <span className="cw-vcs-text">
         {sentences(<strong>{tr(M.titleSentence, { title: text.title })}</strong>, text.detail)}
       </span>
       {text.canUntrack && (

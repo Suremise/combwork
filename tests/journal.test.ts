@@ -10,7 +10,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { DEFAULT_JOURNAL, isoWeek, journalSettings, weekStart, type JournalSettings } from '../src/shared/journal'
 
-const base = tempDir('hive-journal-')
+const base = tempDir('cw-journal-')
 const j = await import('../src/main/journal')
 
 let n = 0

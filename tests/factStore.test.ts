@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
 
-const base = tempDir('hive-fact-store-')
+const base = tempDir('cw-fact-store-')
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 mkdirSync(join(base, 'profile'), { recursive: true })

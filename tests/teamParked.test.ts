@@ -45,7 +45,7 @@ vi.mock('../src/main/updater', async (orig) => ({ ...(await orig<object>()), res
 const tp = await import('../src/main/teamPause')
 const parked = await import('../src/main/teamParked')
 
-const base = tempDir('hive-teamparked-')
+const base = tempDir('cw-teamparked-')
 let n = 0
 /** A workspace (with alpha's B1, or no project), as the scan reads it. */
 function space(withAgent = false): (typeof h.open)[number] {

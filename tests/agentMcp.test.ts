@@ -12,7 +12,7 @@ import type { LaunchContext } from '../src/main/providers/types'
 import type { McpServerDef } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-agentmcp-')
+const base = tempDir('cw-agentmcp-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
 // seam, HI-1755; connections are on for everyone since HI-1774).

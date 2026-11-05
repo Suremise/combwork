@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { storePwshFirst, storePwshIssue } from '../src/main/providers/codex/storePwsh'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-store-pwsh-')
+const base = tempDir('cw-store-pwsh-')
 const folder = (...parts: string[]): string => {
   const d = join(base, ...parts)
   mkdirSync(d, { recursive: true })

@@ -312,7 +312,7 @@ describe('the run record\'s versions are what Combwork selected, not the first c
       const info = await claudeCode.locate()
       expect({ path: info.path, version: info.version, rejected: info.rejected }).toEqual({ path: standalone, version: '2.1.292', rejected: [extension] })
       // A test copy of Combwork notes what it selected for the run record.
-      const log = join(dir, 'hive-clis.jsonl')
+      const log = join(dir, 'cw-clis.jsonl')
       const env = { user: process.env.CW_USER_DATA, log: process.env.CW_TEST_CLI_LOG }
       process.env.CW_USER_DATA = join(dir, 'profile')
       process.env.CW_TEST_CLI_LOG = log

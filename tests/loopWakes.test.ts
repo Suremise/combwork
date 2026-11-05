@@ -48,7 +48,7 @@ describe("a lane's next card, after a Done one (HI-1990)", () => {
 })
 
 describe('loop wakes (main/loopWakes.ts, #405)', async () => {
-  const base = tempDir('hive-loopwakes-')
+  const base = tempDir('cw-loopwakes-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(async () => {
     // The workspace database (#1018: deliveries are kept in it) is open until its board closes.

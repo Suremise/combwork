@@ -180,7 +180,7 @@ describe("Initialise Git Repository's reply", () => {
   })
 
   it('in the language shown: its steps joined by the language, the first capitalised', { timeout: 60_000 }, async () => {
-    const base = tempDir('hive-i18n-gitinit-')
+    const base = tempDir('cw-i18n-gitinit-')
     const global = join(base, 'global.gitconfig')
     writeFileSync(global, '[user]\n\tname = Global Person\n\temail = global@example.com\n')
     process.env.GIT_CONFIG_GLOBAL = global

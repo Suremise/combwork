@@ -206,7 +206,7 @@ describe('what follows', () => {
 })
 
 describe("why: Claude Code's settings turning hooks off", () => {
-  const base = tempDir('hive-hooks-health-')
+  const base = tempDir('cw-hooks-health-')
   const programFiles = process.env.ProgramFiles
   afterEach(() => {
     process.env.ProgramFiles = programFiles

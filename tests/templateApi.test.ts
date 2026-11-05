@@ -13,7 +13,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { StoredAgent } from '../src/shared/agentFolders'
 
-const base = tempDir('hive-template-api-')
+const base = tempDir('cw-template-api-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 

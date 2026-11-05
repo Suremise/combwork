@@ -197,7 +197,7 @@ export function copyToMain({ root, version, info, here = false, replace = false 
  * (copyToMain) without win-unpacked, so there it can describe another build than the win-unpacked it sits next to. This
  * one never moves: removed before packaging (dist.mjs), written by finishDist once the build's code is certain.
  */
-export const UNPACKED_INFO = join('win-unpacked', '.hive-build-info.json')
+export const UNPACKED_INFO = join('win-unpacked', '.cw-build-info.json')
 
 /** What dist/win-unpacked was built from (UNPACKED_INFO), or null: none (an older build, or one whose code changed). */
 export function readUnpackedInfo(dist) {

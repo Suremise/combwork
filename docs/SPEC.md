@@ -3594,7 +3594,7 @@ touched:
 **Locks** [note §12; HB3's round 1 finding 3 and round 2 finding G; #1338's round 1 finding 3] **Built [#1347]**: a
 **repository lock** across processes (the dev and installed Combwork can't merge into or advance a target at once). It is
 a row, not a file's existence: one row (`repo_lock`: `id` 1, `token`, `pid`, `process_start`, `profile`, `taken_at`;
-a typed table) in a small SQLite database in the repository's common git dir (`hive-merge.lock`, so its worktrees
+a typed table) in a small SQLite database in the repository's common git dir (`cw-merge.lock`, so its worktrees
 share it; `repoLockCore.ts`). Taking it is `BEGIN IMMEDIATE` (SQLite's own cross-process lock) then: no row, or a row
 whose holder is **dead** (its pid gone, or running with another process start time: a reused pid), judged before the
 transaction and replaced only if the row is still the one judged (its token: compare and swap), so of two contenders

@@ -155,7 +155,7 @@ describe('a compaction Combwork asked for', () => {
 })
 
 describe('SessionManager.compact: typing the /compact', () => {
-  const ws = tempDir('hive-compact-')
+  const ws = tempDir('cw-compact-')
   const project = join(ws, 'proj')
   const FOCUS = 'x'.repeat(24_000) // 3,000 pieces of 8 every 10 ms: about 30 s, longer than BEGIN_MS
 

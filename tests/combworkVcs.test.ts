@@ -34,7 +34,7 @@ afterEach(() => {
 import { combworkVcsKey, combworkVcsText } from '../src/shared/combworkVcsText'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-vcs-')
+const base = tempDir('cw-vcs-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 const folder = (...parts: string[]): string => {

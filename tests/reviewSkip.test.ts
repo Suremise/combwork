@@ -33,7 +33,7 @@ vi.mock('../src/main/workflow/queueHost', () => ({
   profileName: () => 'test'
 }))
 
-const base = tempDir('hive-reviewskip-')
+const base = tempDir('cw-reviewskip-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

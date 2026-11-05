@@ -100,7 +100,7 @@ describe("Combwork's side of the request (watchRestartRequests)", () => {
   it("removes one left from an earlier process at start without acting on it, then takes this process's once, acknowledged", async () => {
     vi.resetModules()
     const { watchRestartRequests, stopWatchingRestartRequests } = await import('../src/main/restartResume')
-    const dir = tempDir('hive-restart-request-')
+    const dir = tempDir('cw-restart-request-')
     write(dir, { pid: 1, nonce: '11111111-2222-4333-8444-555555555555' })
     const asked = vi.fn()
     watchRestartRequests(asked, dir)

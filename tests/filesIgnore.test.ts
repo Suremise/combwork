@@ -43,7 +43,7 @@ const files = await import('../src/main/files')
 const { onCombworkEvent } = await import('../src/main/events')
 
 const BUSY = { err: 'fatal: .git/index: index file open failed: Permission denied' }
-const base = tempDir('hive-ignore-')
+const base = tempDir('cw-ignore-')
 const ws = join(base, 'ws')
 const proj = join(ws, 'proj')
 mkdirSync(join(proj, 'dist'), { recursive: true })

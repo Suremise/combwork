@@ -23,7 +23,7 @@ vi.mock('../src/main/ptyHost', async (original) => ({
   }
 }))
 
-const base = tempDir('hive-goahead-')
+const base = tempDir('cw-goahead-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

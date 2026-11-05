@@ -39,7 +39,7 @@ const commit = (cwd: string, file: string): void => {
  * with one commit of its own, and the project folder on main.
  */
 async function project(): Promise<{ project: ProjectInfo; slot: string }> {
-  root = tempDir('hive-branchwatch-')
+  root = tempDir('cw-branchwatch-')
   const p = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', p)
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)

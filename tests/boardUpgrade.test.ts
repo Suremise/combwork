@@ -25,7 +25,7 @@ vi.mock('../src/main/walCheckpoint', async (original) => {
   }
 })
 
-const base = tempDir('hive-board-upgrade-')
+const base = tempDir('cw-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')

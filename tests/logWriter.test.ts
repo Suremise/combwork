@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 
 /** A bound for a hung run (the waits are for conditions). */
 const HUNG_MS = 15_000
-const base = tempDir('hive-log-writer-')
+const base = tempDir('cw-log-writer-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

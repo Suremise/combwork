@@ -109,7 +109,7 @@ describe("no line of Combwork's before a launch's Combwork tools have connected 
   })
 
   it('the bound lowered in Settings → Advanced while a task waits: the wait ends with the gate, not at the old bound (round 4)', async () => {
-    const dir = tempDir('hive-tools-bound')
+    const dir = tempDir('cw-tools-bound')
     advanced.load(dir)
     // The clock stands still until the test moves it (the setting's own write is real, however long it takes).
     vi.useFakeTimers({ toFake: ['Date'] })

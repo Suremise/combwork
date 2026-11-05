@@ -494,7 +494,7 @@ describe('what counts as a change', () => {
 })
 
 describe('watches (main/watches.ts)', async () => {
-  const base = tempDir('hive-watch-')
+  const base = tempDir('cw-watch-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => {
     closeAllBoards()

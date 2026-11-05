@@ -42,7 +42,7 @@ describe('what a text of a file shows', () => {
   })
 })
 
-const base = tempDir('hive-dialects-view-')
+const base = tempDir('cw-dialects-view-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 const folder = (): string => {

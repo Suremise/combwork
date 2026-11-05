@@ -26,7 +26,7 @@ const SID2 = '0f5c2a8e-1111-4222-8333-944455557777'
 describe('sessions.backupAllNow', () => {
   async function hive() {
     vi.resetModules()
-    const profile = tempDir('hive-shutdown-')
+    const profile = tempDir('cw-shutdown-')
     const electron = await import('electron')
     ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
     const { sessions } = await import('../src/main/sessions')

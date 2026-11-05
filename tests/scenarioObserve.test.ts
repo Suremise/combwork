@@ -793,7 +793,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
 
   it("mode-*-plans: a question through the CLI's own question tool surfaces the decision; none at all doesn't", () => {
     const SURFACED = 'surfaced a decision for the user (a question put to them, or on a card)'
-    const plans = (tools: unknown[], finalReply = 'Planned.') => run('mode-coordinator-plans', { tools, finalReply }, { ws: tempDir('hive-2222-plans'), agents })[SURFACED]
+    const plans = (tools: unknown[], finalReply = 'Planned.') => run('mode-coordinator-plans', { tools, finalReply }, { ws: tempDir('cw-2222-plans'), agents })[SURFACED]
     expect(plans([{ name: 'AskUserQuestion', input: JSON.stringify({ questions: [{ question: 'Should the CSV include archived cards?' }] }), result: 'Yes', isError: false }])).toBe(true)
     expect(plans([], 'Should the CSV include archived cards?')).toBe(true)
     expect(plans([])).toBe(false)
@@ -1209,7 +1209,7 @@ describe("forgetting Claude Code's memory of a scenario's folders (HI-2260)", ()
   it("removes the memory of the folder and those under it, and nothing else: transcripts, other folders' memory", () => {
     const fs = require('fs') as typeof import('fs')
     const path = require('path') as typeof import('path')
-    const home = tempDir('hive-forget-memory-')
+    const home = tempDir('cw-forget-memory-')
     const root = path.join(home, 'lanes', '1', 'lasting-decision-claude-code')
     const enc = (p: string) => p.replace(/[^A-Za-z0-9]/g, '-')
     const project = (p: string) => {
@@ -1228,7 +1228,7 @@ describe("forgetting Claude Code's memory of a scenario's folders (HI-2260)", ()
     expect(fs.existsSync(path.join(alpha, 'session.jsonl'))).toBe(true)
     expect(fs.existsSync(path.join(other, 'memory', 'indentation-tabs.md'))).toBe(true)
     // A home with no projects yet: nothing to forget.
-    expect(forgetClaudeMemory(tempDir('hive-forget-memory-empty-'), root)).toEqual([])
+    expect(forgetClaudeMemory(tempDir('cw-forget-memory-empty-'), root)).toEqual([])
   })
 })
 
@@ -1239,7 +1239,7 @@ describe("a run's source fingerprint", () => {
   const { execFileSync } = require('child_process') as typeof import('child_process')
 
   it("changes with an untracked file's contents, a tracked change and a new file, not with an ignored one", () => {
-    const repo = tempDir('hive-fingerprint-')
+    const repo = tempDir('cw-fingerprint-')
     const git = (...a: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: repo })
     fs.writeFileSync(join(repo, 'a.txt'), 'one\n')
     fs.writeFileSync(join(repo, '.gitignore'), 'ignored.txt\n')
@@ -1275,7 +1275,7 @@ describe('the fixtures fail when nothing was done', () => {
     const fs = require('fs') as typeof import('fs')
     const path = require('path') as typeof import('path')
     const { execFileSync } = require('child_process') as typeof import('child_process')
-    const repo = tempDir('hive-merge-moved-')
+    const repo = tempDir('cw-merge-moved-')
     const git = (...a: string[]) => execFileSync('git', a, { cwd: repo, encoding: 'utf8', timeout: PROCESS_HUNG_MS })
     const ctx: Record<string, unknown> & { merge?: { base: string; moved: string } } = {
       git,
@@ -1369,7 +1369,7 @@ describe('the fixtures fail when nothing was done', () => {
     type Sc = { setup: (c: unknown) => Promise<void>; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }
     /** A scenario's repository, set up as the run does (the other agent's start and claim stand-ins). */
     const repoFor = async (id: string) => {
-      const repo = tempDir(`hive-merge-slot-${id}-`)
+      const repo = tempDir(`cw-merge-slot-${id}-`)
       const git = (...a: string[]) => execFileSync('git', a, { cwd: repo, encoding: 'utf8', timeout: PROCESS_HUNG_MS })
       const ctx: Record<string, unknown> & { merge?: { base: string } } = {
         git,
@@ -1553,7 +1553,7 @@ describe('the fixtures fail when nothing was done', () => {
       // merge-main-moved's (its base moved since the branch began, so a copy made before the base went in is another tree).
       const UNCHECKED = [CHECKED, HELD, MERGED_HOLDING]
       const scratch = (what: string) => {
-        const d = tempDir(`hive-check-${what}-`)
+        const d = tempDir(`cw-check-${what}-`)
         repos.push(d)
         return d
       }
@@ -1945,7 +1945,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     })
 
     it("asks the CLI Combwork started, and keeps its answer when it exits with 1 signed out (the fake, in a test home)", () => {
-      const dir = tempDir('hive-auth-status-')
+      const dir = tempDir('cw-auth-status-')
       const home = join(dir, 'home')
       mkdirSync(home)
       const log = join(dir, 'combwork.log')
@@ -1962,7 +1962,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     })
 
     it("reads the reason from Combwork's log", () => {
-      const log = join(tempDir('hive-start-failure-'), 'combwork.log')
+      const log = join(tempDir('cw-start-failure-'), 'combwork.log')
       writeFileSync(log, `2026-10-11T08:24:30.000Z [INFO] [pty] spawn x\n2026-10-11T08:24:33.000Z [WARN] [sessions] ⁨alpha · Coder⁩: exited with code 1 before it started: ⁨${OAUTH}⁩\n`)
       expect(startFailureIn(log)).toBe(OAUTH)
       expect(startFailureIn(join(dirname(log), 'none.log'))).toBe('')
@@ -2144,7 +2144,7 @@ describe("Copilot's stand-in model when a scenario's launch fails (#464)", () =>
     const lib = require('./e2e/lib.cjs') as { launch: (o: { env: Record<string, string> }) => Promise<unknown> }
     const { runScenario } = require('./scenarios/harness.cjs') as { runScenario: (sc: object, provider: string, opts: object) => Promise<unknown> }
     const launch = lib.launch
-    const work = tempDir('hive-standin-launch-')
+    const work = tempDir('cw-standin-launch-')
     let url = ''
     let answered = 0
     // The launch fails once the stand-in is up: it answers then, as Copilot would reach it.

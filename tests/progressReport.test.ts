@@ -20,7 +20,7 @@ import { tempDir } from './tempDir'
 type Identity = { pid: number; started: number }
 const { identify, stillSame, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Identity[]; stillSame: (ids: Identity[]) => number[]; endExactly: (ids: Identity[]) => number }
 
-const dir = tempDir('hive-progress-')
+const dir = tempDir('cw-progress-')
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 // Nothing under test may end the test's own process (#547: a worker once exited mid-file, dropping 19 tests): a call
 // to process.exit fails the test that made it, with where it came from.

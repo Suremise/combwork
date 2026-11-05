@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { SkillCopyBook, SkillCopyRecord } from '../src/main/providers/types'
 
-const base = tempDir('hive-skill-copies-')
+const base = tempDir('cw-skill-copies-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 

@@ -66,7 +66,7 @@ const savedGlobal = process.env.GIT_CONFIG_GLOBAL
 const savedNoSystem = process.env.GIT_CONFIG_NOSYSTEM
 
 beforeEach(() => {
-  base = tempDir('hive-gitinit-')
+  base = tempDir('cw-gitinit-')
   projects = []
   refresh.mockClear()
   // No identity in the system config either, whatever this machine's has.

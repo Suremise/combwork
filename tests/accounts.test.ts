@@ -31,7 +31,7 @@ vi.mock('../src/main/ptyHost', async (importOriginal) => {
   }
 })
 
-const base = tempDir('hive-accounts-')
+const base = tempDir('cw-accounts-')
 const home = join(base, 'claude-home')
 process.env.CW_USER_DATA = join(base, 'profile')
 process.env.CLAUDE_CONFIG_DIR = home

@@ -6,7 +6,7 @@ import { createKeptJson, DAMAGED_AGE_MS, KEPT_BY_STAT_MAX, KeptFileBusy, keptSet
 import { tempDir } from './tempDir'
 
 describe('kept files', () => {
-  const dir = tempDir('hive-kept-')
+  const dir = tempDir('cw-kept-')
   const reports: [string, boolean][] = []
   onCorruptFile((file, _aside, restored) => reports.push([file, restored]))
   // Damaged on disk: unchanged for a minute, well past DAMAGED_AGE_MS (#1601).
@@ -279,7 +279,7 @@ describe('path guards', () => {
   it("don't let a link inside a folder lead outside it", async () => {
     const { mkdirSync, symlinkSync, writeFileSync: write } = await import('fs')
     const { insideReal } = await import('../src/main/fsutil')
-    const base = tempDir('hive-guard-')
+    const base = tempDir('cw-guard-')
     const ws = join(base, 'ws')
     const outside = join(base, 'outside')
     mkdirSync(join(ws, 'proj'), { recursive: true })

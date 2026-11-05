@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { PREFERENCE_DEFAULTS } from '../src/shared/workflow/preferences'
 
-const base = tempDir('hive-wfservice-')
+const base = tempDir('cw-wfservice-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 
-const base = tempDir('hive-titleorder-')
+const base = tempDir('cw-titleorder-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

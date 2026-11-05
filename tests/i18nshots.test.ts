@@ -43,7 +43,7 @@ describe('the i18nshots route (#769)', () => {
   })
 
   it('says what is wrong with a case file rather than skipping its screens', () => {
-    const dir = tempDir('hive-i18nshots-')
+    const dir = tempDir('cw-i18nshots-')
     try {
       writeFileSync(join(dir, 'board.cjs'), "module.exports = { area: 'boards', screens: [{ name: 'card', open: () => null }] }")
       writeFileSync(join(dir, 'files.cjs'), "module.exports = { area: 'files', screens: [{ name: 'Tree View', open: () => null }, { name: 'editor' }, { name: 'editor', open: () => null }] }")

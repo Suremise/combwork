@@ -10,7 +10,7 @@ import { asarPackageVersion, installedCopy, runningIdentity } from '../src/main/
 // oxlint-disable-next-line typescript/no-require-imports -- the e2e suites' CommonJS helper, shared with them
 const { fakeInstall } = require('./e2e/fakeInstall.cjs') as { fakeInstall: (dir: string, o?: { version?: string; identity?: unknown }) => string }
 
-const base = tempDir('hive-updates-')
+const base = tempDir('cw-updates-')
 let n = 0
 const dir = () => join(base, `r${++n}`)
 const release = (version: string): BuildIdentity => ({ version, commit: null, local: false })

@@ -21,7 +21,7 @@ import { agentTextSchema, checkTexts } from '../src/main/dialects'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 
-const base = tempDir('hive-agenttext-both-')
+const base = tempDir('cw-agenttext-both-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

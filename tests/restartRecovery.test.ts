@@ -179,7 +179,7 @@ function takesNote(agentId: string): void {
 }
 
 beforeEach(() => {
-  dir = tempDir('hive-restart-recovery-')
+  dir = tempDir('cw-restart-recovery-')
   Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0, toasts: [], openOffers: new Set(), resolved: [], dropped: [], saveHold: null, savesHeld: 0 })
 })
 afterEach(() => {

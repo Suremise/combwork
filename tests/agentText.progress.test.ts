@@ -34,7 +34,7 @@ describe('the canary dialect over hive-progress (card 5)', () => {
     add(revisionProblem(process.cwd(), '-x', process.env))
     add(revisionProblem(process.cwd(), 'nosuchref123', process.env), [process.cwd(), 'nosuchref123'])
     add(revisionProblem(process.cwd(), 'HEAD~1', process.env), ['HEAD~1'])
-    const bare = tempDir('hive-progress-canary-')
+    const bare = tempDir('cw-progress-canary-')
     add(revisionProblem(bare, 'HEAD', process.env), [bare, 'HEAD'])
     for (const why of ['notCheck', 'notContained', 'dirty', 'moved', 'changed', 'revisionChanged'])
       for (const changes of [[], ['a.ts', ':reflog', ':edit']]) for (const isolated of [true, false]) add(uncountedLine({ check: { name: 'lint', counted: false, whyNot: why, changes, platform: 'git' } }, isolated), ['lint', 'a.ts'])

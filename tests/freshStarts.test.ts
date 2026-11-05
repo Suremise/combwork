@@ -45,7 +45,7 @@ describe('who starts fresh (freshWhy)', () => {
 })
 
 describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
-  const base = tempDir('hive-freshstarts-')
+  const base = tempDir('cw-freshstarts-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

@@ -38,7 +38,7 @@ vi.mock('original-fs', async (orig) => {
   }
 })
 
-const base = tempDir('hive-keptunreadable-')
+const base = tempDir('cw-keptunreadable-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => {
   closeAllBoards()
@@ -74,7 +74,7 @@ function bytes(f: string): { file: string; bak: string } {
 }
 
 describe('a kept file that is there but unreadable (HI-2414)', () => {
-  const dir = tempDir('hive-keptlocked-')
+  const dir = tempDir('cw-keptlocked-')
   let n = 0
   const saved = async (value: unknown): Promise<string> => {
     const f = join(dir, `kept-${++n}.json`)

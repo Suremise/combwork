@@ -8,7 +8,7 @@ import { onCombworkEvent } from '../src/main/events'
 import { clearRecent, recentFor, removeRecent } from '../src/main/recentWorkspaces'
 import { tempDir } from './tempDir'
 
-const here = tempDir('hive-recent-')
+const here = tempDir('cw-recent-')
 afterAll(() => rmSync(here, { recursive: true, force: true }))
 
 describe('recent workspaces (#144)', () => {

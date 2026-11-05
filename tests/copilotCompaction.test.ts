@@ -55,7 +55,7 @@ describe("Copilot's compactions in its events (#454)", () => {
   })
 })
 
-const base = tempDir('hive-copilot-compaction-')
+const base = tempDir('cw-copilot-compaction-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 describe("a Copilot compaction's end ends Combwork's compacting status (#454)", () => {

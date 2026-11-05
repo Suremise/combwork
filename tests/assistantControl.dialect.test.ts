@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 import { agentMsg, setChainResolver, type DialectChain } from '../src/shared/agentText'
 import { inRequestScope } from '../src/shared/agentText/asyncScope'
 
-const base = tempDir('hive-control-dialect-')
+const base = tempDir('cw-control-dialect-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

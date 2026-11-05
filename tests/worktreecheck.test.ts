@@ -23,7 +23,7 @@ afterEach(() => {
 type Tree = { path: string; branch: string; base: string }
 
 async function makeProject(main = 'main'): Promise<{ project: string; tree: (name: string) => Promise<Tree> }> {
-  root = tempDir('hive-wtcheck-')
+  root = tempDir('cw-wtcheck-')
   const project = join(root, 'project')
   run(root, 'init', '-q', '-b', main, project)
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(project, 'config', k, v)

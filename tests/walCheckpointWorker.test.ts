@@ -17,7 +17,7 @@ const { CLOSING, runCheckpoint } = await import('../src/main/walCheckpointWorker
 
 /** A bound for a hung run (the waits are for conditions). */
 const HUNG_MS = 15_000
-const base = tempDir('hive-wal-checkpoint-worker-')
+const base = tempDir('cw-wal-checkpoint-worker-')
 const bundle = join(base, 'wal-checkpoint-worker.cjs')
 let n = 0
 const DEFAULTS = { ...wal.checkpointLimits }

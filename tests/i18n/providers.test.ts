@@ -78,7 +78,7 @@ describe('errors thrown at a launch (#842): English for the Agent API, as before
     const { userSettings } = await import('../../src/main/providers/claude/launchSettings')
     const { shownError, windowError } = await import('../../src/main/combworkError')
     const { apiErrorReply } = await import('../../src/main/servers')
-    const dir = tempDir('hive-launch-errors-')
+    const dir = tempDir('cw-launch-errors-')
     mkdirSync(join(dir, 'folder.json'))
     writeFileSync(join(dir, 'big.json'), `{"x":"${'a'.repeat(2 * 1024 * 1024)}"}`)
     writeFileSync(join(dir, 'bad.json'), '{ not json')
@@ -113,7 +113,7 @@ describe('errors thrown at a launch (#842): English for the Agent API, as before
     const { toSpawnable, CMD_MAX_CHARS } = await import('../../src/main/providers/common')
     const { shownError } = await import('../../src/main/combworkError')
     setLanguage('de', GERMAN)
-    const e = await caught(() => toSpawnable(join(tempDir('hive-cmd-'), 'tool.cmd'), ['x'.repeat(CMD_MAX_CHARS)]))
+    const e = await caught(() => toSpawnable(join(tempDir('cw-cmd-'), 'tool.cmd'), ['x'.repeat(CMD_MAX_CHARS)]))
     expect(e.message).toMatch(/^tool\.cmd has to run through cmd\.exe, which takes a command line of at most 8,191 characters, and this launch needs about \d{1,3}(,\d{3})+\. Set the CLI's path in Settings to its \.exe \(or install the standalone CLI\), which has no such limit\.$/)
     expect(shownError(e)).toMatch(/^tool\.cmd läuft über cmd\.exe, das höchstens 8\.191 Zeichen nimmt; dieser Start braucht etwa \d{1,3}(\.\d{3})+\.$/)
   })
@@ -188,7 +188,7 @@ describe('the transcript viewer', () => {
 
 describe('the rest of the area', () => {
   it("auto-compaction's source in the language shown; its English constant as before", () => {
-    const cwd = tempDir('hive-i18n-ac-')
+    const cwd = tempDir('cw-i18n-ac-')
     mkdirSync(join(cwd, '.claude'), { recursive: true })
     writeFileSync(join(cwd, '.claude', 'settings.json'), JSON.stringify({ autoCompactWindow: 400_000 }))
     expect(autoCompactOf([], {}, settingsScopes(cwd, join(cwd, 'home')), ['opus']).source).toBe("autoCompactWindow in the project's .claude/settings.json")
@@ -198,9 +198,9 @@ describe('the rest of the area', () => {
   })
 
   it("a settings file Combwork can't be sure of is a whole clause per file, so Chinese joins a Chinese name with no space (#917)", () => {
-    const programFiles = tempDir('hive-i18n-pf-')
+    const programFiles = tempDir('cw-i18n-pf-')
     mkdirSync(join(programFiles, 'ClaudeCode', 'managed-settings.json'), { recursive: true })
-    const cwd = tempDir('hive-i18n-ac-')
+    const cwd = tempDir('cw-i18n-ac-')
     mkdirSync(join(cwd, 'home', 'settings.json'), { recursive: true })
     vi.stubEnv('ProgramFiles', programFiles)
     try {
@@ -218,7 +218,7 @@ describe('the rest of the area', () => {
   })
 
   it("a stray .codex folder's warning, Copilot's launch notice, start hints, export subtitles and memory labels: all in the language shown", () => {
-    const folder = tempDir('hive-i18n-stray-')
+    const folder = tempDir('cw-i18n-stray-')
     mkdirSync(join(folder, '.codex'), { recursive: true })
     for (const f of ['a.log', 'b.log', 'c.log', 'd.log']) writeFileSync(join(folder, '.codex', f), 'x')
     setProblemReporter((p) => problems.push(p))

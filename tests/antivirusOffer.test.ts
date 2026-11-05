@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { nextOffer, offerOf, REMIND_MS, remindAtOf } from '../src/shared/antivirus'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-av-offer-')
+const base = tempDir('cw-av-offer-')
 // config.json goes to the test's own profile.
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { suggestionFor, dismissFor, workspaceFolders } = await import('../src/main/antivirus')

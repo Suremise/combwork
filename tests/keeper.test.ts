@@ -31,7 +31,7 @@ vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undef
 /** A hung run's bound: every step here waits for a condition, never for time. */
 const HUNG_MS = 30_000
 const POWERSHELL = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-const dir = tempDir('hive-keeper-')
+const dir = tempDir('cw-keeper-')
 profile.dir = join(dir, 'profile')
 const src = join(dir, 'host.cs')
 writeFileSync(src, HOST_SOURCE)

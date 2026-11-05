@@ -65,7 +65,7 @@ vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
   return { ...stub, app: { ...stub.app, getPath: () => H.profile } }
 })
-H.profile = tempDir('hive-leftover-offers-')
+H.profile = tempDir('cw-leftover-offers-')
 
 const P = 'C:\\Work\\alpha'
 const proc = (pid: number, created = String(1000 + pid)) => ({ pid, name: 'node.exe', label: `node ${pid}`, created })

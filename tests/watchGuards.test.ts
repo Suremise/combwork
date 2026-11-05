@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 const slot = vi.hoisted(() => ({ due: null as null | { slot: string; lease: string } }))
 vi.mock('../src/main/slotCards', async (orig) => ({ ...(await orig<object>()), placementDue: async () => slot.due }))
 
-const base = tempDir('hive-watchguards-')
+const base = tempDir('cw-watchguards-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

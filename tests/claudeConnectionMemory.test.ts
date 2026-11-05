@@ -12,7 +12,7 @@ import { advanced } from '../src/main/advanced'
 import { junction } from './pathAliases'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-connection-memory-')
+const base = tempDir('cw-connection-memory-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }

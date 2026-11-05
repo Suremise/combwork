@@ -12,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { as09, editCard } from './boardDb'
 
-const base = tempDir('hive-card-search-')
+const base = tempDir('cw-card-search-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async () => undefined
 

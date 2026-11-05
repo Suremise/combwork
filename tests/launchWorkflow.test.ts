@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { launchWorkflow } from '../src/shared/workflow/roles'
 
-const base = tempDir('hive-launchworkflow-')
+const base = tempDir('cw-launchworkflow-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection.
 process.env.CW_USER_DATA = join(base, 'profile')

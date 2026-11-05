@@ -65,7 +65,7 @@ it("Combwork's own limits, lowered for this file: 2000 entries, 12 folders deep,
   expect(CW_LIMITS).toEqual({ entries: 2000, depth: 12, bytes: 64 * MB })
 })
 
-const base = tempDir('hive-copy-limits-')
+const base = tempDir('cw-copy-limits-')
 beforeEach(() => {
   hooks.beforeWrite = null
   hooks.deny = null
@@ -123,7 +123,7 @@ describe('Codex: a source changing while it is copied', () => {
       const old = await contentHash(copy)
       // A new version, then the change while it is copied.
       writeFileSync(join(bad, 'SKILL.md'), '---\nname: bad\n---\n\nv2\n')
-      hooks.beforeWrite = { match: /cw-bad\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes[kind](bad) }
+      hooks.beforeWrite = { match: /cw-bad\.cw-new-[^\\/]*[\\/]a\.md$/, run: () => changes[kind](bad) }
       const out = await launch(cwd, [{ name: 'bad', sourcePath: bad }, { name: 'ok', sourcePath: ok }])
       const lasting = kind === 'bytes' || kind === 'entries' || kind === 'depth'
       expect(out.bad).toEqual({ revision: old, problem: `${reason[kind]}, so it kept its old copy`, ...(lasting ? { lasting: true } : {}) })
@@ -139,7 +139,7 @@ describe('Codex: a source changing while it is copied', () => {
     const cwd = join(root, 'project')
     mkdirSync(cwd, { recursive: true })
     const bad = source(root, 'bad')
-    hooks.beforeWrite = { match: /cw-bad\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes.bytes(bad) }
+    hooks.beforeWrite = { match: /cw-bad\.cw-new-[^\\/]*[\\/]a\.md$/, run: () => changes.bytes(bad) }
     const out = await launch(cwd, [{ name: 'bad', sourcePath: bad }])
     expect(out.bad).toEqual({ revision: null, problem: reason.bytes, lasting: true })
     expect(readdirSync(join(cwd, '.agents', 'skills'))).toEqual([])
@@ -150,7 +150,7 @@ describe('Codex: a source changing while it is copied', () => {
     const cwd = join(root, 'project')
     mkdirSync(cwd, { recursive: true })
     const s = source(root, 'mine')
-    hooks.beforeWrite = { match: /cw-mine\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes.valid(s) }
+    hooks.beforeWrite = { match: /cw-mine\.cw-new-[^\\/]*[\\/]a\.md$/, run: () => changes.valid(s) }
     const out = await launch(cwd, [{ name: 'mine', sourcePath: s }])
     const copy = join(cwd, '.agents', 'skills', 'cw-mine')
     expect(readFileSync(join(copy, 'b.md'), 'utf8')).toBe('b, edited while it was being copied')

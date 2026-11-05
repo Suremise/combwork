@@ -21,7 +21,7 @@ vi.mock('../src/main/events', async (original) => {
   }
 })
 
-const base = tempDir('hive-modeoffer-')
+const base = tempDir('cw-modeoffer-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
 // seam, HI-1755; connections are on for everyone since HI-1774).

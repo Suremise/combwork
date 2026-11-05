@@ -38,7 +38,7 @@ vi.mock('fs/promises', async (original) => {
   }
 })
 
-const base = tempDir('hive-mcp-from-file-')
+const base = tempDir('cw-mcp-from-file-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

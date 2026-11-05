@@ -14,7 +14,7 @@ import * as electron from 'electron'
 import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-mcp-catalog-')
+const base = tempDir('cw-mcp-catalog-')
 const profile = join(base, 'profile')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
 process.env.CW_USER_DATA = profile
@@ -126,7 +126,7 @@ describe('downloads (HI-545/s17)', () => {
   })
 
   it('holds a file:// download to the same end and time budget (HI-545 round 1)', async () => {
-    const d = tempDir('hive-mcp-catalog-file-')
+    const d = tempDir('cw-mcp-catalog-file-')
     writeFileSync(join(d, 'demo.zip'), 'bytes')
     const url = pathToFileURL(join(d, 'demo.zip')).href
     expect((await catalog.download(url, 'file', 100, 5000))!.bytes.toString()).toBe('bytes')
@@ -198,8 +198,8 @@ describe('installing and updating (HI-545)', () => {
     else process.env.CW_TEST_TRASH_DIR = wasTrash
   })
   beforeEach(async () => {
-    wsPath = tempDir('hive-mcp-catalog-ws-')
-    share = tempDir('hive-mcp-catalog-share-')
+    wsPath = tempDir('cw-mcp-catalog-ws-')
+    share = tempDir('cw-mcp-catalog-share-')
     ambrosia = join(wsPath, 'ambrosia')
     apiary = join(wsPath, 'apiary')
     mkdirSync(mcpDir(), { recursive: true })
@@ -343,7 +343,7 @@ describe('installing and updating (HI-545)', () => {
   it('lists every source, each with its servers, on refresh and in a search after it, and keeps the cache bounded (HI-545 round 1)', async () => {
     const urls: string[] = []
     for (let i = 0; i < 12; i++) {
-      const d = tempDir('hive-mcp-catalog-src-')
+      const d = tempDir('cw-mcp-catalog-src-')
       writeFileSync(join(d, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name: `Source ${i}`, servers: [entry({ description: `The demo of source ${i}` })] }))
       urls.push(pathToFileURL(join(d, 'catalog.json')).href)
     }

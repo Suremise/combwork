@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 import { readCardIn, writeCardOutside } from './boardDb'
 import { storeDocs } from './storeDocs'
 
-const base = tempDir('hive-projectids-')
+const base = tempDir('cw-projectids-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

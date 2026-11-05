@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { insideArchive } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-inside-archive-')
+const base = tempDir('cw-inside-archive-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 const archive = join(base, 'dist', 'app.asar')
 const folder = join(base, 'art.asar')

@@ -10,7 +10,7 @@ import type { LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 describe('loop agents with no watch, and the loop wakes that reach them (HI-1693)', async () => {
-  const base = tempDir('hive-loopcheck-wakes-')
+  const base = tempDir('cw-loopcheck-wakes-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   // No grace in tests (loopCheck's test seam): a check runs as soon as the agent is idle.
   process.env.CW_TEST_LOOP_GRACE_MS = '0'

@@ -13,7 +13,7 @@ import { tempDir } from './tempDir'
 const slot = vi.hoisted(() => ({ due: null as null | { slot: string; lease: string } }))
 vi.mock('../src/main/slotCards', async (orig) => ({ ...(await orig<object>()), placementDue: async () => slot.due }))
 
-const base = tempDir('hive-startwatch-')
+const base = tempDir('cw-startwatch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

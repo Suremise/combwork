@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 import type { CombworkEvent } from '../src/shared/types'
 import type { ForYouSummary } from '../src/shared/workflow/workView'
 
-const base = tempDir('hive-card-work-')
+const base = tempDir('cw-card-work-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

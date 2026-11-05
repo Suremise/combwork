@@ -12,7 +12,7 @@ import { REPO_LOCK_FILE, repoLockHolder, takeRepoLock } from '../src/main/repoLo
 import { tempDir } from './tempDir'
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
-const tmp = tempDir('hive-repo-lock-')
+const tmp = tempDir('cw-repo-lock-')
 const bundle = join(tmp, 'child.cjs')
 const CHILD = `
 const { appendFileSync, existsSync } = require('fs')
@@ -44,7 +44,7 @@ afterEach(() => {
 
 let n = 0
 /** A repository's common git dir stand-in: the lock only needs a folder. */
-const repoDir = (): string => tempDir(`hive-repo-lock-${++n}-`)
+const repoDir = (): string => tempDir(`cw-repo-lock-${++n}-`)
 
 /** A child taking the lock in dir; `lines()` is what it wrote, `release()` lets it go. */
 function contender(dir: string, profile: string, opts: { barrier?: string; waitMs?: number } = {}) {

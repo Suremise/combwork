@@ -91,7 +91,7 @@ const record = (folder: string) => JSON.parse(readFileSync(join(folder, 'profile
 
 describe('the installer upgrades from Hive Desktop (hiveUpgrade.ps1, HI-2460)', () => {
   beforeAll(() => {
-    dir = tempDir('hive-installer-upgrade-')
+    dir = tempDir('cw-installer-upgrade-')
   })
   afterAll(() => {
     for (const c of started) if (c.exitCode === null) c.kill()

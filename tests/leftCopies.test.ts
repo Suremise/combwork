@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 
 describe('the lanes a run sweeps at its start (HI-1453)', () => {
   it("are those with no claim or a gone runner's, a running runner's kept however old its claim", async () => {
-    const dir = tempDir('hive-idle-lanes-')
+    const dir = tempDir('cw-idle-lanes-')
     const day = 25 * 60 * 60_000
     writeFileSync(join(dir, 'lane-0.json'), JSON.stringify({ pid: 100, at: Date.now() }))
     writeFileSync(join(dir, 'lane-1.json'), JSON.stringify({ pid: 200, at: Date.now() }))
@@ -25,7 +25,7 @@ describe('the lanes a run sweeps at its start (HI-1453)', () => {
   })
 
   it("ends the copies recorded in those lanes' folders started before they were read, and none while every lane is held", async () => {
-    const dir = tempDir('hive-left-copies-')
+    const dir = tempDir('cw-left-copies-')
     const work = join(dir, 'e2e')
     const calls: { folders: string[]; before: number }[] = []
     const unrecorded = [{ pid: 7, commandLine: 'electron.exe --combwork-test-profile=x' }]

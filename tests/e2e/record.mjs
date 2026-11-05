@@ -41,7 +41,7 @@ export function fingerprint(root = process.cwd()) {
 export const REAL_CLIS = { claude: { id: 'claude-code', name: 'Claude Code' }, codex: { id: 'codex', name: 'Codex' }, copilot: { id: 'copilot', name: 'GitHub Copilot' } }
 
 /** The file in a suite's folder where its test copies of Combwork note the CLIs they selected (CW_TEST_CLI_LOG). */
-export const CLI_LOG = 'hive-clis.jsonl'
+export const CLI_LOG = 'cw-clis.jsonl'
 
 /**
  * The CLIs a suite's test copies of Combwork selected (#365): each provider's executable and version as Combwork's own

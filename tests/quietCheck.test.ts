@@ -15,7 +15,7 @@ vi.mock('fs/promises', async (original) => {
   const real = await original<typeof import('fs/promises')>()
   const rename = async (from: string, to: string): Promise<void> => {
     fsState.renames.push([from, to])
-    if (fsState.gate && /\.hive-quiet-/.test(to)) await fsState.gate
+    if (fsState.gate && /\.cw-quiet-/.test(to)) await fsState.gate
     return real.rename(from, to)
   }
   return { ...real, default: { ...real, rename }, rename }

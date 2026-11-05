@@ -41,7 +41,7 @@ function put(file: string, now: number, ageFromNow?: number): string {
 
 describe('sweeping the leftovers (#1016)', () => {
   it("sends a move's backups to the Recycle Bin two weeks after the move, by the time in their name, and nothing else (#1111)", async () => {
-    const ws = tempDir('hive-leftovers-imported-')
+    const ws = tempDir('cw-leftovers-imported-')
     const hive = join(ws, '.combwork')
     const project = join(ws, 'alpha', '.combwork')
     const moved = Date.parse('2026-10-01T12:00:00.000Z')
@@ -58,7 +58,7 @@ describe('sweeping the leftovers (#1016)', () => {
       put(join(project, name('project.json')), now)
     ]
     // A link named like a backup is never followed nor removed.
-    const target = tempDir('hive-leftovers-target-')
+    const target = tempDir('cw-leftovers-target-')
     put(join(target, 'keep.json'), now)
     const link = join(hive, name('watches.json'))
     junction(target, link)
@@ -82,7 +82,7 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it("removes old temp files and the migration's old backups, and nothing else", async () => {
-    const hive = join(tempDir('hive-leftovers-'), '.combwork')
+    const hive = join(tempDir('cw-leftovers-'), '.combwork')
     // Files made now are eight days old at `now`: older than both limits. Ones dated an hour before `now` are new.
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     const gone = [
@@ -129,7 +129,7 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it("sweeps the workspace's .combwork and each project's, hidden ones too, and says what went in one line", async () => {
-    const ws = tempDir('hive-leftovers-ws-')
+    const ws = tempDir('cw-leftovers-ws-')
     const files = [join(ws, '.combwork', 'tasks', '9.json.before-ids.bak'), join(ws, 'alpha', '.combwork', 'sessions.json.12-1.tmp'), join(ws, 'beta', '.combwork', 'deliveries.json.12-ab12cd34.tmp')].map((f) => put(f, 0))
     // Opened eight days after they were made (only Date is faked: the file calls run as they do).
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -145,8 +145,8 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it("never removes anything of a workspace switched away from while its projects were listed, nor looks at the next one's (round 1)", async () => {
-    const a = tempDir('hive-leftovers-a-')
-    const b = tempDir('hive-leftovers-b-')
+    const a = tempDir('cw-leftovers-a-')
+    const b = tempDir('cw-leftovers-b-')
     const files = [join(a, '.combwork', 'tasks', '1.json.12-1.tmp'), join(a, 'alpha', '.combwork', 'sessions.json.12-2.tmp'), join(b, '.combwork', 'tasks', '1.json.12-3.tmp'), join(b, 'beta', '.combwork', 'sessions.json.12-4.tmp')].map((f) => put(f, 0))
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(Date.now() + BAK_AGE_MS + 24 * HOUR)
@@ -171,7 +171,7 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it('never follows a link or junction out of the .combwork: a linked store, a linked folder above one, or a linked .combwork (round 2)', async () => {
-    const base = tempDir('hive-leftovers-links-')
+    const base = tempDir('cw-leftovers-links-')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     // Folders elsewhere, with old files named as a store's would be.
     const outside = (name: string, file: string): string => put(join(base, 'elsewhere', name, file), now)
@@ -195,7 +195,7 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it("a project's stores are only its settings, sessions, deliveries and transcript backups", async () => {
-    const hive = join(tempDir('hive-leftovers-project-'), '.combwork')
+    const hive = join(tempDir('cw-leftovers-project-'), '.combwork')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     // A backup compressed, or decompressed to archive it, part way when Combwork stopped (#1110).
     const gone = [put(join(hive, 'project.json.1-1.tmp'), now), put(join(hive, 'sessions.json.bak.1-2.tmp'), now), put(join(hive, 'sessions', 'abc-123.jsonl.1-3.tmp'), now), put(join(hive, 'sessions', 'abc-123.jsonl.gz.1-7.tmp'), now), put(join(hive, 'archive', 'abc-123.jsonl.1-8.tmp'), now)]
@@ -206,7 +206,7 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it('stops when the workspace closes', async () => {
-    const hive = join(tempDir('hive-leftovers-closed-'), '.combwork')
+    const hive = join(tempDir('cw-leftovers-closed-'), '.combwork')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     const f = put(join(hive, 'tasks', '1.json.4242-1.tmp'), now)
     const life = new AbortController()
@@ -218,7 +218,7 @@ describe('sweeping the leftovers (#1016)', () => {
 
 describe('a failed atomic write leaves no temp file (#1016)', () => {
   it('when the rename keeps failing (EPERM), after its retries', async () => {
-    const dir = tempDir('hive-atomic-rename-')
+    const dir = tempDir('cw-atomic-rename-')
     const file = join(dir, '975.json')
     writeFileSync(file, 'before')
     fail.rename = true
@@ -228,7 +228,7 @@ describe('a failed atomic write leaves no temp file (#1016)', () => {
   })
 
   it('when writing the temp file fails part way', async () => {
-    const dir = tempDir('hive-atomic-write-')
+    const dir = tempDir('cw-atomic-write-')
     const file = join(dir, 'metrics.json')
     writeFileSync(file, 'before')
     fail.write = true

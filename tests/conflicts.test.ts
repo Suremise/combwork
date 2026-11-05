@@ -75,7 +75,7 @@ describe('parseConflicts', () => {
 describe('readConflicts', () => {
   const conflicted = region(['o'], ['t']).join('\n')
   const fresh = () => {
-    const base = tempDir('hive-conflicts-')
+    const base = tempDir('cw-conflicts-')
     const folder = join(base, 'queue')
     mkdirSync(folder, { recursive: true })
     return { base, folder }

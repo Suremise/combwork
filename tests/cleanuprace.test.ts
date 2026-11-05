@@ -9,7 +9,7 @@ import { DEFAULT_CLEANUP } from '../src/shared/storage'
 import type { CleanupOptions } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-cleanup-')
+const base = tempDir('cw-cleanup-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, as deleting the file.
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })

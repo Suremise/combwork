@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('editor lists commands', (await page.locator('.kb-table tr:not(.kb-cat)').count()) > 60, String(await page.locator('.kb-table tr:not(.kb-cat)').count()))
 
   // --- Tabs by category (HI-1838): All, then each category in the commands' order, each with its count.
-  const kbTabs = () => page.locator('.kb-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.hive-tab-label').textContent.trim(), count: Number((e.querySelector('.hive-tab-count')?.textContent ?? '').replace(/\D/g, '') || -1), selected: e.getAttribute('aria-selected') === 'true' })))
+  const kbTabs = () => page.locator('.kb-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.cw-tab-label').textContent.trim(), count: Number((e.querySelector('.cw-tab-count')?.textContent ?? '').replace(/\D/g, '') || -1), selected: e.getAttribute('aria-selected') === 'true' })))
   const kbTab = (id) => page.locator(`.kb-tabs [role="tab"][data-tab="${id}"]`)
   const selectedKb = async () => (await kbTabs()).find((t) => t.selected)?.id ?? null
   const bodyRows = () => page.locator('.kb-table tbody td.kb-label').count()
@@ -206,7 +206,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   const tabsFit = () => page.locator('.kb-tabs').evaluate((list) => {
     const l = list.getBoundingClientRect()
     const tabs = [...list.querySelectorAll('[role="tab"]')].map((t) => t.getBoundingClientRect())
-    return { inside: tabs.every((t) => t.left >= l.left - 0.5 && t.right <= l.right + 0.5), scrolls: list.scrollWidth > list.clientWidth + 1, lines: new Set(tabs.map((t) => Math.round(t.top))).size, first: list.querySelector('.hive-tab-label')?.textContent }
+    return { inside: tabs.every((t) => t.left >= l.left - 0.5 && t.right <= l.right + 0.5), scrolls: list.scrollWidth > list.clientWidth + 1, lines: new Set(tabs.map((t) => Math.round(t.top))).size, first: list.querySelector('.cw-tab-label')?.textContent }
   })
   check('German, narrow: the tabs wrap, each whole, none scrolled away', !!(await lib.until(async () => { const f = await tabsFit(); return f.first === 'Alle' && f.inside && !f.scrolls && f.lines > 1 }, HUNG_MS)), JSON.stringify(await tabsFit()))
   // …and the table: the command and its Shortcut whole beside the sticky actions, Category kept after them, reached by

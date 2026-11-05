@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-task-batch-')
+const base = tempDir('cw-task-batch-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, for tests: gone.
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = (p) => rm(p, { recursive: true, force: true })

@@ -25,7 +25,7 @@ import { legacyWorktree, type StoredAgent } from '../src/shared/agentFolders'
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 
-const base = tempDir('hive-templates-')
+const base = tempDir('cw-templates-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 /** Makes the worktree check throw (rather than report a git failure). */

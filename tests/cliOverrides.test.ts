@@ -17,7 +17,7 @@ import { tempDir } from './tempDir'
 
 // The off switches for Combwork's overrides of the CLIs' own behaviour (#966, #1167): each one's effect on the launch, on and off.
 
-const base = tempDir('hive-cli-overrides-')
+const base = tempDir('cw-cli-overrides-')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 beforeAll(() => {
   // Never the user's own homes: the adapters read their config.

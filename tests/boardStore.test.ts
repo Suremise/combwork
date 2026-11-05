@@ -12,7 +12,7 @@ import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
 import { journalSettings } from '../src/shared/journal'
 import type { BoardNotice } from '../src/main/boardStore'
 
-const base = tempDir('hive-board-store-')
+const base = tempDir('cw-board-store-')
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

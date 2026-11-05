@@ -61,7 +61,7 @@ describe('finished notifications', () => {
 // SessionManager's own path (notify → the finish group → the Windows notification), with Electron's Notification
 // recording what it would show and each project's window a stand-in whose focus the test sets.
 describe('a group of finishes, when it is shown', () => {
-  const ws = tempDir('hive-bursts-')
+  const ws = tempDir('cw-bursts-')
   const alpha = join(ws, 'alpha')
   const beta = join(ws, 'beta')
   let focused: Set<string>

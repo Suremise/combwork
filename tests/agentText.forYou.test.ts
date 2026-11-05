@@ -13,7 +13,7 @@ import { FOR_YOU, workflowEnglish, workflowText } from '../src/shared/workflow/t
 import { cardRequests } from '../src/shared/toolReplies'
 import { laneHits, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
 
-const base = tempDir('hive-agenttext-foryou-')
+const base = tempDir('cw-agenttext-foryou-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The board service registers how a stored line is said for an agent (storedForAgents), as Combwork's main does.

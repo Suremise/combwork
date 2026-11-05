@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
 
-const base = tempDir('hive-action-handlers-')
+const base = tempDir('cw-action-handlers-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 
@@ -859,7 +859,7 @@ async function anotherWorker(): Promise<typeof worker> {
     .replace(/from '(\.\.?\/[^']+)'/g, (_m, rel: string) => `from '${abs(rel)}'`)
     // Runs only when the test asks: no subscription of its own to the board's commits, which would outlive the test.
     .replace(/\nonBoardCommitted\(\(ws\) => \{[\s\S]*$/, '\n')
-  const file = join(tempDir('hive-another-worker-'), 'actionWorker.ts')
+  const file = join(tempDir('cw-another-worker-'), 'actionWorker.ts')
   writeFileSync(file, code)
   return (await import(/* @vite-ignore */ pathToFileURL(file).href)) as typeof worker
 }

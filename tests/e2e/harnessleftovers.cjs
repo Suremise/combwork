@@ -42,7 +42,7 @@ async function killedSuite(work, profile) {
 ;(async () => {
   const h = await lib.launch({ userData: ${JSON.stringify(profile)} })
   const main = await h.app.evaluate(() => process.pid)
-  const file = path.join(lib.WORK, '.hive-copies.jsonl')
+  const file = path.join(lib.WORK, '.cw-copies.jsonl')
   await lib.until(() => fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes('"pid":' + main), 60000, 250)
   console.log('COPY ' + h.app.process().pid + ' ' + main)
   setInterval(() => {}, 1000)
@@ -81,7 +81,7 @@ async function detachedCopy(profile) {
     const one = await killedSuite(suite, path.join(lib.WORK, 'killed-suite-profile'))
     check('a suite starts its test copy of Combwork', !!one.copy, one.out.slice(-2000))
     check("…Playwright's pid is a shell's, Combwork's main process its child", !!one.copy && !!one.shell && one.shell.pid !== one.copy.pid)
-    check("…lib.cjs records the main process, by pid and start time, in the suite's folder", !!one.copy && fs.readFileSync(path.join(suite, '.hive-copies.jsonl'), 'utf8').includes(`"started":${one.copy.started}`))
+    check("…lib.cjs records the main process, by pid and start time, in the suite's folder", !!one.copy && fs.readFileSync(path.join(suite, '.cw-copies.jsonl'), 'utf8').includes(`"started":${one.copy.started}`))
     // The shell ends with the suite's job, after the suite's node: waited for, by its identity.
     const shellGone = !!one.shell && !!(await gone([one.shell]))
     check('…the copy outlives its killed suite', !!one.copy && shellGone && running(one.copy), JSON.stringify({ ...one, shellGone }))

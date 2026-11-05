@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 
 // Payloads and screens as Copilot CLI 1.0.93 sent and drew them (the #403 spike), with paths shortened.
 
-const base = tempDir('hive-copilot-')
+const base = tempDir('cw-copilot-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 // Never the user's ~/.copilot: the adapter reads its mcp-config.json and settings.json.
 process.env.COPILOT_HOME = join(base, 'copilot-home')
@@ -225,7 +225,7 @@ describe('Copilot launch', () => {
 
   it('takes its exit grace from Settings → Advanced (copilot.exit.graceSeconds), at each stop (#727)', async () => {
     const { stopWaitMs } = await import('../src/main/sessions')
-    advanced.load(tempDir('hive-copilot-advanced-'))
+    advanced.load(tempDir('cw-copilot-advanced-'))
     try {
       expect(copilot.exitKeys.graceMs).toBe(10_000)
       await advanced.set('copilot.exit.graceSeconds', 25)
@@ -295,7 +295,7 @@ describe('Copilot hooks', () => {
     const [pre, notification, post] = readFileSync(join(__dirname, 'fixtures', 'advanced', 'question-copilot-1.0.105.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l) as Record<string, unknown>)
     const asked = (message: string) => ({ kind: 'ask', ask: { kind: 'question', blocking: true, message } })
     // Overridden in a profile of its own, never the user's.
-    beforeAll(() => advanced.load(tempDir('hive-copilot-question-')))
+    beforeAll(() => advanced.load(tempDir('cw-copilot-question-')))
     afterAll(async () => {
       await advanced.set('copilot.question.tool', null)
       await advanced.set('copilot.question.field', null)

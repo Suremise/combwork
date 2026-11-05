@@ -18,7 +18,7 @@ const shellGit = Object.fromEntries(Object.entries(process.env).filter(([k]) => 
 for (const k of Object.keys(shellGit)) delete process.env[k]
 afterAll(() => void Object.assign(process.env, shellGit))
 
-const base = tempDir('hive-deleted-in-place-')
+const base = tempDir('cw-deleted-in-place-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')

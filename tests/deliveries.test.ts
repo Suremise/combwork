@@ -133,7 +133,7 @@ describe('delivery records (#647)', () => {
 })
 
 describe('the delivery service (#647)', async () => {
-  const base = tempDir('hive-deliveries-')
+  const base = tempDir('cw-deliveries-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   // The hosts' workspace (each host a folder in it), as a window holding it would admit it (#1395).
   const dismiss = admitted(base)

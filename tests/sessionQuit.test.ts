@@ -21,7 +21,7 @@ vi.mock('../src/main/ptyHost', async (orig) => ({
   killPty: (key: string) => void kills.push(key)
 }))
 
-const base = tempDir('hive-quit-')
+const base = tempDir('cw-quit-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { sessions } = await import('../src/main/sessions')
 const { advanced } = await import('../src/main/advanced')

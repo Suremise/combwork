@@ -28,7 +28,7 @@ vi.mock('fs/promises', async (original) => {
 const { testTrashDir, trash } = await import('../src/main/trash')
 const { trashAllOrNothing } = await import('../src/main/fsutil')
 
-const base = tempDir('hive-trash-')
+const base = tempDir('cw-trash-')
 const shell = electron.shell as unknown as { trashItem?: (p: string) => Promise<void> }
 const saved = { dir: process.env.CW_TEST_TRASH_DIR, profile: process.env.CW_USER_DATA }
 afterEach(() => {

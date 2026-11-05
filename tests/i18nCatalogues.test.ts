@@ -27,7 +27,7 @@ afterEach(() => {
 
 /** A tree of its own, with these files (path relative to it → content). */
 function tree(files: Record<string, string>): string {
-  const root = tempDir('hive-i18n-cat-')
+  const root = tempDir('cw-i18n-cat-')
   roots.push(root)
   for (const [rel, text] of Object.entries(files)) {
     mkdirSync(dirname(join(root, rel)), { recursive: true })

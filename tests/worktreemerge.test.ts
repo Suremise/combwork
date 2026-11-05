@@ -20,7 +20,7 @@ afterEach(() => {
 })
 
 async function twoBranches(): Promise<{ project: string; a: { path: string; branch: string; base: string }; b: { path: string; branch: string; base: string } }> {
-  root = tempDir('hive-merge-')
+  root = tempDir('cw-merge-')
   const project = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', project)
   // core.eol: the repo's `* text=auto` (#149) checks text out with the native ending (CRLF on Windows) otherwise.

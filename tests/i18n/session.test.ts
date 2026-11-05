@@ -9,7 +9,7 @@ import { tempDir } from '../tempDir'
 // merge slot's note (mergeSlotText) and Combwork's sign-in message (signIn.messageText); notices are formatted twice: the
 // user's title and the Agent API stream's English one.
 
-const base = tempDir('hive-i18n-session-')
+const base = tempDir('cw-i18n-session-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')

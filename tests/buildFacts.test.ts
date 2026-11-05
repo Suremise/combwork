@@ -29,7 +29,7 @@ vi.mock('fs/promises', async () => {
   return { ...real, readFile, default: { ...real, readFile } }
 })
 
-const base = tempDir('hive-build-facts-')
+const base = tempDir('cw-build-facts-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -223,7 +223,7 @@ describe('the scripts tell Combwork of a build', () => {
   })
 
   it('says so when no workspace holds the checkout', async () => {
-    const lone = tempDir('hive-build-facts-lone-')
+    const lone = tempDir('cw-build-facts-lone-')
     expect(await script.recordBuild({ ...input, root: lone }, { env: {} })).toBe("Build not recorded in Combwork's journal: no Combwork workspace holds this checkout (CW_WORKSPACE names one).")
   })
 })

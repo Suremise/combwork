@@ -103,7 +103,7 @@ const check = (name, ok, extra = '') => {
   console.log(`burst with the lock free: ${BURST} takes in ${free.ms} ms; main's longest stall ${free.gap} ms; slowest echo ${free.echo} ms of ${free.letters} letters`)
 
   // The lock file held by another connection: each take waits in SQLite's busy wait, then fails, nothing changed.
-  const other = new DatabaseSync(path.join(beta, '.git', 'hive-merge.lock'))
+  const other = new DatabaseSync(path.join(beta, '.git', 'cw-merge.lock'))
   other.exec('BEGIN IMMEDIATE')
   let held
   try {

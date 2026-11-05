@@ -17,7 +17,7 @@ const noticeEvent = (n: Partial<Notice>): CombworkEvent => ({ type: 'notice', no
 describe("the events stream's lines, as broadcast says them", async () => {
   // The real resolver (sessions.ts registers it: a session's pinned chain, else the bound workspace's API chain) and two
   // workspaces with API files of their own.
-  const base = tempDir('hive-agenttext-events-')
+  const base = tempDir('cw-agenttext-events-')
   mkdirSync(join(base, 'profile'), { recursive: true })
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))

@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { LaunchContext } from '../src/main/providers/types'
 
-const base = tempDir('hive-workspace-notes-')
+const base = tempDir('cw-workspace-notes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 

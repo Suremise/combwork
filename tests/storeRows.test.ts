@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-store-rows-')
+const base = tempDir('cw-store-rows-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const board = await import('../src/main/boardStore')

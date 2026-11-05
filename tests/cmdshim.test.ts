@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { CMD_MAX_CHARS, commandLineLength, promptArg, runsThroughCmd, shimTarget, toSpawnable } from '../src/main/providers/common'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-cmdshim-')
+const base = tempDir('cw-cmdshim-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 const windows = process.platform === 'win32'
 

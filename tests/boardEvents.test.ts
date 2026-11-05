@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
 import { DatabaseSync } from 'node:sqlite'
 
-const base = tempDir('hive-board-events-')
+const base = tempDir('cw-board-events-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 // Every read of the whole board that recording the running agents' cards makes, counted (the reads themselves unchanged):

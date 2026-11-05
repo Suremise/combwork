@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 import { as09, writeCard } from './boardDb'
 import { holdsOfCard } from '../src/shared/usageLedger'
 
-const base = tempDir('hive-card-writes-')
+const base = tempDir('cw-card-writes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

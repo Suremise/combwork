@@ -15,7 +15,7 @@ import { excludeCopies } from '../src/main/providers/common'
 import { onCombworkEvent } from '../src/main/events'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-platform-')
+const base = tempDir('cw-platform-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -28,17 +28,17 @@ const HUNG_MS = 10000
 
 describe('detection, per case of §16.3.5', () => {
   it('a Git repository is Git, at its root', () => {
-    const p = tempDir('hive-platform-git-')
+    const p = tempDir('cw-platform-git-')
     gitInit(p)
     expect(detect(p)).toEqual({ platform: 'git', root: p })
   })
 
   it('a folder with no version control is None', () => {
-    expect(detect(tempDir('hive-platform-none-'))).toEqual({ platform: 'none' })
+    expect(detect(tempDir('cw-platform-none-'))).toEqual({ platform: 'none' })
   })
 
   it('a subfolder of a larger repository is Git, showing the repository root', () => {
-    const root = tempDir('hive-platform-sub-')
+    const root = tempDir('cw-platform-sub-')
     gitInit(root)
     const p = join(root, 'project')
     mkdirSync(p)
@@ -47,14 +47,14 @@ describe('detection, per case of §16.3.5', () => {
 
   it('Mercurial and Jujutsu are None, naming what was found', () => {
     for (const [marker, name] of [['.hg', 'Mercurial'], ['.jj', 'Jujutsu']]) {
-      const p = tempDir('hive-platform-other-')
+      const p = tempDir('cw-platform-other-')
       mkdirSync(join(p, marker))
       expect(detect(p)).toEqual({ platform: 'none', other: name })
     }
   })
 
   it('a colocated jj+git repository is Jujutsu, so None', () => {
-    const p = tempDir('hive-platform-jjgit-')
+    const p = tempDir('cw-platform-jjgit-')
     gitInit(p)
     mkdirSync(join(p, '.jj'))
     expect(detect(p)).toEqual({ platform: 'none', other: 'Jujutsu' })
@@ -63,14 +63,14 @@ describe('detection, per case of §16.3.5', () => {
 
 describe("a project's platform", () => {
   it('takes what detection finds until one is recorded, with its descriptor\'s capabilities', () => {
-    const p = tempDir('hive-platform-first-')
+    const p = tempDir('cw-platform-first-')
     expect(projectPlatform(p, undefined)).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' } })
     gitInit(p)
     expect(projectPlatform(p, undefined)).toEqual({ id: 'git', capabilities: PLATFORMS.git.capabilities, detected: { platform: 'git', root: p } })
   })
 
   it('keeps the recorded one when detection differs, and offers the switch', () => {
-    const p = tempDir('hive-platform-kept-')
+    const p = tempDir('cw-platform-kept-')
     gitInit(p)
     expect(projectPlatform(p, 'none')).toMatchObject({ id: 'none', capabilities: PLATFORMS.none.capabilities, offer: { offer: 'git', why: 'gitFound' } })
     renameSync(join(p, '.git'), join(p, 'moved.git'))
@@ -82,7 +82,7 @@ describe("a project's platform", () => {
   })
 
   it('a recorded value that is no platform uses detection, offers nothing, and says what it holds', () => {
-    const p = tempDir('hive-platform-invalid-')
+    const p = tempDir('cw-platform-invalid-')
     gitInit(p)
     for (const [value, said] of [['mercurial', 'mercurial'], ['Git', 'Git'], ['toString', 'toString'], ['__proto__', '__proto__'], [42, '42'], [true, 'true'], [{ id: 'git' }, '{"id":"git"}'], [['git'], '["git"]']] as const) {
       expect(projectPlatform(p, value)).toEqual({ id: 'git', capabilities: PLATFORMS.git.capabilities, detected: { platform: 'git', root: p }, invalid: said })
@@ -123,7 +123,7 @@ describe('in ProjectInfo', () => {
   const info = (p: string) => inWorkspace(w, () => w.projectInfo(p))
 
   beforeEach(async () => {
-    ws = tempDir('hive-platform-ws-')
+    ws = tempDir('cw-platform-ws-')
     events.length = 0
     off = onCombworkEvent((e) => events.push(e))
     w = createWorkspaceService()
@@ -235,7 +235,7 @@ describe('in ProjectInfo', () => {
     try {
       const old = info(p)
       await vi.waitFor(() => expect(held).toBe(true), { timeout: HUNG_MS })
-      const next = tempDir('hive-platform-ws2-')
+      const next = tempDir('cw-platform-ws2-')
       await w.open(next)
       release()
       expect((await old).platform?.offer?.why).toBe('repositoryGone')
@@ -278,13 +278,13 @@ describe('every git call goes through git()', () => {
   })
 
   it("excludeCopies' rev-parse --git-common-dir", async () => {
-    const p = tempDir('hive-platform-exclude-')
+    const p = tempDir('cw-platform-exclude-')
     gitInit(p)
     await excludeCopies(p)
     expect(started).toContainEqual(['rev-parse', '--git-common-dir'])
     expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toContain('/.agents/skills/cw-*/')
     // Outside a repository: nothing written, nothing thrown.
-    await excludeCopies(tempDir('hive-platform-norepo-'))
+    await excludeCopies(tempDir('cw-platform-norepo-'))
     expect((await git(p, ['status', '--short'])).ok).toBe(true)
   })
 })

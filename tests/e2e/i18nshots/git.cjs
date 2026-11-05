@@ -243,12 +243,12 @@ async function combworkNotice(ctx) {
   git(ctx, 'commit', '-qm', 'Commit a file in .combwork')
   await inv('workspace:refresh')
   await ctx.command('project.tab.settings')
-  return shown(ctx, page.locator('.hive-vcs-notice').first(), 'the .combwork notice')
+  return shown(ctx, page.locator('.cw-vcs-notice').first(), 'the .combwork notice')
 }
 
 /** Its Untrack… asks first, listing the files. */
 async function untrackDialog(ctx) {
-  await ctx.page.locator('.hive-vcs-notice button.primary').first().click()
+  await ctx.page.locator('.cw-vcs-notice button.primary').first().click()
   return shown(ctx, ctx.page.locator('.dialog').last(), 'the Untrack dialog')
 }
 

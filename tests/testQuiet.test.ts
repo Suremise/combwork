@@ -107,7 +107,7 @@ describe('quiet test copies', () => {
   })
 
   it('a notification is recorded, and shown only when not quiet', () => {
-    const dir = tempDir('hive-quiet-')
+    const dir = tempDir('cw-quiet-')
     try {
       const log = join(dir, 'notify.log')
       process.env.CW_TEST_NOTIFY_LOG = log

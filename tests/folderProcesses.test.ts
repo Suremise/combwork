@@ -128,7 +128,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     expect(childrenFirst(list, [at(grandchild), at(parent)])).toEqual([at(grandchild), at(parent)])
   })
 
-  const tmp = tempDir('hive-folder-processes-')
+  const tmp = tempDir('cw-folder-processes-')
   afterAll(() => rmSync(tmp, { recursive: true, force: true }))
   it.runIf(process.platform === 'win32')('stops its own process; a sibling-prefix folder\'s and an unrelated one keep running', async () => {
     const own = join(tmp, 'scenario')
@@ -329,7 +329,7 @@ describe("a suite's test copies of Combwork (HI-1453)", () => {
   const lane = 'C:\\t\\combwork-test\\e2e\\lanes\\1'
 
   it('are read back from the folder and its own (a nested runner), a line cut short or without a start time skipped', () => {
-    const dir = tempDir('hive-copies-')
+    const dir = tempDir('cw-copies-')
     recordCopy(dir, { pid: 10, started: 1500, profile: join(dir, 'p') })
     mkdirSync(join(dir, 'suite', 'nested', 'inner'), { recursive: true })
     recordCopy(join(dir, 'suite', 'nested', 'inner'), { pid: 11, started: 3500 })
@@ -401,7 +401,7 @@ describe("a suite's test copies of Combwork (HI-1453)", () => {
     ]
 
     it.runIf(process.platform === 'win32')("the launcher's child, by its pid and start time, while the launcher runs; the exit listener removed", async () => {
-      const dir = tempDir('hive-record-')
+      const dir = tempDir('cw-record-')
       const l = launcherOf(42)
       const d = deferred()
       const done = recordMainProcess(dir, l, 1000, 'p', () => d.promise)
@@ -413,7 +413,7 @@ describe("a suite's test copies of Combwork (HI-1453)", () => {
     })
 
     it.runIf(process.platform === 'win32')('nothing, when the launcher exits while the listing is under way, its pid now a later process with a child', async () => {
-      const dir = tempDir('hive-record-')
+      const dir = tempDir('cw-record-')
       const l = launcherOf(42)
       const d = deferred()
       const done = recordMainProcess(dir, l, 1000, 'p', () => d.promise)
@@ -433,7 +433,7 @@ describe("a suite's test copies of Combwork (HI-1453)", () => {
     })
 
     it.runIf(process.platform === 'win32')('nothing, when the launcher had exited already, is missing, or the listing fails', async () => {
-      const dir = tempDir('hive-record-')
+      const dir = tempDir('cw-record-')
       let listed = 0
       const list = async () => (listed++, shellNow)
       const gone = launcherOf(42)

@@ -86,7 +86,7 @@ vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
   return { ...stub, app: { ...stub.app, getPath: () => profile.dir } }
 })
-profile.dir = tempDir('hive-runrecords-profile-')
+profile.dir = tempDir('cw-runrecords-profile-')
 /** A hung run's bound: the records' writes follow each other, so this is never reached by a working one. */
 const HUNG_MS = 10_000
 const file = join(profile.dir, 'leftovers.json')

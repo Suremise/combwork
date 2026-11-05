@@ -10,7 +10,7 @@ import { parseDocRef, splitDocRefs } from '../src/shared/docRefs'
 import { taskPrompt } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 
-const base = tempDir('hive-cardcontext-')
+const base = tempDir('cw-cardcontext-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -38,7 +38,7 @@ describe("a card's context", () => {
   let w: ReturnType<typeof createWorkspaceService>
   let alpha = ''
   beforeEach(async () => {
-    const ws = tempDir('hive-cardcontext-ws-')
+    const ws = tempDir('cw-cardcontext-ws-')
     alpha = join(ws, 'alpha')
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
     mkdirSync(join(alpha, 'docs'), { recursive: true })
@@ -104,7 +104,7 @@ describe('references that no longer resolve (#819)', () => {
   let w: ReturnType<typeof createWorkspaceService>
   let alpha = ''
   beforeEach(async () => {
-    const ws = tempDir('hive-cardcontext-819-')
+    const ws = tempDir('cw-cardcontext-819-')
     alpha = join(ws, 'alpha')
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
     mkdirSync(join(alpha, 'docs'), { recursive: true })

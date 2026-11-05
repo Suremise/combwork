@@ -385,7 +385,7 @@ describe('Copilot sessions', () => {
   })
 
   it('leaves out launches that ended before a prompt, and folders that aren’t sessions', async () => {
-    const home = tempDir('hive-copilot-')
+    const home = tempDir('cw-copilot-')
     const session = (id: string, text: string | null): void => {
       mkdirSync(join(home, 'session-state', id), { recursive: true })
       writeFileSync(join(home, 'session-state', id, 'workspace.yaml'), `id: ${id}\ncwd: C:\\work\\p\n`)
@@ -400,7 +400,7 @@ describe('Copilot sessions', () => {
   })
 
   it('keeps a bounded cache of workspace.yaml that sees edits and deletions', async () => {
-    const dir = tempDir('hive-copilot-ws-')
+    const dir = tempDir('cw-copilot-ws-')
     const file = (n: number, name: string): string => {
       const p = join(dir, `${n}.yaml`)
       writeFileSync(p, `id: s${n}\ncwd: C:\\work\\p\nname: ${name}\n`)

@@ -21,7 +21,7 @@ const { identify, stillSame, endExactly } = req('./e2e/folderProcesses.cjs') as 
 
 /** A hung run's bound: every step here waits for a condition, never for time. */
 const HUNG_MS = 30_000
-const dir = tempDir('hive-keeper-killed-')
+const dir = tempDir('cw-keeper-killed-')
 let bundle = ''
 const started: ChildProcess[] = []
 const helpers: Identity[] = []

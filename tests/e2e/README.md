@@ -62,7 +62,7 @@ needs no `--build` (#274).
 
 **The installer's suites** (`packaged*`) test `dist\win-unpacked`, not `out/`: a run of only those doesn't look at
 `out/` (unless `CW_PROGRESS_CHECK_DEV=1`). Instead the runner checks what `dist\win-unpacked` itself was built from:
-`npm run dist` records that inside it (`win-unpacked\.hive-build-info.json`) once it is sure, and removes it when it
+`npm run dist` records that inside it (`win-unpacked\.cw-build-info.json`) once it is sure, and removes it when it
 starts. Not `dist\build-info.json`: that describes the installer set, which a worktree's `npm run dist` copies into the
 main checkout's `dist` without `win-unpacked`, so there it can describe another build than the one the suites would
 run. When the record's code isn't the fingerprint of the code now, or there is none, the runner warns and a run
@@ -299,7 +299,7 @@ same code while every required check still runs:
   commits first, so it is the commit the round names), each suite's result and time,
   and the logs folder. Paste the printed block into the card comment. When real suites ran, the record also names the
   real CLIs' versions as the suites' test copies of Combwork selected them ("Real CLIs (as Combwork selected them): Claude Code
-  2.1.292, Codex 0.160.1"; each Combwork notes its choice in the suite's `hive-clis.jsonl`, `CW_TEST_CLI_LOG`), and
+  2.1.292, Codex 0.160.1"; each Combwork notes its choice in the suite's `cw-clis.jsonl`, `CW_TEST_CLI_LOG`), and
   `run-record.json` beside it holds them per suite: `npm run tested-clis` makes the release's "Tested with" manifest
   from it (#365, RELEASING.md). The runner itself never starts a CLI.
 - **The reviewer** checks the record instead of repeating it (#533): its fingerprint is the code it's reviewing
@@ -660,7 +660,7 @@ startup failure shows no dialog.
 its lane's port, so no later runner took that lane). Playwright starts Electron through `cmd.exe /c`, so the pid it
 gives is that shell's: a killed suite takes the shell with it, while Combwork's main process, the shell's child, runs on.
 `lib.cjs` records each copy's main process as it starts (the shell's child, by the process tree), by pid and when it
-started, in the suite's folder (`.hive-copies.jsonl`, looked up in the background, so a launch returns as before).
+started, in the suite's folder (`.cw-copies.jsonl`, looked up in the background, so a launch returns as before).
 Once a suite has ended, however it ended (passed, failed, timed out, killed), the runner ends what is left of the
 copies it recorded (`folderProcesses.cjs` `endCopies`); and each run's start, before it takes a lane, ends the copies
 an earlier run recorded in the lanes no running runner holds, started before it looked (`leftCopies.mjs`). Only what

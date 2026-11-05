@@ -1096,7 +1096,7 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
     if (!reg || !H) return
     const root = scroller.current
     if (!query || !root) {
-      reg.delete('hive-search')
+      reg.delete('cw-search')
       return
     }
     const ranges: Range[] = []
@@ -1111,8 +1111,8 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
         ranges.push(r)
       }
     }
-    reg.set('hive-search', new H(...ranges))
-    return () => void reg.delete('hive-search')
+    reg.set('cw-search', new H(...ranges))
+    return () => void reg.delete('cw-search')
   })
 
   const blocks = useMemo(() => (transcript ? toBlocks(transcript.items) : []), [transcript])

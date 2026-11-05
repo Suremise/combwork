@@ -92,7 +92,7 @@ describe('a dialect-only release (scripts/dialectRelease.mjs)', () => {
 })
 
 describe('a dialect-only release over a real repository (what release.mjs asks git)', () => {
-  const dir = tempDir('hive-dialect-release-')
+  const dir = tempDir('cw-dialect-release-')
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
   const git = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8' })
   const put = (files: Files) => {

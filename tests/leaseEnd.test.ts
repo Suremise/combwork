@@ -58,7 +58,7 @@ const { setRunsGoing } = await import('../src/main/workflow/service')
 const { stopLeaseSession } = await import('../src/main/slotsApp')
 const { advanced } = await import('../src/main/advanced')
 const { LANES_GENTLE_END } = await import('../src/shared/advanced')
-advanced.load(tempDir('hive-leaseend-'))
+advanced.load(tempDir('cw-leaseend-'))
 
 const P = 'C:\\ws\\project'
 type SlotArg = Parameters<typeof stopLeaseSession>[2]

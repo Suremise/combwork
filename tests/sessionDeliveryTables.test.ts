@@ -15,7 +15,7 @@ import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, sessi
 import { addDeliveries, addSessionRecords, moveStoreRows, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
 import { QUERIES, V1_0_STEPS } from '../src/main/schema/v1_0'
 
-const base = tempDir('hive-store-tables-')
+const base = tempDir('cw-store-tables-')
 let n = 0
 type Rec = Record<string, unknown>
 
@@ -422,7 +422,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
 
   const live = process.env.CW_STORE_ROUNDTRIP_DB
   it.skipIf(!live)("moves every session and delivery of a live board's copy: counts equal, each equal as JSON", () => {
-    const copy = join(tempDir('hive-store-roundtrip-'), 'combwork.db')
+    const copy = join(tempDir('cw-store-roundtrip-'), 'combwork.db')
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     const db = new DatabaseSync(copy)

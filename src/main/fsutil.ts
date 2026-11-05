@@ -1104,8 +1104,8 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
   const tag = `${process.pid}-${++swapCounter}`
   const parent = dirname(dest)
   const name = dest.slice(parent.length + 1)
-  const fresh = join(parent, `.${name}.hive-new-${tag}`)
-  const old = join(parent, `.${name}.hive-old-${tag}`)
+  const fresh = join(parent, `.${name}.cw-new-${tag}`)
+  const old = join(parent, `.${name}.cw-old-${tag}`)
   const check = o.expected !== undefined
   await mkdir(parent, { recursive: true })
   // The copy, made within the limits as the source is read (it may change meanwhile), and checked before anything is
@@ -1163,7 +1163,7 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
     // place now is moved aside first, and removed only if it is still exactly what was staged; if it was edited too, it
     // is kept as a conflict copy. Nothing that could hold the user's work is removed unchecked.
     if (check && (await hashOrNone(old)) !== o.expected) {
-      const back = join(parent, `.${name}.hive-back-${tag}`)
+      const back = join(parent, `.${name}.cw-back-${tag}`)
       try {
         await renameRetrying(dest, back)
       } catch {
@@ -1204,7 +1204,7 @@ export async function swapOut(dest: string, expected: string): Promise<void> {
   const tag = `${process.pid}-${++swapCounter}`
   const parent = dirname(dest)
   const name = dest.slice(parent.length + 1)
-  const old = join(parent, `.${name}.hive-old-${tag}`)
+  const old = join(parent, `.${name}.cw-old-${tag}`)
   const remove = async (): Promise<void> => {
     if ((await hashOrNone(dest)) !== expected) throw new SwapAbandoned(stored(A.changedBeforeRemoved, { name }))
     await renameRetrying(dest, old, 5)
@@ -1254,7 +1254,7 @@ export async function cleanSwaps(parent: string, disposable: (old: string, name:
     return
   }
   const found = names.flatMap((n) => {
-    const m = /^\.(.+)\.hive-(new|old|back)-\d+-\d+$/.exec(n)
+    const m = /^\.(.+)\.cw-(new|old|back)-\d+-\d+$/.exec(n)
     return m ? [{ n, name: m[1], kind: m[2] }] : []
   })
   const order = { old: 0, back: 1, new: 2 } as Record<string, number>

@@ -60,7 +60,7 @@ const ask = (install: string, profile: string, waits = { ack: 3000, exit: 3000 }
 
 describe("the installer asks a running Combwork to close (askToClose.ps1, HI-1707)", () => {
   beforeAll(() => {
-    dir = tempDir('hive-ask-to-close-')
+    dir = tempDir('cw-ask-to-close-')
     writeFileSync(join(dir, 'stand-in.cjs'), STAND_IN)
   })
   afterAll(() => {

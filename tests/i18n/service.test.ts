@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-const base = tempDir('hive-i18n-service-')
+const base = tempDir('cw-i18n-service-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')
@@ -94,7 +94,7 @@ describe('the service area', () => {
 describe('refusals: English for agents and the log as before, the window in its language', () => {
   it('says each in English with the status it always had, and in German to the window', async () => {
     setLanguage('de', GERMAN)
-    const notRepo = tempDir('hive-not-a-repo-')
+    const notRepo = tempDir('cw-not-a-repo-')
     const nowhere = join(base, 'elsewhere')
     const cases: [Error, string, number, string][] = [
       [await caught(() => w.assertProject(nowhere)), `Not a project in the open workspace: ${nowhere}`, 404, `Kein Projekt im offenen Arbeitsbereich: ${nowhere}`],

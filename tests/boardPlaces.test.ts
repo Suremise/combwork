@@ -29,7 +29,7 @@ vi.mock('../src/main/boardStore', async (original) => {
   }
 })
 
-const base = tempDir('hive-board-places-')
+const base = tempDir('cw-board-places-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

@@ -92,7 +92,7 @@ describe("Claude Code's folder for a path", () => {
 
 describe('copyMissing', () => {
   const setup = async (): Promise<{ src: string; dest: string }> => {
-    const root = tempDir('hive-copymissing-')
+    const root = tempDir('cw-copymissing-')
     const src = join(root, 'old')
     const dest = join(root, 'new')
     await mkdir(join(src, 'memory'), { recursive: true })

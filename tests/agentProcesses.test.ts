@@ -24,7 +24,7 @@ vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
   return { ...stub, app: { ...stub.app, getPath: () => profile.dir } }
 })
-profile.dir = tempDir('hive-agentproc-profile-')
+profile.dir = tempDir('cw-agentproc-profile-')
 
 describe('the CLI a lost terminal leaves (HI-1819)', () => {
   it('is the gate’s child and the command its cmd.exe wrappers run, never what the CLI itself started', async () => {
@@ -107,7 +107,7 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
 }
 
 describe.runIf(process.platform === 'win32')('the processes a launch leaves running', () => {
-  const dir = tempDir('hive-agentproc-')
+  const dir = tempDir('cw-agentproc-')
   // A stand-in CLI: waits for "go", then starts a detached child that starts a detached grandchild (each writes its pid),
   // and exits, as an agent leaving a server behind does. A lingering process sleeps (at most 2 minutes, in case).
   const script = join(dir, 'proc.cjs')
@@ -877,7 +877,7 @@ $r | ConvertTo-Json -Compress
 // root gone, a root whose id names another process now, a child that has exited, a child Combwork can't open or read
 // (reported, never passed over). Nothing real is ended.
 describe.runIf(process.platform === 'win32')("what Stop Them ends of a test run's tree (#1008)", () => {
-  const dir = tempDir('hive-picktree-')
+  const dir = tempDir('cw-picktree-')
 
   it('takes each root only while it is that process, and below it only children started after their parent and by the snapshot', async () => {
     const { HOST_SOURCE } = await import('../src/main/agentProcesses')

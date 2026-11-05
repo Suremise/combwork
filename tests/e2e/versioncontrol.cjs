@@ -259,7 +259,7 @@ function board(sql, ...args) {
         const v = list.closest('.vc-view').getBoundingClientRect()
         const sel = list.querySelector('[aria-selected="true"]')
         const s = sel?.getBoundingClientRect()
-        const name = sel?.querySelector('.hive-tab-label')?.getBoundingClientRect()
+        const name = sel?.querySelector('.cw-tab-label')?.getBoundingClientRect()
         const others = [...list.querySelectorAll('[role="tab"]:not([aria-selected="true"])')]
         return {
           view: Math.round(v.width),

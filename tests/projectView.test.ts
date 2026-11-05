@@ -38,7 +38,7 @@ vi.mock('../src/main/logger', async (original) => {
   }
 })
 
-const base = tempDir('hive-project-view-')
+const base = tempDir('cw-project-view-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, projectViewKey } = await import('../src/main/workspace')

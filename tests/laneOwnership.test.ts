@@ -16,7 +16,7 @@ import { tempDir } from './tempDir'
 /** The bound for a hung run: the lanes are read again within it after each change. */
 const HUNG_MS = 15_000
 
-const base = tempDir('hive-lane-ownership-')
+const base = tempDir('cw-lane-ownership-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

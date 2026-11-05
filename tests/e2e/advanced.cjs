@@ -51,7 +51,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     const list = page.locator('.advanced-list')
     check('Settings → Advanced shows the list', !!(await lib.until(async () => (await list.count()) === 1, HUNG_MS)))
     // Tabs (HI-1839): Combwork (HI-2517), then each CLI in the providers' order, named and iconed as Settings → Providers has them.
-    const tabs = () => list.locator('.advanced-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.hive-tab-label').textContent.trim(), count: e.querySelector('.hive-tab-count') ? Number(e.querySelector('.hive-tab-count').textContent.replace(/\D/g, '')) : null, selected: e.getAttribute('aria-selected') === 'true', muted: e.hasAttribute('data-muted'), name: e.getAttribute('aria-label'), icon: e.querySelector('.hive-tab-icon .provider-icon, .hive-tab-icon .tab-hex')?.getAttribute('class') ?? null })))
+    const tabs = () => list.locator('.advanced-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.cw-tab-label').textContent.trim(), count: e.querySelector('.cw-tab-count') ? Number(e.querySelector('.cw-tab-count').textContent.replace(/\D/g, '')) : null, selected: e.getAttribute('aria-selected') === 'true', muted: e.hasAttribute('data-muted'), name: e.getAttribute('aria-label'), icon: e.querySelector('.cw-tab-icon .provider-icon, .cw-tab-icon .tab-hex')?.getAttribute('class') ?? null })))
     const tab = (id) => list.locator(`.advanced-tabs [role="tab"][data-tab="${id}"]`)
     const selectedTab = async () => (await tabs()).find((t) => t.selected)?.id ?? null
     const configTab = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.['settings.advanced']
@@ -75,8 +75,8 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
       check('a dimmed tab is chosen as any other, its values there', !!(await lib.until(async () => (await selectedTab()) === muted.id && (await visibleIds()).length > 0, HUNG_MS)))
       // Visibly off (the Assistant's screenshot review): an "off" mark on the tab, and a line atop its values.
       const offNote = list.locator(`[role="tabpanel"][data-group="${muted.id}"] [data-note="cli-off"]`)
-      check('…marked off on its tab, and its values headed by a line saying it is turned off', (await tab(muted.id).locator('.hive-tab-tag').innerText()).trim() === 'off' && (await offNote.isVisible()) && (await offNote.innerText()).includes(`${muted.label} is turned off: these settings apply once you turn it on`), await offNote.innerText().catch(() => ''))
-      check('…a CLI turned on has neither', (await list.locator('.advanced-tabs [role="tab"]:not([data-muted]) .hive-tab-tag').count()) === 0 && (await list.locator('[role="tabpanel"][data-note="cli-off"], [role="tabpanel"] [data-note="cli-off"]').count()) === t0.filter((t) => t.muted).length)
+      check('…marked off on its tab, and its values headed by a line saying it is turned off', (await tab(muted.id).locator('.cw-tab-tag').innerText()).trim() === 'off' && (await offNote.isVisible()) && (await offNote.innerText()).includes(`${muted.label} is turned off: these settings apply once you turn it on`), await offNote.innerText().catch(() => ''))
+      check('…a CLI turned on has neither', (await list.locator('.advanced-tabs [role="tab"]:not([data-muted]) .cw-tab-tag').count()) === 0 && (await list.locator('[role="tabpanel"][data-note="cli-off"], [role="tabpanel"] [data-note="cli-off"]').count()) === t0.filter((t) => t.muted).length)
       await list.locator('.advanced-tabs').scrollIntoViewIfNeeded()
       for (const theme of ['dark', 'light']) {
         await page.evaluate((th) => document.documentElement.setAttribute('data-theme', th), theme)

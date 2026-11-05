@@ -15,7 +15,7 @@ import { settingEntry } from '../src/shared/settingsCatalog'
 import type { AppSettings, ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-cliown-')
+const base = tempDir('cw-cliown-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 // Never the user's own homes: the adapters read their config.

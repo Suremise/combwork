@@ -12,7 +12,7 @@ import { duplicateAgentNames, nameTaken, projectPrefix, suggestAgentName } from 
 import type { AgentDef, CombworkEvent } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-agentnames-')
+const base = tempDir('cw-agentnames-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

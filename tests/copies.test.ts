@@ -27,7 +27,7 @@ vi.mock('fs/promises', async (original) => {
   const rename = async (from: string, to: string): Promise<void> => {
     await real.rename(from, to)
     const go = aside.go
-    if (go && /\.hive-quiet-/.test(to)) {
+    if (go && /\.cw-quiet-/.test(to)) {
       aside.go = null
       aside.entered?.()
       await go

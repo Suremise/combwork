@@ -306,7 +306,7 @@ function endChildTree(child) {
 // --- Test copies of Combwork that outlive their suite (HI-1453: one ran 12 h after its run, its parent gone).
 
 /** Where a suite's test copies of Combwork are recorded as they start: a line each in its work folder (lib.cjs). */
-const COPIES_FILE = '.hive-copies.jsonl'
+const COPIES_FILE = '.cw-copies.jsonl'
 /** Records a copy started in `dir`: { pid, started } (its identity, as processes() lists it), and its profile. */
 function recordCopy(dir, copy) {
   fs.appendFileSync(path.join(dir, COPIES_FILE), `${JSON.stringify(copy)}\n`)

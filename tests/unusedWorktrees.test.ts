@@ -16,7 +16,7 @@ import { tempDir } from './tempDir'
 // As on GitHub's runner (#447): the temp folder by its 8.3 short name where it has one (git lists worktrees by their long
 // names; a junction makes another name on any machine, #448), and no global git config (tests/noGlobalGit.ts), so no
 // user identity but the repository's own.
-const made = tempDir('hive-unusedwt-')
+const made = tempDir('cw-unusedwt-')
 const base = shortPath(made) ?? made
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })

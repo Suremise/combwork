@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-bg-subagents-')
+const base = tempDir('cw-bg-subagents-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { sessions } = await import('../src/main/sessions')

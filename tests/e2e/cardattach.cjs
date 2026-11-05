@@ -160,7 +160,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     await page.locator('.project-row', { hasText: 'alpha' }).first().click()
     await page.keyboard.press('Alt+7')
-    const attachTabs = () => page.locator('.attachment-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.hive-tab-label').textContent.trim(), count: Number((e.querySelector('.hive-tab-count')?.textContent ?? '-1').replace(/\D/g, '')), selected: e.getAttribute('aria-selected') === 'true' })))
+    const attachTabs = () => page.locator('.attachment-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.cw-tab-label').textContent.trim(), count: Number((e.querySelector('.cw-tab-count')?.textContent ?? '-1').replace(/\D/g, '')), selected: e.getAttribute('aria-selected') === 'true' })))
     const attachTab = (id) => page.locator(`.attachment-tabs [role="tab"][data-tab="${id}"]`)
     const selectedAttach = async () => (await attachTabs()).find((t) => t.selected)?.id ?? null
     // The session's file in Pane attachments (the card's copy, in Card attachments, has the same name).

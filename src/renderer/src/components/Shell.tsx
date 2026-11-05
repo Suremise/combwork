@@ -70,7 +70,7 @@ const M = {
 }
 
 /** The activity bar's icon for the Assistant: its own mark rather than a codicon. */
-const ASSISTANT_ICON = 'hive-assistant'
+const ASSISTANT_ICON = 'cw-assistant'
 
 const ACTIVITIES: { id: Activity; icon: string; label: Msg; command: string }[] = [
   { id: 'projects', icon: 'files', label: M.projects, command: 'view.projects' },

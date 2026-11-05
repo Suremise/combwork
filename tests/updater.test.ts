@@ -150,7 +150,7 @@ describe('update checks', () => {
 describe('installing a downloaded update (#1647)', () => {
   // oxlint-disable-next-line typescript/no-require-imports -- the e2e suites' CommonJS helper, shared with them
   const { fakeInstall } = require('./e2e/fakeInstall.cjs') as { fakeInstall: (dir: string, o?: { version?: string; identity?: unknown }) => string }
-  const base = tempDir('hive-updater-')
+  const base = tempDir('cw-updater-')
   let n = 0
   /** A packaged Combwork whose install folder's resources are a stand-in (what it reads as the copy on disk), started. */
   const start = async (copy: { version?: string; identity?: unknown }) => {

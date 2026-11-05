@@ -16,7 +16,7 @@ import { setLanguage } from '../src/shared/i18n'
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async () => {
   const { tempDir } = await import('./tempDir')
-  profile.dir = tempDir('hive-flight-')
+  profile.dir = tempDir('cw-flight-')
   return { app: { getPath: () => profile.dir, getVersion: () => '0.9.0-test', isPackaged: false } }
 })
 // Settings → Advanced as the test sets them; anything else at its default.

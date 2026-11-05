@@ -1,6 +1,6 @@
 // Monaco's DOMPurify is Combwork's (#1141). monaco-editor 0.57.0 bundles its own copy of DOMPurify 3.4.15 (two IN_PLACE
 // advisories) and imports it by a relative path, so package.json's override alone wouldn't change what ships: the
-// renderer build's hive-monaco-dompurify plugin (electron.vite.config.ts) gives Monaco's domSanitize.js Combwork's dompurify
+// renderer build's cw-monaco-dompurify plugin (electron.vite.config.ts) gives Monaco's domSanitize.js Combwork's dompurify
 // instead, and a build that would take Monaco's copy fails. Built here for real (Monaco's sanitiser alone, with the
 // plugin), the bundle has Combwork's DOMPurify and not Monaco's. And once Monaco bundles 3.4.17 or later, a test here fails
 // to say the plugin and the override are to go.
@@ -29,8 +29,8 @@ describe("Monaco's DOMPurify is Combwork's (#1141)", () => {
   it("is still needed: Monaco bundles a DOMPurify older than 3.4.17 (else remove the plugin and package.json's override)", () => {
     const bundled = versionOf(monacosCopy)
     const listed = (JSON.parse(readFileSync(join(root, 'node_modules', 'monaco-editor', 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }).dependencies?.dompurify ?? ''
-    expect(bundled, "Monaco's own DOMPurify copy isn't where the plugin expects it: check hive-monaco-dompurify still has something to do").toMatch(/^\d/)
-    expect(atLeast(bundled, [3, 4, 17]) || atLeast(listed.replace(/^[^\d]*/, ''), [3, 4, 17]), `Monaco now has DOMPurify ${bundled} (lists ${listed}): remove the hive-monaco-dompurify plugin (electron.vite.config.ts) and package.json's dompurify override, and this test`).toBe(false)
+    expect(bundled, "Monaco's own DOMPurify copy isn't where the plugin expects it: check cw-monaco-dompurify still has something to do").toMatch(/^\d/)
+    expect(atLeast(bundled, [3, 4, 17]) || atLeast(listed.replace(/^[^\d]*/, ''), [3, 4, 17]), `Monaco now has DOMPurify ${bundled} (lists ${listed}): remove the cw-monaco-dompurify plugin (electron.vite.config.ts) and package.json's dompurify override, and this test`).toBe(false)
   })
 
   it("maps only domSanitize.js's import of Monaco's copy to Combwork's dompurify", () => {

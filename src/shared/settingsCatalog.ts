@@ -948,7 +948,7 @@ const HELPS: Record<string, AgentMsg> = {
 /** The id of the user guide's heading for each section (Help → User Guide). */
 const DOCS: Record<string, string> = {
   general: 'getting-started', // i18n-ignore: a user guide heading's id (#1535)
-  updates: 'updating-hive', // i18n-ignore: a user guide heading's id (#1535)
+  updates: 'updating-combwork', // i18n-ignore: a user guide heading's id (#1535)
   appearance: 'getting-started', // i18n-ignore: a user guide heading's id (#1535)
   providers: 'coding-agents-claude-code-codex-and-github-copilot', // i18n-ignore: a user guide heading's id (#1535)
   notifications: 'notifications', // i18n-ignore: a user guide heading's id (#1535)
@@ -959,7 +959,7 @@ const DOCS: Record<string, string> = {
   agents: 'several-agents-in-one-project', // i18n-ignore: a user guide heading's id (#1535)
   keybindings: 'keyboard-shortcuts', // i18n-ignore: a user guide heading's id (#1535)
   mcpCatalogs: 'installing-servers-from-a-catalogue', // i18n-ignore: a user guide heading's id (#1535)
-  agentApi: 'the-built-in-hive-server', // i18n-ignore: a user guide heading's id (#1535)
+  agentApi: 'the-built-in-combwork-server', // i18n-ignore: a user guide heading's id (#1535)
   advanced: 'troubleshooting' // i18n-ignore: a user guide heading's id (#1535)
 }
 const DOCS_BY_ID: Record<string, string> = {
@@ -987,7 +987,7 @@ const DOCS_BY_ID: Record<string, string> = {
   'sessions.backupTranscripts': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.backupRetention': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.recordPerformance': 'performance-metrics', // i18n-ignore: a user guide heading's id (#1535)
-  'sessions.resumeAfterUnexpectedClose': 'when-hive-closed-unexpectedly', // i18n-ignore: a user guide heading's id (#1535)
+  'sessions.resumeAfterUnexpectedClose': 'when-combwork-closed-unexpectedly', // i18n-ignore: a user guide heading's id (#1535)
   'agents.backgroundTaskMinutes': 'sessions', // i18n-ignore: a user guide heading's id (#1535)
   'agents.leftoverProcesses': 'processes-agents-leave-running' // i18n-ignore: a user guide heading's id (#1535)
 }

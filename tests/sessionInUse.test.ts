@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { SessionBulkProgress } from '../src/shared/types'
 
-const base = tempDir('hive-inuse-')
+const base = tempDir('cw-inuse-')
 // The CLIs' homes are the test's (never ~/.claude or ~/.codex).
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')

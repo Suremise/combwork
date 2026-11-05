@@ -32,7 +32,7 @@ async function excludeRefused(ctx) {
   await ctx.command('project.focus', dir)
   await ctx.command('project.tab.settings')
   await page.mouse.move(5, 5)
-  const exclude = await shown(ctx, page.locator('.hive-vcs-notice button.primary'), "the .combwork notice's Exclude")
+  const exclude = await shown(ctx, page.locator('.cw-vcs-notice button.primary'), "the .combwork notice's Exclude")
   await exclude.click()
   return shown(ctx, page.locator('.toasts .toast.error'), 'the refusal')
 }

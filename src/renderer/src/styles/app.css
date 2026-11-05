@@ -1696,24 +1696,24 @@ textarea.input {
  * switches pages never reads as a segmented control picking a value (None · Git) beside it. Never wider than its row; in
  * a short one (`fold`) the tabs not selected fold to their icons, and shorter still the row scrolls.
  */
-.hive-tabs-row {
+.cw-tabs-row {
   position: relative;
   display: flex;
   min-inline-size: 0;
   max-inline-size: 100%;
   align-self: stretch;
 }
-.hive-tabs {
+.cw-tabs {
   display: flex;
   align-items: stretch;
   max-inline-size: 100%;
   overflow-x: auto;
   scrollbar-width: thin;
 }
-.hive-tabs > .tip-wrap {
+.cw-tabs > .tip-wrap {
   flex-shrink: 0;
 }
-.hive-tab {
+.cw-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -1729,13 +1729,13 @@ textarea.input {
   white-space: nowrap;
   cursor: pointer;
 }
-.hive-tab:hover {
+.cw-tab:hover {
   color: var(--fg-strong);
 }
-.hive-tab.active {
+.cw-tab.active {
   color: var(--fg-strong);
 }
-.hive-tab.active::after {
+.cw-tab.active::after {
   content: '';
   position: absolute;
   inset-inline: 4px;
@@ -1743,32 +1743,32 @@ textarea.input {
   block-size: 2px;
   background: var(--accent);
 }
-.hive-tab:focus-visible {
+.cw-tab:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: -3px;
 }
-.hive-tab .codicon {
+.cw-tab .codicon {
   font-size: 13px;
   color: inherit;
 }
-.hive-tab-count {
+.cw-tab-count {
   padding: 0 5px;
   border-radius: 8px;
   font-size: 11px;
   background: var(--bg-active);
   color: var(--fg);
 }
-.hive-tab-unsaved {
+.cw-tab-unsaved {
   display: block;
   inline-size: 6px;
   block-size: 6px;
   border-radius: 50%;
   background: var(--accent);
 }
-.hive-tab.icon-only {
+.cw-tab.icon-only {
   padding: 0 8px;
 }
-.hive-tab.icon-only .hive-tab-label {
+.cw-tab.icon-only .cw-tab-label {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
@@ -1777,24 +1777,24 @@ textarea.input {
   white-space: nowrap;
 }
 /* A tab's own icon (Hive's mark, a CLI's), the codicons' size; a dimmed tab (a CLI turned off, HI-1839) stays legible. */
-.hive-tab-icon {
+.cw-tab-icon {
   display: inline-flex;
 }
-.hive-tab-icon > :is(.provider-icon, .tab-hex) {
+.cw-tab-icon > :is(.provider-icon, .tab-hex) {
   inline-size: 13px;
   block-size: 13px;
 }
-.hive-tab.muted:not(:hover) {
+.cw-tab.muted:not(:hover) {
   color: var(--fg-faint);
 }
-.hive-tab.muted .hive-tab-icon {
+.cw-tab.muted .cw-tab-icon {
   opacity: 0.6;
 }
-.hive-tab.muted.active:not(:hover) .hive-tab-label {
+.cw-tab.muted.active:not(:hover) .cw-tab-label {
   color: var(--fg-muted);
 }
 /* A short mark after a tab's name ("off"). */
-.hive-tab-tag {
+.cw-tab-tag {
   padding: 0 5px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1803,7 +1803,7 @@ textarea.input {
   color: var(--fg-muted);
 }
 /* The tabs with every name, measured to choose between names and icons (Tabs' `fold`). */
-.hive-tabs-measure {
+.cw-tabs-measure {
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: 0;
@@ -1814,7 +1814,7 @@ textarea.input {
   visibility: hidden;
   pointer-events: none;
 }
-.hive-tabs-measure .hive-tab::after {
+.cw-tabs-measure .cw-tab::after {
   content: attr(data-label);
 }
 /* A tab's page not selected stays mounted (its draft kept) but never shows, whatever its own display. */
@@ -1822,15 +1822,15 @@ textarea.input {
   display: none !important;
 }
 /* The tabs' line runs under the whole row, the selected tab's underline on it. */
-.workflow-defaults-tabs > .hive-tabs-row,
-.kb-editor > .hive-tabs-row,
-.advanced-list > .hive-tabs-row,
-.images-page > .hive-tabs-row {
+.workflow-defaults-tabs > .cw-tabs-row,
+.kb-editor > .cw-tabs-row,
+.advanced-list > .cw-tabs-row,
+.images-page > .cw-tabs-row {
   border-block-end: 1px solid var(--border-subtle);
   margin-block-end: 4px;
 }
 /* Keyboard Shortcuts' many categories (HI-1838) wrap onto another line rather than scroll with the last cut off. */
-.hive-tabs.kb-tabs {
+.cw-tabs.kb-tabs {
   flex-wrap: wrap;
   overflow-x: visible;
 }
@@ -6344,7 +6344,7 @@ h2.section#unused-worktrees {
   color: var(--accent-ink);
   border-radius: 2px;
 }
-::highlight(hive-search) {
+::highlight(cw-search) {
   background-color: rgba(245, 158, 11, 0.35);
   color: inherit;
 }
@@ -14152,17 +14152,17 @@ button.progress-lane-retry {
 
 /* .combwork isn't kept out of version control (#345): the text takes the room and the buttons wrap under it in a narrow
    pane; one too narrow even for them clips rather than scrolling the page sideways. */
-.hive-vcs-notice {
+.cw-vcs-notice {
   flex-wrap: wrap;
   overflow: hidden;
 }
 /* The text, not the buttons' tooltip wrappers, takes the room (#886: the × took half the banner). */
-.hive-vcs-notice > .hive-vcs-text {
+.cw-vcs-notice > .cw-vcs-text {
   flex: 1 1 14em;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.page-narrow .hive-vcs-notice {
+.page-narrow .cw-vcs-notice {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   margin: 8px 0 12px;

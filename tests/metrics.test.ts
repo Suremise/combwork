@@ -13,7 +13,7 @@ import { LATENCY_BOUNDS_MS, percentile, utf8Bytes, type MetricsPart } from '../s
 import { tempDir } from './tempDir'
 import { metricsSaved, putMetrics } from './storeDocs'
 
-const base = tempDir('hive-metrics-')
+const base = tempDir('cw-metrics-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')

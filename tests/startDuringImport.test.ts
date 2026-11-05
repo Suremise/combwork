@@ -28,7 +28,7 @@ vi.mock('../src/main/transcriptFiles', async (orig) => {
   }
 })
 
-const base = tempDir('hive-start-import-')
+const base = tempDir('cw-start-import-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
 // seam, HI-1755; connections are on for everyone since HI-1774).

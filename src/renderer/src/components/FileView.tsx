@@ -566,7 +566,7 @@ function MarkdownPreview({ text, root, rel, onOpenRel }: PreviewProps) {
     if (!blocks.length) return
     void import('../monaco').then(({ monaco }) => {
       // Token colours are only registered once a theme is set, which may not have happened yet.
-      monaco.editor.setTheme(document.documentElement.dataset.theme === 'light' ? 'hive-light' : 'hive-dark')
+      monaco.editor.setTheme(document.documentElement.dataset.theme === 'light' ? 'cw-light' : 'cw-dark')
       for (const code of blocks) {
         const lang = /language-([\w+#-]+)/.exec(code.className)?.[1]
         if (!lang || code.dataset.colorized) continue

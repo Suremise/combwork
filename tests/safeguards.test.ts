@@ -13,7 +13,7 @@ const lines = (...o: unknown[]): string => o.map((x) => JSON.stringify(x)).join(
 const at = (iso: string): number => Date.parse(iso)
 /** Runs `fn` with Settings → Advanced's store in a folder of its own, its overrides removed after. */
 async function withAdvanced(fn: () => Promise<void>): Promise<void> {
-  advanced.load(tempDir('hive-safeguards-advanced-'))
+  advanced.load(tempDir('cw-safeguards-advanced-'))
   try {
     await fn()
   } finally {

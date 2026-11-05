@@ -115,7 +115,7 @@ const theyPush = (file: string): void => {
 
 /** New repositories for this test: the project on main, pushed to its bare remote, and another clone of that remote. */
 function fresh(): void {
-  const base = tempDir('hive-gitrepo-')
+  const base = tempDir('cw-gitrepo-')
   proj = join(base, 'ws', 'proj')
   remote = join(base, 'remote.git')
   other = join(base, 'other')

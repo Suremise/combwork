@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import type { AgentInfo, TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-boardstartstall-')
+const base = tempDir('cw-boardstartstall-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { resetAgentStartsForTests, startBegun, startEnded, startSeq, startWaits } = await import('../src/main/agentStarts')

@@ -717,7 +717,7 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
   if (at && !at.ok) return null
   const index = at ? at.out.trim() : join(gitDir!, 'index')
   const lock = `${index}.lock`
-  const next = `${index}.hive-line`
+  const next = `${index}.cw-line`
   let fd: number | null
   try {
     fd = openSync(lock, 'wx')

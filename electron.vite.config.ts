@@ -17,14 +17,14 @@ const MONACO_SANITIZE = /[\\/]monaco-editor[\\/]esm[\\/]vs[\\/]base[\\/]browser[
  */
 export function monacoDompurify(): Plugin {
   return {
-    name: 'hive-monaco-dompurify',
+    name: 'cw-monaco-dompurify',
     enforce: 'pre',
     resolveId(source: string, importer?: string) {
       if (source !== './dompurify/dompurify.js' || !importer || !MONACO_SANITIZE.test(importer)) return null
       return resolve(__dirname, 'node_modules/dompurify/dist/purify.es.mjs')
     },
     load(id: string) {
-      if (MONACO_DOMPURIFY.test(id)) throw new Error(`Monaco's own DOMPurify would be bundled (${id}): see hive-monaco-dompurify in electron.vite.config.ts (#1141)`)
+      if (MONACO_DOMPURIFY.test(id)) throw new Error(`Monaco's own DOMPurify would be bundled (${id}): see cw-monaco-dompurify in electron.vite.config.ts (#1141)`)
       return null
     }
   }
@@ -88,7 +88,7 @@ export default defineConfig({
         // @vscode/codicons at start, and from Monaco when an editor first loads. As plain CSS it ties with Hive's own
         // icon sizes (.activity-btn .codicon …), so whichever loaded last won and every shell icon fell to 16px. Both
         // copies go in a cascade layer, below Hive's (unlayered) styles: Hive's icon rules win whatever loads when.
-        name: 'hive-codicons-layer',
+        name: 'cw-codicons-layer',
         enforce: 'pre',
         transform(code: string, id: string) {
           if (!/[\\/](?:@vscode[\\/]codicons[\\/]dist|ui[\\/]codicons[\\/]codicon)[\\/]codicon\.css(?:\?|$)/.test(id)) return null
@@ -97,7 +97,7 @@ export default defineConfig({
       },
       {
         // The dev server's hot reload needs ws: and localhost; a build connects to nothing.
-        name: 'hive-production-csp',
+        name: 'cw-production-csp',
         apply: 'build',
         transformIndexHtml: (html: string) => html.replace(" connect-src 'self' ws: http://localhost:*", " connect-src 'self'")
       }

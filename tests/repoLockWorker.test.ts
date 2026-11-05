@@ -14,7 +14,7 @@ import type { LockReply, LockRequest } from '../src/main/repoLockWorker'
 import { useLockWorker, withRepoLock } from '../src/main/repoLock'
 import { tempDir } from './tempDir'
 
-const tmp = tempDir('hive-repo-lock-worker-')
+const tmp = tempDir('cw-repo-lock-worker-')
 const bundle = join(tmp, 'repo-lock-worker.cjs')
 
 beforeAll(async () => {
@@ -26,7 +26,7 @@ afterAll(() => useLockWorker(null))
 let n = 0
 /** A repository of its own, and its common git dir (where the lock's file is). */
 function repo(): { folder: string; dir: string } {
-  const folder = tempDir(`hive-repo-lock-worker-${++n}-`)
+  const folder = tempDir(`cw-repo-lock-worker-${++n}-`)
   execFileSync('git', ['init', '-q', folder], { windowsHide: true })
   return { folder, dir: join(folder, '.git') }
 }

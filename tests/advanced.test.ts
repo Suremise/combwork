@@ -218,7 +218,7 @@ describe('advanced.json', () => {
 describe('the advanced store', () => {
   const stores: AdvancedStore[] = []
   const store = (): { s: AdvancedStore; dir: string; file: string } => {
-    const dir = tempDir('hive-advanced-')
+    const dir = tempDir('cw-advanced-')
     const s = new AdvancedStore()
     stores.push(s)
     return { s, dir, file: join(dir, 'advanced.json') }
@@ -327,7 +327,7 @@ describe('the advanced store', () => {
   const settled = (): Promise<void> => advanced.transact(async () => undefined)
 
   it("keeps the developer switch and advanced.json one value: the setting written to the file, a hand edit to the setting", async () => {
-    const dir = tempDir('hive-advanced-bound-')
+    const dir = tempDir('cw-advanced-bound-')
     const file = join(dir, 'advanced.json')
     const { cfg, change, reset, on } = boundSettings()
     try {
@@ -356,7 +356,7 @@ describe('the advanced store', () => {
   })
 
   it('keeps the developer switch and advanced.json one value whatever comes between their writes (HI-2418)', async () => {
-    const dir = tempDir('hive-advanced-bound-')
+    const dir = tempDir('cw-advanced-bound-')
     const file = join(dir, 'advanced.json')
     const { cfg, given, change, on } = boundSettings()
     const all = (): unknown[] => [existsSync(file) ? read(file).values : {}, advanced.get('cw.showDeveloperFeatures'), on()]
@@ -412,7 +412,7 @@ describe('the advanced store', () => {
   })
 
   it('changes the developer setting only once advanced.json has it: a refusal (an unreadable file, an edit meanwhile) changes neither', async () => {
-    const dir = tempDir('hive-advanced-checked-')
+    const dir = tempDir('cw-advanced-checked-')
     const file = join(dir, 'advanced.json')
     const updates: unknown[] = []
     const update = (patch: unknown) => (updates.push(patch), {} as AppSettings)
@@ -564,7 +564,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it("reads Codex's plan limits under renamed fields once the overrides name them (the recorded token_count, renamed)", async () => {
-    const dir = tempDir('hive-advanced-fields-')
+    const dir = tempDir('cw-advanced-fields-')
     advanced.load(dir)
     const { rolloutDetails } = await import('../src/main/providers/codex/rollout')
     const recorded = fixtureText('tests/fixtures/codex-0.159.jsonl')
@@ -583,7 +583,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it("reads Claude Code's plan limits from its recorded status line, and under renamed fields once the overrides name them", async () => {
-    const dir = tempDir('hive-advanced-claude-fields-')
+    const dir = tempDir('cw-advanced-claude-fields-')
     advanced.load(dir)
     const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
     const recorded = fixtureText('tests/fixtures/advanced/statusline-claude-2.1.296.json')
@@ -602,7 +602,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it("counts Claude Code's recorded background subagents, and under a renamed status and fields once the overrides name them (#1584)", async () => {
-    const dir = tempDir('hive-advanced-subagents-')
+    const dir = tempDir('cw-advanced-subagents-')
     advanced.load(dir)
     const { claudeBackgroundTasks } = await import('../src/main/providers/claude/background')
     const recorded = fixtureText('tests/fixtures/advanced/subagent-launch-claude-2.1.310.jsonl') + fixtureText('tests/fixtures/advanced/subagent-resume-claude-2.1.309.jsonl')
@@ -620,7 +620,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it("counts Codex's recorded subagent, and under a renamed item, kind and fields once the overrides name them (#1584)", async () => {
-    const dir = tempDir('hive-advanced-codex-subagents-')
+    const dir = tempDir('cw-advanced-codex-subagents-')
     advanced.load(dir)
     const { codexBackgroundTasks } = await import('../src/main/providers/codex/background')
     const recorded = fixtureText('tests/fixtures/advanced/subagent-codex-0.164.0.jsonl')
@@ -637,7 +637,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it('takes an override at once (patterns, the placeholder, a sign-in error) and at the next launch (hooks, title, tool timeout)', async () => {
-    const dir = tempDir('hive-advanced-adapters-')
+    const dir = tempDir('cw-advanced-adapters-')
     advanced.load(dir)
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const { codex, codexMcpServer, codexTurnScreen } = await import('../src/main/providers/codex/adapter')
@@ -688,7 +688,7 @@ describe('the adapters and the hive MCP server use them', () => {
     expect(codexMcpServer('combwork', { command: 'node' }).table?.tool_timeout_sec).toBe(1800)
     await advanced.set('codex.title.items', 'activity, spinner')
     await advanced.set('codex.hooks.timeoutSeconds', 8)
-    const home = tempDir('hive-advanced-codex-home-')
+    const home = tempDir('cw-advanced-codex-home-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {

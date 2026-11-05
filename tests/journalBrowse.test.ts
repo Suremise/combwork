@@ -10,7 +10,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { DEFAULT_JOURNAL, type JournalSettings } from '../src/shared/journal'
 
-const base = tempDir('hive-journal-browse-')
+const base = tempDir('cw-journal-browse-')
 const j = await import('../src/main/journal')
 
 let n = 0

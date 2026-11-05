@@ -19,7 +19,7 @@ import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstRead
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-connections-')
+const base = tempDir('cw-connections-')
 const home = join(base, 'claude-home')
 const userHome = join(base, 'user-profile')
 process.env.CW_USER_DATA = join(base, 'profile')

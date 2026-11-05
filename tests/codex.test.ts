@@ -100,7 +100,7 @@ describe('Codex: when a person must act', () => {
 
   it("pins the title's items for Combwork's sessions, so a user's [tui].terminal_title can't hide it", async () => {
     const { rmSync } = await import('fs')
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
@@ -127,8 +127,8 @@ describe('Codex: when a person must act', () => {
 
   it("says a connection's folder is set up (HI-1870) when its launches run in a Windows sandbox: its own, or this PC's passed on", async () => {
     const { mkdirSync, rmSync, statSync, utimesSync, writeFileSync } = await import('fs')
-    const pc = tempDir('hive-codex-pc-')
-    const conn = tempDir('hive-codex-conn-')
+    const pc = tempDir('cw-codex-pc-')
+    const conn = tempDir('cw-codex-conn-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = pc
     try {
@@ -173,7 +173,7 @@ describe('Codex: when a person must act', () => {
     const { advanced } = await import('../src/main/advanced')
     const real = advanced.get.bind(advanced)
     const off = vi.spyOn(advanced, 'get').mockImplementation(((id: string) => (id === 'codex.trust.perLaunch' ? false : real(id))) as typeof advanced.get)
-    const home = tempDir('hive-codex-trust-')
+    const home = tempDir('cw-codex-trust-')
     try {
       const t = (root: string | null, git = true) => ({ root, git, short: false })
       const targets = [t('C:\\work\\alpha'), t('c:\\WORK\\Alpha'), t('C:\\work\\beta'), t('C:\\work\\notes', false), t(null)]
@@ -205,7 +205,7 @@ describe('Codex: when a person must act', () => {
     const { rmSync } = await import('fs')
     const { codex } = await import('../src/main/providers/codex/adapter')
     const { advanced } = await import('../src/main/advanced')
-    const home = tempDir('hive-codex-perlaunch-')
+    const home = tempDir('cw-codex-perlaunch-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
@@ -238,7 +238,7 @@ describe('Codex: when a person must act', () => {
 
   it('passes the first task after "--", so extra arguments ending in --image keep it (#523)', async () => {
     const { rmSync } = await import('fs')
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
@@ -263,7 +263,7 @@ describe('Codex: when a person must act', () => {
 
   it("pre-approves only Combwork's own server's tools: a third-party one follows Codex's approval policy (#1166)", async () => {
     const { rmSync } = await import('fs')
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
@@ -496,7 +496,7 @@ describe('Codex skill copies', () => {
   it("replaces and removes only Combwork's marked copies, and leaves the user's own folders alone", async () => {
     const { mkdirSync, writeFileSync, existsSync, readFileSync } = await import('fs')
     const { join } = await import('path')
-    const root = tempDir('hive-skills-')
+    const root = tempDir('cw-skills-')
     const src = join(root, 'src', 'deploy')
     mkdirSync(src, { recursive: true })
     writeFileSync(join(src, 'SKILL.md'), '# deploy v1')

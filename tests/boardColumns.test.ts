@@ -10,7 +10,7 @@ import { cardChange, readCondition, wakeAbout, wakeLine, watchLabel } from '../s
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-columns-')
+const base = tempDir('cw-columns-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

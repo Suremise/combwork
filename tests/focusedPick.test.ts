@@ -156,7 +156,7 @@ describe('the tests a change needs (pickTests)', () => {
   })
 
   it('a CW_TEST_ seam read added to an existing src/main file selects tests/e2esuites.test.ts (git diff -U0 of a real change)', () => {
-    const repo = tempDir('hive-focused-pick-')
+    const repo = tempDir('cw-focused-pick-')
     const git = (...args: string[]): string => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=Hive Test', '-c', 'user.email=test@example.invalid', ...args], { cwd: repo, env: runContext.baseEnv(), encoding: 'utf8' })
     git('init', '-q', '-b', 'main')
     const file = 'src/main/usageHistory.ts'

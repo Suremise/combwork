@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 
 const source = process.env.CW_BOARD_BENCH_DB
-const base = tempDir('hive-board-bench-')
+const base = tempDir('cw-board-bench-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

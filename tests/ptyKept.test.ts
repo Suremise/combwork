@@ -104,7 +104,7 @@ describe.runIf(process.platform === 'win32')('the output kept from quiet exits',
 describe.runIf(process.platform === 'win32')('the environment the terminals get', () => {
   it("is the allowlist: a shell's NODE_OPTIONS and CW_ variables don't reach a terminal's process (#580)", async () => {
     // A shell that would load a script into every Node it starts, and an agent session's token.
-    const dir = tempDir('hive-ptykept-env-')
+    const dir = tempDir('cw-ptykept-env-')
     const marker = join(dir, 'loaded.txt')
     const script = join(dir, 'marker.cjs')
     writeFileSync(script, `require('fs').writeFileSync(${JSON.stringify(marker)}, 'loaded')\n`)

@@ -118,7 +118,7 @@ describe('what cards cite (they keep it)', () => {
   })
 
   it("reads the cards that aren't Done or archived; a card it can't read means nothing may go", () => {
-    const dir = temp('hive-clean-board-')
+    const dir = temp('cw-clean-board-')
     const write = (n: number, c: object) => writeFileSync(join(dir, `${n}.json`), JSON.stringify({ number: n, title: 't', description: '', comments: [], column: 'todo', ...c }))
     write(1, { description: 'combwork-test\\e2e\\a.png' })
     write(2, { column: 'done', description: 'combwork-test\\e2e\\b.png' })
@@ -139,7 +139,7 @@ describe('what cards cite (they keep it)', () => {
   })
 
   it("reads a board in its database (#1017) as it reads card files; one it can't open means nothing may go", () => {
-    const dir = temp('hive-clean-db-')
+    const dir = temp('cw-clean-db-')
     const file = join(dir, 'combwork.db')
     const db = new DatabaseSync(file)
     db.exec('CREATE TABLE cards (number INTEGER PRIMARY KEY, doc TEXT NOT NULL)')
@@ -160,7 +160,7 @@ describe('what cards cite (they keep it)', () => {
   })
 
   it("reads a 1.0 board's cards from its tables (#1209) as it reads a 0.9 board's documents", () => {
-    const dir = temp('hive-clean-db10-')
+    const dir = temp('cw-clean-db10-')
     const file = join(dir, 'combwork.db')
     const db = new DatabaseSync(file)
     for (const sql of CARDS_STEP.ddl) db.exec(sql)
@@ -181,7 +181,7 @@ describe('what cards cite (they keep it)', () => {
   })
 
   it('finds the database before the stub folder an older Combwork reads (#1017): a moved board never reads as empty', () => {
-    const ws = temp('hive-clean-find-')
+    const ws = temp('cw-clean-find-')
     mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
     writeFileSync(join(ws, '.combwork', 'tasks', 'board.json'), '{"next":9}')
     expect(findBoard(ws)).toBe(join(ws, '.combwork', 'tasks'))
@@ -193,7 +193,7 @@ describe('what cards cite (they keep it)', () => {
 describe('the clean-up (clean.mjs)', () => {
   /** A combwork-test with something of each kind; lane 1 held by a runner (pid 4242). */
   function machine() {
-    const root = temp('hive-clean-root-')
+    const root = temp('cw-clean-root-')
     const lanesDir = join(root, 'e2e-lanes')
     tree(root, {
       'codex/auth.json': 30,
@@ -318,7 +318,7 @@ describe('the clean-up (clean.mjs)', () => {
 
   it("never follows a link out (a worktree's node_modules junction)", async () => {
     const m = machine()
-    const outside = temp('hive-clean-outside-')
+    const outside = temp('cw-clean-outside-')
     writeFileSync(join(outside, 'precious.txt'), 'keep')
     symlinkSync(outside, join(m.root, 'charts-132', 'node_modules'), 'junction')
     const r = await run(m, { days: 0 })
@@ -328,7 +328,7 @@ describe('the clean-up (clean.mjs)', () => {
   })
 
   it('a lane being cleaned is claimed: a runner takes another; a held lane is not cleaned', async () => {
-    const dir = temp('hive-clean-lanes-')
+    const dir = temp('cw-clean-lanes-')
     const release = await holdLane(dir, 0, { owner: 10, alive: () => true })
     expect(release).toBeTypeOf('function')
     const runner = await claimLane(dir, { owner: 11, alive: () => true, free: async () => true })
@@ -361,7 +361,7 @@ describe('the clean-up (clean.mjs)', () => {
 describe('the Codex test home (#404): old rollouts, package copies and unfinished downloads go, never its sign-in or sandbox', () => {
   /** A Codex test home with something of each kind, as Codex 0.162 leaves it. */
   function codexMachine() {
-    const root = temp('hive-clean-codex-')
+    const root = temp('cw-clean-codex-')
     tree(root, {
       'codex/auth.json': 30,
       'codex/config.toml': 30,
@@ -454,7 +454,7 @@ describe('the Codex test home (#404): old rollouts, package copies and unfinishe
 
   it('never deletes through a link: a package, cache or sessions folder that is a junction into the sandbox, config or outside', async () => {
     const m = codexMachine()
-    const outside = temp('hive-clean-codex-outside-')
+    const outside = temp('cw-clean-codex-outside-')
     tree(outside, { 'cache/.tmpOutside': 30, 'sessions/2026/01/01/rollout-2026-01-01T00-00-00-z.jsonl': 30 })
     // releases → .sandbox-bin, with the marker naming another release: its codex.exe would look like an unused one.
     tree(m.root, { 'codex/packages/linked/auto-update-version': 30, 'codex/.sandbox-bin/1.0/': 30 })
@@ -475,7 +475,7 @@ describe('the Codex test home (#404): old rollouts, package copies and unfinishe
     const item = codexPlan({ root: m.root, ev: rules(m.root, []) }).find((i: { rel: string }) => i.rel === `${PKG}/releases/${OLD}`)
     expect(item.check()).toBe(null)
     // The releases folder swapped for a junction to a copy of it elsewhere: the same path now leads somewhere else.
-    const elsewhere = temp('hive-clean-codex-swap-')
+    const elsewhere = temp('cw-clean-codex-swap-')
     cpSync(join(m.root, PKG, 'releases'), elsewhere, { recursive: true })
     renameSync(join(m.root, PKG, 'releases'), join(m.root, PKG, 'releases-moved'))
     symlinkSync(elsewhere, join(m.root, PKG, 'releases'), 'junction')
@@ -529,13 +529,13 @@ describe('the Codex test home (#404): old rollouts, package copies and unfinishe
       }]
     ]
     for (const [what, make] of cases) {
-      const root = temp('hive-clean-codex-markers-')
+      const root = temp('cw-clean-codex-markers-')
       tree(root, { 'codex/auth.json': 30, 'codex/.sandbox-bin/codex.exe': 30, 'codex/packages/p/releases/1.0/x': 30, 'codex/packages/p/releases/2.0/x': 30 })
       make(join(root, 'codex/packages/p'))
       expect(codexPlan({ root, ev: rules(root, []) }), what).toEqual([])
     }
     // Both told and agreeing with what is there: the others go.
-    const root = temp('hive-clean-codex-markers-')
+    const root = temp('cw-clean-codex-markers-')
     tree(root, { 'codex/packages/p/releases/1.0/x': 30, 'codex/packages/p/releases/2.0/x': 30, 'codex/packages/p/releases/3.0/x': 30 })
     writeFileSync(join(root, 'codex/packages/p/auto-update-version'), '3.0')
     symlinkSync(join(root, 'codex/packages/p/releases/2.0'), join(root, 'codex/packages/p/current'), 'junction')
@@ -544,13 +544,13 @@ describe('the Codex test home (#404): old rollouts, package copies and unfinishe
 
   it("never looks in a user's own ~/.codex", () => {
     const home = join(process.env.USERPROFILE ?? '', '.codex')
-    expect(codexPlan({ root: join(home, '..'), home, days: 0, ev: rules(temp('hive-clean-codex-user-'), []) })).toEqual([])
+    expect(codexPlan({ root: join(home, '..'), home, days: 0, ev: rules(temp('cw-clean-codex-user-'), []) })).toEqual([])
   })
 })
 
 describe("the runners' own deletions keep evidence too", () => {
   it("a suite's folder: reused when nothing in it is cited, else the next free one; never another run's evidence", () => {
-    const root = temp('hive-clean-suite-')
+    const root = temp('cw-clean-suite-')
     const lane = join(root, 'e2e', 'lanes', '0')
     tree(lane, { 'board/board.png': 0, 'board/board-profile/x': 0, 'about/about.png': 0, 'about/about-ws/a.ts': 0 })
     const ev = rules(root, [card(400, 'failed: combwork-test\\e2e\\lanes\\0\\board\\board.png')])
@@ -564,7 +564,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it("…and while the board can't be read, an earlier folder is never emptied", () => {
-    const root = temp('hive-clean-suite-')
+    const root = temp('cw-clean-suite-')
     const lane = join(root, 'e2e', 'lanes', '0')
     tree(lane, { 'about/about.png': 0 })
     expect(freshFolder(join(lane, 'about'), rules(root, null))).toBe(join(lane, 'about-2'))
@@ -572,7 +572,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it("after a pass the suite's whole folder goes; a failed one's, or one a card cites something in, stays (#285)", () => {
-    const root = temp('hive-clean-suite-')
+    const root = temp('cw-clean-suite-')
     const lane = join(root, 'e2e', 'lanes', '0')
     tree(lane, { 'board/board-profile/Cache/x': 0, 'board/evidence/shot.png': 0, 'board/board.png': 0, 'about/about-ws/a.ts': 0, 'about/about.png': 0, 'plan/plan-ws/a.ts': 0 })
     // A card naming the whole lane keeps nothing; one naming a file in board keeps board.
@@ -586,7 +586,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it('suite folders never pile up: a failed one goes with its run (KEEP_RUNS), a passed one at once (#285)', async () => {
-    const root = temp('hive-clean-runs-')
+    const root = temp('cw-clean-runs-')
     const lane = join(root, 'e2e', 'lanes', '0')
     const logs = join(root, 'e2e', 'logs')
     // The runner holds lane 0 (this process), as it does while it prunes its runs.
@@ -626,7 +626,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it("a run's kept folders in a lane another runner holds are left for the clean-up, never removed under it", async () => {
-    const root = temp('hive-clean-held-')
+    const root = temp('cw-clean-held-')
     const lanesDir = join(root, 'e2e-lanes')
     tree(root, { 'e2e/lanes/0/about/about.png': 0, 'e2e/lanes/2/board/board.png': 0, 'e2e/logs/run-20261006-120000/about.log': 0 })
     const run = join(root, 'e2e', 'logs', 'run-20261006-120000')
@@ -651,8 +651,8 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it('a kept-folders manifest authorises nothing unless every entry is a suite folder in a lane', async () => {
-    const root = temp('hive-clean-manifest-')
-    const outside = temp('hive-clean-outside-')
+    const root = temp('cw-clean-manifest-')
+    const outside = temp('cw-clean-outside-')
     tree(root, {
       'codex/auth.json': 0,
       'claude/.credentials.json': 0,
@@ -702,8 +702,8 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it('nothing is deleted through a link on the way: a linked lane, a linked parent of a nested run, one linked meanwhile', async () => {
-    const root = temp('hive-clean-linked-')
-    const outside = temp('hive-clean-outside-')
+    const root = temp('cw-clean-linked-')
+    const outside = temp('cw-clean-outside-')
     tree(outside, { 'about/precious.txt': 0, 'plan/precious.txt': 0, 'swap/plan/precious.txt': 0 })
     tree(root, { 'e2e/lanes/0/about/about.png': 0, 'e2e/lanes/0/board/board.png': 0, 'e2e/logs/run-1/a.log': 0 })
     // Lane 1 is a junction to the outside folder; board's nested/ in lane 0 too.
@@ -744,7 +744,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it('the copies of a folder are capped: past MAX_COPIES the suite is refused, saying what keeps them', () => {
-    const root = temp('hive-clean-cap-')
+    const root = temp('cw-clean-cap-')
     const lane = join(root, 'e2e', 'lanes', '0')
     tree(lane, { 'about/x': 0, 'about-2/x': 0, 'about-3/x': 0 })
     const all = () => 'cited by #9'
@@ -763,7 +763,7 @@ describe("the runners' own deletions keep evidence too", () => {
   }
 
   it('a card that cites a folder after an earlier look still keeps it: every deletion reads the board afresh', () => {
-    const root = temp('hive-clean-live-')
+    const root = temp('cw-clean-live-')
     const b = board(root)
     const ev = evidence({ tasksDir: b.dir, testRoot: root })
     const dir = join(root, 'e2e', 'lanes', '0', 'board')
@@ -781,7 +781,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it("a fresh folder cited during the run, then the board unreadable at its clean-up: nothing goes, and it says why", () => {
-    const root = temp('hive-clean-live-')
+    const root = temp('cw-clean-live-')
     const b = board(root)
     const ev = evidence({ tasksDir: b.dir, testRoot: root })
     const lane = join(root, 'e2e', 'lanes', '0')
@@ -803,7 +803,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it("the clean-up checks each removal against the board as it is then, not as it was when it listed them", async () => {
-    const root = temp('hive-clean-live-')
+    const root = temp('cw-clean-live-')
     const b = board(root)
     tree(root, { 'charts-132/a.png': 10, 'evidence-old/b.png': 10 })
     const ev = evidence({ tasksDir: b.dir, testRoot: root })
@@ -821,7 +821,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it('log pruning keeps a run a card cites (beyond KEEP_RUNS), and every run while the board is unreadable', () => {
-    const root = temp('hive-clean-logs-')
+    const root = temp('cw-clean-logs-')
     const logs = join(root, 'e2e', 'logs')
     const names = Array.from({ length: 6 }, (_, k) => `run-20261005-23000${k}`)
     for (const n of names) tree(logs, { [`${n}/board.log`]: 0 })
@@ -833,7 +833,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it("the runner's prune lists with one look at the board, and asks afresh only for each run about to go (HI-2364)", async () => {
-    const root = temp('hive-clean-look-')
+    const root = temp('cw-clean-look-')
     const logs = join(root, 'e2e', 'logs')
     const names = Array.from({ length: 8 }, (_, k) => `run-20261005-23000${k}`)
     for (const n of names) tree(logs, { [`${n}/board.log`]: 0 })
@@ -856,7 +856,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it('…and a run a card cites while its release waits (for a lane) keeps its logs (HI-2364 review)', async () => {
-    const root = temp('hive-clean-release-')
+    const root = temp('cw-clean-release-')
     const logs = join(root, 'e2e', 'logs')
     const names = Array.from({ length: 4 }, (_, k) => `run-20261005-23000${k}`)
     for (const n of names) tree(logs, { [`${n}/board.log`]: 0 })
@@ -884,7 +884,7 @@ describe("the runners' own deletions keep evidence too", () => {
   })
 
   it('scenario results and older baselines a card cites stay', () => {
-    const root = temp('hive-clean-sc-')
+    const root = temp('cw-clean-sc-')
     const results = join(root, 'scenarios', 'results')
     for (const n of ['2026-10-01T00-00-00-fake', '2026-10-02T00-00-00-fake', '2026-10-03T00-00-00-fake']) tree(results, { [`${n}/results.json`]: 0 })
     const ev = rules(root, [card(272, 'combwork-test/scenarios/results/2026-10-01T00-00-00-fake/summary.md')])
@@ -906,7 +906,7 @@ describe("the runners' own deletions keep evidence too", () => {
 describe('no shell deletes before a rerun (#304): a new folder each run, or clearDir from Node', () => {
   /** A temp folder and a combwork-test of their own, with a scratchpad, a CLI test home and some evidence. */
   function roots() {
-    const top = temp('hive-cleardir-')
+    const top = temp('cw-cleardir-')
     const tmp = join(top, 'Temp')
     const testRoot = join(top, 'combwork-test')
     const pad = join(tmp, 'claude', 'D--proj', 'session', 'scratchpad')
@@ -968,7 +968,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
 
   it('never a CLI test home, in one or holding one, whatever the area', () => {
     const { testRoot, homes } = roots()
-    const tmp2 = temp('hive-cleardir-home-')
+    const tmp2 = temp('cw-cleardir-home-')
     // A test home inside the scratch area (CW_TEST_CODEX_HOME pointed there): still refused, and its parent too.
     const home = join(testRoot, 'scratch', 'my-codex')
     tree(testRoot, { 'scratch/my-codex/auth.json': 0 })
@@ -978,7 +978,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
 
   it('never through a link or a link itself, nor a file', () => {
     const { tmp, pad, clear } = roots()
-    const outside = temp('hive-cleardir-outside-')
+    const outside = temp('cw-cleardir-outside-')
     tree(outside, { 'precious.txt': 0 })
     symlinkSync(outside, join(pad, 'linked'), 'junction')
     expect(() => clear(join(pad, 'linked'))).toThrow(/is a link/)
@@ -989,7 +989,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
   })
 
   it('never when an allowed root, or a folder above it, is a link: the delete would land outside (round 2)', () => {
-    const top = temp('hive-cleardir-rootlink-')
+    const top = temp('cw-cleardir-rootlink-')
     const outside = join(top, 'outside')
     tree(top, { 'outside/scratch/probe/sentinel.txt': 0, 'outside/scratch/probe/auth.json': 0, 'outside/Temp/cw-x/sentinel.txt': 0, 'realtmp/cw-y/keep.txt': 0 })
     // combwork-test itself is a junction to the outside folder; and the configured home is that outside place.
@@ -1007,7 +1007,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
   })
 
   it('a test home is recognised as it really is: one reached through a link elsewhere still protects its folder', () => {
-    const top = temp('hive-cleardir-homelink-')
+    const top = temp('cw-cleardir-homelink-')
     tree(top, { 'combwork-test/scratch/probe/auth.json': 0, 'Temp/x.txt': 0 })
     const real = join(top, 'combwork-test', 'scratch', 'probe')
     const alias = join(top, 'codex-home-link')
@@ -1039,7 +1039,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
   })
 
   it('probeDir gives a new folder every call, in combwork-test\\scratch, named for the probe', () => {
-    const root = temp('hive-probedir-')
+    const root = temp('cw-probedir-')
     const a = probeDir('R2 #291 probe!', root)
     const b = probeDir('R2 #291 probe!', root)
     expect(a).not.toBe(b)
@@ -1054,10 +1054,10 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
 
 describe("a suite's kept files include its screenshot folders (#284)", () => {
   it('copies the top-level files and the *shots / reports folders at any depth; never profiles, workspaces or through links; survives the suite folder being reused', () => {
-    const root = temp('hive-keep-')
+    const root = temp('cw-keep-')
     const lane = join(root, 'e2e', 'lanes', '0')
     const suite = join(lane, 'restart')
-    const outside = temp('hive-keep-outside-')
+    const outside = temp('cw-keep-outside-')
     tree(root, {
       'e2e/lanes/0/restart/restart-1.png': 0,
       'e2e/lanes/0/restart/notify.log': 0,
@@ -1093,7 +1093,7 @@ describe("a suite's kept files include its screenshot folders (#284)", () => {
   })
 
   it('never a profile, workspace, CLI home or sign-in file, even inside a screenshot folder (round 2)', () => {
-    const root = temp('hive-keep-nested-')
+    const root = temp('cw-keep-nested-')
     const suite = join(root, 'e2e', 'lanes', '0', 'restart')
     tree(root, {
       'e2e/lanes/0/restart/shots/good.png': 0,
@@ -1128,7 +1128,7 @@ describe("a suite's kept files include its screenshot folders (#284)", () => {
   })
 
   it("keeps how a fake Claude Code's launches ended from its home, and nothing else of it (#1146)", () => {
-    const root = temp('hive-keep-exits-')
+    const root = temp('cw-keep-exits-')
     const suite = join(root, 'e2e', 'lanes', '0', 'board')
     tree(root, {
       'e2e/lanes/0/board/board-start.png': 0,
@@ -1149,8 +1149,8 @@ describe("a suite's kept files include its screenshot folders (#284)", () => {
   })
 
   it('never through a link to the suite folder or a folder above it', () => {
-    const root = temp('hive-keep-rootlink-')
-    const outside = temp('hive-keep-rootlink-outside-')
+    const root = temp('cw-keep-rootlink-')
+    const outside = temp('cw-keep-rootlink-outside-')
     tree(outside, { 'outside-secret.png': 0, 'restart/inside-secret.png': 0 })
     tree(root, { 'logs/.keep': 0 })
     // The suite folder itself a junction; and a junction above it.
@@ -1167,7 +1167,7 @@ describe("a suite's kept files include its screenshot folders (#284)", () => {
   })
 
   it('keeps within its limits, saying what it left out', () => {
-    const root = temp('hive-keep-limits-')
+    const root = temp('cw-keep-limits-')
     tree(root, { 'suite/a.png': 0, 'suite/b.png': 0, 'suite/shots/c.png': 0, 'suite/shots/d.png': 0 })
     writeFileSync(join(root, 'suite', 'huge.png'), 'x'.repeat(5000))
     const files = keepSuiteFiles(join(root, 'suite'), join(root, 'run1'), 's', { maxBytes: 1000, maxFiles: 3 })

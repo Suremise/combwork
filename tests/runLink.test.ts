@@ -16,7 +16,7 @@ import { setLanguage, tr } from '../src/shared/i18n'
 import type { ProgressRun, TaskColumn } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-runlink-')
+const base = tempDir('cw-runlink-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 

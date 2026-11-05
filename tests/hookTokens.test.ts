@@ -10,12 +10,12 @@ import { tempDir } from './tempDir'
 const HUNG_MS = 10000
 
 // Its own user data folder, so the auth files never meet another test's.
-const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('hive-hook-tokens-'))
+const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('cw-hook-tokens-'))
 vi.mock('electron', () => ({ app: { getPath: () => userData, getVersion: () => '0.0.0-test', isPackaged: false } }))
 
 const { clearHookAuth, endHookToken, hookAuthFile, hookTokenMatches, newHookToken, refusedHookNote } = await import('../src/main/hookTokens')
 
-const base = tempDir('hive-hook-launch-')
+const base = tempDir('cw-hook-launch-')
 afterAll(() => {
   rmSync(base, { recursive: true, force: true })
   rmSync(userData, { recursive: true, force: true })

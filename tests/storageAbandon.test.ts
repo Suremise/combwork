@@ -20,7 +20,7 @@ vi.mock('fs/promises', async (original) => {
   }
 })
 
-const base = tempDir('hive-storage-abandon-')
+const base = tempDir('cw-storage-abandon-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 const DIRS = 40
 /** A project whose agent's worktree has DIRS folders of one 100-byte file each. */

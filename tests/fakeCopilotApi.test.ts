@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 const require = createRequire(import.meta.url)
 const { pathWithoutGh, actionsOf, decide } = require('./e2e/fake-copilot-api.cjs')
 
-const base = tempDir('hive-fake-copilot-')
+const base = tempDir('cw-fake-copilot-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 const PATHEXT = '.COM;.EXE;.BAT;.CMD'
 /** A folder with these files in it (empty files: only their names count). */

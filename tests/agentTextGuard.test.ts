@@ -31,7 +31,7 @@ afterEach(() => {
 
 /** A tree with source files, their lists made by --init. */
 function tree(files: Record<string, string>) {
-  const root = tempDir('hive-agent-guard-')
+  const root = tempDir('cw-agent-guard-')
   roots.push(root)
   const allowDir = join(root, ALLOW_DIR)
   const write = (rel: string, src: string) => {
@@ -94,7 +94,7 @@ describe('the agent-text guard', () => {
   it('has the agent-facing files the i18n guard leaves out, and the i18n guard skips agent messages anywhere', () => {
     for (const f of ['src/shared/combworkGuidance.ts', 'src/main/mcp/cw-mcp.ts', 'src/main/servers.ts', 'src/main/workflow/queueState.ts', 'src/shared/restartResume.ts']) expect(isAgentFile(f), f).toBe(true)
     for (const f of ['src/shared/workspaceNotes.ts', 'src/renderer/src/App.tsx', 'src/shared/agentText/icu.ts']) expect(isAgentFile(f), f).toBe(false)
-    const root = tempDir('hive-i18n-agentmsg-')
+    const root = tempDir('cw-i18n-agentmsg-')
     roots.push(root)
     mkdirSync(join(root, 'src', 'shared'), { recursive: true })
     writeFileSync(join(root, OTHER.replace('main', 'shared')), `const N = agentMsg({ id: 'contract.notes.cut', text: '(cut: read the shared note {note} for the rest)', note: 'Ends the notes' })\n`)
@@ -113,7 +113,7 @@ describe("Combwork's own source", () => {
   it('fails a new hard-coded string in the session contract, which has no list (group 1 is extracted)', () => {
     const rel = 'src/shared/combworkGuidance.ts'
     expect(existsSync(join(ROOT, ALLOW_DIR, allowName(rel)))).toBe(false)
-    const root = tempDir('hive-agent-guard-real-')
+    const root = tempDir('cw-agent-guard-real-')
     roots.push(root)
     mkdirSync(dirname(join(root, rel)), { recursive: true })
     const code = readFileSync(join(ROOT, rel), 'utf8')
@@ -126,7 +126,7 @@ describe("Combwork's own source", () => {
 
   it('a real file with a list passes as it is, and fails with a new string', () => {
     const rel = 'src/shared/toolReplies.ts'
-    const root = tempDir('hive-agent-guard-list-')
+    const root = tempDir('cw-agent-guard-list-')
     roots.push(root)
     mkdirSync(dirname(join(root, rel)), { recursive: true })
     mkdirSync(join(root, ALLOW_DIR), { recursive: true })

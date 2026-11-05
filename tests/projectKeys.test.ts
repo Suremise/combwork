@@ -16,7 +16,7 @@ import { taskPrompt } from '../src/shared/tasks'
 import { taskRow, taskRowText } from '../src/shared/toolReplies'
 import { unexpectedCloseText } from '../src/shared/unexpectedClose'
 
-const base = tempDir('hive-keys-')
+const base = tempDir('cw-keys-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

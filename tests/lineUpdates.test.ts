@@ -28,7 +28,7 @@ vi.mock('original-fs', async () => {
   }
 })
 
-const base = tempDir('hive-lines-')
+const base = tempDir('cw-lines-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -600,7 +600,7 @@ describe('a move failing after its first change (#1271 round 4)', () => {
     expect(git(wt, 'rev-parse', 'HEAD')).toBe(at)
     expect(git(wt, 'status', '--porcelain')).toBe('')
     const index = git(wt, 'rev-parse', '--path-format=absolute', '--git-path', 'index')
-    expect([existsSync(`${index}.lock`), existsSync(`${index}.hive-line`)]).toEqual([false, false])
+    expect([existsSync(`${index}.lock`), existsSync(`${index}.cw-line`)]).toEqual([false, false])
   }
 
   it("the new index can't be staged in the lock: the files are put back, nothing moved, the user told, the next card held", async () => {

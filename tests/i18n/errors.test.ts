@@ -107,7 +107,7 @@ describe('CombworkError', () => {
 describe('IPC (#845)', () => {
   it("tells the window a refused call in the window's language, and in English again after a change back", async () => {
     const ws = createWorkspaceService()
-    ws.path = tempDir('hive-errors-ipc-')
+    ws.path = tempDir('cw-errors-ipc-')
     callerWorkspace = ws
     try {
       registerIpc(() => ({}) as never, {} as never)

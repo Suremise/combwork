@@ -79,7 +79,7 @@ describe("stored MCP definitions", () => {
 
 describe('the comments in info/exclude', () => {
   const repo = (): { dir: string; exclude: string } => {
-    const dir = tempDir('hive-copies-exclude-')
+    const dir = tempDir('cw-copies-exclude-')
     execFileSync('git', ['init', '-q', dir])
     const exclude = join(dir, '.git', 'info', 'exclude')
     mkdirSync(join(exclude, '..'), { recursive: true })

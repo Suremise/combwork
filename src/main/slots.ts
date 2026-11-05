@@ -2201,7 +2201,7 @@ let waiting = 0
 export const folderWaiting = (): number => waiting
 
 async function quietOnce(folder: string): Promise<boolean> {
-  const aside = `${folder}.hive-quiet-${randomBytes(3).toString('hex')}`
+  const aside = `${folder}.cw-quiet-${randomBytes(3).toString('hex')}`
   try {
     await rename(folder, aside)
   } catch {

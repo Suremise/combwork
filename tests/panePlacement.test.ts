@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-placement-')
+const base = tempDir('cw-placement-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -26,7 +26,7 @@ describe('saving pane placements', () => {
     await w.open(wsPath)
   }
   beforeEach(() => {
-    wsPath = tempDir('hive-placement-ws-')
+    wsPath = tempDir('cw-placement-ws-')
     alpha = join(wsPath, 'alpha')
     file = join(alpha, '.combwork', 'project.json')
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
