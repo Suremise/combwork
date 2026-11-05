@@ -192,7 +192,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   // Its own card to be given to it in a slot (HI-2197): a watch it has would hold that placement off ("waiting on cards"),
   // so it ends here, its wake cancelled, and the reply says so. Only once this start has left its placement due.
   if (intent.kind === 'start' && self && m.placed && ws.path && card.agent === self.agentId && (await placementDue(ws, join(ws.path, before.project), ref.n))) {
-    const ended = await endWatchOf(join(ws.path, self.project), self.agentId, `Hive gives it ${card.key ?? `#${ref.n}`} in a slot`) // i18n-ignore: for the log and a cancelled wake
+    const ended = await endWatchOf(join(ws.path, self.project), self.agentId, `Combwork gives it ${card.key ?? `#${ref.n}`} in a slot`) // i18n-ignore: for the log and a cancelled wake
     if (ended) m.warnings = [...(m.warnings ?? []), say(WATCH_ENDED, { watch: ended, card: card.key ?? `#${ref.n}` })]
   }
   const lane = intent.kind === 'start' && self && !m.placed && m.from !== m.to ? await laneStartWords(ws, before.project, self.agentId, ref.n, card.key ?? `#${ref.n}`) : null

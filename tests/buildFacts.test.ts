@@ -65,8 +65,8 @@ describe('a build fact', () => {
     expect(buildFactOf({ ...fact, commit: 'HEAD' })).toEqual({ error: expect.stringMatching(/^commit is a commit id/) })
     expect(buildFactOf({ ...fact, installer: '' })).toEqual({ error: expect.stringMatching(/^installer/) })
     expect(buildFactOf({ ...fact, by: 'ci' })).toEqual({ error: 'by is dist or release.' })
-    expect(buildFactSummary(buildFactOf(fact) as never)).toBe('Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')
-    expect(buildFactSummary(buildFactOf({ ...fact, kind: 'release', version: '1.0.0', by: 'release' }) as never)).toBe('Uploaded a draft of Hive 1.0.0 (release) from 1fef5341 on 1.0.0')
+    expect(buildFactSummary(buildFactOf(fact) as never)).toBe('Built Combwork 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')
+    expect(buildFactSummary(buildFactOf({ ...fact, kind: 'release', version: '1.0.0', by: 'release' }) as never)).toBe('Uploaded a draft of Combwork 1.0.0 (release) from 1fef5341 on 1.0.0')
   })
 
   it('reads its line and detail back, for the window', () => {
@@ -74,6 +74,8 @@ describe('a build fact', () => {
     expect(parseBuildSummary(buildFactSummary(f))).toEqual({ by: 'dist', version: '1.0.0-rc.1', kind: 'baseline', commit: '1fef5341', branch: '1.0.0' })
     expect(parseBuildSummary(buildFactSummary({ ...f, kind: 'rc', branch: null, by: 'release' }))).toEqual({ by: 'release', version: '1.0.0-rc.1', kind: 'rc', commit: '1fef5341', branch: null })
     expect(parseBuildSummary('#12 "Ship it" is Done (merged), moved there by B1')).toBeNull()
+    // HI-2581, Darren's decision: a one-way rename. An old entry's "Built Hive …" is history, shown as written.
+    expect(parseBuildSummary('Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')).toBeNull()
     expect(parseBuildDetail(buildFactDetail(f))).toEqual({ installer: f.installer, builtAt: f.builtAt, uploaded: false })
     expect(parseBuildDetail(buildFactDetail({ ...f, by: 'release' }))?.uploaded).toBe(true)
     expect(parseBuildDetail('Some other detail')).toBeNull()
@@ -83,8 +85,11 @@ describe('a build fact', () => {
   it("shows a build's line and detail in every language, and any other entry as written", () => {
     const f = buildFactOf({ ...fact, by: 'release', kind: 'rc' }) as Exclude<ReturnType<typeof buildFactOf>, { error: string }>
     const e = { source: 'hive' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
-    // Stored in English as agents read it ("Hive", until HI-2463); the window says the app's name (HI-2458).
-    expect(journalSummary(e)).toBe(e.summary.replace(' Hive ', ' Combwork '))
+    // Stored in English as agents read it; the window says it in the user's language (here English: the same line).
+    expect(journalSummary(e)).toBe(e.summary)
+    // An old entry's "Built Hive …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
+    const old = e.summary.replace(' Combwork ', ' Hive ')
+    expect(journalSummary({ ...e, summary: old })).toBe(old)
     expect(journalSummary({ ...e, source: 'assistant' })).toBe(e.summary)
     expect(journalBuildDetail({ ...e, source: 'assistant' })).toBeNull()
     expect(journalBuildDetail(e)?.[0]).toBe(`Installer: ${fact.installer}`)
@@ -247,7 +252,7 @@ describe('Combwork records a build in the journal', () => {
 
   it('as its own fact, from the API', () => {
     expect(builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: true })
-    expect(facts().map((f) => f.summary)).toEqual(['Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0'])
+    expect(facts().map((f) => f.summary)).toEqual(['Built Combwork 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0'])
     // The same build again (a reply cut off, then its marker): one entry.
     expect(builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: true })
     expect(facts()).toHaveLength(1)

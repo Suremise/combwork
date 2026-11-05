@@ -993,7 +993,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     const before = store.list
     // The limit holds for what Hive writes as for what it reads: replacing an agent's watch is always allowed.
     // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-    if (!already && !old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} card watches, the most Hive keeps: wait for some to end`)
+    if (!already && !old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} card watches, the most Combwork keeps: wait for some to end`)
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     // The Assistant's: the user's replies to its cards' agents from what its last wake told (#418).
     const replySeq = scope === null ? (store.wokeReplies.get(agentKey(projectPath, agentId)) ?? latestReplySeq()) : undefined

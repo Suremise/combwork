@@ -4028,7 +4028,7 @@ async function progressCallerIn(workspacePath: string): Promise<ProgressCaller> 
   if (assistantCaller()) {
     const live = sessions.liveFor(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID)
     // agent-protocol: the Assistant's name
-    return { source: 'assistant', workspacePath, agentName: `Hive ${ASSISTANT_NAME}`, provider: live?.provider ?? null }
+    return { source: 'assistant', workspacePath, agentName: `Combwork ${ASSISTANT_NAME}`, provider: live?.provider ?? null }
   }
   return { source: 'api', workspacePath }
 }
@@ -4117,7 +4117,7 @@ function consoleRow(s: ConsoleSource | undefined, id: string) {
   // label, which is cut and masked: following a listing always reads the source it lists.
   const select = kind === 'hive' ? { source: 'hive' } : kind === 'assistant' ? { source: 'assistant' } : s?.agentId && s.project ? { agent: s.agentId, project: s.project } : undefined
   // agent-protocol: the app's name, as a source's label
-  return { label: hiveName(s?.label ?? (kind === 'hive' ? 'Hive' : say(API.console.anAgent)), 80), kind, ...(select ? { select } : {}), ...(s?.provider ? { provider: s.provider } : {}), capturing: devConsole.capturing(id), events: devConsole.count(id) }
+  return { label: hiveName(s?.label ?? (kind === 'hive' ? 'Combwork' : say(API.console.anAgent)), 80), kind, ...(select ? { select } : {}), ...(s?.provider ? { provider: s.provider } : {}), capturing: devConsole.capturing(id), events: devConsole.count(id) }
 }
 
 const consoleRowOf = (e: ConsoleEvent) => ({ seq: e.seq, at: e.at, kind: e.kind, name: e.name, summary: e.summary, ...(e.truncated ? { truncated: true } : {}) })
