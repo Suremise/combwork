@@ -905,19 +905,19 @@ describe("the repository's AGENTS.md", () => {
       expect(text).toMatch(own)
   })
   it("points to Combwork's development skills for what they own", () => {
-    expect(text).toMatch(/is the `verify-hive-ui` skill/)
+    expect(text).toMatch(/is the `verify-combwork-ui` skill/)
     expect(text).toMatch(/use the `investigate-flake` skill/)
     // Moved there (#1532): AGENTS.md no longer carries them.
     for (const moved of [/EventID=5007/, /HIVE_TEST_SLOW_IPC/, /HIVE_UPDATE_FEED/, /make it cheaper unasked/]) expect(text).not.toMatch(moved)
     const skill = (name: string): string => readFileSync(join(ROOT, '.claude/skills', name, 'SKILL.md'), 'utf8')
     expect(skill('investigate-flake')).toMatch(/EventID=5007/)
     expect(skill('investigate-flake')).toMatch(/make it cheaper unasked/)
-    expect(skill('verify-hive-ui')).toMatch(/HIVE_TEST_SLOW_IPC/)
-    expect(skill('verify-hive-ui')).toMatch(/HIVE_UPDATE_FEED/)
+    expect(skill('verify-combwork-ui')).toMatch(/HIVE_TEST_SLOW_IPC/)
+    expect(skill('verify-combwork-ui')).toMatch(/HIVE_UPDATE_FEED/)
   })
 })
 
-// #1533 (P8): RELEASING.md owns the release path and the list of the user's OKs; release-hive and AGENTS.md point to it.
+// #1533 (P8): RELEASING.md owns the release path and the list of the user's OKs; release-combwork and AGENTS.md point to it.
 describe('RELEASING.md on the 1.0 path', () => {
   const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
   const section = (heading: string): string => releasing.split(/^## /m).find((s) => s.startsWith(heading)) ?? ''
@@ -937,15 +937,15 @@ describe('RELEASING.md on the 1.0 path', () => {
     expect(path).toMatch(/\*\*Its checks are lighter than a release's\*\*[^\n]*a \*\*smoke run\*\*: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot\. The full trials, the full e2e set and the real tier come before a proper release/)
     expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
     // #1534: where each build is recorded.
-    expect(path).toMatch(/also goes into the Hive Assistant's journal as Hive's entry[^\n]*\*\*Settings → Advanced → Record builds in the journal\*\* turns it off/)
+    expect(path).toMatch(/also goes into the Combwork Assistant's journal as Combwork's entry[^\n]*\*\*Settings → Advanced → Record builds in the journal\*\* turns it off/)
     expect(section('What a release checks')).toMatch(/unlike the baseline's lighter checks/)
-    for (const copy of ['.claude', '.agents']) expect(readFileSync(join(ROOT, copy, 'skills', 'release-hive', 'SKILL.md'), 'utf8')).toMatch(/Its checks are lighter than an uploaded release's \(the model trials a smoke run: RELEASING says which\)/)
+    for (const copy of ['.claude', '.agents']) expect(readFileSync(join(ROOT, copy, 'skills', 'release-combwork', 'SKILL.md'), 'utf8')).toMatch(/Its checks are lighter than an uploaded release's \(the model trials a smoke run: RELEASING says which\)/)
   })
-  it("lists every publishing step as the user's OK, which release-hive and AGENTS.md point to without repeating", () => {
+  it("lists every publishing step as the user's OK, which release-combwork and AGENTS.md point to without repeating", () => {
     const ok = section("The user's OK")
     for (const step of [/`npm run dist`/, /changing the version/, /pushing/, /merging an integration branch into `main`/, /`npm run release`/, /publishing the draft, and creating tags/, /GitHub issue/]) expect(ok).toMatch(step)
     for (const copy of ['.claude', '.agents']) {
-      const skill = readFileSync(join(ROOT, copy, 'skills', 'release-hive', 'SKILL.md'), 'utf8')
+      const skill = readFileSync(join(ROOT, copy, 'skills', 'release-combwork', 'SKILL.md'), 'utf8')
       expect(skill).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists the decisions that are the user's/)
       expect(skill).not.toMatch(/^- creating tags;/m)
       // HR5's #1533 round 1 finding: the current-version candidate is the uploaded release's; a baseline sets its version first.
@@ -994,8 +994,8 @@ describe("Combwork's development skills", () => {
   })
 
   // #1075: a push or release OK relayed by the Assistant was refused by Claude Code's permission check (#1073).
-  it('release-hive takes each OK in its own pane, never relayed', () => {
-    expect(readFileSync(join(ROOT, claude, 'release-hive', 'SKILL.md'), 'utf8')).toMatch(/Ask for each in your own pane, and take the user's answer there: an OK relayed by the Assistant or another agent isn't one/)
+  it('release-combwork takes each OK in its own pane, never relayed', () => {
+    expect(readFileSync(join(ROOT, claude, 'release-combwork', 'SKILL.md'), 'utf8')).toMatch(/Ask for each in your own pane, and take the user's answer there: an OK relayed by the Assistant or another agent isn't one/)
   })
 
   // #1076: briefs capped load by hand after a load run took the machine to 95 °C (16 Oct). The repo's guidance says it.

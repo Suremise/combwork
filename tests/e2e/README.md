@@ -443,7 +443,7 @@ minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or cred
 (pass or fail per check, with screenshots) and passes only with every check run.
 
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the
-  release-hive skill), with the verdict and report folder commented on the release card.
+  release-combwork skill), with the verdict and report folder commented on the release card.
 - **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --hive "<the main checkout>"
   --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
   upgrade start; `--hive` is only where that is looked for, the newest other installer in its `dist`). It drives the
