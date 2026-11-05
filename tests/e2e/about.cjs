@@ -63,9 +63,9 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const preview = dialog.locator('.diagnostics-preview')
   let shown = ''
   for (let i = 0; i < 50 && !/### Log/.test(shown); i++) { await sleep(200); shown = await preview.innerText().catch(() => '') }
-  check('Copy Diagnostics shows a preview', /## Hive diagnostics/.test(shown) && /### Coding agents/.test(shown) && /### Counts/.test(shown) && /### Log \(last 50 lines\)/.test(shown), shown.slice(0, 200))
+  check('Copy Diagnostics shows a preview', /## Combwork diagnostics/.test(shown) && /### Coding agents/.test(shown) && /### Counts/.test(shown) && /### Log \(last 50 lines\)/.test(shown), shown.slice(0, 200))
   check('with the secret and home folder taken out', !shown.includes('SECRETVALUE123') && shown.includes('token=<redacted>') && !shown.toLowerCase().includes(require('os').homedir().toLowerCase()))
-  check("and the older version's card title", !shown.includes('takeover') && shown.includes('[tasks] <message left out: logged by an older version of Hive>'))
+  check("and the older version's card title", !shown.includes('takeover') && shown.includes('[tasks] <message left out: logged by an older version of Combwork>'))
   await page.screenshot({ path: path.join(scratch, 'about-3-diagnostics.png') })
   await dialog.getByRole('button', { name: 'Copy' }).click()
   check('Copy copies exactly what was shown', await becomes(async () => ((await page.evaluate(() => window.__copied)) || '').trim() === shown.trim()))

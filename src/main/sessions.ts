@@ -886,7 +886,7 @@ export function backspaceKeys(written: string | readonly number[]): number {
 async function heldTyped(label: string, check: () => void): Promise<void> {
   const file = app.isPackaged ? undefined : process.env.HIVE_TEST_HOLD_TYPED
   if (!file || !existsSync(file)) return
-  log.info(`${userText(label)}: the line Hive typed is held before its Enter (a test's)`)
+  log.info(`${userText(label)}: the line Combwork typed is held before its Enter (a test's)`)
   while (existsSync(file)) {
     await new Promise((r) => setTimeout(r, 50))
     check()
@@ -3094,7 +3094,7 @@ class SessionManager {
     if (!l) return null
     const key = this.key(projectPath, agentId)
     if (this.delivering.has(key)) return 'Hive is typing into it' // i18n-ignore: a reason for the log
-    if (this.lineBlocked(l)) return "a line Hive typed isn't taken yet" // i18n-ignore: a reason for the log
+    if (this.lineBlocked(l)) return "a line Combwork typed isn't taken yet" // i18n-ignore: a reason for the log
     if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there' // i18n-ignore: a reason for the log
     const u = this.userInput.get(key)
     if (u && !u.enter) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
@@ -3841,7 +3841,7 @@ class SessionManager {
   private clearUntaken(l: LiveSession, why: string): void {
     const u = l.state.untakenLine
     if (!u) return
-    log.info(`${userText(this.label(l.state))}: the line Hive typed is no longer waiting (${why}, ${Math.round((Date.now() - Date.parse(u.since)) / 1000)} s after it was marked)`)
+    log.info(`${userText(this.label(l.state))}: the line Combwork typed is no longer waiting (${why}, ${Math.round((Date.now() - Date.parse(u.since)) / 1000)} s after it was marked)`)
     l.state.untakenLine = undefined
     l.untakenFor = undefined
     l.untakenText = undefined
@@ -4194,13 +4194,13 @@ class SessionManager {
         // How long, at most: Settings → Advanced (a slower CLI may need longer).
         const most = advanced.number(drawnWaitId(l!.adapter.id)) * 1000
         // Typed, and not drawn yet (a busy CLI): e2e suites wait for this line (wakepaste-codex).
-        log.info(`${userText(this.label(l!.state))}: the line Hive typed is in; Enter once it shows`)
+        log.info(`${userText(this.label(l!.state))}: the line Combwork typed is in; Enter once it shows`)
         const t = Date.now()
         while (!drawn() && Date.now() - t < most) {
           await new Promise((r) => setTimeout(r, 50))
           check()
         }
-        if (!drawn()) log.info(`${userText(this.label(l!.state))}: the line Hive typed wasn't drawn within ${most} ms: Enter anyway`)
+        if (!drawn()) log.info(`${userText(this.label(l!.state))}: the line Combwork typed wasn't drawn within ${most} ms: Enter anyway`)
       }
       const before = l?.prompts ?? 0
       // Hive's line from its Enter (HI-2218): the CLI reports it taken while the confirm below still waits, before `typed`.
@@ -6655,7 +6655,7 @@ class SessionManager {
     this.carryOut(id, l, hookStep(ev, this.statusInput(l)), by, ev)
     this.noteTurn(l)
     const seen = (l.recentHooks ?? []).map((h) => `${h.kind} ${new Date(h.at).toISOString().slice(11, 19)} → ${h.status}`).join(', ')
-    log.info(`${userText(this.label(st))}: ${why}, and Hive saw no Stop: its turn is over (${turn}; ${before} → ${st.status}; hooks before: ${seen || 'none'})`)
+    log.info(`${userText(this.label(st))}: ${why}, and Combwork saw no Stop: its turn is over (${turn}; ${before} → ${st.status}; hooks before: ${seen || 'none'})`)
     hookJournal(`run=${st.runId} seq=${l.ledger!.seq} (no hook) turn over by ${by} ${before}→${st.status}`)
   }
 
@@ -6912,7 +6912,7 @@ class SessionManager {
           // Hive missed how its last turn ended (#612): what it saw before, so the next time says why. Hook kinds and
           // statuses only, no user text.
           const seen = (l.recentHooks ?? []).map((h) => `${h.kind} ${new Date(h.at).toISOString().slice(11, 19)} → ${h.status}`).join(', ')
-          log.info(`${userText(label)}: ${l.adapter.descriptor.name} is idle at its prompt while Hive showed it working; idle again (hooks before: ${seen || 'none'})`)
+          log.info(`${userText(label)}: ${l.adapter.descriptor.name} is idle at its prompt while Combwork showed it working; idle again (hooks before: ${seen || 'none'})`)
           break
         }
         case 'signedOut':

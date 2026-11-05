@@ -137,12 +137,12 @@ const check = (name, ok, extra = '') => {
   // Codex: its Stop never reaches Combwork; its rollout records the turn's end (task_complete).
   await turn(codex, 'loststop')
   check("Codex: a turn whose Stop is lost ends from Codex's own record of it", !!(await is(codex, 'finished', 'over')))
-  check('the log says so', !!(await until(() => /Codex recorded the end of turn [\w-]+ at .*, and Hive saw no Stop: its turn is over/.test(hiveLog()), HUNG_MS)))
+  check('the log says so', !!(await until(() => /Codex recorded the end of turn [\w-]+ at .*, and Combwork saw no Stop: its turn is over/.test(hiveLog()), HUNG_MS)))
 
   // Claude Code: its Stop is lost and nothing records it; after a silence, its screen shows it idle at its prompt.
   await turn(claude, 'loststop')
   check('Claude Code: a turn whose Stop is lost ends once its screen shows it idle at its prompt', !!(await is(claude, 'finished', 'over')))
-  check('the log says so', !!(await until(() => /Claude Code is idle at its prompt on screen after \d+ (s|min) of silence, and Hive saw no Stop/.test(hiveLog()), HUNG_MS)))
+  check('the log says so', !!(await until(() => /Claude Code is idle at its prompt on screen after \d+ (s|min) of silence, and Combwork saw no Stop/.test(hiveLog()), HUNG_MS)))
 
   // Codex 0.160.0 (no screen check for it): no Stop, nothing recorded. Unknown, never idle; Mark idle.
   await turn(codex, 'silent')

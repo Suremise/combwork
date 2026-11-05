@@ -538,7 +538,7 @@ describe('decisions on several cards, and another Hive (#1266 round 2)', () => {
     fake(alpha, { b1: 'working', r1: 'working' })
     await inReview(w)
     await settled()
-    const mine = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'old local' })
+    const mine = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, body: 'old local' })
     const db = store.workspaceDb(ws).writer
     const row = db.prepare('SELECT * FROM deliveries WHERE id = ?').get(mine.id) as Record<string, unknown>
     // Another Hive's, with the id this one would give next, and an action's.
@@ -551,7 +551,7 @@ describe('decisions on several cards, and another Hive (#1266 round 2)', () => {
     } finally {
       outside.close()
     }
-    const later = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'later local' })
+    const later = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, body: 'later local' })
     // Theirs is kept as they saved it; this one's new delivery took the next free id instead of theirs.
     expect({ ...(db.prepare('SELECT id, body FROM deliveries WHERE action = 99999').get() as object) }).toEqual({ id: next, body: 'another Hive wake' })
     expect(later.id).not.toBe(next)
@@ -882,10 +882,10 @@ describe('writers at once (#1266 round 3)', () => {
     fake(alpha, { b1: 'working', r1: 'working' })
     await inReview(w)
     await settled()
-    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'action wake', action: 99999 })
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, body: 'action wake', action: 99999 })
     const at = new Date().toISOString()
     await outside(ws, (db) => db.prepare("UPDATE deliveries SET state = 'received', received = ?, received_via = 'inbox' WHERE id = ?").run(at, own.id))
-    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'unrelated local' })
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, body: 'unrelated local' })
     expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, received FROM deliveries WHERE action = 99999').get() as object) }).toEqual({ state: 'received', received: at })
   })
 
@@ -894,7 +894,7 @@ describe('writers at once (#1266 round 3)', () => {
     fake(alpha, { b1: 'working', r1: 'working' })
     await inReview(w)
     await settled()
-    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'received elsewhere' })
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, body: 'received elsewhere' })
     await outside(ws, (db) => db.prepare("UPDATE deliveries SET state = 'received', received = ?, received_via = 'inbox' WHERE id = ?").run(new Date().toISOString(), own.id))
     // Cancelling: from what this one read (queued), it would cancel it; read again, it was received, and isn't.
     expect(await deliveries.cancelDeliveries(alpha, 'b1', 'a test')).toBe(0)
@@ -1061,7 +1061,7 @@ describe('boundaries (#1266 round 4)', () => {
     fake(alpha, { b1: 'working', r1: 'working' })
     await inReview(w)
     await settled()
-    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'received right after the read' })
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, body: 'received right after the read' })
     await deliveries.forgetDeliveriesForTests()
     const tables = await import('../src/main/schema/sessionDeliveryTables')
     const real = tables.readDeliveriesWithBases

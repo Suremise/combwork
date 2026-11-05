@@ -259,9 +259,10 @@ const ABSOLUTE_PATH = /(?<![\w<>])(?:[A-Za-z]:[\\/](?:Program Files(?: \(x86\))?
 
 /** In the line Hive logs as it starts, once its log marks the user's own text. */
 export const MARKED_LOG = 'your text marked'
-const START_LINE = /^\S+ \[INFO\] \[main\] Hive \S+ starting \((.*)\)$/
+/** Its start line: "Combwork <version> starting (…)", or "Hive …" in a log from before the rename (HI-2572). */
+const START_LINE = /^\S+ \[INFO\] \[main\] (?:Combwork|Hive) \S+ starting \((.*)\)$/
 /** What a line logged before Hive marked the user's text shows instead of its message. */
-export const OLDER_LINE = '<message left out: logged by an older version of Hive>'
+export const OLDER_LINE = '<message left out: logged by an older version of Combwork>'
 
 /**
  * Redaction for Hive's log: the user's own text it marked goes first, then redact(), then any absolute path left

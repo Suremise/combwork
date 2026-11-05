@@ -252,7 +252,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const at = (re) => lines.findIndex((l) => re.test(l))
     const spawned = (a) => at(new RegExp(`\\[pty\\] spawn .*#${a.id}`))
     const settledAt = (n) => {
-      const resumed = at(new RegExp(`Resumed .*${n}.* after Hive restarted`))
+      const resumed = at(new RegExp(`Resumed .*${n}.* after Combwork restarted`))
       return resumed >= 0 ? resumed : at(new RegExp(`${n}.* wasn't ready within`))
     }
     const order = ['Worker', 'Watcher', 'Builder', 'Reviewer'].sort((a, b) => spawned(agents[a]) - spawned(agents[b]))
@@ -278,7 +278,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const midway = logLines().length
     c = await start()
     check('the next start resumes Worker, once', !!(await lib.until(async () => (await c.live(agents.Worker.id))?.status && (await c.live(agents.Worker.id)).status !== 'starting', HUNG_MS, 300)))
-    const resumedLines = () => logLines().slice(midway).filter((l) => /Resumed .*Worker.* after Hive restarted/.test(l)).length
+    const resumedLines = () => logLines().slice(midway).filter((l) => /Resumed .*Worker.* after Combwork restarted/.test(l)).length
     await lib.until(() => resumedLines() >= 1 && !fs.existsSync(recordFile), HUNG_MS)
     check('…its resume logged once since', resumedLines() === 1, String(resumedLines()))
 

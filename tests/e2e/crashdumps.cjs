@@ -31,7 +31,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
 /** The log since the last start: this run's lines. */
 const thisRun = () => {
   const text = logText()
-  const at = text.lastIndexOf('] Hive ')
+  const at = Math.max(-1, ...[...text.matchAll(/\] Combwork \S+ starting \(/g)].map((m) => m.index))
   return at < 0 ? '' : text.slice(text.lastIndexOf('\n', at) + 1)
 }
 const has = (text, re) => re.test(text)
@@ -127,9 +127,9 @@ process.on('uncaughtException', (e) => {
       check('and the snapshot', /\[memory\] 1 memory snapshot\(s\) in .*\\heap; the newest from \d{4}-/.test(thisRun()))
       const report = await inv('app:diagnostics')
       check('Copy Diagnostics names the newest dump', /### Crash dumps\n\n- 3 in `[^`]*Crashpad\\reports`; the newest from [^:]+:[^`]*`[\w-]+\.dmp`/.test(report), report.slice(report.indexOf('### Crash dumps'), report.indexOf('### Crash dumps') + 300))
-      check('and says they are never sent', /Hive never sends them/.test(report))
+      check('and says they are never sent', /Combwork never sends them/.test(report))
       const memory = report.slice(report.indexOf('### Memory'), report.indexOf('### Log'))
-      check('Copy Diagnostics has the memory now, the snapshots and the lines logged', /- Now: heap \d+ of \d+ MB used/.test(memory) && /- Memory snapshots: on; 1 in `[^`]*\\heap`, the newest from \d{4}-[^(]+\(\d+ MB\): they hold what Hive had in memory, so never attached/.test(memory) && /- Logged:\n {2}- \d{4}-\S+ Memory, at start: heap/.test(memory), memory)
+      check('Copy Diagnostics has the memory now, the snapshots and the lines logged', /- Now: heap \d+ of \d+ MB used/.test(memory) && /- Memory snapshots: on; 1 in `[^`]*\\heap`, the newest from \d{4}-[^(]+\(\d+ MB\): they hold what Combwork had in memory, so never attached/.test(memory) && /- Logged:\n {2}- \d{4}-\S+ Memory, at start: heap/.test(memory), memory)
       const quitting = await lib.quitWatch(app)
       await inv('app:quit').catch(() => undefined)
       check('the test copy quits again', !!(await quitting.gone(HUNG_MS)))

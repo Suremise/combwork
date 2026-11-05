@@ -126,7 +126,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     for (const [what, p, status] of [
       ['outside the project (..)', '../beta/docs/PLAN.md', 400],
       ['through a junction out of it', 'beta-link/docs/PLAN.md', 400],
-      ["in Hive's own folder", '.combwork/project.json', 400],
+      ["in Combwork's own folder", '.combwork/project.json', 400],
       ["in git's", '.git/description.md', 400],
       ['not Markdown', 'notes.txt', 400],
       ['an absolute path', path.join(beta, 'docs', 'PLAN.md'), 400],
