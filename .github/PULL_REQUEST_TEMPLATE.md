@@ -10,7 +10,7 @@
 
 ## Screenshots
 
-<!-- For a change you can see in Hive: before and after. Delete this section otherwise. -->
+<!-- For a change you can see in Combwork: before and after. Delete this section otherwise. -->
 
 ## Checklist
 
