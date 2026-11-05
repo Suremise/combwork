@@ -205,7 +205,7 @@ export async function retireRenamedSkills(dir: string, o: RetireOps = {}): Promi
       if (asideOf(await list())) throw new Error('An old copy set aside as it was being removed could not be put back') // i18n-ignore: an error for the log
     }
   } catch (e) {
-    later('Could not put back a renamed skill set aside by an earlier run', e)
+    later('Could not put back a renamed skill set aside by an earlier run', e) // i18n-ignore: a log line
     return settled
   }
   for (const id of Object.keys(RENAMED_SKILLS)) {
@@ -222,7 +222,7 @@ export async function retireRenamedSkills(dir: string, o: RetireOps = {}): Promi
       // Changed as it was being removed: the user's now, kept. One swapOut couldn't read again as it went (SwapUnreadable,
       // HI-2612) is put back too, but isn't the user's change: unsettled, so the next open retires it.
       if (e instanceof SwapAbandoned && !(e instanceof SwapUnreadable)) log.info(`Kept the skill ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
-      else later(`Could not look at or remove the renamed skill ${userText(id)}`, e)
+      else later(`Could not look at or remove the renamed skill ${userText(id)}`, e) // i18n-ignore: a log line
       continue
     }
     gone.push(id)
@@ -244,7 +244,7 @@ export async function retireRenamedSkills(dir: string, o: RetireOps = {}): Promi
       await writeJsonAtomic(manifest, m)
     })
   } catch (e) {
-    later("Could not drop the renamed skill from the workspace's bundled.json", e)
+    later("Could not drop the renamed skill from the workspace's bundled.json", e) // i18n-ignore: a log line
   }
   return settled
 }
