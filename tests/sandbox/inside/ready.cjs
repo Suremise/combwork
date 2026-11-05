@@ -49,7 +49,7 @@ const VIEWS = [
   // The servers list in the sidebar: "No MCP servers yet…" shows only once mcp:list has replied (none in a fresh one).
   { name: 'MCP Servers', slug: 'mcp-servers', ready: ['.pane-body .pane-empty:has-text("No MCP servers yet")'], loading: [] },
   // The Assistant's conversations, once session:list has replied ("Loading…" meanwhile): the sessions tree.
-  { name: 'Assistant', slug: 'hive-assistant', ready: ['.sessions-list .sessions-tree'], loading: ['.main-area .empty-state .codicon-loading'] }
+  { name: 'Assistant', slug: 'assistant', ready: ['.sessions-list .sessions-tree'], loading: ['.main-area .empty-state .codicon-loading'] }
 ]
 /** The view is shown and loaded: `count(selector)` counts matches in the window. Gives true, or null when ms pass. */
 function viewReady(view, count, ms = 20_000, every = 250) {

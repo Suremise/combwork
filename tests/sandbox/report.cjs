@@ -22,7 +22,7 @@ const SCENARIOS = {
   6: 'A new workspace in the fresh install (for the fresh-install comparison)',
   7: 'Install by hand over the previous release, running (/S --force-run)',
   8: "The installer's edge cases over the previous release, and a notification under the new app ID",
-  9: 'A clean install used as a new user would, then searched: no "hive" anywhere (HI-2592)',
+  9: 'A clean install used as a new user would, then searched: no trace of the old name anywhere (HI-2592)',
   10: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old',
   11: "The profile move the installer couldn't make (a file in %LOCALAPPDATA%\\Hive held as it ran): the app refuses to start while it is held, then moves it itself (HI-2602)"
 }
@@ -38,9 +38,9 @@ const REQUIRED = {
     drivers: {
       s1: { scenario: 1, ids: ['1.start-screen', '1.profile', '2.banner', '2.no-claude-warning', '2.api-providers', '2.agent-setup-opens', '2.agent-setup-three'], facts: ['version'] },
       s3: { scenario: 3, ids: ['3.on-not-found', '3.banner-none-installed', '3.setup-not-installed', '3.user-path', '3.check-again-finds', '3.setup-found', '3.api-installed', '3.banner-gone'], facts: [] },
-      s6: { scenario: 6, ids: ['6.workspace-opens', '6.hive-folder', '6.views'], facts: ['hive', 'views'] }
+      s6: { scenario: 6, ids: ['6.workspace-opens', '6.combwork-folder', '6.views'], facts: ['workspaceTree', 'views'] }
     },
-    shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-hive-assistant.png', 's5-desktop.jpg']
+    shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-assistant.png', 's5-desktop.jpg']
   },
   upgrade: overPrevious(4, 's4'),
   manual: overPrevious(7, 's7'),
@@ -57,7 +57,7 @@ const REQUIRED = {
 }
 
 /** The edge cases' checks edges.ps1 must record (HI-2460). */
-const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.refuses-unchanged', '8.running', '8.running-unchanged', '8.uninstall-fails', '8.uninstall-fails-unchanged', '8.fallback-running', '8.fallback-moved']
+const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.refuses-unchanged', '8.running', '8.running-unchanged', '8.uninstall-fails', '8.uninstall-fails-unchanged', '8.moved-at-start', '8.moved-at-start-installed']
 
 /** The profile move's checks profile-move.ps1 must record (HI-2602), in its order. */
 const PROFILE_MOVE_IDS = ['11.hive-profile', '11.installer-held', '11.refused', '11.refused-unchanged', '11.moved', '11.record', '11.sign-in-checked', '11.sign-in-once']
@@ -214,7 +214,7 @@ function evaluate(meta, files) {
     const scan = need(9, 's9-scan')
     if (scan) {
       const asar = cleanChecks(scan, (id, name, ok, detail) => add(9, name, ok, detail))
-      asarNote = `**app.asar** holds ${asar.total} "hive" hit(s) (${asar.files.map(a => `${a.place}: ${a.count}`).join(', ') || 'none found'}): counted, not failed. The app's own code, with the upgrade code that knows the 1.0 names.`
+      asarNote = `**app.asar** holds ${asar.total} hit(s) of the old name (${asar.files.map(a => `${a.place}: ${a.count}`).join(', ') || 'none found'}): counted, not failed. The app's own code, with the upgrade code that knows the 1.0 names.`
     }
   }
 
@@ -291,7 +291,7 @@ function markdown(r) {
   }
   // Scenario 9's hits, each with its place and text (HI-2592).
   const hits = hitsMarkdown(r.files?.['s9-scan'])
-  if (hits.length) lines.push('## 9. Where "hive" was found', '', ...hits)
+  if (hits.length) lines.push('## 9. Where the old name was found', '', ...hits)
   if (r.differences.length) lines.push('## Notes and fresh-install differences', '', ...r.differences.map(d => `- ${d}`), '')
   if (m.timings && Object.keys(m.timings).length) lines.push('## Timings', '', ...Object.entries(m.timings).map(([k, v]) => `- ${k}: ${v}`), '')
   if (m.shots?.length) lines.push('## Screenshots', '', ...m.shots.map(s => `- [${s}](${encodeURI(s)})`), '')

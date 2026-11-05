@@ -48,7 +48,7 @@ function server(serverJs, env, { roots } = {}) {
     if (m.error) throw new Error(m.error.message)
     return { text: m.result.content.filter(c => c.type === 'text').map(c => c.text).join('\n'), isError: !!m.result.isError, content: m.result.content }
   }
-  void request('initialize', { protocolVersion: '2025-06-18', capabilities: roots ? { roots: { listChanged: false } } : {}, clientInfo: { name: 'hive-sandbox-checks', version: '1.0.0' } })
+  void request('initialize', { protocolVersion: '2025-06-18', capabilities: roots ? { roots: { listChanged: false } } : {}, clientInfo: { name: 'combwork-sandbox-checks', version: '1.0.0' } })
     .then(() => { if (!exited) write({ method: 'notifications/initialized' }) })
   return { child, call, request, exit, close: () => { child.stdin.end(); return exit } }
 }

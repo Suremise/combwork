@@ -7,8 +7,8 @@
 #       Desktop and the profile folders untouched.
 #   8.4 Hive Desktop's uninstall not finishing (its Hive.exe held open, so it can't be removed): exit 6, the profile
 #       folders untouched.
-#   8.5 Combwork running on Hive's folders (HI-2461's fallback) as the installer runs again: Combwork closes, the folders
-#       move.
+#   8.5 Combwork started over Hive's folders (an installer's rename that didn't happen): its start moves them once
+#       (HI-2594); the installer run again closes it and removes Hive Desktop, the folders left Combwork's.
 #   install-edges.ps1 -Prev <1.0 installer> -New <installer> -Short <short-bound installer>
 # Writes C:\out\edges.json ({ checks: [{ id, name, ok, detail }], completed }) as it goes.
 param(
@@ -135,17 +135,21 @@ try {
   LetGo $held
   WaitFor { Free $hiveExe } 'Hive.exe let go'
 
-  # 8.5: Combwork running on Hive's folders (the fallback), with its window: the installer closes it, removes what is
-  # left of Hive Desktop, and moves the folders.
+  # 8.5: Combwork started over the folders its installer left (8.4's), with Hive Desktop installed again and not
+  # running: its start moves them, once, by one rename each with its own record (HI-2594: it never runs on Hive's
+  # folders), and runs with its window; the installer run again closes it and removes Hive Desktop, the folders left as
+  # they are.
   InstallPrev
   $p = Start-Process -FilePath $combExe -PassThru
   $null = $p.Handle
   WaitFor { $g = Get-Process -Id $p.Id -ErrorAction SilentlyContinue; $g -and $g.MainWindowHandle -ne 0 } 'Combwork running with its window'
-  Check '8.fallback-running' 'Combwork runs, with its window, on Hive''s folders (the fallback)' ((Test-Path $roamHive) -and -not (Test-Path $roamComb)) "roaming Hive $(Test-Path $roamHive), Combwork $(Test-Path $roamComb)"
+  $rec = try { Get-Content -Raw (Join-Path $locComb 'profile-move.json') | ConvertFrom-Json } catch { $null }
+  $moved = (Test-Path (Join-Path $roamComb 'edge-mark.txt')) -and (Test-Path (Join-Path $locComb 'edge-mark.txt')) -and -not (Test-Path $roamHive) -and -not (Test-Path $locHive)
+  Check '8.moved-at-start' 'Combwork''s start moved Hive''s folders (its record by app) and runs with its window' ($moved -and $rec -and $rec.by -eq 'app') "moved $moved; record $(if ($rec) { $rec | ConvertTo-Json -Compress } else { 'none' })"
   $i = Install $New
   $code = WaitExit $i 300
   $still = -not $p.HasExited
-  Check '8.fallback-moved' 'Installed again (exit 0): that Combwork closed, Hive Desktop removed, the folders moved' ($code -eq 0 -and -not $still -and -not (Test-Path $hiveKey) -and (Test-Path (Join-Path $roamComb 'edge-mark.txt')) -and (Test-Path (Join-Path $locComb 'edge-mark.txt')) -and -not (Test-Path $roamHive)) "exit $code; still running $still; key $(Test-Path $hiveKey); roaming Combwork $(Test-Path $roamComb)"
+  Check '8.moved-at-start-installed' 'Installed again (exit 0): that Combwork closed, Hive Desktop removed, the folders still Combwork''s' ($code -eq 0 -and -not $still -and -not (Test-Path $hiveKey) -and (Test-Path (Join-Path $roamComb 'edge-mark.txt')) -and (Test-Path (Join-Path $locComb 'edge-mark.txt')) -and -not (Test-Path $roamHive) -and -not (Test-Path $locHive)) "exit $code; still running $still; key $(Test-Path $hiveKey); roaming Combwork $(Test-Path $roamComb), Hive $(Test-Path $roamHive)"
   $res.completed = $true
 } catch {
   Check '8.error' 'The edge cases ran without an error' $false $_.Exception.Message

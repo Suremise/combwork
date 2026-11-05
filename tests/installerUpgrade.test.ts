@@ -1,4 +1,4 @@
-// The Combwork installer's upgrade from Hive Desktop (HI-2460, build/hiveUpgrade.ps1, run by installer.nsh's
+// The Combwork installer's upgrade from Hive Desktop (HI-2460, build/legacyUpgrade.ps1, run by installer.nsh's
 // customInit): closing and checking what runs, removing Hive Desktop through its own uninstaller, its Launch at login,
 // and moving the profile folders with the installer's record (HI-2461's contract). Against stand-ins only: a registry key
 // of the test's own under HKCU\Software\combwork-test, a fake uninstaller (a copy of Node running a script), stand-in apps
@@ -12,7 +12,7 @@ import { powershellEnv } from './powershellEnv'
 import { tempDir } from './tempDir'
 
 const HUNG_MS = 60_000
-const SCRIPT = join(__dirname, '..', 'build', 'hiveUpgrade.ps1')
+const SCRIPT = join(__dirname, '..', 'build', 'legacyUpgrade.ps1')
 const root = join(process.env.SystemRoot ?? 'C:\\Windows')
 const ps = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const psEnv = powershellEnv()
@@ -89,7 +89,7 @@ const profile = (parent: string, name = 'Hive'): string => {
 }
 const record = (folder: string) => JSON.parse(readFileSync(join(folder, 'profile-move.json'), 'utf8')) as Record<string, unknown>
 
-describe('the installer upgrades from Hive Desktop (hiveUpgrade.ps1, HI-2460)', () => {
+describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)', () => {
   beforeAll(() => {
     dir = tempDir('cw-installer-upgrade-')
   })
@@ -102,7 +102,7 @@ describe('the installer upgrades from Hive Desktop (hiveUpgrade.ps1, HI-2460)', 
     const f = fixture('fresh')
     const r = upgrade(f)
     expect(r.code, r.out).toBe(0)
-    expect(r.out).toContain('hive desktop: not installed')
+    expect(r.out).toContain('previous installation: none')
     expect(readdirSync(f.appData)).toEqual([])
     expect(readdirSync(f.local)).toEqual([])
   })
