@@ -19,6 +19,8 @@ import { NEW_ID, OLD_ID, upgradedAdvancedIds, upgradedOptions, upgradedRunName }
  * - **The progress command's old names** (HI-2594): 1.0 and the RCs put `hive-progress` and `hive-progress.cmd` beside
  *   `cw-progress` in the profile's bin folder. They are removed before the shims are written (index.ts), so no session
  *   finds the old command.
+ * - **The window's storage** (HI-2610): the Activity tabs' kept views, by the renderer as each window starts
+ *   (activityView.ts upgradeActivityViews).
  */
 
 /**

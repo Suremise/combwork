@@ -28,7 +28,7 @@ import { pausedFor } from './teamPause'
  * the wait.
  */
 const log = createLogger('outage')
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 const M = {
   waiting: msg({ id: 'session.status.waitingForConnection', defaultMessage: 'Waiting for the connection…', description: "An agent's status while Combwork waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)." }),
@@ -149,7 +149,7 @@ const combworkHost: OutageHost = {
     // Not while its team is paused (HI-2081): a turn carried on is work, which waits for the team to resume.
     const still = (): boolean => combworkHost.stillStopped(a) && !pausedFor(a.projectPath)
     if (!still()) return false
-    return !!(await deliverNow(a.projectPath, { agentId: a.agentId, kind: 'control', from: HIVE, body: note, source: 'connection-back', ref: `${a.runId}@${a.turn}`, forRun: a.runId }, still).catch(() => null))
+    return !!(await deliverNow(a.projectPath, { agentId: a.agentId, kind: 'control', from: COMBWORK, body: note, source: 'connection-back', ref: `${a.runId}@${a.turn}`, forRun: a.runId }, still).catch(() => null))
   },
   now: () => Date.now(),
   later(fn, ms) {

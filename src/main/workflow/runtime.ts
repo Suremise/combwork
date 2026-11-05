@@ -899,8 +899,8 @@ export class Workflow {
       st.stage === 'active' && !!st.started && !!agentOf(actor) && st.started.builder === agentOf(actor) && this.store.facts(card.id).find((f) => f.seq === st.started!.seq)?.actor === 'combwork'
         ? this.ok(card, 'active', 'active', { folder: this.folderOf(st), line: st.started.line, base: st.started.base, target: st.started.target }, [say(W.laneStarted, { card: card.key })])
         : null
-    const hives = forIt(s)
-    if (hives) return hives
+    const started = forIt(s)
+    if (started) return started
     if (s.stage !== 'todo' && !reopening) return this.notFrom(card, actor, s, 'start')
     const from: CardState = reopening ? { ...s, stage: 'todo' } : s
     // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The
