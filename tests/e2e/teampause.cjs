@@ -2,7 +2,7 @@
 // - window A's alpha: Builder runs a lane (two cards) and watches its first card. Pause the Team: the lane shows it is
 //   paused for the team, Builder is told once to park, Start Lane is refused, and a comment on its card wakes it with
 //   nothing (its watch's wake held) until the team resumes, when the wake is typed once;
-// - Builder's run (hive-progress, held open) keeps the team unparked, named; once it ends, All parked; Install Now with no
+// - Builder's run (cw-progress, held open) keeps the team unparked, named; once it ends, All parked; Install Now with no
 //   update ready installs nothing;
 // - window B's workspace is paused by the user's pause too; its Assistant's token reads its own team only, with A as one
 //   line, and its pause or resume never touches A; a project agent and a script are refused;
@@ -125,7 +125,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
 
     // --- What still runs: Builder's run keeps the team unparked; once it ends, All parked.
     await until(() => idle(alpha, builder.id), HUNG_MS)
-    await say(alpha, builder.id, `shell: hive-progress --title "probe run" -- node "${holder}" "${release}"`)
+    await say(alpha, builder.id, `shell: cw-progress --title "probe run" -- node "${holder}" "${release}"`)
     const named = async () => (await inv('team:state')).workspaces.find((w) => w.workspacePath.toLowerCase() === wsA.toLowerCase())?.items ?? []
     check('the run keeps the team unparked, named', !!(await until(async () => (await named()).some((i) => i.kind === 'run' && i.label === 'probe run'), HUNG_MS)), JSON.stringify(await named()))
     check('…not All parked', (await inv('team:state')).allParked === false)

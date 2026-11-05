@@ -187,7 +187,7 @@ const check = (name, ok, extra = '') => {
     // measuring it again and again took the window down).
     const runDone = path.join(lib.WORK, 'tilesview-run-done')
     const runTitle = 'A very long progress run title that should be truncated cleanly in every narrow tile'
-    await prompts('A').type(`shell: hive-progress --title "${runTitle}" -- node -e "setInterval(() => require('fs').existsSync(process.argv[1]) && process.exit(0), 100)" ${runDone}`)
+    await prompts('A').type(`shell: cw-progress --title "${runTitle}" -- node -e "setInterval(() => require('fs').existsSync(process.argv[1]) && process.exit(0), 100)" ${runDone}`)
     const progressShown = () => tile('A').evaluate((el) => el.querySelector('.tile-progress-text')?.textContent ?? '')
     check("A's tile shows its progress run", !!(await lib.until(async () => (await progressShown()).startsWith(runTitle), HUNG_MS)), await progressShown())
     const during = await heights()

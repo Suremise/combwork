@@ -6,7 +6,7 @@
 // on no card (a solo agent); the others don't run. The tab opens frozen: what comes meanwhile is counted in the pill, not
 // drawn; Refresh takes a new snapshot; Play goes live (the command that ended fades out and leaves, the subagent comes);
 // shown again after another view it is frozen again. No spinners: working is a pulse. The agent's own processes (its
-// CLI, its terminal, hive-mcp.js) show only on request; a command shows as given. Hide finished (on by default) hides the
+// CLI, its terminal, cw-mcp.js) show only on request; a command shows as given. Hide finished (on by default) hides the
 // agents with nothing running; Activity in an agent's menu opens its tab, filtered, frozen; a card in progress has
 // Activity in its dialog and its menu, opening the workspace level on its builder (HI-1664, activityworkspace covers it);
 // a finished card has none. Details show a prompt with its
@@ -122,7 +122,7 @@ function transcript(sid, startMin) {
     check('nothing past: no earlier card, no earlier session', !/earlier card|Building the earlier/.test(await list.innerText()))
     const titles = async () => page.locator('.activity-row.act-process .activity-row-title').allInnerTexts()
     check("the command as given: a cmd /c wrapper shows what it runs, never 'cmd d s c'", (await titles()).some((t) => /^node -e "?setTimeout/.test(t)) && !(await titles()).some((t) => t.startsWith('cmd d s c')), JSON.stringify(await titles()))
-    check("the agent's own plumbing is hidden: no CLI, no terminal host, no hive-mcp.js; the processes it left running show", !(await titles()).some((t) => /fake-claude\.cjs|powershell|hive-mcp/.test(t)) && (await titles()).filter((t) => /linger/.test(t)).length === 2, JSON.stringify(await titles()))
+    check("the agent's own plumbing is hidden: no CLI, no terminal host, no cw-mcp.js; the processes it left running show", !(await titles()).some((t) => /fake-claude\.cjs|powershell|hive-mcp/.test(t)) && (await titles()).filter((t) => /linger/.test(t)).length === 2, JSON.stringify(await titles()))
     check("a process's command line shows with its token masked", !(await list.innerText()).includes(GH))
     check('no spinner anywhere; working is a pulse', (await page.locator('.activity-tab .spin, .activity-tab .codicon-loading').count()) === 0 && (await page.locator('.activity-tab .activity-pulse').count()) > 0)
 

@@ -223,7 +223,7 @@ describe('task board', () => {
     })
   })
 
-  it('says what a change did, for the hive tools to confirm it', async () => {
+  it('says what a change did, for the Combwork tools to confirm it', async () => {
     const a = await run(() => tasks.createTask({ title: 'Said', project: 'alpha' }, agent))
     const b = await run(() => tasks.createTask({ title: 'Other', project: 'alpha' }, agent))
     const said: string[] = []

@@ -232,7 +232,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const progressRuns = async () => (await inv('progress:snapshot')).runs.filter((r) => r.state === 'running' || r.state === 'queued')
     // B1's command typed as its shell would get it. Combwork may type a wake into B1 at the same moment (card 1's Done, #1553):
     // typeLine types it again when the wake disturbed it or B1 dropped it.
-    await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), home, 'B1', `shell: hive-progress --title "B1 holds slot-a" -- node "${hold}"`, {
+    await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), home, 'B1', `shell: cw-progress --title "B1 holds slot-a" -- node "${hold}"`, {
       ready: async () => ['ready', 'finished'].includes((await live(b1.id))?.status),
       taken: async () => (await progressRuns()).length > 0,
       hungMs: HUNG_MS,

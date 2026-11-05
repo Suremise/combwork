@@ -192,7 +192,7 @@ export const AREAS = [
   { paths: ['src/main/bundled.ts', 'src/main/bundledHistory.json', 'src/main/skills.ts', 'src/main/revisions.ts', 'src/renderer/src/components/Skills.tsx', 'src/shared/skillDescriptions.ts', 'src/shared/skillLinks.ts'], suites: ['skills', 'skillaudience', 'skilldelivery'] },
   { paths: ['src/main/guidance.ts', 'src/shared/hiveGuidance.ts', 'src/shared/toolReplies.ts', 'src/shared/hiveToolLoad.ts', 'src/main/mcp/'], suites: ['skilldelivery', 'replysize', 'mcp', 'bridgereport', 'cardloop', 'slotguidance'] },
   // Agent text (HI-2065): the module every agent message is said through, and its extracted catalogue and schema; the
-  // canary runs through the built hive-mcp.js in agentguidance.
+  // canary runs through the built cw-mcp.js in agentguidance.
   { paths: ['src/shared/agentText/', 'agent-text/catalogue/', 'agent-text/schema/', 'src/main/apiText.ts', 'src/main/sessionText.ts'], suites: ['agentguidance', 'replysize', 'mcp', 'skilldelivery', 'bridgereport'] },
   // HI-2245: a builder's card watch and cw_lane next saying its card in Review has unsubmitted commits.
   { paths: ['src/main/unsubmitted.ts', 'src/shared/unsubmitted.ts'], suites: ['replysize', 'cardloop'] },
@@ -568,7 +568,7 @@ export const AREAS = [
   // session's chain is pinned from them at its launch (HI-2443).
   { paths: ['resources/dialects/'], suites: ['skills', 'openspeed', 'dialectlaunch', 'dialectsview'] },
   // The dialects service wired into sessions and the Agent API (HI-2443): chains pinned at launch, the Dialect setting,
-  // the launch record, CW_DIALECT_FILE for hive-mcp.js and hive-progress, the API chain.
+  // the launch record, CW_DIALECT_FILE for cw-mcp.js and cw-progress, the API chain.
   { paths: ['src/main/dialects/', 'tests/e2e/dialectlaunch.cjs'], suites: ['dialectlaunch', 'agentguidance', 'dialectsview'] },
   // The Dialects view (HI-2444): its list, a file's texts and layers, Save's checks, the JSON tab, the file actions,
   // Agent Settings' Dialect.

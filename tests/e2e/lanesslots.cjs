@@ -159,7 +159,7 @@ const lines = (file) => {
     check('R1 reviews in copy-1', started.status === 200 && !!copy && copy.endsWith('copy-1'), JSON.stringify(started.body))
     await until(async () => ['ready', 'finished'].includes((await live(r1.id))?.status), HUNG_MS)
     // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
-    await lib.typeLine(inv, lib.ptyKey(alpha, r1.id), home, null, `shell: cd /d "${copy}" && hive-progress --check quick`, { live: () => live(r1.id) })
+    await lib.typeLine(inv, lib.ptyKey(alpha, r1.id), home, null, `shell: cd /d "${copy}" && cw-progress --check quick`, { live: () => live(r1.id) })
     const checkRun = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.check === 'quick' && r.card === c1 && r.copy === 'copy-1' && r.state !== 'running'), HUNG_MS)
     check("the check ran in copy-1, linked to the card and its revision", !!checkRun && checkRun.revision === rev && same(lines(checkLog).at(-1), copy), JSON.stringify({ checkRun, ran: lines(checkLog) }))
     await tab('runs').click()

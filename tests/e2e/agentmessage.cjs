@@ -1,5 +1,5 @@
 // The Assistant leaves a message for an agent that can't take a prompt now (#530), on fake Claude Code agents
-// (fake-claude/), through cw_message_agent as the Assistant calls it (hive-mcp.js with the Assistant's token): a
+// (fake-claude/), through cw_message_agent as the Assistant calls it (cw-mcp.js with the Assistant's token): a
 // watching reviewer is woken by it at once and keeps its watch (cw_prompt_agent is refused and points to the tool); a
 // working builder gets it queued (a delivery, #647, with its id), its pane's ⋯ shows "1 unread" (#977), and it is typed as its next
 // line once the builder is idle, with its id to ack; cw_agent_activity says what waits and that it was offered (typed;
@@ -80,7 +80,7 @@ const check = (name, ok, extra = '') => {
   for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
   check('the agents start', !!(await until(async () => (await idle(builder.id)) && (await idle(reviewer.id)), HUNG_MS)))
 
-  // The Assistant, for its own token: its tools go through hive-mcp.js as it calls them.
+  // The Assistant, for its own token: its tools go through cw-mcp.js as it calls them.
   const home = (await inv('workspace:refresh')).assistant.path
   await inv('session:start', home, { agentId: 'assistant' })
   await until(async () => (await live(home, 'assistant'))?.status === 'ready', HUNG_MS)

@@ -278,7 +278,7 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
   const warningsOf = (r: unknown): string[] => (r as { warnings?: string[] }).warnings ?? []
   const pairNone = () => (env = setup({ ...preset('none', 'pair'), preChecks: [] }, { files: { 'a.txt': 'a\n' } }))
 
-  it("a later round's new file, and a user's edit: the resubmission's refusal names both, through the Agent API and the hive tools; declared, accepted with the new file only", async () => {
+  it("a later round's new file, and a user's edit: the resubmission's refusal names both, through the Agent API and the Combwork tools; declared, accepted with the new file only", async () => {
     const e = pairNone()
     const card = e.wf.createCard({ title: 'Round two' })
     moved(await e.wf.start(card.key, B1))
@@ -299,7 +299,7 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
     expect(r.warnings![1]).toMatch(/in neither its paths nor what it recorded as its agents' edits: c\.txt\./)
     // Factual, not attributed: the unclaimed file isn't said to be the user's or anyone's.
     expect(r.warnings![1]).not.toMatch(/user|editor|formatter|not by/)
-    // The Agent API's body and the hive tools' text carry them.
+    // The Agent API's body and the Combwork tools' text carry them.
     const body = refusalBody(r)
     expect(body.warnings).toEqual(r.warnings)
     const text = refusedText(body as unknown as Refused)

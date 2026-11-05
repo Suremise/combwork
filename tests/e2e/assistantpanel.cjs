@@ -314,7 +314,7 @@ const check = (name, ok, extra = '') => {
   check('Space opens it again', !!(await lib.until(async () => (await again.getAttribute('aria-expanded')) === 'true' && (await panel().locator('.assistant-action').count()) >= 1, HUNG_MS)))
 
   // --- Its mark where the Assistant is listed: its run in the Progress panel (reported with its own token, as
-  // hive-progress would), the Workspace Overview's running row, and the hidden panel's strip.
+  // cw-progress would), the Workspace Overview's running row, and the hidden panel's strip.
   const tokens = path.join(userData, 'assistant-api')
   const token = JSON.parse(fs.readFileSync(path.join(tokens, fs.readdirSync(tokens)[0]), 'utf8')).token
   const started = await fetch(`http://127.0.0.1:${env.HIVE_API_PORT}/v1/progress`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Checking the panel' }) })

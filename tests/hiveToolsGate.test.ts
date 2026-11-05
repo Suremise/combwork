@@ -1,5 +1,5 @@
-// No line of Combwork's before a launch's hive tools have connected (#865): a resumed Claude Code is ready at its SessionStart
-// before its hive MCP server has connected, and a doorbell typed then is a turn that can't call cw_inbox. The server
+// No line of Combwork's before a launch's Combwork tools have connected (#865): a resumed Claude Code is ready at its SessionStart
+// before its Combwork MCP server has connected, and a doorbell typed then is a turn that can't call cw_inbox. The server
 // says when the CLI has connected it (POST /v1/launch/connected → sessions.hiveToolsConnected); until then, at most
 // cw.mcp.connectSeconds (30 s) from when the launch first became ready, the line writer and the watch wakes wait. The
 // real SessionManager with hand-made live states.
@@ -29,7 +29,7 @@ function launched(status = 'ready', tools = true): Entry {
   return e
 }
 
-describe("no line of Combwork's before a launch's hive tools have connected (#865)", () => {
+describe("no line of Combwork's before a launch's Combwork tools have connected (#865)", () => {
   const watched = { current: false }
   let spy: ReturnType<typeof vi.spyOn>
   beforeEach(() => {

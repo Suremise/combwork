@@ -1,4 +1,4 @@
-// Documents by section (#817), through the real Agent API and hive-mcp.js: a project agent outlines and reads its own
+// Documents by section (#817), through the real Agent API and cw-mcp.js: a project agent outlines and reads its own
 // project's Markdown in the folder it works in (its worktree's copy), not another project's (403, as its sessions);
 // the workspace token reads any project's (the project folder's copy) and shared notes (shared:<path>); a section by
 // slug or text comes with its subsections; a repeated heading is ambiguous (409, listing both slugs) and an unknown one
@@ -160,7 +160,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     r = await outline(agentToken, { path: 'shared:../outside.md' })
     check('a shared path outside the notes: refused', r.status === 400, JSON.stringify(r))
 
-    // --- Through hive-mcp.js, as the agent's tools: lean text.
+    // --- Through cw-mcp.js, as the agent's tools: lean text.
     const tool = (name, args) => {
       const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
