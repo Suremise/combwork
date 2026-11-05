@@ -6,7 +6,7 @@ import { boardFileNeeded, moveBoardFile, NEW_DB_FILE } from './boardFileMove'
 import { writeTextAtomic } from './fsutil'
 import { CombworkError, errorText, combworkError } from './combworkError'
 import { createLogger } from './logger'
-import { present } from './fsPresence'
+import { ifAbsent, present } from './fsPresence'
 import { upgradeWorkspaceFiles } from './nameUpgradeFiles'
 import { upgradeProject } from './nameUpgradeProjects'
 import { upgradeProjectValues, upgradeWorkspaceValues } from './nameUpgradeValues'
@@ -55,9 +55,16 @@ const M = {
  */
 const recordOf = (host: string): string => join(host, CW_DIR, NAMES_DONE_FILE)
 
+/**
+ * Whether a host's record says this version. Not there, or not a record (damaged, an older version): not recorded, so
+ * every step runs again. One that can't be read now (access denied, held) throws (HI-2612): the open is refused and the
+ * next one reads it again, rather than an unread record taken for an answer either way.
+ */
 async function recorded(host: string): Promise<boolean> {
+  const text = await readFile(recordOf(host), 'utf8').catch(ifAbsent(null))
+  if (text === null) return false
   try {
-    return (JSON.parse(await readFile(recordOf(host), 'utf8')) as { version?: unknown }).version === NAMES_VERSION
+    return (JSON.parse(text) as { version?: unknown } | null)?.version === NAMES_VERSION
   } catch {
     return false
   }

@@ -1412,7 +1412,9 @@ export class WorkspaceService {
     // with a `.combwork` of an RC's (its skill copies' old markers, git's old comments and refs), or a new one, once.
     // Under the move's lock, refused while another process has the workspace open (HR2's round 3): then nothing is
     // written, the project is used as it is, and the next time it is set up (or the workspace opens) tries again.
-    if (this.path && !this.isAssistantHome(projectPath) && !(await projectNamesDone(projectPath))) {
+    // A record that can't be read now (HI-2612) waits the same way: not taken for done, nor run over.
+    const namesDone = this.path && !this.isAssistantHome(projectPath) ? await projectNamesDone(projectPath).catch((e) => (log.warn(`${userText(basename(projectPath))}: its names upgrade waits: its record can't be read`, e), true)) : true
+    if (this.path && !namesDone) {
       try {
         const moved = await moveFolders(this.path, { only: projectPath })
         if (moved.late) await this.finishFolderMove()

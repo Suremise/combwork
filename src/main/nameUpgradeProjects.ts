@@ -1,7 +1,7 @@
 import { readdir, readFile, rename } from 'original-fs/promises'
 import { join } from 'path'
 import { EXCLUDE_COMMENT } from '../shared/combworkFolderMove'
-import { contentHash, COPY_MARKER, SwapAbandoned, swapOut, withFileLock, writeTextAtomic } from './fsutil'
+import { contentHash, ContentTooLarge, COPY_MARKER, SwapAbandoned, swapOut, withFileLock, writeTextAtomic } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { gitDirOf, vcsOf } from './combworkVcs'
@@ -105,6 +105,26 @@ async function oldMarkers(folder: string): Promise<string[]> {
   return names.map((n) => join(skills, n)).filter((d) => present(join(d, OLD_COPY_MARKER)) && !present(join(d, COPY_MARKER)))
 }
 
+/** For a marker read's `.catch()`: none there (ENOENT), or the entry a file of the user's, not a folder (ENOTDIR). */
+const noMarker = (e: unknown): null | Promise<never> => (['ENOENT', 'ENOTDIR'].includes((e as NodeJS.ErrnoException | null)?.code ?? '') ? null : Promise.reject(e))
+
+/** A copy marker's hash, or null when there is none (no file, not JSON, no hash). */
+function markerHash(text: string | null): string | null {
+  if (text === null) return null
+  try {
+    const hash = (JSON.parse(text) as { hash?: unknown } | null)?.hash
+    return typeof hash === 'string' && hash ? hash : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * For contentHash's `.catch()`: null (not the marker's hash, so the copy is kept) when the content is what makes it
+ * differ: too large to be the copy, or a file of it gone as it was read (changed). Any other error fails the step.
+ */
+const unhashable = (e: unknown): null | Promise<never> => (e instanceof ContentTooLarge || (e as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? null : Promise.reject(e))
+
 /** The prefix of Combwork's copies' folders in `.agents/skills` before HI-2463 (now `cw-`), read only here. */
 export const OLD_COPY_PREFIX = 'hive-'
 
@@ -124,9 +144,11 @@ async function retireOldCopies(folder: string): Promise<void> {
   await withFileLock(skills, async () => {
     for (const n of names) {
       const dest = join(skills, n)
-      const marker = await readFile(join(dest, COPY_MARKER), 'utf8').then((t) => (JSON.parse(t) as { hash?: unknown }).hash, () => undefined).catch(() => undefined)
-      if (typeof marker !== 'string' || !marker) continue
-      if ((await contentHash(dest).catch(() => null)) !== marker) continue
+      // No marker, or one that isn't a marker: the user's. One that can't be read now, or content that can't be hashed
+      // now (access denied, a file held), fails the step (HI-2612): kept, nothing recorded, and the next open looks again.
+      const marker = markerHash(await readFile(join(dest, COPY_MARKER), 'utf8').catch(noMarker))
+      if (!marker) continue
+      if ((await contentHash(dest).catch(unhashable)) !== marker) continue
       try {
         await swapOut(dest, marker)
         log.info(`retired the old copy ${userText(dest)}`)
