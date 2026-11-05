@@ -313,9 +313,11 @@ export const BOARD_MIGRATIONS: Migration[] = [
   },
   {
     // HI-2587, the names upgrade: what the board kept under Hive's names takes Combwork's (comments' `hive_text` column,
-    // the 0.9 import's record's `appVersion`). After the 1.0 group: a board waiting for it gets this after it.
+    // the 0.9 import's record's old version key). The 1.0 group's last step: a board 1.0 or an RC upgraded takes it
+    // unasked (as HI-1718's later steps), a 0.9 board with its upgrade.
     version: 25,
     name: NAMES_STEP.name,
+    group: UPGRADE_GROUP_ID,
     up: (db) => {
       // Only with 1.0's tables (a board made before them, its group not run, has no comments' column to rename).
       const cols = (db.prepare("SELECT name FROM pragma_table_info('card_comments')").all() as { name: string }[]).map((c) => c.name) // i18n-ignore: SQL

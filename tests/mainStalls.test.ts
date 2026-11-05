@@ -402,7 +402,7 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     timedStep('db commit combwork.db', () => s.stall(900, 0))
     call()
     s.settle()
-    expect(s.warnings[0]).toMatch(/during it: (db commit hive\.db \(0\.9 s\), ipc tasks:list|ipc tasks:list \(0\.9 s\), db commit hive\.db)/)
+    expect(s.warnings[0]).toMatch(/during it: (db commit combwork.db \(0\.9 s\), ipc tasks:list|ipc tasks:list \(0\.9 s\), db commit combwork.db)/)
     expect(s.warnings[0]).toContain('db commit combwork.db (0.9 s)')
   })
 
@@ -423,7 +423,7 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     // The loop's delay as the tick measured it: the step's whole block.
     s.settle()
     const line = s.warnings[0] ?? ''
-    expect(line).toMatch(/during it: db begin hive\.db \(4\.0 s\), ipc waiting-/)
+    expect(line).toMatch(/during it: db begin combwork.db \(4\.0 s\), ipc waiting-/)
     expect(line).toMatch(/ and 1 more$/)
   })
 

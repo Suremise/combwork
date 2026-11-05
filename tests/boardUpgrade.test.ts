@@ -304,7 +304,7 @@ const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => t
 describe("the board's upgrade to 1.0 (#1207)", () => {
   it('has the 1.0 group, after every 0.9 step', () => {
     expect(upgradeSteps.length).toBeGreaterThan(0)
-    const last09 = Math.max(...store.BOARD_MIGRATIONS.filter((m) => !m.group && m.version < 25).map((m) => m.version))
+    const last09 = Math.max(...store.BOARD_MIGRATIONS.filter((m) => !m.group).map((m) => m.version))
     expect(Math.min(...upgradeSteps.map((m) => m.version))).toBeGreaterThan(last09)
   })
 
