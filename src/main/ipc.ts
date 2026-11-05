@@ -799,7 +799,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const scope = q.scope.kind === 'project' && !sanitize ? q.scope.project.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').trim().slice(0, 60) : q.own ? 'own-work' : q.scope.kind
       const r = await dialog.showSaveDialog(win(), {
         title: tr(M.exportMetrics),
-        defaultPath: join(app.getPath('downloads'), `hive-performance-${scope}-${new Date().toISOString().slice(0, 10)}.json`),
+        defaultPath: join(app.getPath('downloads'), `combwork-performance-${scope}-${new Date().toISOString().slice(0, 10)}.json`),
         filters: [{ name: 'JSON', extensions: ['json'] }]
       })
       if (r.canceled || !r.filePath) return null
@@ -894,7 +894,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const ws = currentWorkspace()
       const r = await dialog.showOpenDialog(win(), { title: tr(M.exportBoard), buttonLabel: tr(M.exportBoardButton), defaultPath: app.getPath('documents'), properties: ['openDirectory', 'createDirectory'] })
       if (r.canceled || !r.filePaths[0]) return null
-      const dir = join(r.filePaths[0], `hive-board-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
+      const dir = join(r.filePaths[0], `combwork-board-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
       await requireMasking()
       return { dir, cards: await exportBoard(ws, dir, maskDeep) }
     },
