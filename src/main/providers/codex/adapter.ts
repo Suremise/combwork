@@ -141,31 +141,40 @@ export function codexHoldsInput(screen: string): boolean {
     .at(-1)
   return last !== undefined && advanced.pattern('codex.queue.hint').test(last)
 }
-/**
- * Whether a screen line is Codex's input, or a prompt its conversation shows: a line its "›" begins. A choice view's
- * selected row ("› 1. Switch to gpt-6-luna", HI-2609) begins with it too, and isn't one.
- */
-export function codexInputLine(line: string): boolean {
-  return /^\s*›/.test(line) && !/^\s*›\s*\d+\.\s/.test(line)
-}
-/** How many of the lines Codex drew last its question by itself is looked for in (HI-2609): its view's title and choices. */
+/** How many lines from a choice view's selected row its choices are looked for in (HI-2609). */
 const IDLE_QUESTION_LINES = 14
+/** A choice view's selected row (HI-2609): "›" in Codex's first column, then its number ("› 1. Switch to gpt-6-luna"). */
+const SELECTED_ROW = /^›\s*\d+\.\s/
+/** How far above its selected row a choice view's title may be: its title, its question line and a blank line. */
+const VIEW_TITLE_ABOVE = 4
 /**
  * The question Codex shows by itself between turns, sending no hook (HI-2609, 0.166.0: "Approaching rate limits", its
  * offer of a cheaper model with that choice selected, which Enter takes): its title (codex.screen.idleQuestion) and one
- * of its choices (codex.screen.idleQuestionChoice), both in the last lines drawn below Codex's last input line. Such a
- * view replaces the input while it shows, so a title above an input line is a reply's, a prompt's, or what is left of a
- * view answered; the same words in the input itself don't count either. Null when none shows.
+ * of its choices (codex.screen.idleQuestionChoice), read by the view's own layout. Such a view replaces the input while
+ * it shows, so it is the last thing drawn: the last line Codex marks with "›" in its first column is the view's selected
+ * row ("› 1. Switch to …"), and the title starts a paragraph of its own just above that row (its title, its question, a
+ * blank line), its choices at and below the row. Anything else is no question (HR2's round 1): an input line last (the
+ * view gone, or leftovers of one above it), the words in a reply or a prompt above the input, or typed into the input
+ * however it wraps or is numbered (a first line "› 1. …" has nothing of the view above it, and a draft's other lines
+ * follow its "›"). Null when none shows.
  */
 export function codexIdleQuestion(screen: string): string | null {
   const lines = screen.split('\n').map((l) => l.trimEnd())
   while (lines.length && !lines.at(-1)) lines.pop()
-  const input = lines.findLastIndex(codexInputLine)
-  const bottom = lines.slice(input + 1).slice(-IDLE_QUESTION_LINES)
+  const row = lines.findLastIndex((l) => l.startsWith('›'))
+  if (row < 0 || !SELECTED_ROW.test(lines[row])) return null
   const title = advanced.pattern('codex.screen.idleQuestion')
   const choice = advanced.pattern('codex.screen.idleQuestionChoice')
-  const asked = bottom.map((l) => title.exec(l)?.[0]).find(Boolean)
-  return asked && bottom.some((l) => choice.test(l)) ? asked.trim() : null
+  // Its title: a line just above the row (never the row itself), starting a paragraph, with only the view's own lines
+  // (indented text, blank lines) between it and the row: no conversation item ("•"), no prompt or input ("›").
+  for (let t = row - 1; t >= Math.max(0, row - VIEW_TITLE_ABOVE); t--) {
+    if (!/^(\s|$)/.test(lines[t])) return null
+    const asked = title.exec(lines[t])?.[0]
+    if (!asked) continue
+    if (t > 0 && lines[t - 1].trim()) return null
+    return lines.slice(row, row + IDLE_QUESTION_LINES).some((l) => choice.test(l)) ? asked.trim() : null
+  }
+  return null
 }
 /**
  * Whether Codex's input still holds `command`, unrun (#363): the input is the last line Codex marks with "›", and holds

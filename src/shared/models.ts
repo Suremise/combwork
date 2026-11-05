@@ -298,11 +298,21 @@ export function dialectModelId(provider: ProviderId, info: Info, chosen: string 
 }
 
 /**
- * A model ID's identity, to tell whether two IDs are the same model (HI-2609): trimmed, in lower case, without the "[…]"
- * context suffix a CLI adds to the same model ("claude-opus-5-5[1m]" is "claude-opus-5-5"). Nothing else is dropped: a
- * snapshot date or another name is another model. Never a display name: two models can share one.
+ * Suffixes a CLI adds to a model ID that leave it the same model (HI-2609): Claude Code's 1M context, "[1m]". Only these:
+ * any other suffix ("[preview]") stays part of the ID until it is known to be the same model.
  */
-export const modelIdentity = (id: string): string => id.trim().toLowerCase().replace(/\[[^\]]*\]$/, '')
+export const MODEL_ID_EQUIVALENT_SUFFIXES: readonly string[] = ['[1m]']
+
+/**
+ * A model ID's identity, to tell whether two IDs are the same model (HI-2609): trimmed, in lower case, without a suffix
+ * MODEL_ID_EQUIVALENT_SUFFIXES lists ("claude-opus-5-5[1m]" is "claude-opus-5-5"). Nothing else is dropped: another
+ * suffix, a snapshot date or another name is another model. Never a display name: two models can share one.
+ */
+export function modelIdentity(id: string): string {
+  const k = id.trim().toLowerCase()
+  const same = MODEL_ID_EQUIVALENT_SUFFIXES.find((s) => k.endsWith(s))
+  return same ? k.slice(0, -same.length) : k
+}
 
 /**
  * Whether a running session reports another model than its launch gave it (HI-2609: Codex took a cheaper model at its

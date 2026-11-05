@@ -6,7 +6,7 @@
 import { readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { codex, codexIdleQuestion, codexInputLine } from '../src/main/providers/codex/adapter'
+import { codex, codexIdleQuestion } from '../src/main/providers/codex/adapter'
 import { rolloutDetails } from '../src/main/providers/codex/rollout'
 import { TerminalScreen } from '../src/main/terminalScreen'
 import { sessions } from '../src/main/sessions'
@@ -14,7 +14,7 @@ import * as pty from '../src/main/ptyHost'
 import * as events from '../src/main/events'
 import * as writer from '../src/main/lineWriter'
 import { advanced } from '../src/main/advanced'
-import { modelIdentity, modelSwitched } from '../src/shared/models'
+import { MODEL_ID_EQUIVALENT_SUFFIXES, modelIdentity, modelSwitched } from '../src/shared/models'
 import type { AgentInstallInfo, ModelCatalog } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -29,9 +29,6 @@ const INPUT = '› Ask Codex to do anything\n\n  GPT-6-Astra low · C:\\work\\al
 describe("Codex's offer of a cheaper model, on its screen (0.166.0)", () => {
   it('reads it from the composed screen: its title, with its first choice selected ("› 1. …", not an input line)', () => {
     expect(codexIdleQuestion(NUDGE)).toBe(TITLE)
-    expect(codexInputLine('› 1. Switch to gpt-6-luna                    Uses fewer credits')).toBe(false)
-    expect(codexInputLine('› Ask Codex to do anything')).toBe(true)
-    expect(codexInputLine('› Print a.txt contents')).toBe(true)
     // Another choice selected, and the view drawn alone (nothing above it).
     expect(codexIdleQuestion(NUDGE.replace('› 1. Switch', '  1. Switch').replace('  2. Keep current model', '› 2. Keep current model'))).toBe(TITLE)
     expect(codexIdleQuestion(VIEW)).toBe(TITLE)
@@ -50,6 +47,25 @@ describe("Codex's offer of a cheaper model, on its screen (0.166.0)", () => {
     expect(codexIdleQuestion(`${VIEW}\n\n• Model changed to gpt-6-luna medium.\n\n${INPUT}`)).toBeNull()
     // Typed into the input (a prompt about it), on one line or wrapped onto two.
     expect(codexIdleQuestion(`• Done.\n\n› ${TITLE}: 2. Keep current model\n\n  GPT-6-Astra low · C:\\work\\alpha`)).toBeNull()
+  })
+
+  it("isn't fooled by a draft in Codex's input, however it wraps or is numbered (HR2's round 1)", () => {
+    const FOOTER = '\n\n  GPT-6-Astra low · C:\\work\\alpha\n  ? for shortcuts'
+    for (const draft of [
+      // Several lines: its title and a choice on lines of their own.
+      `› Explain this Codex prompt:\n  ${TITLE}\n  2. Keep current model`,
+      // Numbered: its first line looks like a selected row, with the title in it.
+      `› 1. Explain ${TITLE}\n  2. Keep current model`,
+      // Numbered, the title on a line of its own below the first.
+      `› 1. Explain this:\n  ${TITLE}\n  2. Keep current model`,
+      // Wrapped onto a blank line and on.
+      `› Explain:\n\n  ${TITLE}\n\n  2. Keep current model`
+    ]) {
+      expect(codexIdleQuestion(`• Done.\n\n${draft}${FOOTER}`), draft).toBeNull()
+      expect(codexIdleQuestion(`• Done.\n\n${draft}`), draft).toBeNull()
+    }
+    // A numbered draft under a reply that quotes the title: the title is the reply's, not a view's.
+    expect(codexIdleQuestion(`• Codex may show:\n  ${TITLE}\n\n› 1. Fix it\n  2. Keep current model${FOOTER}`)).toBeNull()
   })
 
   it('both texts are advanced settings: another wording is read once they say it', () => {
@@ -103,6 +119,20 @@ describe('a Codex agent and its offer of a cheaper model (HI-2609)', () => {
     // Answered by the user (Keep current model): Codex's input again.
     await draw(e, IDLE)
     expect(sessions.cliAsks(project, id)).toBe(false)
+  })
+
+  it("a draft with the offer's words in Codex's input is no question: the agent stays idle, and typing goes on (HR2's round 1)", async () => {
+    vi.spyOn(internals, 'notify').mockImplementation(() => undefined)
+    for (const draft of [`› Explain this Codex prompt:\n  ${TITLE}\n  2. Keep current model`, `› 1. Explain ${TITLE}\n  2. Keep current model`]) {
+      const e = running('finished')
+      await draw(e, `• Done.\n\n${draft}\n\n  GPT-6-Astra low · C:\\work\\alpha`)
+      expect(sessions.cliAsks(project, id), draft).toBe(false)
+      internals.lookAtIdleScreen(liveKey(), e)
+      expect(e.state.status, draft).toBe('finished')
+      expect(writer.whyNoLine(project, id) ?? '', draft).not.toMatch(/shows a question/)
+      e.screen.dispose()
+      live.delete(key)
+    }
   })
 
   it('the agent waits for the user with it while it shows ("Codex asks: …"), and is idle again once it is gone', async () => {
@@ -233,8 +263,12 @@ describe('a model other than the launch gave it (modelSwitched, HI-2609)', () =>
     expect(modelIdentity(' Claude-Opus-5-5[1m] ')).toBe('claude-opus-5-5')
   })
 
-  it('is another model for another snapshot date: only the context suffix is the same model', () => {
+  it('is another model for another snapshot date or an unlisted suffix: only the listed ones are the same model (HR2)', () => {
+    expect(MODEL_ID_EQUIVALENT_SUFFIXES).toEqual(['[1m]'])
     expect(modelSwitched('claude-code', own('claude-opus-5-5'), 'claude-opus-5-5-20261015', null)).toEqual({ launched: 'claude-opus-5-5', running: 'claude-opus-5-5-20261015' })
+    expect(modelSwitched('codex', own('gpt-6-astra'), 'gpt-6-astra[preview]', null)).toEqual({ launched: 'gpt-6-astra', running: 'gpt-6-astra[preview]' })
+    expect(modelIdentity('gpt-6-astra[preview]')).not.toBe(modelIdentity('gpt-6-astra[beta]'))
+    expect(modelIdentity('gpt-6-astra[preview]')).toBe('gpt-6-astra[preview]')
   })
 
   it('resolves an alias through the catalogue first, and decides nothing for one it cannot resolve', () => {
