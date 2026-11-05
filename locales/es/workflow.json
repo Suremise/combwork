@@ -357,7 +357,7 @@
   "workflow.refused.submit.sameRevisionNote.next": "Vuelve a enviarla con una nota que diga qué cambió en tu respuesta, o haz commit de una nueva versión.",
   "workflow.refused.submit.trailer.change": "Con cada tarjeta en su propia carpeta no hacen falta trailers: Control de versiones → Dónde se trabaja cada tarjeta.",
   "workflow.refused.submit.trailer.message": "{card}: el commit {commit} no tiene trailer de tarjeta, y el agente de otra tarjeta trabaja en esta carpeta.",
-  "workflow.refused.submit.trailer.next": "Ejecuta {command} y vuelve a enviarla.",
+  "workflow.refused.submit.trailer.next": "{at, select, head {Ejecuta {command} y vuelve a enviarla.} other {Le siguen otros commits, entre ellos trabajo de otros agentes: un amend o un rebase los reescribiría. No hagas ninguno de los dos. Infórmalo con cw_cannot_within_rules (regla submit.trailer) y el usuario decide.}}",
   "workflow.refused.submit.unchanged.message": "{card}: sus archivos no han cambiado desde que empezó.",
   "workflow.refused.submit.unchanged.next": "Cambia los archivos de la tarjeta y después envíala a revisión.",
   "workflow.refused.verdict.currentSubmission.message": "El envío {submission} no es el último de la tarjeta {card}.",

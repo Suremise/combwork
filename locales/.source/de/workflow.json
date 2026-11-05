@@ -366,7 +366,7 @@
   "workflow.refused.submit.sameRevisionNote.next": "Submit it again with a note saying what changed in your answer, or commit a new revision.",
   "workflow.refused.submit.trailer.change": "Each card in its own folder needs no trailers: Version Control → Where cards are built.",
   "workflow.refused.submit.trailer.message": "{card}: commit {commit} has no card trailer, and another card's agent works in this folder.",
-  "workflow.refused.submit.trailer.next": "Run {command}, then submit again.",
+  "workflow.refused.submit.trailer.next": "{at, select, head {Run {command}, then submit again.} other {Other commits follow it, so amending or rebasing would rewrite them, other agents' work among them: do neither. Report it with cw_cannot_within_rules (rule submit.trailer), and the user decides.}}",
   "workflow.refused.submit.unchanged.message": "{card}: its files haven't changed since it started.",
   "workflow.refused.submit.unchanged.next": "Change the card's files, then submit it for review.",
   "workflow.refused.verdict.currentSubmission.message": "Submission {submission} isn't {card}'s latest.",

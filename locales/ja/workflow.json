@@ -357,7 +357,7 @@
   "workflow.refused.submit.sameRevisionNote.next": "回答として何を変えたかを書いたメモを付けてもう一度提出するか、新しいリビジョンをコミットしてください。",
   "workflow.refused.submit.trailer.change": "カードごとに専用フォルダーで作業すれば、トレーラーは不要です：「バージョン管理」→「カードの作業場所」。",
   "workflow.refused.submit.trailer.message": "{card}：コミット{commit}にカードのトレーラーがありません。このフォルダーでは別のカードのエージェントも作業しています。",
-  "workflow.refused.submit.trailer.next": "{command}を実行してから、もう一度提出してください。",
+  "workflow.refused.submit.trailer.next": "{at, select, head {{command}を実行してから、もう一度提出してください。} other {このコミットの後に、ほかのエージェントの作業を含む別のコミットがあります。amend や rebase をするとそれらを書き換えてしまうため、どちらも行わないでください。cw_cannot_within_rules（ルール submit.trailer）で報告し、ユーザーの判断を待ってください。}}",
   "workflow.refused.submit.unchanged.message": "{card}：開始してからファイルが変更されていません。",
   "workflow.refused.submit.unchanged.next": "カードのファイルを変更してから、レビューに提出してください。",
   "workflow.refused.verdict.currentSubmission.message": "提出{submission}は{card}の最新の提出ではありません。",
