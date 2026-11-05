@@ -4296,9 +4296,14 @@ async function twoLanes(c, { d = false, aColumn = 'todo', cColumn = 'todo' } = {
  */
 async function builder2LaneRuns(c) {
   const column = (await c.api('GET', `/v1/tasks/${c.cards.c}`)).body?.column
-  const lane = ((await c.api('GET', '/v1/lanes')).body ?? []).find((l) => l.builder?.name === 'Builder2')
-  if (column !== 'doing' || !lane) throw new Error(`setup: Builder2's lane isn't running on #${c.cards.c} in Doing: ${JSON.stringify({ column, lanes: ((await c.api('GET', '/v1/lanes?all=true')).body ?? []).map((l) => [l.builder?.name, l.state]) })}`)
+  const lanes = (await c.api('GET', '/v1/lanes?all=true')).body ?? []
+  if (!laneRunsOn(column, lanes, 'Builder2')) throw new Error(`setup: Builder2's lane isn't running on #${c.cards.c} in Doing: ${JSON.stringify({ column, lanes: lanes.map((l) => [l.builder?.name, l.state]) })}`)
 }
+/**
+ * Whether a card in `column` is in Doing with `builder`'s lane active among `lanes` (HR1, HI-2569 round 1: a lane listed
+ * after it ended, as the listing keeps one for a while, isn't running).
+ */
+const laneRunsOn = (column, lanes, builder) => column === 'doing' && (lanes ?? []).some((l) => l.builder?.name === builder && l.state === 'active')
 /** What Hive's card wake to the Assistant ends with while lanes run (src/shared/watch.ts, the same: a unit test checks). */
 const LANES_RUNNING_TAIL = ' Lanes are still running (cw_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (cw_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).'
 /** The Assistant's card watches that worked and wake it (with wake: true), each with its cards. */
@@ -5407,4 +5412,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, relaysOk, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, relaysOk, laneRunsOn, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
