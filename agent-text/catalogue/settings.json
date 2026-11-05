@@ -854,6 +854,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
+  "settings.advanced.codex.rateLimitNudge.hide.desc": {
+    "text": "Each Codex agent is started with Codex's offer to switch to a cheaper model turned off for that launch, so it keeps its connection's model when the account nears its limit. Nothing is written to Codex's files. Off, Codex may ask, and the agent waits for your answer in its terminal: Combwork types nothing into it meanwhile.",
+    "note": "What the advanced setting \"Don't offer a cheaper model near the limit\" is for, and what happens when it is off (Settings → Advanced, HI-2609). A connection is an account Combwork signs a CLI in with.",
+    "audience": "both"
+  },
+  "settings.advanced.codex.rateLimitNudge.hide.title": {
+    "text": "Don't offer a cheaper model near the limit",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork (HI-2609): Codex's offer to switch to a cheaper model when the account nears its usage limit.",
+    "audience": "both"
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "text": "The field of Codex's token counts with a subscription's limits. Wrong, Combwork shows no plan limits for Codex.",
     "note": "What the advanced setting \"Session file: plan limits field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
@@ -922,6 +932,26 @@
   "settings.advanced.codex.retry.pattern.title": {
     "text": "Retry wait: message",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry wait: the coding agent waiting to try its model request again.",
+    "audience": "both"
+  },
+  "settings.advanced.codex.screen.idleQuestion.desc": {
+    "text": "The title of a question Codex shows by itself between turns, sending no hook (its offer of a cheaper model near the account's limit), in the lines it drew last. While it shows with one of its choices (Screen: question's choice), the agent waits for you and Combwork types nothing into it, since Enter would answer it. Wrong, a wake's Enter can answer the question.",
+    "note": "What the advanced setting \"Screen: question while idle\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2609). \"Screen: question's choice\" is another advanced setting's title: keep it as translated there.",
+    "audience": "both"
+  },
+  "settings.advanced.codex.screen.idleQuestion.title": {
+    "text": "Screen: question while idle",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.codex.screen.idleQuestionChoice.desc": {
+    "text": "One of the choices of that question (Screen: question while idle), as Codex numbers it. Both must show, near the bottom of its screen and not in its input, for the question to count, so the same words in the conversation don't stop Combwork typing.",
+    "note": "What the advanced setting \"Screen: question's choice\" is for (Settings → Advanced, HI-2609). \"Screen: question while idle\" is another advanced setting's title: keep it as translated there.",
+    "audience": "both"
+  },
+  "settings.advanced.codex.screen.idleQuestionChoice.title": {
+    "text": "Screen: question's choice",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.signIn.expired.desc": {

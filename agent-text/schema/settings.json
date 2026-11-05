@@ -523,6 +523,12 @@
   "settings.advanced.codex.queue.hint.title": {
     "placeholders": {}
   },
+  "settings.advanced.codex.rateLimitNudge.hide.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimitNudge.hide.title": {
+    "placeholders": {}
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "placeholders": {}
   },
@@ -563,6 +569,18 @@
     "placeholders": {}
   },
   "settings.advanced.codex.retry.pattern.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.screen.idleQuestion.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.screen.idleQuestion.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.screen.idleQuestionChoice.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.screen.idleQuestionChoice.title": {
     "placeholders": {}
   },
   "settings.advanced.codex.signIn.expired.desc": {
