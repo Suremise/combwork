@@ -445,7 +445,7 @@ describe('notices in the hook replies (#650)', () => {
     expect(st.status).toBe('finished')
   })
 
-  it("nothing for an agent that can't read an inbox (the Agent API or its hive server off): it is typed what it is given in full instead", async () => {
+  it("nothing for an agent that can't read an inbox (the Agent API or its Combwork MCP server off): it is typed what it is given in full instead", async () => {
     const st = agent()
     await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
     await leave(st)

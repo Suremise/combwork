@@ -88,7 +88,7 @@ const check = (name, ok, extra = '') => {
     ['the Assistant', home, 'assistant']
   ]) {
     const watch = async () => {
-      await say(p, id, `hive cw_wait_for_tasks {"cards":[${card}],"changes":["comment"],"wake":true}`)
+      await say(p, id, `cw cw_wait_for_tasks {"cards":[${card}],"changes":["comment"],"wake":true}`)
       return lib.until(async () => (await live(p, id))?.status === 'watching', HUNG_MS)
     }
     const mine = () => wakes().filter((w) => w.text.includes(named) && w.agent === name)

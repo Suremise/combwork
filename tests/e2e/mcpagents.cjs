@@ -1,6 +1,6 @@
 // Per-agent MCP server access (#537), in the window: two agents in one project with two workspace MCP servers on. The
 // Agent Settings dialog gives Tester only one of them (MCP servers: Only these); Builder keeps all of the project's.
-// Each agent's launch (the fake Claude Code's --mcp-config) has only its own servers, the hive server in both; the
+// Each agent's launch (the fake Claude Code's --mcp-config) has only its own servers, the Combwork MCP server in both; the
 // agent's tooltip, the project's MCP tab and the Agent API's project status say who has what; the API changes the choice
 // and puts it back. Throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
     const of = (name) => status?.agents?.find((a) => a.name === name)
     check('the API says what each agent gets', JSON.stringify([of('Builder')?.mcpServers, of('Builder')?.mcpChoice, of('Tester')?.mcpServers, of('Tester')?.mcpChoice]) === '[["notes","sandbox"],"all",["sandbox"],"only"]', JSON.stringify(status?.agents))
 
-    // --- Each launch has only its own servers, the hive server in both.
+    // --- Each launch has only its own servers, the Combwork MCP server in both.
     await inv('session:start', proj, { agentId: builder.id })
     await inv('session:start', proj, { agentId: tester.id })
     const launched = async (agentId) => {
@@ -105,7 +105,7 @@ const check = (name, ok, extra = '') => {
     const b = await lib.until(() => launched(builder.id), 30000)
     const t = await lib.until(() => launched(tester.id), 30000)
     check("Builder's launch has both servers", !!b?.notes && !!b?.sandbox && !!b?.combwork, JSON.stringify(Object.keys(b ?? {})))
-    check("Tester's launch has only sandbox, and the hive server", !t?.notes && !!t?.sandbox && !!t?.combwork, JSON.stringify(Object.keys(t ?? {})))
+    check("Tester's launch has only sandbox, and the Combwork MCP server", !t?.notes && !!t?.sandbox && !!t?.combwork, JSON.stringify(Object.keys(t ?? {})))
 
     // --- The API changes the choice; a running agent is told to restart; ["*"] puts all back.
     // Changes through the Agent API are the Assistant's: started (in the workspace folder) for its token.
@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => {
     check('the API gives Builder only notes', patched.status === 200 && JSON.stringify(patched.body?.mcpServers) === '["notes"]', JSON.stringify(patched))
     check('and the running Builder needs a restart for it', !!(await lib.until(async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo').agents.find((a) => a.id === builder.id)?.restartNeeded, HUNG_MS)))
     const bad = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['hive'] })
-    check('the hive server is not one to choose', bad.status === 400 && /always given/.test(bad.body?.error ?? ''), JSON.stringify(bad))
+    check('the Combwork MCP server is not one to choose', bad.status === 400 && /always given/.test(bad.body?.error ?? ''), JSON.stringify(bad))
     const back = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['*'] })
     check('["*"] gives it all again', back.status === 200 && !('mcpServers' in (back.body ?? {})), JSON.stringify(back.body))
 

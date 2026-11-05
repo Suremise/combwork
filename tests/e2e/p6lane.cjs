@@ -298,7 +298,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
       check('…both agents run, with their tokens', !!ok, JSON.stringify(tokens))
     }
 
-    // The builder's shell (the fake's "shell:" step), as hive-progress runs in its session (p5lane's).
+    // The builder's shell (the fake's "shell:" step), as cw-progress runs in its session (p5lane's).
     const shells = () => {
       const file = path.join(fx.claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -313,11 +313,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
       if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
     }
     const counted = (x) => x.kind === 'CheckRan' && x.data?.counted === true
-    /** The quick check through hive-progress on the card's revision now (passing): a new counted CheckRan on it. */
+    /** The quick check through cw-progress on the card's revision now (passing): a new counted CheckRan on it. */
     const quickCheck = async (n) => {
       q.steer(fx, 'pass')
       const before = (await h.facts(n)).filter(counted).length
-      await shell(`hive-progress --check typecheck --card ${await keyOf(n)}`)
+      await shell(`cw-progress --check typecheck --card ${await keyOf(n)}`)
       return !!(await waitHung(async () => (await h.facts(n)).filter(counted).length > before))
     }
     const commit = (file) => {
@@ -358,7 +358,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const line = s1.body?.data?.line
     check("One starts in the lane's slot, on its line", s1.status === 200 && !!line && !!(await onLine(s1)), JSON.stringify(s1.body))
     const rev1 = commit('one.txt')
-    check("One's quick check through hive-progress --check is counted", await quickCheck(c1))
+    check("One's quick check through cw-progress --check is counted", await quickCheck(c1))
     const sub1 = await intent('b1', c1, 'submit', { summary: 'one ready' })
     check('One submitted: Review', sub1.status === 200 && (await card(c1)).column === 'review', JSON.stringify(sub1.body))
     const k1 = await keyOf(c1)

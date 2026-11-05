@@ -5,7 +5,7 @@
 // runner and a scenario run, and in a second worktree (a git worktree of this one's HEAD with its uncommitted changes,
 // made for the check in this invocation's own folder and removed after unless --keep: tempWorktrees.mjs, #207, so two
 // checkers at once never remove each other's) two e2e runners. One run in each worktree is started with the
-// environment of an agent's shell inside an outer hive-progress (NO_COLOR, CW_PROGRESS_WRAPPED, a Combwork Agent API
+// environment of an agent's shell inside an outer cw-progress (NO_COLOR, CW_PROGRESS_WRAPPED, a Combwork Agent API
 // token…) and a shell's git and Node settings pointing elsewhere (GIT_DIR and GIT_WORK_TREE at a decoy repository,
 // NODE_OPTIONS loading a script that notes each Node process it starts in), the other with a plain one; the checker's
 // own environment points git at the decoy too, for its own setup (#208). Checked, each round: every run passes; each
@@ -63,7 +63,7 @@ const SUITES = ['isolation', 'about', 'bridgereport', 'busy']
 const SCENARIO = 'work-on-card'
 /** This invocation's own folder (tempWorktrees.mjs): its worktrees, decoy, heavy-run pool; no other checker's. */
 const RUN = invocationDir()
-/** An agent's shell in Combwork running the tests through hive-progress, and a person's own settings. */
+/** An agent's shell in Combwork running the tests through cw-progress, and a person's own settings. */
 const AGENT_SHELL = {
   NO_COLOR: '1',
   FORCE_COLOR: '1',

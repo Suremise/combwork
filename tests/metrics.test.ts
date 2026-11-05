@@ -725,7 +725,7 @@ describe('cost', () => {
 })
 
 describe('approved labels', () => {
-  it("the tool names metrics take are exactly the hive MCP server's tools", async () => {
+  it("the tool names metrics take are exactly the Combwork MCP server's tools", async () => {
     const { CW_TOOLS } = await import('../src/shared/assistantTools')
     const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
     // A tool's name, or an intent tool's (#1267: intent('cw_submit', …)).

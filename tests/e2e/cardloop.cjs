@@ -82,7 +82,7 @@ const check = (name, ok, extra = '') => {
     await typers.get(id).type(text)
   }
   // Cards as `#N`, their workspace numbers: a plain number reading as another card's key is refused (HI-2197).
-  const wait = (n, extra) => `hive cw_wait_for_tasks ${JSON.stringify({ cards: (Array.isArray(n) ? n : [n]).map((x) => `#${x}`), ...extra, wake: true })}`
+  const wait = (n, extra) => `cw cw_wait_for_tasks ${JSON.stringify({ cards: (Array.isArray(n) ? n : [n]).map((x) => `#${x}`), ...extra, wake: true })}`
 
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
@@ -110,7 +110,7 @@ const check = (name, ok, extra = '') => {
 
   // The reviewer joins the builder's lane first (#483): Combwork makes the lane, which the builder's own start then updates.
   // Then it waits for c1 to arrive in Review: watching, never idle.
-  const lane = (body) => `hive cw_lane ${JSON.stringify(body)}`
+  const lane = (body) => `cw cw_lane ${JSON.stringify(body)}`
   // The project's own Card loops rounds and wait (workflow options since HI-1766): the lane the join makes takes them.
   await lib.setOwnOptions(inv, alpha, { loopRounds: 7, loopWaitHours: 5 })
   await say(reviewer.id, `${lane({ action: 'join', builder: 'Builder', cards: [c1, c2] })} then ${wait(c1, { column: 'review' })}`)

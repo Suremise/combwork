@@ -4,7 +4,7 @@
 // then leave it marked red (or when dismissed), Pulse saying a run failed until a later run of it passes, and the Runs
 // tab keeping every run by day, retries folded, found by words and filtered; a row opens its details, its agent's name shows the agent (flashing its pane); an agent that
 // stops leaves its run "stopped reporting", and the setting turns it all off; another tells agents to run long commands
-// through hive-progress, which reaches a new session's guidance (#167). The agents are the fake Claude Code;
+// through cw-progress, which reaches a new session's guidance (#167). The agents are the fake Claude Code;
 // dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR. The taskbar calls are recorded through
 // CW_TEST_TASKBAR_LOG (the page can't see them).
 const lib = require('./lib.cjs')

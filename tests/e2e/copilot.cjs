@@ -159,7 +159,7 @@ const check = (name, ok, extra = '') => {
 
     // B: a hive tool, with no prompt in any mode (--allow-tool=hive, #468): it reaches Combwork's Agent API.
     check('B: starts in Accept edits, Copilot’s default', (await live(b.id))?.permissionMode === 'accept-edits', (await live(b.id))?.permissionMode)
-    await send(b.id, 'hive cw_list_projects then say Listed.', ['working', 'waiting'])
+    await send(b.id, 'cw cw_list_projects then say Listed.', ['working', 'waiting'])
     const hiveTurn = await timeline(b.id)
     check('B: a hive tool runs without asking, and the turn finishes', hiveTurn.finished && !hiveTurn.asked, hiveTurn.seen.join(' → '))
     check('B: …no tool dialog on its screen', !/Do you want to use this tool\?/.test(await screen(b.id)))

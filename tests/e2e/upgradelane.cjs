@@ -116,7 +116,7 @@ function driver(app, page) {
     await h.app.close().catch(() => undefined)
   }
   // The 0.9 Hive's tool, by its name there (HI-2463 renamed it cw_lane in 1.1).
-  const lane = (body) => `hive hive_lane ${JSON.stringify(body)}`
+  const lane = (body) => `cw hive_lane ${JSON.stringify(body)}`
   try {
     // 1. The 0.9 Hive runs the loop: c1 built and in Review, c2 in Doing, c3 still in Todo.
     const oldApp = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ CW_USER_DATA: oldProfile, ...claude }) })
@@ -175,7 +175,7 @@ function driver(app, page) {
     // its merge, and the lane's next card starts once the one before it is Done (Darren on HI-1985: 1.0's rule holds for
     // a lane carried over, as card-loop says): woken by each verdict, the builder reports that card's merge first.
     const cards = await dev.inv('tasks:list')
-    const merged = (n) => `hive cw_report_merge ${JSON.stringify({ card: cards.find((c) => c.number === n)?.key })}`
+    const merged = (n) => `cw cw_report_merge ${JSON.stringify({ card: cards.find((c) => c.number === n)?.key })}`
     script('Builder', [`${merged(n1)} then ${work(n2)} then boardmove ${n2} review then boardcomment ${n2}`, `${merged(n2)} then boardmove ${n3} doing then ${work(n3)} then boardmove ${n3} review then boardcomment ${n3}`, 'work 1'])
     const sessions = await dev.inv('session:list', alpha)
     const sessionOf = (id) => sessions.find((x) => x.agentId === id && x.source === 'hive')?.id

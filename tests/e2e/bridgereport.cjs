@@ -1,7 +1,7 @@
 // The hive MCP bridge's metrics reports (POST /v1/metrics/mcp) never hold it up: against a mock Agent API that answers
 // tool calls but never answers a report, the replies come at once, at most one report is in flight however many calls
 // there are, and once its CLI closes its input the bridge exits within the report's own deadline (3 s) plus a margin,
-// not after one deadline per batch. Uses the built bridge (out/main/hive-mcp.js; npx electron-vite build first) and
+// not after one deadline per batch. Uses the built bridge (out/main/cw-mcp.js; npx electron-vite build first) and
 // no Combwork app or profile.
 const lib = require('./lib.cjs')
 const http = require('http')

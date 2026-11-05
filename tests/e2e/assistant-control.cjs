@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
   const watched = (await api('POST', '/v1/tasks', { title: 'Watched card', project: 'alpha' })).body?.number
   await api('POST', '/v1/projects/alpha/agents/Fixer/start', {})
   await until(async () => (await live(alpha, fixer))?.status === 'ready', HUNG_MS)
-  await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${watched}`], column: 'done', wake: true })}` })
+  await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: `cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${watched}`], column: 'done', wake: true })}` })
   check('Fixer watches a card', !!(await until(async () => (await live(alpha, fixer))?.status === 'watching', HUNG_MS)), (await live(alpha, fixer))?.status)
   const quiet = await api('POST', '/v1/projects/alpha/agents/Fixer/stop', { reason: 'testing' })
   check('stopping an agent that only watches asks nothing: it stops at once', quiet.status === 200 && quiet.body?.wasRunning === true && (await inv('assistant:questions')).length === 0 && !!(await until(async () => !(await live(alpha, fixer)), HUNG_MS)), JSON.stringify(quiet.body))

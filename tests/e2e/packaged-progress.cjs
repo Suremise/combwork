@@ -49,7 +49,7 @@ const wrap = (args, apiUrl) =>
   fs.rmSync(data, { recursive: true, force: true })
   await new Promise((r) => srv.listen(0, '127.0.0.1', r))
   const url = `http://127.0.0.1:${srv.address().port}`
-  const cmd = ['--title', 'Packaged check', '--', 'node', '-e', "console.log('hello'); console.log('##hive-progress step=1 total=2 name=one'); console.log('##hive-progress step=2 name=two'); setTimeout(() => process.exit(0), 700)"]
+  const cmd = ['--title', 'Packaged check', '--', 'node', '-e', "console.log('hello'); console.log('##cw-progress step=1 total=2 name=one'); console.log('##cw-progress step=2 name=two'); setTimeout(() => process.exit(0), 700)"]
 
   // The run's start (POST /v1/progress); before it, the wrapper asks what the run is for (/v1/progress/resolve, #1220).
   const started = () => calls.find((c) => c.method === 'POST' && c.path === '/v1/progress')
@@ -76,7 +76,7 @@ const wrap = (args, apiUrl) =>
   const away = await wrap(['--', 'node', '-e', "console.log('still runs'); process.exit(4)"], 'http://127.0.0.1:9')
   check('Combwork unreachable: the command runs as usual, quickly', away.code === 4 && away.out === 'still runs\n' && Date.now() - t0 < 8000, JSON.stringify(away))
 
-  // An Electron app run through hive-progress (itself run by Combwork's executable as Node) starts as an app, exactly as
+  // An Electron app run through cw-progress (itself run by Combwork's executable as Node) starts as an app, exactly as
   // when run directly: ELECTRON_RUN_AS_NODE, the shims' setting for the wrapper, isn't passed on. Reporting on,
   // off and unavailable. The app quits rather than exits: app.exit() as soon as it's ready sometimes crashes Electron
   // under load, app.quit() never (#656).
@@ -98,7 +98,7 @@ const wrap = (args, apiUrl) =>
       p.stdout.on('data', (d) => (out += d))
       p.on('close', (code) => resolve({ code, out: out.replace(/\r/g, '') }))
     })
-    check(`…and through hive-progress (${mode}): the same output and exit code`, wrapped.code === direct.code && wrapped.out === direct.out, JSON.stringify(wrapped))
+    check(`…and through cw-progress (${mode}): the same output and exit code`, wrapped.code === direct.code && wrapped.out === direct.out, JSON.stringify(wrapped))
     if (mode === 'reporting') check('…reported as passed', calls.slice(before).at(-1)?.body?.ok === true, JSON.stringify(calls.slice(before)))
   }
 

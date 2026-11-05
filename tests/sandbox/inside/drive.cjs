@@ -15,6 +15,10 @@
  *                 overrides under the old hive.* ids (Combwork's own and a workspace's own, HI-2518)
  *   after-upgrade scenario 4, after it: those settings kept, the Advanced overrides under cw.* (an old id refused,
  *                 naming the new one), the version, a screenshot
+ *   clean         scenario 9 (HI-2592): a new user's first session on a clean install: first run, Claude Code on and an
+ *                 account (the fake), a workspace with a git project, an agent started briefly (its `set` kept), a card,
+ *                 Settings, Copy Diagnostics, Export Board, quit. Keeps what the window showed and what it copied for
+ *                 clean-scan.cjs, which then searches it all for "hive".
  */
 const fs = require('fs')
 const path = require('path')
@@ -61,9 +65,9 @@ function closeRunningHive() {
   return Number(out) || 0
 }
 
-async function launch() {
+async function launch(opts = {}) {
   const t0 = Date.now()
-  app = await _electron.launch({ executablePath: CW_EXE, args: [], timeout: 90_000 })
+  app = await _electron.launch({ executablePath: CW_EXE, args: [], timeout: 90_000, ...opts })
   page = await app.firstWindow({ timeout: 90_000 })
   page.on('pageerror', e => { (res.facts.pageErrors ||= []).push(String(e.message).slice(0, 300)) })
   await page.waitForSelector('.app .workbench', { timeout: 90_000 })
@@ -122,6 +126,27 @@ function runValues() {
   } catch {
     return []
   }
+}
+
+/**
+ * Runs a command from the palette as a user does: Ctrl+Shift+P, its name typed, Enter only once the command `id` is the
+ * one chosen. False when the palette or the command didn't come.
+ */
+async function paletteCommand(id, typed) {
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Control+Shift+P')
+  if (!(await until(async () => page.evaluate(() => !!document.activeElement?.closest('.palette')), 10_000))) return false
+  await page.keyboard.type(typed)
+  if (!(await until(async () => (await page.locator(`.palette-item.active[data-command="${id}"]`).count()) === 1, 10_000))) return false
+  await page.keyboard.press('Enter')
+  return true
+}
+
+/** All the text the window shows a user: its title, the page's text, and the titles, labels and placeholders on hover. */
+const windowText = async () => {
+  const title = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.getTitle()).join(' | ')).catch((e) => `(title unread: ${e.message})`)
+  const text = await page.evaluate(() => [document.title, document.body.innerText, ...[...document.querySelectorAll('[title],[aria-label],[placeholder],[alt]')].map((e) => ['title', 'aria-label', 'placeholder', 'alt'].map((a) => e.getAttribute(a)).filter(Boolean).join(' | '))].join('\n'))
+  return `${title}\n${text}`
 }
 
 const bodyText = () => page.evaluate(() => document.body.innerText)
@@ -304,6 +329,158 @@ const steps = {
     const sc = /^s(\d+)/.exec(prefix)?.[1] || '8'
     check(`${sc}.notification`, `A notification shows under the app ID ${aumid} (Windows lists it in Notifications)`, res.facts.shown && known, `shown ${res.facts.shown}; ${key} ${known ? 'there' : 'missing'}`)
     await shot('notified')
+  },
+
+  // Scenario 9 (HI-2592): a new user's first session, kept for clean-scan.cjs. Each step goes on whatever the one before
+  // did, so the scan has as much as can be made; a step that didn't work is its check's failure.
+  async clean() {
+    const pages = []
+    const keep = async (where) => {
+      try { pages.push({ where, text: await windowText() }) } catch (e) { pages.push({ where, text: '', error: String(e.message) }) }
+      fs.writeFileSync(path.join(OUT, `${prefix}-window.json`), JSON.stringify(pages, null, 2))
+    }
+    // Git (this machine's, mapped at C:\tools\git) and the fake Claude Code, as a user installs them: on the user PATH.
+    const gitCmd = 'C:\\tools\\git\\cmd'
+    ps(`$p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not (($p -split ';') -contains '${gitCmd}')) { [Environment]::SetEnvironmentVariable('Path', ((@($p, '${gitCmd}') | Where-Object { $_ }) -join ';'), 'User') }`)
+    res.facts.fakeClaude = ps('& C:\\tools\\hive-tests\\sandbox\\inside\\fake-claude-install.ps1')
+    const fakeBin = path.join(process.env.LOCALAPPDATA, 'FakeClaude', 'bin')
+    // Combwork starts with a user's environment: this script's, less what the checks themselves put in it (the mapped
+    // tests folder's path), which no user has. What was left out is recorded.
+    const env = {}
+    const dropped = []
+    for (const [k, v] of Object.entries(process.env)) {
+      if (/^path$/i.test(k)) {
+        const parts = String(v).split(';').filter(Boolean)
+        dropped.push(...parts.filter((x) => /hive/i.test(x)))
+        env[k] = [...parts.filter((x) => !/hive/i.test(x)), gitCmd, fakeBin].join(';')
+      } else if (/hive/i.test(k) || /hive/i.test(String(v))) dropped.push(k)
+      else env[k] = v
+    }
+    res.facts.harnessEnvLeftOut = dropped
+    await launch({ env, cwd: process.env.USERPROFILE })
+    res.facts.version = (await api('/v1/health')).version
+    res.facts.appName = await app.evaluate(({ app: a }) => a.getName())
+    check('9.first-run', `First run shows the start screen ("${res.facts.appName}")`, (await page.locator('.welcome h1', { hasText: res.facts.appName }).count()) > 0, (await bodyText()).slice(0, 400))
+    await keep('start screen')
+    await shot('start')
+
+    // Claude Code turned on as a user does (the banner's "Choose providers", its switch): the fake is found on the PATH.
+    await page.locator('.providers-banner button', { hasText: 'Choose providers' }).click({ timeout: 10_000 }).catch(() => {})
+    await keep('Provider Setup')
+    await page.locator('[role="switch"][aria-label="Use Claude Code"]').click({ timeout: 10_000 }).catch(() => {})
+    const found = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)
+    check('9.provider-on', 'Claude Code turned on and found (the fake, 2.1.999)', found && found.version === '2.1.999', JSON.stringify((await inv('provider:info'))['claude-code']))
+    await keep('Provider Setup, Claude Code on')
+    await page.keyboard.press('Escape')
+
+    // An account, signed in through the CLI's own sign-in (the fake signs in to nothing).
+    const account = await inv('connections:add', 'claude-code', 'Sandbox').catch((e) => ({ error: String(e) }))
+    const home = account?.id ? path.join(process.env.LOCALAPPDATA, 'Combwork', 'accounts', account.id) : null
+    if (account?.id) await inv('connections:signIn', account.id).catch((e) => { res.facts.signInError = String(e) })
+    const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')), 30_000))
+    res.facts.account = { id: account?.id, error: account?.error, home }
+    check('9.account', 'A Claude Code account added and signed in', signedIn, JSON.stringify(res.facts.account))
+
+    // A workspace with a git project, as a user makes one: a folder, git init, then Open Workspace.
+    const ws = path.join(process.env.USERPROFILE, 'Workspaces', 'Clean')
+    const proj = path.join(ws, 'demo')
+    res.facts.workspace = ws
+    fs.mkdirSync(proj, { recursive: true })
+    fs.writeFileSync(path.join(proj, 'README.md'), '# demo\n')
+    try { res.facts.gitInit = execFileSync(path.join(gitCmd, 'git.exe'), ['init'], { cwd: proj, encoding: 'utf8', env, timeout: 60_000 }).trim() } catch (e) { res.facts.gitInit = String(e.message) }
+    check('9.git-project', 'The project is a git repository (git init)', fs.existsSync(path.join(proj, '.git', 'HEAD')), res.facts.gitInit)
+    await inv('workspace:open', ws)
+    const status = await workspaceSetUp(() => api('/v1/status'), ws)
+    check('9.workspace', 'The workspace opens and is set up', !!status && fs.existsSync(path.join(ws, '.combwork')), 'not set up within 60 s')
+    await keep('workspace')
+    for (const view of VIEWS) {
+      try {
+        await page.getByRole('button', { name: view.name, exact: true }).first().click({ timeout: 5000 })
+        await viewReady(view, (sel) => page.locator(sel).count())
+        await keep(`view: ${view.name}`)
+      } catch (e) {
+        res.facts[`view ${view.name}`] = String(e.message).slice(0, 300)
+      }
+    }
+
+    // An agent, started briefly: its first task is `set`, which the fake runs in the session's shell (fake-shell.jsonl).
+    const agent = await inv('agents:add', proj, { provider: 'claude-code' }).catch((e) => ({ error: String(e) }))
+    res.facts.agent = { id: agent?.id, error: agent?.error }
+    const key = `session:${proj.toLowerCase()}#${agent?.id}`
+    let started = false
+    if (agent?.id) started = await inv('session:start', proj, { agentId: agent.id, prompt: 'shell: set' }).then(() => true, (e) => { res.facts.startError = String(e); return false })
+    let trusted = false
+    const shellLog = home && path.join(home, 'fake-shell.jsonl')
+    const setRun = () => { try { return fs.readFileSync(shellLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).find((r) => r.cmd === 'set') } catch { return null } }
+    // Its folder is new to it: it asks whether to trust it, and the user says yes (Enter).
+    const ran = started && (await until(async () => {
+      if (!trusted && /trust this folder/i.test(await inv('pty:buffer', key).catch(() => ''))) { trusted = true; await inv('pty:write', key, '\r') }
+      return setRun()
+    }, 60_000))
+    check('9.agent-started', 'An agent starts in the project (the fake Claude Code)', started && !!(await inv('pty:buffer', key).catch(() => '')), JSON.stringify(res.facts.agent) + (res.facts.startError || ''))
+    if (ran) fs.writeFileSync(path.join(OUT, `${prefix}-agent-env.txt`), ran.stdout)
+    check('9.agent-env', "The agent's environment captured (`set` in its session)", !!ran && /^PATH=/im.test(ran.stdout), ran ? ran.stdout.slice(0, 300) : 'set never ran')
+    await keep('agent')
+    await shot('agent')
+    if (started) await inv('session:stop', proj, agent.id).catch((e) => { res.facts.stopError = String(e) })
+
+    // A card, and the board showing it.
+    const card = await inv('tasks:create', { title: 'A first card', project: 'demo', description: 'Made on a clean install.' }).catch((e) => ({ error: String(e) }))
+    await page.getByRole('button', { name: 'Task Board', exact: true }).first().click({ timeout: 5000 }).catch(() => {})
+    const shown = await until(async () => (await page.locator('.board-view', { hasText: 'A first card' }).count()) > 0, 20_000)
+    check('9.card', 'A card made, on the board', typeof card?.number === 'number' && shown, JSON.stringify(card))
+    await keep('board')
+    await shot('board')
+
+    // Settings, every section.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+,')
+    const rows = page.locator('.settings-nav .row[data-section]')
+    const opened = await until(async () => (await rows.count()) > 0, 10_000)
+    const sections = opened ? await rows.evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) : []
+    res.facts.settingsSections = sections
+    let seen = 0
+    for (const s of sections) {
+      try {
+        await page.locator(`.settings-nav .row[data-section="${s}"]`).click({ timeout: 5000 })
+        await painted()
+        await keep(`Settings: ${s}`)
+        if (!seen) await shot('settings')
+        seen++
+      } catch (e) {
+        res.facts[`settings ${s}`] = String(e.message).slice(0, 300)
+      }
+    }
+    check('9.settings', `Settings opens, each section shown (${seen} of ${sections.length})`, sections.length > 0 && seen === sections.length, JSON.stringify(sections))
+    await page.keyboard.press('Escape')
+
+    // Help → Copy Diagnostics, its Copy, and what it put on the clipboard.
+    await app.evaluate(({ clipboard }) => clipboard.clear())
+    const diagOpen = await paletteCommand('help.diagnostics', 'Copy Diagnostics')
+    const copy = page.locator('.dialog', { hasText: 'Copy Diagnostics' }).locator('button.btn.primary')
+    const ready = diagOpen && (await until(async () => (await copy.count()) === 1 && (await copy.isEnabled()), 30_000))
+    await keep('Copy Diagnostics')
+    if (ready) await copy.click()
+    const diag = ready && (await until(async () => (await app.evaluate(({ clipboard }) => clipboard.readText())) || false, 10_000))
+    if (diag) fs.writeFileSync(path.join(OUT, `${prefix}-diagnostics.txt`), diag)
+    check('9.diagnostics', 'Copy Diagnostics copies its text', !!diag, diagOpen ? 'nothing copied' : 'the palette found no Copy Diagnostics')
+
+    // Export Board to JSON, into a folder of Documents (Windows' folder picker answered with it).
+    const exportDir = path.join(process.env.USERPROFILE, 'Documents', 'Board export')
+    fs.mkdirSync(exportDir, { recursive: true })
+    res.facts.exportDir = exportDir
+    await app.evaluate(({ dialog }, dir) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] }) }, exportDir)
+    const exportRan = await paletteCommand('task.exportBoard', 'Export Board')
+    const exported = exportRan && (await until(async () => fs.readdirSync(exportDir).some((d) => fs.statSync(path.join(exportDir, d)).isDirectory() && fs.readdirSync(path.join(exportDir, d)).length > 0), 20_000))
+    check('9.export', 'Export Board to JSON writes the board', !!exported, exportRan ? JSON.stringify(fs.readdirSync(exportDir)) : 'the palette found no Export Board')
+    await keep('after the export')
+
+    // Quit, as a user does (the app's own quit), and wait for it to end.
+    const proc = app.process()
+    await app.evaluate(({ app: a }) => a.quit()).catch(() => {})
+    const quit = await until(async () => proc.exitCode !== null, 60_000)
+    check('9.quit', 'Combwork quits', quit, `still running (pid ${proc.pid})`)
+    if (quit) app = null
   },
 
   async 'after-upgrade'() {

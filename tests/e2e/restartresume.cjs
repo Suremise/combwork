@@ -178,7 +178,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', reviewer: 'Reviewer', name: 'restart lane', cards: [laneCard] })
     check('a lane runs, Builder and Reviewer its agents', lane.status === 200, JSON.stringify(lane))
     await say(agents.Worker, 'holduntil go-worker')
-    await say(agents.Watcher, `hive cw_wait_for_tasks {"cards":[${watched}],"wake":true,"limitMinutes":60}`)
+    await say(agents.Watcher, `cw cw_wait_for_tasks {"cards":[${watched}],"wake":true,"limitMinutes":60}`)
     check('Worker works and Watcher watches its card', !!(await lib.until(async () => (await c.live(agents.Worker.id))?.status === 'working' && (await c.live(agents.Watcher.id))?.status === 'watching', HUNG_MS, 300)))
     // A second workspace in a window of its own, its agent working too.
     const nextWindow = c.app.waitForEvent('window')

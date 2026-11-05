@@ -1,8 +1,8 @@
 // The run context (runContext.cjs, #203): nothing from the environment a test is started from reaches what it starts,
-// but the allowlist. With the variables an agent's shell or an outer hive-progress sets put into this suite's own
+// but the allowlist. With the variables an agent's shell or an outer cw-progress sets put into this suite's own
 // environment (NO_COLOR, CW_PROGRESS_WRAPPED, an Agent API token…), checked: under the runner, the suite itself got
 // nothing else; a test Combwork's main process (whose environment its agents' shells get), a child that is part of Combwork,
-// and the hive-progress wrapper (#202: it reports, not taking itself for nested) see none of them; a test Combwork's git
+// and the cw-progress wrapper (#202: it reports, not taking itself for nested) see none of them; a test Combwork's git
 // reads the suite's global config, with the test identity (#1466); and a test Combwork
 // started with any environment but lib.hiveEnv's is refused.
 const lib = require('./lib.cjs')
@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
 }
 const upper = (keys) => keys.filter((k) => !k.startsWith('=')).map((k) => k.toUpperCase())
 
-/** What an agent's shell in Combwork, an outer hive-progress, or a person's own shell may have set. */
+/** What an agent's shell in Combwork, an outer cw-progress, or a person's own shell may have set. */
 const LEAKS = {
   NO_COLOR: '1',
   FORCE_COLOR: '1',
@@ -109,7 +109,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
   })
   check("a child gets none of the suite's environment, and what it is given", !leaked(child).length && child.CW_API_URL === 'http://127.0.0.1:1', leaked(child).join(', '))
 
-  // #202: the hive-progress wrapper, started by a suite while the suite runs inside an outer hive-progress
+  // #202: the cw-progress wrapper, started by a suite while the suite runs inside an outer cw-progress
   // (CW_PROGRESS_WRAPPED above), reports its run rather than taking itself for nested.
   const calls = []
   const srv = http.createServer((req, res) => {
@@ -123,13 +123,13 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
   await new Promise((r) => srv.listen(0, '127.0.0.1', r))
   const wrapped = await new Promise((resolve) => {
     const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', CW_PROGRESS_DATA: data, CW_API_URL: `http://127.0.0.1:${srv.address().port}`, CW_API_TOKEN_FILE: lib.tokenFile('agent-token') })
-    const p = spawn(lib.ELECTRON, [path.join(lib.ROOT, 'out', 'main', 'cw-progress.js'), '--', 'node', '-e', "console.log('##hive-progress step=1 total=1 name=one')"], { env, cwd: lib.WORK })
+    const p = spawn(lib.ELECTRON, [path.join(lib.ROOT, 'out', 'main', 'cw-progress.js'), '--', 'node', '-e', "console.log('##cw-progress step=1 total=1 name=one')"], { env, cwd: lib.WORK })
     let out = ''
     p.stdout.on('data', (d) => (out += d))
     p.on('close', (code) => resolve({ code, out: out.replace(/\r/g, '') }))
   })
   srv.close()
-  check("hive-progress started inside an outer one's environment reports its run (#202)", wrapped.code === 0 && calls.includes('POST /v1/progress') && !wrapped.out.includes('##hive-progress'), JSON.stringify({ ...wrapped, calls }))
+  check("cw-progress started inside an outer one's environment reports its run (#202)", wrapped.code === 0 && calls.includes('POST /v1/progress') && !wrapped.out.includes('##cw-progress'), JSON.stringify({ ...wrapped, calls }))
 
   console.log(failed ? `${failed} failed` : 'all passed')
   process.exit(failed ? 1 : 0)

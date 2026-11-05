@@ -7,7 +7,7 @@
 // - G9's `mergeInstall: always`: the queue installs from scratch before every entry's checks, also in its warm worktree
 //   with no manifest changed (`onManifestChange` is p5scenarios' S13);
 // - None (a project folder with no version control, `nada`): N3 a check before review refuses submit until it is counted
-//   (run through Progress for the card, as hive-progress --check does); N4 a change under node_modules isn't part of the
+//   (run through Progress for the card, as cw-progress --check does); N4 a change under node_modules isn't part of the
 //   work (not unclaimed, and written while the check runs, the check still counts), nor can a card declare it (#1511); N2 the builder can't review its own card; N6 a card blocked by one not yet accepted can't start, and
 //   starts once it is.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -169,7 +169,7 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
     check("…the card's paths as declared before", kept.status === 200 && kept.body?.data?.revision === decl.body?.data?.revision, JSON.stringify(kept.body))
     const early = await q.intent(h, nb, nc, 'submit', { summary: 'notes: ready' })
     check('N3: submit refused until the check before review is counted', early.status === 409 && early.body?.rule === 'submit.checksPassed' && JSON.stringify(early.body).includes('quick'), JSON.stringify(early.body))
-    // The check through Progress for the card, as hive-progress --check reports it: resolved (the folder as it starts),
+    // The check through Progress for the card, as cw-progress --check reports it: resolved (the folder as it starts),
     // started, passed. As it runs, it writes a cache under node_modules (N4: not a deliverable, so the run still counts).
     /** A run of the quick check for the card, `during` written as it runs; its CheckRan once recorded. */
     const quickRun = async (during) => {

@@ -82,7 +82,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:start', alpha, { agentId: agent.id })
   check('the agent starts', !!(await until(() => idle(agent.id), HUNG_MS)))
   const watch = async () => {
-    await say(agent.id, `hive cw_wait_for_tasks {"cards":[${card}],"changes":["comment"],"wake":true}`)
+    await say(agent.id, `cw cw_wait_for_tasks {"cards":[${card}],"changes":["comment"],"wake":true}`)
     return until(async () => (await live(agent.id))?.status === 'watching', HUNG_MS)
   }
 

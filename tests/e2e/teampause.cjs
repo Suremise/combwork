@@ -2,7 +2,7 @@
 // - window A's alpha: Builder runs a lane (two cards) and watches its first card. Pause the Team: the lane shows it is
 //   paused for the team, Builder is told once to park, Start Lane is refused, and a comment on its card wakes it with
 //   nothing (its watch's wake held) until the team resumes, when the wake is typed once;
-// - Builder's run (hive-progress, held open) keeps the team unparked, named; once it ends, All parked; Install Now with no
+// - Builder's run (cw-progress, held open) keeps the team unparked, named; once it ends, All parked; Install Now with no
 //   update ready installs nothing;
 // - window B's workspace is paused by the user's pause too; its Assistant's token reads its own team only, with A as one
 //   line, and its pause or resume never touches A; a project agent and a script are refused;
@@ -90,11 +90,11 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     check('Builder starts', !!(await until(() => idle(alpha, builder.id), HUNG_MS)))
     const c1 = (await inv('tasks:create', { title: 'Greeting says Hi', project: 'alpha', agent: builder.id, column: 'doing' })).number
     const c2 = (await inv('tasks:create', { title: 'Greeting trims', project: 'alpha', agent: builder.id })).number
-    await say(alpha, builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', name: 'greetings' })}`)
+    await say(alpha, builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', name: 'greetings' })}`)
     const lane = async () => (await inv('lanes:list')).find((l) => l.builder.id === builder.id && l.state !== 'ended')
     check("Builder's lane runs", !!(await until(async () => (await lane())?.state === 'active', HUNG_MS)), JSON.stringify(await lane()))
     await until(() => idle(alpha, builder.id), HUNG_MS)
-    await say(alpha, builder.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1], changes: ['comment'], wake: true, limitMinutes: 60 })}`)
+    await say(alpha, builder.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1], changes: ['comment'], wake: true, limitMinutes: 60 })}`)
     check('Builder watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'watching', HUNG_MS)))
 
     // --- Window B, another workspace (opened before the pause: the user's pause covers it).
@@ -125,7 +125,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
 
     // --- What still runs: Builder's run keeps the team unparked; once it ends, All parked.
     await until(() => idle(alpha, builder.id), HUNG_MS)
-    await say(alpha, builder.id, `shell: hive-progress --title "probe run" -- node "${holder}" "${release}"`)
+    await say(alpha, builder.id, `shell: cw-progress --title "probe run" -- node "${holder}" "${release}"`)
     const named = async () => (await inv('team:state')).workspaces.find((w) => w.workspacePath.toLowerCase() === wsA.toLowerCase())?.items ?? []
     check('the run keeps the team unparked, named', !!(await until(async () => (await named()).some((i) => i.kind === 'run' && i.label === 'probe run'), HUNG_MS)), JSON.stringify(await named()))
     check('…not All parked', (await inv('team:state')).allParked === false)

@@ -24,7 +24,7 @@ function hiveServer(env) {
     const p = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ ...env, ELECTRON_RUN_AS_NODE: '1' }) })
     let buf = ''
     const got = {}
-    const timer = setTimeout(() => (p.kill(), reject(new Error('hive-mcp did not answer'))), 15000)
+    const timer = setTimeout(() => (p.kill(), reject(new Error('cw-mcp did not answer'))), 15000)
     p.stdout.on('data', (d) => {
       buf += d
       for (let i; (i = buf.indexOf('\n')) >= 0; ) {

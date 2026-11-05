@@ -117,7 +117,7 @@ const lines = (file) => {
     const wakesBefore = lines(wakes).length
     const before = (await submits()).length
     const args = { card: key, summary: 'The change E1 asked for: a is 3.', followUp: true }
-    const sent = await lib.sendPrompt(inv, lib.ptyKey(alpha, b1.id), `hive cw_submit ${JSON.stringify(args)}`, { submitted: async () => (await submits()).length > before })
+    const sent = await lib.sendPrompt(inv, lib.ptyKey(alpha, b1.id), `cw cw_submit ${JSON.stringify(args)}`, { submitted: async () => (await submits()).length > before })
     const reply = sent ? await until(async () => (await submits())[before], HUNG_MS) : null
     check('B1 submits the follow-up with cw_submit followUp', !!reply && !/refused|error/i.test(reply), String(reply))
     const now = await card(n)

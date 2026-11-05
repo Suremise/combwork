@@ -72,7 +72,7 @@ describe('why a lane waits (laneStatus)', () => {
     expect(laneStatus(rec, [lc(1, 'doing', { blocked: 'Why' })], 1, true, null)).toEqual({ reason: 'blocked', card: 1, blocked: 'Why' })
   })
 
-  it('reads in English for the hive tools', () => {
+  it('reads in English for the Combwork tools', () => {
     expect(laneStatusText({ reason: 'notMerged', card: 11 })).toBe('waiting: #11 not merged')
     expect(laneStatusText({ reason: 'listChanges', card: 12 })).toBe('list changes after #12')
   })

@@ -83,7 +83,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:start', home, { agentId: 'assistant' })
   check('both start', !!(await until(async () => (await idle(alpha, builder.id)) && (await idle(home, 'assistant')), HUNG_MS)))
   const watchCard = async () => {
-    await type(home, 'assistant', `hive cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
+    await type(home, 'assistant', `cw cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
     return until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)
   }
 
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), 20000)
 
   // A line Combwork types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.
-  await type(home, 'assistant', `hive cw_prompt_agent {"project":"alpha","agent":"Builder","text":"work 2"} then hive cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
+  await type(home, 'assistant', `cw cw_prompt_agent {"project":"alpha","agent":"Builder","text":"work 2"} then cw cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
   check('the Assistant gives Builder a task, then watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', 15000)) && !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)))
   await until(() => idle(alpha, builder.id), 20000)
   await lib.sleep(2000) // A fixed wait on purpose: this checks that Combwork's own line tells nothing.
@@ -123,7 +123,7 @@ const check = (name, ok, extra = '') => {
   // #1099: the Assistant watches Builder while Builder is idle (answered at once: no watch starts) and ends its turn.
   // The user's reply to Builder still reaches it within seconds, as a wake of its own.
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), HUNG_MS)
-  await type(home, 'assistant', `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Builder' }], wake: true })}`)
+  await type(home, 'assistant', `cw cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Builder' }], wake: true })}`)
   check('an agent watch on idle Builder is answered at once', !!(await until(async () => (await idle(home, 'assistant')) && (await live(home, 'assistant'))?.status !== 'watching', HUNG_MS)))
   const before = wakes().length
   const t0 = Date.now()

@@ -1,6 +1,6 @@
 // The brief a lane started from the window gives its agents (#1280, SPEC §16.11.3): the cards in order, where the
 // builder works, the reviewer, what the project's options require, how to move cards and report, and the user's note;
-// every hive tool it names is one the hive MCP server has.
+// every Combwork tool it names is one the Combwork MCP server has.
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
@@ -71,7 +71,7 @@ describe("a lane's brief (#1280)", () => {
     expect(laneRules({ ...o, review: 'you', finish: 'accept', preChecks: [], okBefore: { mode: 'labels', labels: [] } })).toEqual(['The user reviews each card before it is merged.', 'An approved card is accepted where it is (no merge).'])
   })
 
-  it('every hive tool it names is one the hive MCP server has', () => {
+  it('every Combwork tool it names is one the Combwork MCP server has', () => {
     const server = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
     const text = ['builder', 'reviewer'].map((r) => laneBrief(input(), r as 'builder' | 'reviewer')).join('\n') + laneRules(null).join('\n')
     const named = [...new Set(text.match(/cw_[a-z_]+/g))]

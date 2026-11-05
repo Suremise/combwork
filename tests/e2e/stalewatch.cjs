@@ -94,11 +94,11 @@ const transcripts = () => {
     const first = await inv('lanes:start', alpha, { builder: b1.id, reviewer: null, pool: true, cards: [c1.n], name: 'First' })
     check('the first lane is lent slot-a', first.slot === 'slot-a', JSON.stringify(first))
     check(`B1 is given ${c1.key} in slot-a, and is idle`, !!(await until(async () => transcripts().includes(`Work on task ${c1.key}`) && (await idleIn(slotA)), HUNG_MS)), JSON.stringify(await live(b1.id)))
-    await say(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1.key], changes: ['column'], wake: true })}`)
+    await say(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1.key], changes: ['column'], wake: true })}`)
     check('B1 watches its card', !!(await until(async () => (await live(b1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(b1.id)))
     // Told the lane is finished (that wake ends its watch), B1 watches its card again, as HB3 did: that watch is the one
     // its next conversation would inherit.
-    fs.writeFileSync(path.join(home, 'fake-wakes-B1.txt'), `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1.key], changes: ['column'], wake: true })}\n`)
+    fs.writeFileSync(path.join(home, 'fake-wakes-B1.txt'), `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1.key], changes: ['column'], wake: true })}\n`)
     const ending = Math.max(0, log().length - 1)
     await inv('lanes:end', first.lane.id)
     check('…told the lane ended, B1 watches its card again', !!(await until(() => log().slice(ending).filter((l) => l.includes(' watches #')).length >= 1, HUNG_MS)), log().slice(ending).filter((l) => l.includes('[watches]')).join('\n'))
@@ -122,10 +122,10 @@ const transcripts = () => {
     const clash = cards.find((c) => cards.some((o) => o.key === `${c.key.split('-')[0]}-${c.n}`))
     check('a number of alpha reads as another of its keys', !!clash, JSON.stringify(cards))
     const other = `${clash.key.split('-')[0]}-${clash.n}`
-    await say(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [clash.n], wake: true })}`)
+    await say(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [clash.n], wake: true })}`)
     check(`watching ${clash.n} is refused, naming ${clash.key} and ${other}`, !!(await until(() => transcripts().includes(`${clash.n} is ${clash.key}'s number (#${clash.n}), not ${other}, which is another card. Name cards by key`), HUNG_MS)))
     check('…and nothing is watched', !(await live(b1.id))?.watch, JSON.stringify(await live(b1.id)))
-    await say(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [cards[4].key], wake: true })}`)
+    await say(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [cards[4].key], wake: true })}`)
     check(`a watch on ${cards[4].key}, in Done, answers at once`, !!(await until(() => transcripts().includes(`${cards[4].key} is in Done`), HUNG_MS)), transcripts().split('\n').filter((l) => l.includes(cards[4].key)).slice(-3).join('\n'))
     check('…and nothing is watched', !(await live(b1.id))?.watch, JSON.stringify(await live(b1.id)))
   } catch (err) {

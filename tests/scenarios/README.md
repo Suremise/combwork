@@ -4,7 +4,7 @@ Combwork tells agents little up front (its session contract) and leaves its work
 (#102). These scenarios check that this works. Given what a user would say, does the agent or the Assistant:
 
 - read the right skill;
-- make the right hive tool calls;
+- make the right Combwork tool calls;
 - leave the board, notes and files as they should be?
 
 They check what happened, never the wording of a reply.
@@ -14,7 +14,7 @@ or edited skill. It starts the project's agent **Coder** or the **Combwork Assis
 scenario's prompt, waits for its turn to end (and for any agent the Assistant started), and reads only evidence of what
 ran:
 
-- **Combwork tool calls** come from the hive MCP server itself. In development builds it logs each call it ran, with
+- **Combwork tool calls** come from the Combwork MCP server itself. In development builds it logs each call it ran, with
   whether it worked, to the file named by `CW_TEST_MCP_LOG`. Tool names in a transcript, or in a Codex script that
   may never have run, are kept apart as *mentions* and are never counted as calls.
 - **Codex's calls in code mode** (HI-2235, HI-2246): Codex runs its tools from a script (its `exec` tool), which Combwork's
@@ -22,7 +22,7 @@ ran:
   file changes, images viewed) with its arguments and result, and Combwork's parser gives each script those calls (`calls`,
   HI-2240), in the script it started in. The harness reads them from the transcript (a script with a call cut short for
   display read whole, `transcript:tool`) and puts them in the script's place, named as Combwork names the same call made
-  directly (`hive · <tool>`, `Shell`, `Edit`, `view_image`): the checks read what Codex called and got back, as for the
+  directly (`combwork · <tool>`, `Shell`, `Edit`, `view_image`): the checks read what Codex called and got back, as for the
   other CLIs, and a call written in a script that never ran isn't one (`codexScripts.cjs`). A script whose calls aren't
   known (its Codex records none: no `calls`) is no evidence
   of any: neither its code nor what it printed counts, and the run notes it as unobservable (`NOTE unobservable`,
@@ -187,18 +187,18 @@ that start an agent for the fixture (a builder working, an agent idle) fail the 
 environment problem when the screen shows one) when it doesn't get there, rather than run on a fixture it didn't get.
 So does a setup's move of a card as the user moves it (`userMove`): its reply is checked, and the card must be seen in
 the column (in Review, with a new submission) before the scenario goes on (#1583). So does the scenario's own prompt
-never taken (HI-1168): typed as Combwork types (`lib.sendPrompt`, on real Claude Code once its hive tools connected) and
+never taken (HI-1168): typed as Combwork types (`lib.sendPrompt`, on real Claude Code once its Combwork tools connected) and
 not taken nor refused for the environment, the trial is `setup: the prompt was never taken`, with no checks (incomplete
 in the benchmark), never every check failed as the model's. Setups change the project's workflow
 options through Combwork (`workflow:setOptions`, under the project's lock), never by writing `project.json` beside it (a
 write that lost the agents just added, #1588), and make an agent's watch with its own token (`POST /v1/tasks/wait`), as
-its hive tool does, so a model trial gets the same fixture as a fake (#1545).
+its Combwork tool does, so a model trial gets the same fixture as a fake (#1545).
 
 - **The fakes** (`fake`, the default, `fake-codex` and `fake-copilot`) act each scenario out with their scripted commands (`skill NAME`, `boardmove`,
   `boardreview`, `boardcomment`). It checks the harness itself and the board rules Combwork enforces, at no cost. Checks
   only a model's own work can meet are skipped there (listed as SKIP). `fake-copilot` is the real Copilot CLI, offline,
   in a home of the run's own: a scripted stand-in model (`tests/e2e/fake-copilot-api.cjs`) turns the same commands into
-  Copilot's own tool calls (its skill tool, the hive MCP server's tools), so its hooks, skills and transcript are
+  Copilot's own tool calls (its skill tool, the Combwork MCP server's tools), so its hooks, skills and transcript are
   Copilot's. It needs the Copilot CLI installed (the run is skipped without it) and no sign-in.
 - **Model trials** cost tokens, and run only in the providers' **test homes**: never the user's own `~/.claude` or
   `~/.codex`, and never a copy of their credentials (refreshing a copy could sign the user out).
@@ -247,7 +247,7 @@ its hive tool does, so a model trial gets the same fixture as a fake (#1545).
   `--repeat`, is a heavy run: it waits for one of the machine's test slots, as heavy e2e runs do, saying who holds them
   (`--no-wait` fails at once instead; tests/e2e/README.md, "Heavy runs queue").
 - **Results** go to `%LOCALAPPDATA%\hive-test\scenarios\results\<time>-<provider>`: `results.json` (each scenario's
-  checks, skills read, executed hive calls and mentions, the final reply whole up to 6,000 characters, so a check that
+  checks, skills read, executed Combwork calls and mentions, the final reply whole up to 6,000 characters, so a check that
   judged it can be audited (HI-2230; `finalReplyLength` when longer), versions, guidance and source, usage) and `summary.md` (a
   table). `results.json` is written as each trial ends (`meta.incomplete` says how many of how many until the run
   has ended), so a run cut short keeps what it had. A run holds its folder while it runs (`runner.json`, its process):
@@ -267,8 +267,8 @@ Each run also writes `benchmark.json` (schema `hive-benchmark/1`, `benchmark.cjs
 it passed its checks and what Combwork's own parts cost in it. Combwork's performance metrics are read before the launch and after
 the turn (`GET /v1/metrics` of the run's own workspace), and the difference is the scenario's:
 - **Context Combwork gave the session**: launch guidance in parts (core, project, the Assistant's role and mode, the skills' catalog), the
-  hive tools' list, and every tool reply (characters and UTF-8 bytes, exact; never tokens).
-- **Work**: tool calls (detail ones too), calls the hive server ran, repeated identical calls, failures, Agent API
+  Combwork tools' list, and every tool reply (characters and UTF-8 bytes, exact; never tokens).
+- **Work**: tool calls (detail ones too), calls the Combwork MCP server ran, repeated identical calls, failures, Agent API
   requests and bytes (the harness's own reads are left out), time.
 - **Skills**: delivered skills' bytes (what was available, not what a model read), skills not delivered, and the skill
   service's scans, misses and bytes read.
@@ -278,10 +278,10 @@ the turn (`GET /v1/metrics` of the run's own workspace), and the difference is t
 **The subject apart from the other agents** (HI-2186): a scenario's measures are every agent's in its workspace together
 (the session under test, a lane's builder and reviewer, agents it or Combwork started), and each sample also has them for
 the subject (`measures.subject`: the Assistant, or the agent the scenario tests) and the others (`measures.others`), each
-measured on its own, and each agent's hive calls in the measured window (`measures.agents`, by its fixture name):
+measured on its own, and each agent's Combwork calls in the measured window (`measures.agents`, by its fixture name):
 - The Assistant as subject: Combwork's metrics by caller role (the Assistant's, project agents'), every measure, only when
   the coverage is whole (else `split: 'partial'` and neither part).
-- An agent as subject: its tool calls, replies and tool lists from the hive servers' test log (`CW_TEST_MCP_LOG`: each
+- An agent as subject: its tool calls, replies and tool lists from the Combwork MCP servers' test log (`CW_TEST_MCP_LOG`: each
   call with its reply's size, and a `kind: 'list'` line per server's tool list); its API and launch measures are unknown
   (Combwork's metrics don't say which agent a request or launch was).
 - Which calls the window holds is told call by call, not by counting: each call and list line has an id, and the
@@ -291,7 +291,7 @@ measured on its own, and each agent's hive calls in the measured window (`measur
   no report on record, or a log without ids (before HI-2186) leaves the log's parts and rows out (`split: 'partial'`);
   so does a window whose counts still differ from the metrics' (Combwork's own start-view record left out).
 
-**The fakes count per hive call.** The fake Claude Code and fake Codex (not fake-copilot: the real Copilot CLI) start a hive MCP server for every hive call (and
+**The fakes count per Combwork call.** The fake Claude Code and fake Codex (not fake-copilot: the real Copilot CLI) start a Combwork MCP server for every Combwork call (and
 each lists the tools), where a real CLI starts one a session: with them, tool-list starts and API requests count calls,
 not sessions. HI-2181 read a lane scenario's doubled tool-list starts as twice the fetches per session; it was the lane's
 agents making more calls.
@@ -317,7 +317,7 @@ guidance than the run started with) and incomplete samples are left out, and sai
 spread to judge a change by: use `--repeat N` for model trials.
 
 - **Fakes** prove routing, delivery, sizes and failure handling: deterministic, free. Their board steps and
-  `hive TOOL {json}` go through the real hive MCP server (`tests/e2e/fake-bridge.cjs`), except the fake Claude Code's
+  `cw TOOL {json}` go through the real Combwork MCP server (`tests/e2e/fake-bridge.cjs`), except the fake Claude Code's
   board moves, which call the Agent API directly (its e2e suites read their answers). So the fake Codex's runs measure
   tool replies for board work and the fake Claude Code's don't. Compare like with like.
 - **Model trials** are opt-in, cost tokens, and only report (models vary). They record the model, effort, mode, CLI
