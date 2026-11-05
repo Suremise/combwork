@@ -31,8 +31,9 @@ const claudeHome = path.join(lib.WORK, 'boardupgrade-claude')
 const alpha = path.join(ws, 'alpha')
 // The board's folder: the 0.9 Hive's .hive until the dev build moves it to .combwork (HI-2462), the dev build's after
 // (a .hive a 0.9 Hive makes again beside it is that Hive's own, HI-2506).
-const tree = () => path.join(ws, fs.existsSync(path.join(ws, '.combwork', 'hive.db')) ? '.combwork' : '.hive')
-const dbFileNow = () => path.join(tree(), 'hive.db')
+const tree = () => path.join(ws, fs.existsSync(path.join(ws, '.combwork', 'combwork.db')) ? '.combwork' : '.hive')
+// The board's file: combwork.db once moved (HI-2587, with .hive's move), hive.db in 0.9's .hive.
+const dbFileNow = () => path.join(tree(), tree().endsWith('.combwork') ? 'combwork.db' : 'hive.db')
 const backupsNow = () => path.join(tree(), 'backups')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -222,7 +223,7 @@ async function themes(dev, name) {
     // 3. The 0.9 Hive closed: the folders move, and the dev build asks before upgrading.
     await close(old1)
     await lib.openWorkspace(dev.inv, dev.page, ws)
-    check('with 0.9 closed, the folders moved to .combwork', fs.existsSync(path.join(ws, '.combwork', 'hive.db')) && !fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(alpha, '.combwork', 'project.json')) && !fs.existsSync(path.join(alpha, '.hive')))
+    check('with 0.9 closed, the folders moved to .combwork', fs.existsSync(path.join(ws, '.combwork', 'combwork.db')) && !fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(alpha, '.combwork', 'project.json')) && !fs.existsSync(path.join(alpha, '.hive')))
     const ask = dialogWith(dev.page, ASK)
     check('the dev build asks before upgrading', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)))
     check('…saying why, that a 0.9 Combwork can then no longer open it, and that a backup is kept', /Combwork 1\.0 needs to upgrade this workspace's data\. A 0\.9 Combwork can then no longer open it; a backup of the board is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
@@ -291,7 +292,7 @@ async function themes(dev, name) {
     const read09 = old2.openError ?? (await failure(old2.inv('tasks:list')))
     const made09 = old2.openError ?? (await failure(old2.inv('tasks:create', { title: 'From 0.9 after', project: 'alpha' })))
     record('0.9 after the upgrade', old2.openError ? `opening the workspace failed: ${old2.openError}` : `the workspace opened on a fresh .hive; its board: ${read09 ?? 'read'}; a change: ${made09 ?? 'accepted'}`)
-    check('0.9 opened afterwards starts a .hive of its own beside .combwork', fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(ws, '.combwork', 'hive.db')))
+    check('0.9 opened afterwards starts a .hive of its own beside .combwork', fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(ws, '.combwork', 'combwork.db')))
     check("…which hasn't the moved board's cards", old2.openError !== null || !(await old2.inv('tasks:list')).some((c) => c.title === 'Made in 1.0'))
     check('…and nothing it does reaches the moved board', fileVersion() > 2 && !(await dev.inv('tasks:list')).some((c) => c.title === 'From 0.9 after') && (await dev.inv('tasks:list')).some((c) => c.title === 'Made in 1.0'))
     await screenshot(old2.page, '4-old-after.png')
