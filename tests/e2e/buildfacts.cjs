@@ -57,7 +57,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
 
     succeeded()
     const said = fakeBuild(api)
-    check('a successful build is recorded through the Agent API', said === "Build recorded in Hive's journal (baseline).", said)
+    check('a successful build is recorded through the Agent API', said === "Build recorded in Combwork's journal (baseline).", said)
     const rows = await lib.until(async () => ((await builds(inv)).length === 1 ? builds(inv) : null), HUNG_MS)
     check('the journal has it as a fact by Combwork', !!rows && rows[0].summary === `Built Hive 9.9.9-rc.1 (baseline) from ${head().slice(0, 8)} on main` && rows[0].source === 'hive', JSON.stringify(rows))
     check('…with no marker left', !fs.existsSync(markers) || fs.readdirSync(markers).length === 0)
@@ -75,7 +75,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     // Settings → Advanced → Record builds in the journal off: Hive answers it wrote nothing; no marker either.
     await inv('advanced:set', 'cw.journal.builds', false)
     const off = fakeBuild(api)
-    check('with the switch off, Combwork says it wrote nothing', /^Build not recorded in Hive's journal: Settings → Advanced → Record builds in the journal is off\.$/.test(off), off)
+    check('with the switch off, Combwork says it wrote nothing', /^Build not recorded in Combwork's journal: Settings → Advanced → Record builds in the journal is off\.$/.test(off), off)
     check('…and nothing was written or left', (await builds(inv)).length === 1 && (!fs.existsSync(markers) || fs.readdirSync(markers).length === 0))
     await inv('advanced:set', 'cw.journal.builds', null)
 
@@ -85,7 +85,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     // Another build (its own time: the same build sent twice is recorded once).
     succeeded()
     const left = fakeBuild(null)
-    check('with Combwork closed, the build is left for it', left.startsWith("Build left for Hive's journal (baseline)"), left)
+    check('with Combwork closed, the build is left for it', left.startsWith("Build left for Combwork's journal (baseline)"), left)
     check('…as one marker in the workspace', fs.existsSync(markers) && fs.readdirSync(markers).filter((n) => n.endsWith('.json')).length === 1)
     // Opened in German this time: the journal stores the line in English, and the window shows it in the user's language.
     ;({ app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_LANG: 'de' }, viewport: { width: 1400, height: 900 } }))
