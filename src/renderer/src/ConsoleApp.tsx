@@ -148,7 +148,7 @@ export function ConsoleApp() {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const onScheme = (): void => applyTheme(settings)
     mq.addEventListener('change', onScheme)
-    const off = window.hive.onEvent((e: HiveEvent) => {
+    const off = window.combwork.onEvent((e: HiveEvent) => {
       if (e.type === 'settings-changed') {
         settings = e.settings
         applyTheme(e.settings)

@@ -34,7 +34,7 @@ function hideGit(): void {
     .join(delimiter)
 }
 
-/** A repository on main with one worktree, `hive/wt`, merged and clean (removable while git runs). */
+/** A repository on main with one worktree, `cw/wt`, merged and clean (removable while git runs). */
 async function project(): Promise<{ p: string; wt: { path: string; branch: string; base: string } }> {
   root = tempDir('hive-gittool-')
   const p = join(root, 'project')
@@ -43,7 +43,7 @@ async function project(): Promise<{ p: string; wt: { path: string; branch: strin
   writeFileSync(join(p, 'a.txt'), 'a\n')
   run(p, 'add', '-A')
   run(p, 'commit', '-qm', 'base')
-  const wt = { path: join(root, 'wt'), branch: 'hive/wt', base: 'main' }
+  const wt = { path: join(root, 'wt'), branch: 'cw/wt', base: 'main' }
   await createWorktree(p, wt.path, wt.branch, 'main')
   return { p, wt }
 }
@@ -116,7 +116,7 @@ describe('git missing', () => {
     expect((await removeCheckedWorktree(p, wt, check)).deleted).toBe(false)
     expect(existsSync(wt.path)).toBe(true)
     process.env.PATH = PATH
-    expect(run(p, 'branch', '--format=%(refname:short)')).toMatch(/hive\/wt/)
+    expect(run(p, 'branch', '--format=%(refname:short)')).toMatch(/cw\/wt/)
   })
 
   it('.combwork is still excluded by the line Combwork writes, marked unconfirmed', async () => {
@@ -140,14 +140,14 @@ describe('git missing', () => {
 describe('git failing', () => {
   it('a branch git cannot count is not "nothing to merge"', async () => {
     const { p, wt } = await project()
-    await expect(branchStatus(p, { ...wt, branch: 'hive/gone' })).rejects.toThrow(/Git couldn't check hive\/gone/)
+    await expect(branchStatus(p, { ...wt, branch: 'cw/gone' })).rejects.toThrow(/Git couldn't check cw\/gone/)
   })
 
   it('a worktree whose status fails is not clean, and not removable', async () => {
     const { p, wt } = await project()
     // A damaged index: git status fails there.
     writeFileSync(join(p, '.git', 'worktrees', 'wt', 'index'), 'not an index')
-    await expect(branchStatus(p, wt)).rejects.toThrow(/Git couldn't check hive\/wt/)
+    await expect(branchStatus(p, wt)).rejects.toThrow(/Git couldn't check cw\/wt/)
     const c = await worktreeCheck(p, wt)
     expect(c.removable).toBe(false)
     expect(gitProblem()).toBeNull()

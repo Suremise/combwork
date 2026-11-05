@@ -275,7 +275,7 @@ async function appReady(page, ms = 90000) {
     page
       .evaluate(async () => {
         if (!document.querySelector('.app .workbench')) return false
-        const info = await window.hive.invoke('provider:info')
+        const info = await window.combwork.invoke('provider:info')
         return Object.values(info).every((p) => !p.checking)
       })
       .catch(() => false)
@@ -317,7 +317,7 @@ async function launch({ userData, env = {}, viewport = { width: 1400, height: 85
     await app.close().catch(() => undefined)
     throw e
   }
-  const inv = (ch, ...a) => page.evaluate(([c, args]) => window.hive.invoke(c, ...args), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, a])
   return { app, page, inv }
 }
 
@@ -984,18 +984,18 @@ async function sessionProblems() {
     for (const page of app.windows()) {
       const texts = await page
         .evaluate(async () => {
-          const ws = await window.hive.invoke('workspace:get')
+          const ws = await window.combwork.invoke('workspace:get')
           const hosts = ws ? [...ws.projects, ...(ws.assistant ? [ws.assistant] : [])] : []
-          const live = await window.hive.invoke('session:live').catch(() => [])
+          const live = await window.combwork.invoke('session:live').catch(() => [])
           const found = []
           for (const h of hosts) {
             let records = null
             for (const a of h.agents ?? []) {
               const key = `session:${h.path.toLowerCase()}#${a.id}`
               const sessionId = live.find((s) => s.projectPath.toLowerCase() === h.path.toLowerCase() && s.agentId === a.id)?.sessionId
-              if (sessionId) records ??= await window.hive.invoke('session:list', h.path).catch(() => [])
+              if (sessionId) records ??= await window.combwork.invoke('session:list', h.path).catch(() => [])
               const transcript = (sessionId && records?.find((r) => r.id === sessionId)?.transcriptPath) || null
-              found.push([key, `${await window.hive.invoke('pty:buffer', key).catch(() => '')}\n${a.live?.statusMessage ?? ''}`, transcript])
+              found.push([key, `${await window.combwork.invoke('pty:buffer', key).catch(() => '')}\n${a.live?.statusMessage ?? ''}`, transcript])
             }
           }
           return found
@@ -1549,7 +1549,7 @@ function pathWithoutStoreAliases(parent = process.env) {
  * Text agents read with its cards named by number, as before keys (#1219): "AL-1" becomes "#1", so a suite's checks of
  * card numbers stay as they were; each suite checks the keyed form itself (KEYED). Only for a suite whose cards are all
  * one project's, made in order, so a key's digits are its card's number (HI-1661: texts name cards by key alone); a
- * suite where they differ fails its checks, never passes them wrongly. A branch's key (hive/AL/AL-1-…) stays as it is.
+ * suite where they differ fails its checks, never passes them wrongly. A branch's key (cw/AL/AL-1-…) stays as it is.
  */
 const unkey = (text) => (typeof text === 'string' ? text.replace(/(?<![\w/-])[A-Z]{2,4}-(\d+)\b(?!-)/g, '#$1') : text)
 /** A card as the window names it (#1221): its key, else #n (a workspace card, or one the board doesn't have). */
@@ -1639,7 +1639,7 @@ async function haikuAutoCaveat(page, autoOffered, timeoutMs = 10000) {
   // A Combwork account on Claude Code (the view's `connections`: HI-2106 kept the old name); a test copy on its CLI test home
   // has none listed (that home isn't shown in Settings), so one is added for the look, never signed in, and removed after.
   // The warning depends on what the CLI said about its models, not on the account.
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const listed = (await inv('connections:list')).connections.find((a) => a.provider === 'claude-code')
   const account = listed ?? (await inv('connections:add', 'claude-code', 'Auto with Haiku'))
   const form = page.locator('[data-connection-form]')

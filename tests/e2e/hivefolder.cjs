@@ -3,7 +3,7 @@
 // closed, the workspace is put back as 1.0 kept it: each .combwork renamed .hive (the workspace's, the Assistant's home's
 // inside it, the project's), git's exclude line Hive's 1.0 wrote, and a card and a handover naming files by their old
 // .hive paths. Opened again: no .hive is left, the board's cards, the notes and the attachment are there, the paths in
-// the card and the handover point into .combwork, an old link still opens (hive-img, through the map), the exclude line
+// the card and the handover point into .combwork, an old link still opens (combwork-img, through the map), the exclude line
 // follows, and the project keeps its agent. Opened once more: nothing moves again. No agents. Dev build, throwaway
 // profile and workspace.
 const lib = require('./lib.cjs')
@@ -106,12 +106,12 @@ function folders() {
     const tree = JSON.stringify(await inv('notes:tree'))
     check('the shared notes are there', tree.includes('plan.md') && tree.includes('2026-11-01-evidence.md'), tree.slice(0, 300))
     // A link kept elsewhere by its old path (a transcript, the journal) still opens: through the map.
-    // Shown as the window shows an image (hive-img:, which the page's policy allows for images).
+    // Shown as the window shows an image (combwork-img:, which the page's policy allows for images).
     const shown = (p) => page.evaluate((src) => new Promise((res) => {
       const img = new Image()
       img.addEventListener('load', () => res(img.naturalWidth), { once: true })
       img.addEventListener('error', () => res(0), { once: true })
-      img.src = `hive-img://img/${encodeURIComponent(src)}`
+      img.src = `combwork-img://img/${encodeURIComponent(src)}`
     }), p)
     const width = await shown(shot('.hive'))
     check('an old link to the attachment still opens', width === 64, String(width))

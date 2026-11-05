@@ -58,7 +58,7 @@ const check = (name, ok, extra = '') => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
@@ -103,6 +103,14 @@ const check = (name, ok, extra = '') => {
     check('…in the project too', (await inv('tasks:forYou', 'alpha')).count === 1 && (await inv('tasks:forYou', 'beta')).count === 0)
     check('the lane pauses on it', !!(await lib.until(async () => (await lane())?.state === 'paused' && (await lane())?.pausedOn === n, HUNG_MS)), JSON.stringify(await lane()))
     check('the user is told', !!(await lib.until(async () => told().includes('failed 1 review: carry on with more rounds'), HUNG_MS)), told())
+    // HI-2583: the chip's tooltip names the app, Combwork, as who asks its own requests.
+    await showBoard(page)
+    const ownChip = page.locator(`.task-card[data-task="${n}"] .task-for-you`)
+    await lib.until(async () => (await ownChip.count()) === 1, HUNG_MS)
+    const ownTip = await lib.hoverTip(page, ownChip, (t) => t.includes('asks you to decide'), HUNG_MS)
+    check("…the chip's tooltip says Combwork asks", ownTip.includes('Combwork asks you to decide'), ownTip)
+    await page.locator('.tip:visible').last().screenshot({ path: path.join(lib.WORK, 'foryou-own-request-tip.png') }).catch(() => {})
+    await page.mouse.move(5, 5)
 
     // An answer that doesn't fit (an approval) is refused; the user's carry on is taken.
     const refused = await inv('tasks:answer', n, item.request, { outcome: 'approved' }).then(() => null, (e) => String(e.message ?? e))

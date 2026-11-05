@@ -85,7 +85,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('demo', { exact: true }).first().click()
     const live = async (p, id) => (await inv('session:live')).find((l) => l.projectPath.toLowerCase() === p.toLowerCase() && l.agentId === id)

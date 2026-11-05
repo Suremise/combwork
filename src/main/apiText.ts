@@ -464,8 +464,8 @@ export const API = {
     closed: agentMsg({ id: 'api.workspace.closed', text: 'The workspace was closed' }),
     noneOpen: agentMsg({ id: 'api.workspace.noneOpen', text: 'No workspace is open' }),
     projectInSeveral: agentMsg({ id: 'api.workspace.projectInSeveral', text: '"{project}" is a project in several open workspaces: name it as <workspace>/<project>, e.g. {workspace}/{project}' }),
-    sayWhich: agentMsg({ id: 'api.workspace.sayWhich', text: 'Several workspaces are open in Combwork: say which with ?workspace=<name> or the X-Hive-Workspace header' }),
-    severalNamed: agentMsg({ id: 'api.workspace.severalNamed', text: 'Several open workspaces are named "{name}" ({paths}): say which by its full path in the X-Hive-Workspace header or ?workspace=' }),
+    sayWhich: agentMsg({ id: 'api.workspace.sayWhich', text: 'Several workspaces are open in Combwork: say which with ?workspace=<name> or the X-Combwork-Workspace header' }),
+    severalNamed: agentMsg({ id: 'api.workspace.severalNamed', text: 'Several open workspaces are named "{name}" ({paths}): say which by its full path in the X-Combwork-Workspace header or ?workspace=' }),
     unknown: agentMsg({ id: 'api.workspace.unknown', text: 'Unknown workspace "{name}": it isn\'t open in Combwork' }),
     unknownProject: agentMsg({ id: 'api.workspace.unknownProject', text: 'Unknown project "{name}"' })
   }

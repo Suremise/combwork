@@ -40,7 +40,7 @@ function project(p) {
   const page2 = await next
   await page2.waitForLoadState('domcontentloaded')
   await lib.appReady(page2)
-  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv2, page2, wsB)
 
   // The gate: main's opendir under a project's attachments waits while held, and counts each folder read, by project.
@@ -70,7 +70,7 @@ function project(p) {
   /** Asks for a project's storage from a page, without waiting: its answer goes to window.__storage. */
   const ask = (pg, p, request) =>
     pg.evaluate(([x, r]) => {
-      window.__storage = window.hive.invoke('storage:project', x, true, r).then((v) => ({ attachments: v.attachments }), (e) => ({ error: String(e) }))
+      window.__storage = window.combwork.invoke('storage:project', x, true, r).then((v) => ({ attachments: v.attachments }), (e) => ({ error: String(e) }))
     }, [p, request])
 
   // Both windows measure, with the same request id; each walk is held at its first folder.

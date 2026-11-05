@@ -89,7 +89,7 @@ async function started(w: WS, title: string, by: typeof A | typeof B): Promise<{
 function commit(repo: string, files: Record<string, string>, key: string): void {
   for (const [f, c] of Object.entries(files)) writeFileSync(join(repo, f), c)
   git(repo, 'add', '-A')
-  git(repo, 'commit', '-qm', `work on ${key}`, '--trailer', `Hive-Card: ${key}`)
+  git(repo, 'commit', '-qm', `work on ${key}`, '--trailer', `Combwork-Card: ${key}`)
 }
 /** What a session publishes as its locks change (sessions.publishLocks): its files relative to its folder. */
 function locks(repo: string, agentId: string, lockedFiles: string[]): void {
@@ -142,7 +142,7 @@ describe("G16's lock records in the app (#1481)", () => {
     await expect(submit(w, z.n, B)).rejects.toMatchObject({ refusal: { rule: 'submit.clean' } })
     // Committed with the change: submitted, warning of A's card too.
     git(repo, 'add', 'one.txt')
-    git(repo, 'commit', '-qm', 'one', '--trailer', `Hive-Card: ${z.key}`)
+    git(repo, 'commit', '-qm', 'one', '--trailer', `Combwork-Card: ${z.key}`)
     expect((await submit(w, z.n, B)).done).toMatchObject({ ok: true, warnings: [`one.txt is a1's (${x.key})`] })
   })
 
@@ -226,13 +226,13 @@ describe("G16's lock records in the app (#1481)", () => {
     const z = await started(w, 'Z', B)
     writeFileSync(join(repo, 'two.txt'), 'two\n')
     git(repo, 'add', 'two.txt')
-    git(repo, 'commit', '-qm', 'two', '--trailer', `Hive-Card: ${z.key}`)
+    git(repo, 'commit', '-qm', 'two', '--trailer', `Combwork-Card: ${z.key}`)
     expect((await submit(w, z.n, B)).done).toMatchObject({ ok: true })
     // B's own uncommitted file: refused.
     const z2 = await started(w, 'Z2', B)
     writeFileSync(join(repo, 'three.txt'), 'three\n')
     git(repo, 'add', 'three.txt')
-    git(repo, 'commit', '-qm', 'three', '--trailer', `Hive-Card: ${z2.key}`)
+    git(repo, 'commit', '-qm', 'three', '--trailer', `Combwork-Card: ${z2.key}`)
     writeFileSync(join(repo, 'b-loose.txt'), 'not committed\n')
     await expect(submit(w, z2.n, B)).rejects.toMatchObject({ refusal: { rule: 'submit.clean' } })
   })

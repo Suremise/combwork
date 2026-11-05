@@ -100,7 +100,7 @@ const lines = (file) => {
     check("B1's lane, E1 its reviewer", lane.status === 200, JSON.stringify(lane.body))
     const s = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/start`)
     fs.writeFileSync(path.join(alpha, 'a.ts'), 'export const a = 2\n')
-    gitIn(alpha, 'commit', '-qam', 'card', '-m', `Hive-Card: ${key}`)
+    gitIn(alpha, 'commit', '-qam', 'card', '-m', `Combwork-Card: ${key}`)
     const first = gitIn(alpha, 'rev-parse', 'HEAD')
     const sub = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: 'Done.' })
     check(`B1 builds and submits ${key}`, s.status === 200 && sub.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, sub: sub.body }))
@@ -111,7 +111,7 @@ const lines = (file) => {
 
     // --- B1 commits what E1 asked for and submits it as a follow-up, through its hive tool.
     fs.writeFileSync(path.join(alpha, 'a.ts'), 'export const a = 3\n')
-    gitIn(alpha, 'commit', '-qam', 'asked for', '-m', `Hive-Card: ${key}`)
+    gitIn(alpha, 'commit', '-qam', 'asked for', '-m', `Combwork-Card: ${key}`)
     const head = gitIn(alpha, 'rev-parse', 'HEAD')
     const wakes = path.join(claudeHome, 'fake-wakes.jsonl')
     const wakesBefore = lines(wakes).length
@@ -125,7 +125,7 @@ const lines = (file) => {
     check('…its history says so, and never "Given to"', now.history.some((h) => h.whatText?.id === 'tasks.history.followUpSubmitted' && h.whatText.values?.revision === head.slice(0, 7)) && !now.history.some((h) => h.what.startsWith('Given to E1')), JSON.stringify(now.history.slice(-4)))
     const subs = (await facts(n)).filter((f) => f.kind === 'Submitted')
     check('…a second submission, at the head, in the same round', subs.length === 2 && subs[1].data.revision === head && subs[1].data.followUp === true && subs[1].data.round === subs[0].data.round, JSON.stringify(subs.map((f) => f.data)))
-    check('…pinned', !!(await until(() => { try { return gitIn(alpha, 'rev-parse', `refs/hive/cards/${key.toLowerCase()}/2`) === head } catch { return false } }, HUNG_MS)))
+    check('…pinned', !!(await until(() => { try { return gitIn(alpha, 'rev-parse', `refs/cw/cards/${key.toLowerCase()}/2`) === head } catch { return false } }, HUNG_MS)))
     check('…B1 watches it again', !!(await until(async () => (await live(b1.id))?.status === 'watching', HUNG_MS)), String((await live(b1.id))?.status))
     const woken = await until(() => lines(wakes).slice(wakesBefore).find((w) => w.agent === 'E1' && w.text.includes(`follow-up submitted for review at ${head.slice(0, 7)}`)), HUNG_MS)
     check('…and E1 is woken, with no column move, to start its review again', !!woken && /cw_start_review/.test(woken.text), JSON.stringify(lines(wakes).slice(wakesBefore)))
@@ -148,7 +148,7 @@ const lines = (file) => {
     await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(mkey)}/start`)
     fs.writeFileSync(path.join(alpha, 'b.ts'), 'export const b = 1\n')
     gitIn(alpha, 'add', 'b.ts')
-    gitIn(alpha, 'commit', '-qm', 'b', '-m', `Hive-Card: ${mkey}`)
+    gitIn(alpha, 'commit', '-qm', 'b', '-m', `Combwork-Card: ${mkey}`)
     await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(mkey)}/submit`, { summary: 'Done.' })
     await call(te1, 'POST', `/v1/tasks/${encodeURIComponent(mkey)}/start-review`, {})
     const back = await call(te1, 'PATCH', `/v1/tasks/${m}`, { column: 'doing', reply: 'short' })

@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const key = lib.ptyKey(home, 'assistant')
@@ -185,7 +185,7 @@ const check = (name, ok, extra = '') => {
   // Started in the page and left there (nothing returned to wait on: the write is held on purpose).
   const userWrite = (value) =>
     page.evaluate(([p, v]) => {
-      window.__userWrite = window.hive.invoke('project:updateConfig', p, { compactSuggestTokens: v }).then(() => 'saved', (e) => e.message)
+      window.__userWrite = window.combwork.invoke('project:updateConfig', p, { compactSuggestTokens: v }).then(() => 'saved', (e) => e.message)
     }, [alpha, value])
 
   // Change settings turned off while the Assistant's change waits for the lock: it is refused when its turn comes.
@@ -235,7 +235,7 @@ const check = (name, ok, extra = '') => {
   check("the user's newer edit holds the lock", !!(await held()))
   await watchLockQueue()
   await page.evaluate((id) => {
-    window.__undo = window.hive.invoke('assistant:undo', { change: id })
+    window.__undo = window.combwork.invoke('assistant:undo', { change: id })
   }, latest.id)
   check("Undo waits behind the user's write", await queuedForLock())
   await release()

@@ -60,7 +60,7 @@ describe('saving the order', () => {
     const agents = [
       { id: 'a1', name: 'Agent 1', model: 'opus' },
       { id: 'a2', name: 'Agent 2' },
-      { id: 'a3', name: 'Agent 3', worktree: { path: join(base, 'wt'), branch: 'hive/three', base: 'main' } }
+      { id: 'a3', name: 'Agent 3', worktree: { path: join(base, 'wt'), branch: 'cw/three', base: 'main' } }
     ]
     writeFileSync(file, JSON.stringify({ version: 2, agents, worktreeSetup: 'npm ci' }))
     w = createWorkspaceService()
@@ -73,7 +73,7 @@ describe('saving the order', () => {
     expect(await inWorkspace(w, () => moveAgent(alpha, 'a3', 0))).toEqual(['a3', 'a1', 'a2'])
     const cfg = saved()
     expect(cfg.agents.map((a: { id: string }) => a.id)).toEqual(['a3', 'a1', 'a2'])
-    expect(cfg.agents[0].worktree.branch).toBe('hive/three')
+    expect(cfg.agents[0].worktree.branch).toBe('cw/three')
     expect(cfg.agents[1]).toMatchObject({ name: 'Agent 1', model: 'opus' })
     expect(cfg.worktreeSetup).toBe('npm ci')
   })
@@ -95,7 +95,7 @@ describe('saving the order', () => {
     const cfg = saved()
     expect(cfg.agents.map((a: { id: string }) => a.id)).toEqual([before[2], before[1], before[0]])
     expect(cfg.agents[1].model).toBe('haiku')
-    expect(cfg.agents.find((a: { id: string }) => a.id === 'a3').worktree.branch).toBe('hive/three')
+    expect(cfg.agents.find((a: { id: string }) => a.id === 'a3').worktree.branch).toBe('cw/three')
     await expect(inWorkspace(w, () => swapAgents(alpha, 'a1', 'gone'))).rejects.toThrow(/no longer exists/)
   })
 

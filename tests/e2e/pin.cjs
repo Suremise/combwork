@@ -23,7 +23,7 @@ async function start() {
   app.on('window', (p) => p.on('pageerror', (e) => check('no page errors', false, e.message)))
   return app
 }
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 /** The window's real state (Combwork asks Electron), and what its title bar shows. */
 const onTop = (page) => invOn(page)('window:getAlwaysOnTop')
 const pinLit = async (page) => (await page.locator('.titlebar-pin.on').count()) === 1 && (await page.locator('.titlebar-pin').getAttribute('aria-pressed')) === 'true'
@@ -61,7 +61,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   await lib.sleep(1500) // A fixed wait on purpose: this checks that the other window's workspace events do NOT unpin it.
   check("another window opening and refreshing a workspace leaves the pinned welcome window on top, its pin lit", await both(p1, true))
   check('…and that window starts off', await both(pw, false))
-  await pw.evaluate(() => window.hive.invoke('window:close')).catch(() => undefined)
+  await pw.evaluate(() => window.combwork.invoke('window:close')).catch(() => undefined)
   await lib.until(() => app.windows().length === 1, 10000)
   await p1.locator('.titlebar-pin').click()
   check('unpinned again', !!(await lib.until(() => both(p1, false), 5000)))

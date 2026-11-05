@@ -411,7 +411,7 @@ export function App() {
   useEffect(() => {
     // What another window changes while this one loads must outlive the older snapshot it loads (#295).
     const early = startupReplay(handleEvent)
-    const off = window.hive.onEvent((e) => {
+    const off = window.combwork.onEvent((e) => {
       handleEvent(e)
       early.note(e)
     })

@@ -15,7 +15,7 @@ import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
 
-/** A commit as attribution reads it: its id, author email and `Hive-Card` trailers. */
+/** A commit as attribution reads it: its id, author email and `Combwork-Card` trailers. */
 export interface CommitInfo {
   commit: string
   email: string
@@ -649,11 +649,11 @@ export async function commitIds(repo: string, range: string, max: number): Promi
 }
 
 /**
- * The commits of a range, oldest first, with their author emails and `Hive-Card` trailers. `firstParent`: only the line's
+ * The commits of a range, oldest first, with their author emails and `Combwork-Card` trailers. `firstParent`: only the line's
  * own commits, its merges included but not the commits a merge brought in (HI-2382).
  */
 export async function commits(repo: string, range: string, opts: { firstParent?: boolean } = {}): Promise<Maybe<CommitInfo[]>> {
-  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Hive-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
+  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Combwork-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
   if (!r.ok) return unknown(U.commitsOf, { range })
   return r.out
     .split('\x1e')

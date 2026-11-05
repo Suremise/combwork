@@ -58,7 +58,7 @@ describe('a lane on slots (#1438)', () => {
   const cards = new Map([[1, card(1, 'done')], [2, card(2, 'todo')], [3, card(3, 'todo')]])
 
   it("its slot's details for the row's hover (#1446): lent or carried, its line, ready or preparing, waiting while preparing", () => {
-    const info = { name: 'slot-b', carried: false, line: 'hive/HI/HI-2-lane-hover', state: 'ready' as const, since: '2026-10-23T10:00:00.000Z' }
+    const info = { name: 'slot-b', carried: false, line: 'cw/HI/HI-2-lane-hover', state: 'ready' as const, since: '2026-10-23T10:00:00.000Z' }
     const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info })
     expect([v.slot, v.slotInfo, v.status]).toEqual(['slot-b', info, null])
     // Its builder's carried slot (a 0.9 worktree, #1441): named the same way.

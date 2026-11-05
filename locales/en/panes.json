@@ -857,7 +857,7 @@
   },
   "panes.table.worktreePrefix": {
     "defaultMessage": "worktree {value}",
-    "description": "The agent's worktree in a line of text (screen readers, a dialog's copy): {value} is its branch (\"hive/b1\"). Lower case."
+    "description": "The agent's worktree in a line of text (screen readers, a dialog's copy): {value} is its branch (\"cw/b1\"). Lower case."
   },
   "panes.template.detail": {
     "defaultMessage": "{n, plural, one {# agent} other {# agents}} · {layout}",

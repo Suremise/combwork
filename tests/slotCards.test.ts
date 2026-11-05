@@ -790,7 +790,7 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     const slot = join(tempDir('slot-'), 'slot-a')
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const cycle = cycleIn(e.store.facts(card.id))!
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, slot, cycle, ws }
@@ -924,7 +924,7 @@ describe("a Start's prompt goes to the slot's placement only while one is due (H
     const card = e.wf.createCard({ title: 'Back for more' })
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: join(tempDir('slot-'), 'slot-a'), lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, cycle: cycleIn(e.store.facts(card.id))!, ws }
   }
@@ -995,7 +995,7 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     state.slot = slot
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
   }
@@ -1294,7 +1294,7 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
       moved(await e.wf.putBack(key, B1, { why: 'again' }))
       e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: state.slot, lease: 'l-2', fresh: true })
       moved(await e.wf.start(key, B1))
-      await e.wf.write(e.store.card(n)!, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-2', line: 'hive/AM/x', revision: 'r' }))
+      await e.wf.write(e.store.card(n)!, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-2', line: 'cw/AM/x', revision: 'r' }))
       const again = cycleIn(e.store.facts(n))!
       const lease2 = { ...(lease as object), id: 'l-2' } as never
       // One failure on the new cycle is its first, not the old one's third: no cutoff, no notice.
@@ -1316,7 +1316,7 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
     state.slot = slot
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     lane.text = brief
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
@@ -1729,11 +1729,11 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
 
 describe("a card's cycle in a slot (#1438)", () => {
   const f = (seq: number, kind: string, data: object): Fact => ({ seq, card: 1, kind, at: '', actor: 'hive', source: 'recorded', data }) as unknown as Fact
-  const started = (seq: number, lease: string) => f(seq, 'Started', { folder: 'F', line: 'hive/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
+  const started = (seq: number, lease: string) => f(seq, 'Started', { folder: 'F', line: 'cw/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
 
   it("is its last start's, with what was done for it since; a start outside slots has none", () => {
     expect(cycleIn([f(1, 'Started', { folder: 'project', line: 'main', base: 'b', target: 'main', builder: 'B1', cardKind: 'code' })])).toBeNull()
-    const facts = [started(1, 'l-1'), f(2, 'SlotPrepared', { lease: 'l-1', line: 'hive/AM/AM-1-x', revision: 'r' }), f(3, 'PlacementClaimed', { lease: 'l-1', pid: 5, started: 6 }), f(4, 'BuilderPlaced', { lease: 'l-1', delivery: 'm1', how: 'typed' })]
+    const facts = [started(1, 'l-1'), f(2, 'SlotPrepared', { lease: 'l-1', line: 'cw/AM/AM-1-x', revision: 'r' }), f(3, 'PlacementClaimed', { lease: 'l-1', pid: 5, started: 6 }), f(4, 'BuilderPlaced', { lease: 'l-1', delivery: 'm1', how: 'typed' })]
     expect(cycleIn(facts)).toMatchObject({ seq: 1, prepared: { revision: 'r' }, claimed: { pid: 5, seq: 3 }, placed: true, deleted: false, deleting: null })
     // Put back and started again (the same lease, or another): a new cycle owes all of it again.
     expect(cycleIn([...facts, started(5, 'l-1')])).toMatchObject({ seq: 5, prepared: null, claimed: null, placed: false })
@@ -1746,15 +1746,15 @@ describe("a card's cycle in a slot (#1438)", () => {
   })
 
   it("follows Repair's move and its line's rename since its start, as the card's state does (HI-1791); a later start's own folder and line", () => {
-    const at = (folder: string, seq: number, lease = 'l-1') => f(seq, 'Started', { folder, line: 'hive/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
+    const at = (folder: string, seq: number, lease = 'l-1') => f(seq, 'Started', { folder, line: 'cw/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
     const before = 'C:\\before\\ws.worktrees\\alpha\\slot-a'
     const after = 'C:\\after\\ws.worktrees\\alpha\\slot-a'
-    const afterMove = [at(before, 1), f(2, 'FolderMoved', { from: before.toUpperCase(), to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'HIVE/AM/AM-1-x', to: 'hive/AM/AM-1-y', why: 'repair' })]
-    expect(cycleIn(afterMove)?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-y', slot: 'slot-a', lease: 'l-1' })
+    const afterMove = [at(before, 1), f(2, 'FolderMoved', { from: before.toUpperCase(), to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'CW/AM/AM-1-x', to: 'cw/AM/AM-1-y', why: 'repair' })]
+    expect(cycleIn(afterMove)?.started).toMatchObject({ folder: after, line: 'cw/AM/AM-1-y', slot: 'slot-a', lease: 'l-1' })
     // Another folder's move, or another line's rename, isn't its own.
-    expect(cycleIn([at(before, 1), f(2, 'FolderMoved', { from: 'C:\\elsewhere', to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'hive/AM/AM-2-z', to: 'hive/AM/AM-2-w', why: 'repair' })])?.started).toMatchObject({ folder: before, line: 'hive/AM/AM-1-x' })
+    expect(cycleIn([at(before, 1), f(2, 'FolderMoved', { from: 'C:\\elsewhere', to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'cw/AM/AM-2-z', to: 'cw/AM/AM-2-w', why: 'repair' })])?.started).toMatchObject({ folder: before, line: 'cw/AM/AM-1-x' })
     // A move before its start was the last cycle's: its start names where it is.
-    expect(cycleIn([...afterMove, at(after, 4, 'l-2')])?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-x', lease: 'l-2' })
+    expect(cycleIn([...afterMove, at(after, 4, 'l-2')])?.started).toMatchObject({ folder: after, line: 'cw/AM/AM-1-x', lease: 'l-2' })
   })
 })
 
@@ -1779,8 +1779,8 @@ describe("a lane's slot in the Progress panel (#1446)", () => {
       // alpha's own carried slot is its slot, with the line of the card last started under that lease.
       slot('alpha-id', 'hb1')
       lease('l-alpha', 'alpha-id', 'hb1', 'carried', 'b1')
-      db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 99, 'Started', ?, 'hive', 'recorded', ?)").run(card.id, at, JSON.stringify({ lease: 'l-alpha', line: 'hive/AM/AM-1-own-line' }))
-      expect(laneSlotIn(db, 'alpha-id', alphaLane)).toEqual({ name: 'hb1', carried: true, line: 'hive/AM/AM-1-own-line', state: 'ready', since: at })
+      db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 99, 'Started', ?, 'hive', 'recorded', ?)").run(card.id, at, JSON.stringify({ lease: 'l-alpha', line: 'cw/AM/AM-1-own-line' }))
+      expect(laneSlotIn(db, 'alpha-id', alphaLane)).toEqual({ name: 'hb1', carried: true, line: 'cw/AM/AM-1-own-line', state: 'ready', since: at })
       // A slot lent to the lane wins over the carried one; one being made reads as being prepared.
       slot('alpha-id', 'slot-a', 'creating')
       lease('l-lane', 'alpha-id', 'slot-a', 'lane', 'b2', 'lane-a')

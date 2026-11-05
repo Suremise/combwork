@@ -40,7 +40,7 @@ async function workspace(): Promise<WS> {
   return w
 }
 
-const started = { folder: 'project', line: 'hive/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code' as const }
+const started = { folder: 'project', line: 'cw/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code' as const }
 const submitted = (revision: string, marker = 'Did it') => ({ revision, base: 'base0000aaaa', head: revision, key: null, files: [{ path: 'a.ts', status: 'M' }], round: 1, generation: 0, sameRevision: false, summary: marker })
 
 /** A card of project p, with a start, a submission and the stage Review, written in one board change. */
@@ -62,7 +62,7 @@ describe("a card's work from the board (#1223)", () => {
     const w = await workspace()
     const card = await cardWithWork(w, 'Worked')
     const v = cardWork(w, card)!
-    expect(v).toMatchObject({ card, stage: 'review', line: 'hive/b1', base: 'base0000aaaa', target: 'main', builder: 'B1' })
+    expect(v).toMatchObject({ card, stage: 'review', line: 'cw/b1', base: 'base0000aaaa', target: 'main', builder: 'B1' })
     expect(v.revisions).toMatchObject([{ revision: 'rev1111aaaa', round: 1, by: 'B1' }])
     const bare = (await inWorkspace(w, () => tasks.createTask({ title: 'Bare', project: 'p', column: 'doing' }, user))).number
     expect(cardWork(w, bare)).toMatchObject({ card: bare, stage: 'active', preWorkflow: false, revisions: [] })
@@ -215,7 +215,7 @@ describe("a card's work from the board (#1223)", () => {
     try {
       const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
       await store.boardWrite(w, async () => {
-        facts.tx((tx) => tx.appendObserved(card, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: 'prev:0', data: { line: 'hive/b1', from: null, to: 'rev1' } }))
+        facts.tx((tx) => tx.appendObserved(card, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: 'prev:0', data: { line: 'cw/b1', from: null, to: 'rev1' } }))
         expect(seen).toEqual([])
       })
       expect(seen).toHaveLength(1)

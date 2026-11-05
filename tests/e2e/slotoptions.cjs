@@ -183,7 +183,7 @@ function board(sql, ...args) {
       process.env.HIVE_TEST_FAIL_IPC = 'slots:setSetting*1'
     })
     await setupField.press('Enter')
-    const probe = await page.evaluate((p) => window.hive.invoke('slots:setSetting', p, 'setup', 'npm ci --elsewhere').then(() => 'saved', () => 'failed'), fx.alpha)
+    const probe = await page.evaluate((p) => window.combwork.invoke('slots:setSetting', p, 'setup', 'npm ci --elsewhere').then(() => 'saved', () => 'failed'), fx.alpha)
     await app.evaluate(() => {
       delete process.env.HIVE_TEST_FAIL_IPC
     })

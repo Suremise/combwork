@@ -1,7 +1,7 @@
 // The preload runs in the window, beside its page (HI-1964): its DOM is said here, not found by chance through a test's import.
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
-import type { HiveBridge } from '../shared/api'
+import type { CombworkBridge } from '../shared/api'
 import type { HiveEvent } from '../shared/types'
 import { COMMIT_WATCH_ARG, FROM_MAIN_EVENT } from '../shared/commitWatch'
 
@@ -28,7 +28,7 @@ ipcRenderer.on('hive:event', (_: IpcRendererEvent, event: HiveEvent) => noteArri
 ipcRenderer.on('pty:data', () => noteArrived('terminal output')) // i18n-ignore: combwork.log, in English
 ipcRenderer.on('pty:exit', () => noteArrived('terminal exit')) // i18n-ignore: combwork.log, in English
 
-const bridge: HiveBridge = {
+const bridge: CombworkBridge = {
   invoke: (channel, ...args) =>
     ipcRenderer.invoke(channel, ...args).then(
       (r) => (noteArrived(`reply ${channel}`), r), // i18n-ignore: combwork.log, in English
@@ -58,4 +58,4 @@ const bridge: HiveBridge = {
   arrivals: (from, to) => arrived.filter((a) => a.at >= from && a.at <= to).map((a) => (a.n > 1 ? `${a.what} ×${a.n}` : a.what))
 }
 
-contextBridge.exposeInMainWorld('hive', bridge)
+contextBridge.exposeInMainWorld('combwork', bridge)

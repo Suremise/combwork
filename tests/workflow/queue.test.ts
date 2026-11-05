@@ -50,11 +50,11 @@ describe('the merge queue', () => {
     expect(s.stage).toBe('done')
     expect(s.integrated).toMatchObject({ by: 'hive', method: 'merge', result: mainHead(e) })
     const msg = sh(e.project, 'log', '-1', '--format=%B', 'main')
-    expect(msg).toContain(`Hive-Card: ${card.key}`)
-    expect(msg).toContain(`Hive-Revision: ${s.latest!.revision}`)
-    expect(msg).toContain('Hive-Reviewed-By: R1')
+    expect(msg).toContain(`Combwork-Card: ${card.key}`)
+    expect(msg).toContain(`Combwork-Revision: ${s.latest!.revision}`)
+    expect(msg).toContain('Combwork-Reviewed-By: R1')
     // The submitted revision is pinned.
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/1`)).toBe(s.latest!.revision)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(s.latest!.revision)
   })
 
   it("HI-1181: a conflict in the test merge records its hunks, the target's side first, and the builder's wake says where", async () => {
@@ -410,7 +410,7 @@ describe('the merge queue', () => {
     const s = e.wf.state(card)
     expect(s.stage).toBe('done')
     expect(s.integrated).toMatchObject({ method: 'squash', by: 'outside' })
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/1`)).toBe(rev)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(rev)
     const n = e.store.facts(card.id).length
     await reconcile(e.wf, card)
     expect(e.store.facts(card.id).length).toBe(n)

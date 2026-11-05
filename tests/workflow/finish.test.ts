@@ -201,8 +201,8 @@ describe('a finish’s steps', () => {
     moved(await e.wf.move(a.key, 'done', 'user', { confirm: true, reason: 'r' }))
     const f = e.wf.state(a).finished!.seq
     // A slot question, as the slot pass asks it: Combwork's own gate, so it stays until the slot is clean.
-    expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'hive/x', target: 'main' })).toBe(true)
-    expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'hive/x', target: 'main' })).toBe(false)
+    expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'cw/x', target: 'main' })).toBe(true)
+    expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'cw/x', target: 'main' })).toBe(false)
     expect(await e.wf.finishStep(a, f, 'requests')).toBe('done')
     expect(e.wf.state(a).requests.map((r) => r.gate)).toEqual(['slotDirty'])
     // Only the finish it was asked for closes it.

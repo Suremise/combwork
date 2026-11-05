@@ -37,13 +37,13 @@ afterAll(async () => {
 const user = { kind: 'user' } as const
 const git = (cwd: string, args: string[], input?: string): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8', input, maxBuffer: 64 * 1024 * 1024 }).trim()
 
-/** `n` commits on a new branch from main, a file each, made at once with fast-import; `trailer(i)`: a commit's Hive-Card. */
+/** `n` commits on a new branch from main, a file each, made at once with fast-import; `trailer(i)`: a commit's Combwork-Card. */
 function manyCommits(repo: string, branch: string, n: number, trailer: (i: number) => string | null = () => null): void {
   const from = git(repo, ['rev-parse', 'main'])
   let s = ''
   for (let i = 0; i < n; i++) {
     const t = trailer(i)
-    const message = `work ${i}${t ? `\n\nHive-Card: ${t}` : ''}\n`
+    const message = `work ${i}${t ? `\n\nCombwork-Card: ${t}` : ''}\n`
     s += `commit refs/heads/${branch}\ncommitter T <t@t> ${1700000000 + i} +0000\ndata ${Buffer.byteLength(message)}\n${message}${i ? '' : `from ${from}\n`}M 100644 inline f/${i}.txt\ndata ${String(i).length + 1}\n${i}\n\n`
   }
   git(repo, ['fast-import', '--quiet'], s)

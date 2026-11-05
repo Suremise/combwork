@@ -34,7 +34,7 @@ const mark = (label) => {
     return null
   }
 }
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 /** A workspace's commands with its close point running `cmd` (HI-1954: a list of one), as Settings saves them. */
 const closeList = (cmd) => ({ list: [{ id: 'c-00000001', name: 'Close', command: cmd }], onOpen: { run: [] }, onClose: { run: [{ scope: 'workspace', id: 'c-00000001' }] } })
 /** Combwork's commands with When Combwork quits running `cmd`. */
@@ -238,7 +238,7 @@ async function shots(page, name) {
   const goC = path.join(marks, 'go-c')
   await saveClose(inv2, command('c-quit', `chatty:${goC}`))
   const watch = await lib.quitWatch(app)
-  void page.evaluate(() => window.hive.invoke('app:quit')).catch(() => undefined)
+  void page.evaluate(() => window.combwork.invoke('app:quit')).catch(() => undefined)
   check("quitting: the second window's panel runs its chatty command", !!(await lib.until(async () => (await panel(p2, 'running').count()) === 1 && /z{20}/.test((await p2.locator('.close-command-output').textContent().catch(() => '')) ?? ''), HUNG_MS)))
   await p2.locator('.close-command .dialog-footer button').click()
   check('…Combwork quits once every command has ended or been let go', await watch.gone(HUNG_MS * 2))

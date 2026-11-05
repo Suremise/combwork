@@ -1065,7 +1065,7 @@ export function setAssistantOpen(open: boolean): void {
   set({ assistantOpen: open })
   if (!ws) return
   set((s) => ({ panes: { ...s.panes, [assistantOpenKey(ws)]: open ? 1 : 0 } }))
-  void window.hive.invoke('ui:setPane', assistantOpenKey(ws), open ? 1 : 0)
+  void window.combwork.invoke('ui:setPane', assistantOpenKey(ws), open ? 1 : 0)
 }
 
 /** Whether the Assistant's panel is on the left of the window (Settings → Assistant → Panel side; right by default). */
@@ -1073,7 +1073,7 @@ export const assistantOnLeft = (s: State): boolean => s.settings?.assistant.pane
 
 /** Moves the Assistant's panel to that side of the window: a setting, so every window and workspace follows. */
 export async function setAssistantSide(side: AssistantPanelSide): Promise<void> {
-  set({ settings: await window.hive.invoke('settings:update', { assistant: { panelSide: side } }) })
+  set({ settings: await window.combwork.invoke('settings:update', { assistant: { panelSide: side } }) })
 }
 
 const progressOpenKey = (ws: string): string => `progress-open:${ws.toLowerCase()}`
@@ -1103,7 +1103,7 @@ export function setProgressFilter(f: ProgressFilter): void {
   next[ws] = f
   const kept = Object.fromEntries(Object.entries(next).slice(-100))
   set({ progressFilter: kept })
-  void window.hive.invoke('ui:set', { progressFilter: kept }).catch(() => undefined)
+  void window.combwork.invoke('ui:set', { progressFilter: kept }).catch(() => undefined)
 }
 
 /** The tab a remembered row of tabs shows (HI-1837): the one last chosen while it is offered, else `fallback`. */
@@ -1116,7 +1116,7 @@ export function useRememberedTab<T extends string>(key: string, ids: readonly T[
 export function chooseTab(key: string, id: string): void {
   const kept = rememberTab(get().tabs, key, id)
   set({ tabs: kept })
-  void window.hive.invoke('ui:set', { tabs: kept }).catch(() => undefined)
+  void window.combwork.invoke('ui:set', { tabs: kept }).catch(() => undefined)
 }
 
 /** Settings → Version Control's tabs (HI-1837): Hive defaults and the open workspace's, by their rows' ids. */
@@ -1136,7 +1136,7 @@ export function setProgressOpen(open: boolean): void {
   if (!ws) return
   // Folded for the room (HI-1737): opening it shows it anyway, until there's room; folding it is the user's again.
   set((s) => ({ panes: { ...s.panes, [progressOpenKey(ws)]: open ? 1 : 0 }, progressUnfolded: open && s.progressFolded }))
-  void window.hive.invoke('ui:setPane', progressOpenKey(ws), open ? 1 : 0)
+  void window.combwork.invoke('ui:setPane', progressOpenKey(ws), open ? 1 : 0)
 }
 
 /** Whether the Progress panel is open now (for commands). */
@@ -1272,7 +1272,7 @@ export async function cardActivityAgents(c: TaskCard): Promise<string[]> {
   // On it now: running, with this card as its current one.
   const onIt = (id: string | null): id is string => !!p && !!id && !!p.agents.find((a) => a.id === id)?.live && currentCard(id, cards)?.number === c.number
   const out = p ? [c.agent, c.review?.agent ?? null].filter(onIt).map((id) => activityAgentKey(p.path, id)) : []
-  const found = (await window.hive.invoke('activity:cardAgents', c.number).catch(() => [])) as ActivityCardAgent[]
+  const found = (await window.combwork.invoke('activity:cardAgents', c.number).catch(() => [])) as ActivityCardAgent[]
   // A project card's agents found by their session only while it is still their current card: a builder's session runs
   // on into its next card (a card loop), its record keeping this one. A workspace card's agents have no current card.
   for (const a of found) if (!p || a.path.toLowerCase() !== p.path.toLowerCase() || onIt(a.agentId)) out.push(activityAgentKey(a.path, a.agentId))
@@ -1816,7 +1816,7 @@ async function readTasks(): Promise<void> {
     // With them, each project's workflow line for the toolbar's link (#1420): it came after the board's first paint, and
     // a toolbar it made wrap moved every column down under the pointer (HI-1852).
     const forms = readStages ? workflowForms() : null
-    const [cards, boardState, projectKeys, movedCardNames, stages, formsRead] = await Promise.all([board.request, window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames'), readStages ? window.hive.invoke('board:stages').catch(() => ({})) : null, forms])
+    const [cards, boardState, projectKeys, movedCardNames, stages, formsRead] = await Promise.all([board.request, window.combwork.invoke('board:state'), window.combwork.invoke('project:keys'), window.combwork.invoke('project:movedCardNames'), readStages ? window.combwork.invoke('board:stages').catch(() => ({})) : null, forms])
     if (mine !== tasksLoad) return
     const tasks = board.take(cards, { ws: get().workspace?.path ?? null, whole: fullArchive > 0 })
     if (tasks === 'again') return void loadTasks()
@@ -1827,7 +1827,7 @@ async function readTasks(): Promise<void> {
 }
 
 /** The window's board reads, with the board as main last sent it (HI-1715). */
-const boardReads = boardReader({ list: () => window.hive.invoke('tasks:list', true), changes: (since) => window.hive.invoke('tasks:changes', since) })
+const boardReads = boardReader({ list: () => window.combwork.invoke('tasks:list', true), changes: (since) => window.combwork.invoke('tasks:changes', since) })
 
 /**
  * What the board's stages are read for: the workspace, its projects and their version control, and the workflows
@@ -1836,7 +1836,7 @@ const boardReads = boardReader({ list: () => window.hive.invoke('tasks:list', tr
 /** Each project with version control's workflow form, by path in lower case; one that can't be read is left out. */
 async function workflowForms(): Promise<Record<string, WorkflowForm>> {
   const projects = (get().workspace?.projects ?? []).filter((p) => p.platform)
-  const read = await Promise.all(projects.map((p) => window.hive.invoke('workflow:form', p.path).then((f) => [p.path.toLowerCase(), f] as const, () => null)))
+  const read = await Promise.all(projects.map((p) => window.combwork.invoke('workflow:form', p.path).then((f) => [p.path.toLowerCase(), f] as const, () => null)))
   return Object.fromEntries(read.filter((x) => !!x))
 }
 

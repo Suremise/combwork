@@ -43,8 +43,8 @@ The Assistant's changes go through `assistantChange()` (control level, recorded 
 AGENTS.md's gotcha: main's thread carries every keystroke. Moving work off it:
 - The pattern to copy is the repository lock's (HI-1680): `src/main/repoLockWorker.ts` runs the unchanged core, `repoLock.ts`'s `LockThread` talks to it (its code runs in-process in unit tests), and it is a build entry in `electron.vite.config.ts`. The usage history's worker (#1106) is the larger example. A queue in the worker keeps calls in order where they must stay so.
 - Only where it makes sense: small, fast work stays on main, where a worker's messaging would cost more than it saves.
-- The evidence is hive.log's "main process was busy" and "on main's thread" warnings, which name what was under way (often waiting, not the cause), or a stall you measured. Measure before and after (main's longest stall, and a keystroke's echo where typing suffers, as `tests/e2e/repolocktyping.cjs` does), and put the numbers on the card.
-- Asynchronous file calls don't hold the thread but share the process's 16-thread libuv pool with every window and worker (`threadPool.ts`, HI-1702): keep bulk file work a few calls at a time (`atMost`), and read hive.log's "A file call took … to end" as the pool full or the disk slow (timed off main's thread, so not main being busy).
+- The evidence is combwork.log's "main process was busy" and "on main's thread" warnings, which name what was under way (often waiting, not the cause), or a stall you measured. Measure before and after (main's longest stall, and a keystroke's echo where typing suffers, as `tests/e2e/repolocktyping.cjs` does), and put the numbers on the card.
+- Asynchronous file calls don't hold the thread but share the process's 16-thread libuv pool with every window and worker (`threadPool.ts`, HI-1702): keep bulk file work a few calls at a time (`atMost`), and read combwork.log's "A file call took … to end" as the pool full or the disk slow (timed off main's thread, so not main being busy).
 
 ## Resources
 

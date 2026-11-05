@@ -143,8 +143,8 @@ const starts = () => lines(started)
       const key = await keyOf(n)
       const s = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/start`)
       fs.writeFileSync(path.join(alpha, 'a.ts'), `export const a = ${v}\n`)
-      // Its own commit, attributed to it (a shared folder's cards are their Hive-Card commits).
-      gitIn(alpha, 'commit', '-qam', `card ${n}`, '-m', `Hive-Card: ${key}`)
+      // Its own commit, attributed to it (a shared folder's cards are their Combwork-Card commits).
+      gitIn(alpha, 'commit', '-qam', `card ${n}`, '-m', `Combwork-Card: ${key}`)
       revs[n] = gitIn(alpha, 'rev-parse', 'HEAD')
       const sub = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: `Card ${n} done.`, revision: revs[n] })
       check(`B1 builds and submits ${key}`, s.status === 200 && sub.status === 200 && (await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, sub: sub.body }))

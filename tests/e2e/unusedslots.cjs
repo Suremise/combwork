@@ -61,7 +61,7 @@ const git = (cwd, args) => lib.git(cwd, ['-c', 'user.email=t@t', '-c', 'user.nam
     check('slot-e is carried for B2', !!(await op({ op: 'carry', agent: b2.id, slot: 'slot-e', folder: e })))
     // A retired home no conversation can resume in.
     const home = path.join(root, 'home-r1')
-    lib.git(fx.alpha, ['worktree', 'add', '-q', '-b', 'hive/r1-old', home])
+    lib.git(fx.alpha, ['worktree', 'add', '-q', '-b', 'cw/r1-old', home])
     fs.writeFileSync(path.join(home, 'notes.txt'), 'review notes\n')
     git(home, ['add', '-A'])
     git(home, ['commit', '-qm', 'Review notes'])

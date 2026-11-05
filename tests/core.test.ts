@@ -741,7 +741,7 @@ describe('resumeRecord', () => {
     const { resumeRecord } = await import('../src/shared/defaults')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'm2' }, records, new Set(['m2']), agents)?.id).toBe('m1')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'w1' }, records, new Set(['m1', 'm2']), agents)).toBeNull()
-    expect(resumeRecord(P, { id: 'a2', worktree: { path: WT, branch: 'hive/agent-2', base: 'main' } } as StoredAgent, records, new Set(), agents)?.id).toBe('w1')
+    expect(resumeRecord(P, { id: 'a2', worktree: { path: WT, branch: 'cw/agent-2', base: 'main' } } as StoredAgent, records, new Set(), agents)?.id).toBe('w1')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'old' }, records, new Set(), agents)?.id).toBe('m2')
   })
 })

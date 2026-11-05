@@ -38,7 +38,7 @@ function prepare() {
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const waitFor = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(500) } return null }
 
   const info = await waitFor(async () => { const i = (await inv('provider:info')).codex; return i && !i.checking ? i : null }, 30000)

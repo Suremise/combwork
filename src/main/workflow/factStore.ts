@@ -384,7 +384,7 @@ export class FactStore {
   /**
    * A card of this project by its key (`HI-12`, any case; an old key of its project's too, and a card's name in a project
    * it left: #1219's resolver), its old number (`#1061`), or the name keys had before (`<name>-<old number>`, the scope's
-   * name, which may hold hyphens: Hive-Card trailers written before #1294 say it), or null.
+   * name, which may hold hyphens: card trailers written before #1294 said it), or null.
    * A prefix any project holds or held as a key is a key, never that name form (HR5's #1294 round 1): a key no card has
    * here, or another project's card, is null, not the card with that number on the board. So where a project's name is
    * one of its keys, a name-form trailer finds only a card from before 1.0 (which kept its number in its project, #1219).

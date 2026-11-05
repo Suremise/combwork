@@ -528,7 +528,7 @@
   "settings.advanced.hive.skills.removeIdleCopies.never": "しない",
   "settings.advanced.hive.skills.removeIdleCopies.slots": "スロットのみ",
   "settings.advanced.hive.skills.removeIdleCopies.title": "フォルダーでエージェントが作業していないときにCombworkのスキルのコピーを削除する",
-  "settings.advanced.hive.slots.deleteMergedLines.desc": "スロットで作業するカードはそれぞれ専用のブランチ（例：hive/AM/AM-12-fix-the-login）を持ちます。カードが完了し、マージ先ブランチがそのブランチの作業を含むと（スカッシュマージでも）、Combworkはブランチを削除してカードに記録します。マージされていない作業があるブランチや、どこかでチェックアウトされているブランチは削除しません。オフにするとブランチは残ります。",
+  "settings.advanced.hive.slots.deleteMergedLines.desc": "スロットで作業するカードはそれぞれ専用のブランチ（例：cw/AM/AM-12-fix-the-login）を持ちます。カードが完了し、マージ先ブランチがそのブランチの作業を含むと（スカッシュマージでも）、Combworkはブランチを削除してカードに記録します。マージされていない作業があるブランチや、どこかでチェックアウトされているブランチは削除しません。オフにするとブランチは残ります。",
   "settings.advanced.hive.slots.deleteMergedLines.title": "マージ後にカードのブランチを削除",
   "settings.advanced.hive.slots.removeIdle.desc": "プロジェクトはビルダーの数だけスロットを保持します。それを超える空きスロットが1日使われないと削除されます。先にアーカイブコマンドが実行され、失敗した場合はスロットが残ります。エージェントやプロセスが中にあるもの、貸し出し中のもの、マージ中のもの、コミットされていないかマージされていない作業があるものは決して削除しません。オフにすると、使われていないスロットは自分で削除するまで残ります。",
   "settings.advanced.hive.slots.removeIdle.title": "使われていないスロットを1日後に削除",

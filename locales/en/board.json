@@ -2125,7 +2125,7 @@
   },
   "board.lanes.slotLine": {
     "defaultMessage": "On {line}",
-    "description": "A lane's slot in its hover (Progress panel, #1446): the branch its current card is built on there follows ({line}, such as hive/HI/HI-12-fix-login: keep it as it is)."
+    "description": "A lane's slot in its hover (Progress panel, #1446): the branch its current card is built on there follows ({line}, such as cw/HI/HI-12-fix-login: keep it as it is)."
   },
   "board.lanes.slotLink": {
     "defaultMessage": "Show {slot} in Branches & remotes",

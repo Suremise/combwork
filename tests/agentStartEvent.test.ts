@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import type { AgentInfo, WorkspaceInfo } from '../src/shared/types'
 import { stallAgentOf } from '../src/shared/tasks'
 
-;(globalThis as unknown as { window: unknown }).window = { hive: { invoke: async () => null, on: () => () => {} }, addEventListener: () => {}, matchMedia: () => ({ matches: false, addEventListener: () => {} }) }
+;(globalThis as unknown as { window: unknown }).window = { combwork: { invoke: async () => null, on: () => () => {} }, addEventListener: () => {}, matchMedia: () => ({ matches: false, addEventListener: () => {} }) }
 // The renderer's module, typed here by what the test uses: the main process's typecheck doesn't follow renderer code.
 interface RendererStore {
   get: () => { workspace: WorkspaceInfo }

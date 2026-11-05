@@ -54,7 +54,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   await lib.waitForProvider(inv)
@@ -263,7 +263,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     const done = await until(async () => (await kept()) === rows && (await edgeSays()).now === String(rows), HUNG_MS)
     check(`the drag ${what} is kept and drawn (${rows} shown)`, !!done, JSON.stringify({ was, dy, kept: await kept(), says: await edgeSays(), box: b, now: await edge.boundingBox() }))
   }
-  const kept = () => page.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
+  const kept = () => page.evaluate((w) => window.combwork.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
   // Its floor (HI-1673, Darren): with more lanes than six, a drag never shows fewer than six.
   check('the splitter ranges from six (the floor) to the lanes there are', (await edgeMin()) === 6 && (await edgeSays()).max === '7', JSON.stringify({ min: await edgeMin(), says: await edgeSays() }))
   // Dragged up by just under one: seven, kept.
@@ -559,7 +559,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
 
   // --- The user's order (#568). Running: l7, l6, l3, l2, l1 (five show); then l4 and l5, finished.
   const rowOf = (id) => section.locator(`.progress-lane[data-lane="${id}"]`)
-  const savedOrder = () => page.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
+  const savedOrder = () => page.evaluate((w) => window.combwork.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
   const said = () => section.locator('.progress-lanes-said').innerText()
   const ordered = async (ids) => !!(await until(async () => (await order()).join() === ids.join(), HUNG_MS))
   const scrollTop = () => list.evaluate((el) => el.scrollTop)
@@ -716,7 +716,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   page2.on('pageerror', (e) => check('no page errors after the restart', false, e.message))
   await lib.fitWindow(app2, page2, { width: 1400, height: 850 })
   await lib.appReady(page2)
-  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   if (!(await page2.evaluate((n) => document.title.includes(n), path.basename(ws)))) await lib.openWorkspace(inv2, page2, ws)
   if (offered) {
     const dontResume = page2.locator('.toast').getByRole('button', { name: "Don't Resume", exact: true })
@@ -747,7 +747,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await page2.locator(`.progress-lane[data-lane="${l3}"] .progress-lane-top`).click({ button: 'right' })
   await page2.locator('.menu[role="menu"] .menu-item', { hasText: 'Usual Order' }).click()
   const usualOrder = [l8, l7, l3, l2, l1, l4, l5, l6]
-  const saved2 = () => page2.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
+  const saved2 = () => page2.evaluate((w) => window.combwork.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
   check('Usual Order puts the lanes back, and keeps no order', !!(await until(async () => (await order2()).join() === usualOrder.join() && (await saved2()) === null, HUNG_MS)), JSON.stringify({ order: await order2(), saved: await saved2() }))
 
   // --- A lane's queued list change in the Lanes tab (HI-2151): B10's lane, its first card in flight, changed to add a

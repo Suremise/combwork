@@ -66,8 +66,8 @@ const rowFolder = (table: 'slots' | 'copies', name: string): string => (boardRea
 function writeProject(p: string): void {
   const trees = treesAt(before)
   const agents = [
-    { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(trees, 'hb1'), branch: 'hive/hb1', base: 'main' } },
-    { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: join(trees, 'hr1'), branch: 'hive/hr1', base: 'main' } },
+    { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(trees, 'hb1'), branch: 'cw/hb1', base: 'main' } },
+    { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: join(trees, 'hr1'), branch: 'cw/hr1', base: 'main' } },
     { id: 'b2', name: 'B2', provider: 'claude-code', workflowRole: 'builder' }
   ]
   writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, ...(projectId ? { id: projectId } : {}), agents }))
@@ -77,7 +77,7 @@ beforeAll(async () => {
   const p = join(wsAt(before), 'alpha')
   gitRepo(p)
   commit(p, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
-  for (const n of ['hb1', 'hr1']) sh(p, 'worktree', 'add', '-q', '-b', `hive/${n}`, join(treesAt(before), n))
+  for (const n of ['hb1', 'hr1']) sh(p, 'worktree', 'add', '-q', '-b', `cw/${n}`, join(treesAt(before), n))
   sh(p, 'worktree', 'add', '-q', '--detach', join(treesAt(before), 'copies', 'copy-1'))
   mkdirSync(join(p, '.combwork'), { recursive: true })
   writeProject(p)
@@ -155,10 +155,10 @@ describe('Repair a Moved Workspace with slots, copies and homes (#1447)', () => 
     const lease = boardRead(ws, (db) => (db.prepare("SELECT id FROM slot_leases WHERE project = ? AND slot = 'hb1' AND ended_at IS NULL").get(projectId) as { id: string }).id)
     rmSync(folder, { recursive: true, force: true })
     const gone = await run(() => missingWorktree(project(), 'b1'))
-    expect(gone).toMatchObject({ slot: 'hb1', branch: 'hive/hb1', branchExists: true })
+    expect(gone).toMatchObject({ slot: 'hb1', branch: 'cw/hb1', branchExists: true })
     await run(() => recreateWorktree(project(), 'b1'))
     expect(existsSync(join(folder, 'a.txt'))).toBe(true)
-    expect(sh(folder, 'branch', '--show-current')).toBe('hive/hb1')
+    expect(sh(folder, 'branch', '--show-current')).toBe('cw/hb1')
     expect(boardRead(ws, (db) => (db.prepare("SELECT id FROM slot_leases WHERE project = ? AND slot = 'hb1' AND ended_at IS NULL").get(projectId) as { id: string } | undefined)?.id)).toBe(lease)
     expect(await run(() => missingWorktree(project(), 'b1'))).toBeNull()
   })
@@ -184,7 +184,7 @@ describe('project removal on slots (#1447)', () => {
     await pool.release(clean.ok ? clean.lease.id : '', 'done')
     await pool.refresh()
     const outside = join(base, 'outside')
-    sh(p, 'worktree', 'add', '-q', '-b', 'hive/outside', outside)
+    sh(p, 'worktree', 'add', '-q', '-b', 'cw/outside', outside)
     expect(await pool.carry('r9', { name: 'outside', folder: outside, target: 'main' })).not.toBeNull()
     const preview = await run(() => removeFolders(ws, p, false))
     // By name (a home by its label): a slot's label also names its agent and cards.
@@ -218,9 +218,9 @@ describe('Repair cut short after a folder was published (#1447, HR1 round 1 find
     const p = join(root, 'before', 'ws', 'omega')
     gitRepo(p)
     commit(p, { '.gitignore': '.combwork/\n', 'o.txt': 'o\n' }, 'first')
-    sh(p, 'worktree', 'add', '-q', '-b', 'hive/ho1', join(treesOf(join(root, 'before')), 'ho1'))
+    sh(p, 'worktree', 'add', '-q', '-b', 'cw/ho1', join(treesOf(join(root, 'before')), 'ho1'))
     mkdirSync(join(p, '.combwork'), { recursive: true })
-    const agents = [{ id: 'o1', name: 'O1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(treesOf(join(root, 'before')), 'ho1'), branch: 'hive/ho1', base: 'main' } }]
+    const agents = [{ id: 'o1', name: 'O1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(treesOf(join(root, 'before')), 'ho1'), branch: 'cw/ho1', base: 'main' } }]
     writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents }))
     await w2.open(join(root, 'before', 'ws'))
     const id = (await w2.projectConfig(p)).id
@@ -264,11 +264,11 @@ describe("a gone slot's recreation, guarded and recovered (#1447, HR1 round 1 fi
   async function goneSlot(name: string): Promise<{ lease: string; folder: string; line: string; to: string }> {
     const p = project()
     const folder = join(treesAt(after), name)
-    sh(p, 'worktree', 'add', '-q', '-b', `hive/${name}`, folder)
+    sh(p, 'worktree', 'add', '-q', '-b', `cw/${name}`, folder)
     const pool = await run(() => poolFor(ws, p))
     const lease = (await pool.carry(`a-${name}`, { name, folder, target: 'main' }))!
     rmSync(folder, { recursive: true, force: true })
-    return { lease: lease.id, folder, line: `hive/${name}`, to: join(treesAt(after), `${name}-again`) }
+    return { lease: lease.id, folder, line: `cw/${name}`, to: join(treesAt(after), `${name}-again`) }
   }
   const noPrune = async (): Promise<string[]> => []
   const open = (name: string) => boardRead(ws, (db) => (db.prepare('SELECT id FROM slot_leases WHERE project = ? AND slot = ? AND ended_at IS NULL').get(projectId, name) as { id: string } | undefined)?.id ?? null)
@@ -353,12 +353,12 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     gitRepo(p)
     commit(p, { '.gitignore': '.combwork/\n', 'g.txt': 'g\n' }, 'first')
     const home = join(trees, 'hr')
-    sh(p, 'worktree', 'add', '-q', '-b', 'hive/hr', home)
+    sh(p, 'worktree', 'add', '-q', '-b', 'cw/hr', home)
     mkdirSync(join(p, '.combwork'), { recursive: true })
     const agents = [
       { id: 'g1', name: 'G1', provider: 'claude-code', workflowRole: 'builder' },
       { id: 'g2', name: 'G2', provider: 'claude-code', workflowRole: 'builder' },
-      { id: 'gr', name: 'GR', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: home, branch: 'hive/hr', base: 'main' } }
+      { id: 'gr', name: 'GR', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: home, branch: 'cw/hr', base: 'main' } }
     ]
     writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents }))
     await ws.refresh()
@@ -410,7 +410,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     for (const f of [g.p, g.dirty, g.unmerged, g.home]) back(f)
     expect(sh(g.unmerged, 'log', '-1', '--format=%s')).toBe('unmerged')
     expect(existsSync(join(g.dirty, 'draft.txt'))).toBe(true)
-    expect(sh(g.home, 'branch', '--show-current')).toBe('hive/hr')
+    expect(sh(g.home, 'branch', '--show-current')).toBe('cw/hr')
   })
 
   // Another Combwork on the same workspace (HR1's round 2): its own connection to combwork.db, its own holder.
@@ -548,7 +548,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
   it("a slot outside the project's worktrees folder stops Delete before anything is done", async () => {
     const g = await gamma('gamma3', [521, 522])
     const outside = join(base, 'outside-gamma3')
-    sh(g.p, 'worktree', 'add', '-q', '-b', 'hive/out', outside)
+    sh(g.p, 'worktree', 'add', '-q', '-b', 'cw/out', outside)
     const pool = await run(() => poolFor(ws, g.p))
     expect(await pool.carry('g9', { name: 'out', folder: outside, target: 'main' })).not.toBeNull()
     const { removeProject } = await removal()

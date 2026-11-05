@@ -1119,7 +1119,7 @@
   },
   "workflow.refused.submit.trailer.message": {
     "text": "{card}: commit {commit} has no card trailer, and another card's agent works in this folder.",
-    "note": "A refused submit in a shared folder: a commit lacks the Hive-Card trailer. {commit} is a short commit id.",
+    "note": "A refused submit in a shared folder: a commit lacks the Combwork-Card trailer. {commit} is a short commit id.",
     "audience": "both"
   },
   "workflow.refused.submit.trailer.next": {
@@ -1514,7 +1514,7 @@
   },
   "workflow.value.commitMessage.hive": {
     "text": "Combwork’s: the card’s key and title, with trailers",
-    "note": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.",
+    "note": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Combwork’s trailers (Combwork-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.",
     "audience": "both"
   },
   "workflow.value.finish.agentMerges": {

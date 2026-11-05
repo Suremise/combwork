@@ -528,7 +528,7 @@
   "settings.advanced.hive.skills.removeIdleCopies.never": "Nigdy",
   "settings.advanced.hive.skills.removeIdleCopies.slots": "Tylko sloty",
   "settings.advanced.hive.skills.removeIdleCopies.title": "Usuwaj kopie umiejętności Combwork, gdy w folderze nie pracuje żaden agent",
-  "settings.advanced.hive.slots.deleteMergedLines.desc": "Każda karta tworzona w slocie ma własną gałąź, np. hive/AM/AM-12-fix-the-login. Gdy karta jest gotowa, a jej gałąź docelowa zawiera pracę tej gałęzi (także po scaleniu squash), Combwork usuwa gałąź i odnotowuje to na karcie. Gałąź z pracą, która nie jest scalona, albo gdzieś wybrana, nigdy nie jest usuwana. Po wyłączeniu gałęzie zostają.",
+  "settings.advanced.hive.slots.deleteMergedLines.desc": "Każda karta tworzona w slocie ma własną gałąź, np. cw/AM/AM-12-fix-the-login. Gdy karta jest gotowa, a jej gałąź docelowa zawiera pracę tej gałęzi (także po scaleniu squash), Combwork usuwa gałąź i odnotowuje to na karcie. Gałąź z pracą, która nie jest scalona, albo gdzieś wybrana, nigdy nie jest usuwana. Po wyłączeniu gałęzie zostają.",
   "settings.advanced.hive.slots.deleteMergedLines.title": "Usuwaj gałąź karty po scaleniu",
   "settings.advanced.hive.slots.removeIdle.desc": "Projekt zachowuje tyle slotów, ilu ma wykonawców. Wolny slot ponad tę liczbę, nieużywany przez dzień, jest usuwany: najpierw uruchamia się jego polecenie archiwizacji, a jeśli się nie powiedzie, slot zostaje. Combwork nigdy nie usuwa slotu z agentem lub procesem w środku, z wypożyczeniem, z trwającym scalaniem ani z pracą, która nie ma commita lub nie jest scalona. Po wyłączeniu nieużywane sloty zostają, dopóki ich nie usuniesz.",
   "settings.advanced.hive.slots.removeIdle.title": "Usuwaj nieużywane sloty po dniu",

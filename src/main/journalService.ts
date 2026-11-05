@@ -89,7 +89,7 @@ async function tellAssistant(ws: WorkspaceService, body: string): Promise<void> 
 }
 
 /** What the Assistant is asked to suggest, once, when it writes a handover with its journal off (#1032). */
-export const JOURNAL_SUGGESTION = "Your journal is off. Suggest to the user once, in a line, that Settings → Assistant → Journal lets you remember decisions and plans across sessions without handovers; Hive won't ask again."
+export const JOURNAL_SUGGESTION = "Your journal is off. Suggest to the user once, in a line, that Settings → Assistant → Journal lets you remember decisions and plans across sessions without handovers; Combwork won't ask again."
 
 /**
  * The suggestion for a handover the Assistant writes (#1032, Darren's decision on #989): while its journal is off, the

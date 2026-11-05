@@ -194,10 +194,10 @@ describe("a card's open requests (HI-1992)", () => {
 describe('projects and notes', () => {
   it('projects: one line each, with their agents', () => {
     const text = projectListText([
-      { name: 'alpha', workspace: 'ws', active: true, branch: 'main', agents: [{ name: 'Coder', provider: 'claude-code', status: 'working', branch: null, backgroundTasks: 0 }, { name: 'Two', provider: 'codex', status: 'finished', branch: 'hive/two', backgroundTasks: 1 }] },
+      { name: 'alpha', workspace: 'ws', active: true, branch: 'main', agents: [{ name: 'Coder', provider: 'claude-code', status: 'working', branch: null, backgroundTasks: 0 }, { name: 'Two', provider: 'codex', status: 'finished', branch: 'cw/two', backgroundTasks: 1 }] },
       { name: 'beta', workspace: 'ws', active: false, branch: null, agents: [] }
     ])
-    expect(text.split('\n').slice(0, 2)).toEqual(['alpha (on, main): Coder [claude-code] working; Two [codex, hive/two] idle (1 background)', 'beta (off): no agents'])
+    expect(text.split('\n').slice(0, 2)).toEqual(['alpha (on, main): Coder [claude-code] working; Two [codex, cw/two] idle (1 background)', 'beta (off): no agents'])
   })
 
   it('a watching agent says what it waits for', () => {

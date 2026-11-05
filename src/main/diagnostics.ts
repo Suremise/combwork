@@ -124,7 +124,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     return [head, ...extra]
   })
   const g = gitTool()
-  providerLines.push(`- **Git**: ${g.state === 'missing' ? "not found on Hive's PATH" : g.version ? `${g.version}${g.path ? ` at \`${g.path}\`` : ''}${g.state === 'old' ? ' (older than Hive needs)' : ''}` : `unknown${g.error ? ` (${g.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  providerLines.push(`- **Git**: ${g.state === 'missing' ? "not found on Combwork's PATH" : g.version ? `${g.version}${g.path ? ` at \`${g.path}\`` : ''}${g.state === 'old' ? ' (older than Combwork needs)' : ''}` : `unknown${g.error ? ` (${g.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 
   // Bundled skills: Hive's own names, so they are shown; the user's own skills only as a count.
   const skillLines: string[] = []
@@ -156,7 +156,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     '',
     `- Windows: ${windows.length}; projects: ${projects.filter((p) => p.active).length} active of ${projects.length}`,
     `- Agents: ${agents.length}, ${agents.filter((a) => a.live).length} running, ${agents.filter((a) => a.live?.slot).length} in slots`,
-    `- Hive Assistant: ${assistants.some((a) => a.agents.some((x) => x.live)) ? 'running' : 'not running'}`,
+    `- Combwork Assistant: ${assistants.some((a) => a.agents.some((x) => x.live)) ? 'running' : 'not running'}`,
     '',
     '### Guidance',
     '',

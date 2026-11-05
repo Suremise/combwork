@@ -53,7 +53,7 @@ const check = (name, ok, extra = '') => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1' })
@@ -108,7 +108,7 @@ const check = (name, ok, extra = '') => {
     await dc.locator('.dc-source').waitFor({ timeout: HUNG_MS })
     const title = await lib.until(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.getTitle()).find((x) => x.startsWith('Developer Console — consolewindow-ws')) ?? null), HUNG_MS)
     check('…titled for its workspace', !!title, String(title))
-    const outside = await dc.evaluate(() => window.hive.invoke('settings:update', { general: { userName: 'console-page' } }).then(() => 'allowed', (e) => e.message))
+    const outside = await dc.evaluate(() => window.combwork.invoke('settings:update', { general: { userName: 'console-page' } }).then(() => 'allowed', (e) => e.message))
     check("…and its page may call only the console's channels", /Not allowed/.test(outside) && (await inv('settings:get')).general.userName !== 'console-page', outside)
     check('…watching nothing until a source is picked', (await dc.locator('.dc-live').textContent()).includes('Not watching') && (await inv('console:sources')).every((s) => !s.capturing))
 
@@ -185,7 +185,7 @@ const check = (name, ok, extra = '') => {
     const lastShown = Math.max(0, ...(await rows()).map((r) => r.seq))
     await lib.sendPrompt(inv, key, 'edit a.ts', { submitted: async () => /\(\d+ new\)/.test(await dc.locator('.dc-live').textContent()) })
     await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
-    const ring = () => dc.evaluate((src) => window.hive.invoke('console:snapshot', src, 0), b1Option)
+    const ring = () => dc.evaluate((src) => window.combwork.invoke('console:snapshot', src, 0), b1Option)
     const heldTurn = await lib.until(async () => {
       const r = (await ring()).filter((e) => e.seq > lastShown)
       return r.some((e) => e.name === 'Stop') ? r : null
@@ -350,14 +350,14 @@ const check = (name, ok, extra = '') => {
     const page2 = await nextWindow
     page2.on('pageerror', (e) => check('no page errors (second window)', false, e.message))
     await lib.appReady(page2)
-    const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv2, page2, ws2)
     await inv2('console:open')
     // The console showing a workspace's sources, by its folder's name.
     const consoleOn = (name) =>
       lib.until(async () => {
         for (const c of consoles()) {
-          const list = await c.evaluate(() => window.hive.invoke('console:sources')).catch(() => null)
+          const list = await c.evaluate(() => window.combwork.invoke('console:sources')).catch(() => null)
           if (list?.length && list.every((x) => x.workspacePath.toLowerCase().endsWith(name))) return c
         }
         return null
@@ -380,10 +380,10 @@ const check = (name, ok, extra = '') => {
     check("…and the other window's console carries on", consoles().includes(dc2) && (await hive2Live()))
     await inv('console:open')
     const dc3 = await consoleOn('consolewindow-ws3')
-    const ws3Sources = await dc3.evaluate(() => window.hive.invoke('console:sources'))
+    const ws3Sources = await dc3.evaluate(() => window.combwork.invoke('console:sources'))
     check('opened again, it shows the new workspace only', ws3Sources.every((x) => x.workspacePath.toLowerCase().endsWith('consolewindow-ws3')), JSON.stringify(ws3Sources.map((x) => x.id)))
-    const oldWatch = await dc3.evaluate((id) => window.hive.invoke('console:subscribe', [id]), b1Option)
-    const oldRead = await dc3.evaluate((id) => window.hive.invoke('console:snapshot', id, 0), b1Option)
+    const oldWatch = await dc3.evaluate((id) => window.combwork.invoke('console:subscribe', [id]), b1Option)
+    const oldRead = await dc3.evaluate((id) => window.combwork.invoke('console:snapshot', id, 0), b1Option)
     check("…and can't watch or read the old workspace's sources", JSON.stringify(oldWatch) === '{}' && oldRead.length === 0, `${JSON.stringify(oldWatch)} ${oldRead.length}`)
     const hive3 = ws3Sources.find((x) => x.kind === 'hive')
     await dc3.locator('.dc-source').selectOption(hive3.id)

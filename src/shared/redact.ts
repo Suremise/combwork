@@ -11,7 +11,7 @@ export interface RedactContext {
   folders: string[]
   /** Names to remove wherever they appear as a word: projects, agents, branches, workspaces. */
   names: { name: string; as: string }[]
-  /** Hive's own folder (a development build's checkout): becomes <hive>, so its stack traces keep their file names. */
+  /** Hive's own folder (a development build's checkout): becomes <combwork>, so its stack traces keep their file names. */
   app?: string
 }
 
@@ -189,7 +189,7 @@ const SECRETS: Step[] = [
 
 export function redact(text: string, ctx: RedactContext): string {
   let out = text
-  if (ctx.app && ctx.app.length > 3) out = out.replace(folderRe(ctx.app), '<hive>')
+  if (ctx.app && ctx.app.length > 3) out = out.replace(folderRe(ctx.app), '<combwork>')
   // Longest first, so a worktree inside a workspace isn't half replaced.
   for (const f of [...ctx.folders].filter((x) => x.length > 3).sort((a, b) => b.length - a.length)) out = out.replace(folderRe(f), '<workspace>')
   if (ctx.home.length > 3) out = out.replace(folderRe(ctx.home), '~')

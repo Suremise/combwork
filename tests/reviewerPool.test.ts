@@ -194,7 +194,7 @@ function withBoundary(e: Env, before: () => void | Promise<void>): unknown {
 async function submitted(e: Env, card: { id: number; key: string; title: string }, by = B1): Promise<void> {
   if (e.options.folder === 'slots') {
     const slot = join(tempDir('slot-'), 'slot')
-    sh(e.project, 'worktree', 'add', '-q', '-b', `hive/am/am-${card.id}`, slot, 'main')
+    sh(e.project, 'worktree', 'add', '-q', '-b', `cw/am/am-${card.id}`, slot, 'main')
     e.wf.cfg.slotFor = async () => ({ slot: 'slot', folder: slot, lease: `l-${card.id}`, fresh: true })
     moved(await e.wf.start(card.key, by))
     commit(slot, { [`${card.id}.txt`]: `${card.title}\n` }, card.title)

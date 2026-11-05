@@ -402,7 +402,7 @@
   "performance.toolList.chars": "文字数",
   "performance.toolList.descriptions": "説明",
   "performance.toolList.empty": "ツール一覧はありません。",
-  "performance.toolList.heading": "hiveツール一覧",
+  "performance.toolList.heading": "Combwork ツール一覧",
   "performance.toolList.params": "パラメーター",
   "performance.toolList.schemas": "スキーマ",
   "performance.toolList.starts": "起動",

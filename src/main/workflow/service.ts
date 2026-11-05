@@ -189,7 +189,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
   return new Workflow({
-    // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for Hive-Card
+    // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for card
     // trailers written before, as the adoption's store keyed them).
     store,
     project: project.path,

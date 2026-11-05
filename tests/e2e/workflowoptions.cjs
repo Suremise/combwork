@@ -119,7 +119,7 @@ async function theForm(page, app, inv) {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 950 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const f = await theForm(page, app, inv)
     const { section, row, groups, choice, preview, save, reasons, values, dialog, applyChoice, saveAll, reopen, discard, themes } = f

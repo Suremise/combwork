@@ -86,11 +86,11 @@ describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: 12
     store = new SlotStore(fileSlotConn(boardFile(wsPath)), (await ws.projectConfig(project)).id ?? 'alpha-id')
     // slot-a lent for a card (its line checked out), slot-b carried and protected, slot-c left dirty, slot-d carried
     // and given up, slot-e free beyond the pool, slot-f with a session writing in it; a copy, two homes, one other.
-    tree('slot-a', 'hive/AL/AL-7-a-line')
-    tree('slot-b', 'hive/b2-old')
+    tree('slot-a', 'cw/AL/AL-7-a-line')
+    tree('slot-b', 'cw/b2-old')
     tree('slot-c')
     writeFileSync(join(at('slot-c'), 'left.txt'), 'work\n')
-    tree('slot-d', 'hive/b3-old')
+    tree('slot-d', 'cw/b3-old')
     tree('slot-e')
     tree('slot-f')
     tree(join('copies', 'copy-1'))
@@ -141,8 +141,8 @@ describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: 12
   })
 
   it('Remove checks every protected place again, never only the list (HR3, round 1 finding 1)', async () => {
-    tree('home-r3', 'hive/r3-old')
-    tree(join('copies', 'copy-2'), 'hive/copy-2')
+    tree('home-r3', 'cw/r3-old')
+    tree(join('copies', 'copy-2'), 'cw/copy-2')
     setRetiredHomes(() => [at('home-r1'), at('home-r2'), at('home-r3')])
     const r3 = (await run(() => unusedWorktrees(project))).worktrees.find((w) => w.path.toLowerCase().endsWith('home-r3'))
     expect(r3).toMatchObject({ kind: 'home', check: { removable: true } })
@@ -184,12 +184,12 @@ describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: 12
     expect(list.checkedOut).toBe('main')
     expect(list.targets).toContain('main')
     expect(list.branches.map((b) => [b.name, b.kind, b.slot ?? null])).toEqual([
-      ['hive/AL/AL-7-a-line', 'line', 'slot-a'],
-      ['hive/b2-old', 'carried', 'slot-b'],
-      ['hive/b3-old', 'carried', 'slot-d'],
-      ['feature', 'branch', null],
-      ['hive/copy-2', 'branch', null],
-      ['hive/r3-old', 'branch', null]
+      ['cw/AL/AL-7-a-line', 'line', 'slot-a'],
+      ['cw/b2-old', 'carried', 'slot-b'],
+      ['cw/b3-old', 'carried', 'slot-d'],
+      ['cw/copy-2', 'branch', null],
+      ['cw/r3-old', 'branch', null],
+      ['feature', 'branch', null]
     ])
   })
 

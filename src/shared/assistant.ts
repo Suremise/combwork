@@ -133,7 +133,7 @@ export const NEW_MODE_DESCRIPTION = 'What this mode is for, in one line.'
 
 /** A new mode's file: a header and a starting point for its instructions. */
 export function newModeText(name: string): string {
-  return `---\nname: ${name}\ndescription: ${NEW_MODE_DESCRIPTION}\nicon: 🐝\nsummary: |\n  Its habits in a few lines: what Hive tells the Assistant when you switch to it.\n---\n\nYou are in **${name}** mode.\n\nDescribe how the Assistant works in it: what it puts first, its habits and the shape of what it hands back.\n`
+  return `---\nname: ${name}\ndescription: ${NEW_MODE_DESCRIPTION}\nicon: 🐝\nsummary: |\n  Its habits in a few lines: what Combwork tells the Assistant when you switch to it.\n---\n\nYou are in **${name}** mode.\n\nDescribe how the Assistant works in it: what it puts first, its habits and the shape of what it hands back.\n`
 }
 
 /** A mode id from a name: lower case, words joined by hyphens. */

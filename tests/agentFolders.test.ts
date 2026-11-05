@@ -68,7 +68,7 @@ describe('where a new conversation starts, and where an agent works now', () => 
   })
 
   it('until the migration takes it over an agent with a 0.9 worktree keeps working there; after, its worktree no longer counts', () => {
-    const legacy: FolderAgent = { id: 'b1', role: 'builder', legacy: { path: 'C:\\ws.worktrees\\project\\hb1', branch: 'hive/hb1' } }
+    const legacy: FolderAgent = { id: 'b1', role: 'builder', legacy: { path: 'C:\\ws.worktrees\\project\\hb1', branch: 'cw/hb1' } }
     expect(launchFolder(facts([], { migrated: false }), legacy, 'build')).toBe('C:\\ws.worktrees\\project\\hb1')
     expect(launchFolder(facts([], { migrated: false }), legacy, 'review')).toBe('C:\\ws.worktrees\\project\\hb1')
     expect(launchFolder(facts([], { migratedAgents: ['b1'] }), legacy, 'build')).toBe(P)
@@ -106,7 +106,7 @@ describe('where an agent is, as the Agent API names it (#1451)', () => {
 
   it('a carried agent: its adopted slot (carried); a 0.9 worktree not migrated yet: there (carried), by its path', () => {
     expect(agentPlaces(facts([slot('hb2', { open: lease('l2', 'hb2', 'b1', 'carried') })]), builder, null).now).toEqual({ path: slotFolder('hb2'), at: 'hb2', why: 'carried', slot: 'hb2' })
-    const old: FolderAgent = { ...builder, legacy: { path: slotFolder('b1'), branch: 'hive/b1' } }
+    const old: FolderAgent = { ...builder, legacy: { path: slotFolder('b1'), branch: 'cw/b1' } }
     expect(agentPlaces(facts([], { migrated: false }), old, null).now).toEqual({ path: slotFolder('b1'), at: slotFolder('b1'), why: 'carried', slot: null })
   })
 
@@ -128,7 +128,7 @@ describe('where an agent is, as the window shows it (#1442)', () => {
 
   it('a builder in a card\'s slot: "slot", by the slot\'s name, with its line; in its carried slot: "carried"', () => {
     const f = facts([slot('slot-b', { open: lease('l1', 'slot-b', 'b1') })])
-    expect(shown(f, builder, null, 'hive/card-12')).toEqual({ folder: slotFolder('slot-b'), is: 'slot', name: 'slot-b', branch: 'hive/card-12' })
+    expect(shown(f, builder, null, 'cw/card-12')).toEqual({ folder: slotFolder('slot-b'), is: 'slot', name: 'slot-b', branch: 'cw/card-12' })
     expect(shown(facts([slot('hb2', { open: lease('l2', 'hb2', 'b1', 'carried') })]), builder)).toEqual({ folder: slotFolder('hb2'), is: 'carried', name: 'hb2', branch: null })
     // Running in a slot under another agent's carried lease (draining): a slot, not its carried one.
     expect(shown(facts([slot('hb3', { open: lease('l3', 'hb3', 'b9', 'carried') })]), builder, { cwd: slotFolder('hb3') }).is).toBe('slot')
@@ -136,9 +136,9 @@ describe('where an agent is, as the window shows it (#1442)', () => {
 
   it("a slot with a target: its base, what the Changes tab compares the slot's work with (#1569)", () => {
     const f = facts([{ ...slot('slot-b', { open: lease('l1', 'slot-b', 'b1') }), target: 'main' }])
-    expect(shown(f, builder, null, 'hive/card-12')).toEqual({ folder: slotFolder('slot-b'), is: 'slot', name: 'slot-b', branch: 'hive/card-12', base: 'main' })
+    expect(shown(f, builder, null, 'cw/card-12')).toEqual({ folder: slotFolder('slot-b'), is: 'slot', name: 'slot-b', branch: 'cw/card-12', base: 'main' })
     // Its card's target, where the line merges, before the slot's (#1627: a lane's slot lent before targets were passed on).
-    expect(shownPlace(f, builder, agentPlaces(f, builder, null).now, 'hive/card-12', '1.0.0').base).toBe('1.0.0')
+    expect(shownPlace(f, builder, agentPlaces(f, builder, null).now, 'cw/card-12', '1.0.0').base).toBe('1.0.0')
   })
 
   it('a reviewer resumed in its retired home: "home", by the folder\'s name; in the project folder: nothing to name', () => {
@@ -149,8 +149,8 @@ describe('where an agent is, as the window shows it (#1442)', () => {
   })
 
   it('an agent on its 0.9 worktree, not migrated yet: "legacy", with its branch; once migrated, where the contract puts it', () => {
-    const old: FolderAgent = { ...builder, legacy: { path: slotFolder('hb1'), branch: 'hive/hb1' } }
-    expect(shown(facts([], { migrated: false }), old)).toEqual({ folder: slotFolder('hb1'), is: 'legacy', name: 'hb1', branch: 'hive/hb1' })
+    const old: FolderAgent = { ...builder, legacy: { path: slotFolder('hb1'), branch: 'cw/hb1' } }
+    expect(shown(facts([], { migrated: false }), old)).toEqual({ folder: slotFolder('hb1'), is: 'legacy', name: 'hb1', branch: 'cw/hb1' })
     expect(shown(facts([], { migratedAgents: ['b1'] }), old).is).toBe('project')
   })
 
@@ -289,8 +289,8 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     // b1's card lease on slot-b, its card not started there yet: no line.
     expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-b'), target: null, line: null, carried: false })
     db.prepare("INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (12, 'Fix', '', 'p1', 'doing', 1, ?, 'test', ?)").run(at, at)
-    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'hive', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'hive/P1/P1-12-fix' }))
-    expect(leasedLine(db, 'p1', 'b1')?.line).toBe('hive/P1/P1-12-fix')
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'hive', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix' }))
+    expect(leasedLine(db, 'p1', 'b1')?.line).toBe('cw/P1/P1-12-fix')
     // A carried lease too (its 0.9 worktree, adopted): the dispatch lease's still wins; another agent's carried one is its own.
     db.prepare("UPDATE slots SET target = 'main' WHERE name = 'slot-c'").run()
     db.prepare("INSERT INTO slot_leases (id, project, slot, kind, agent, from_at) VALUES ('l2', 'p1', 'slot-c', 'carried', 'b1', ?)").run(at)
@@ -306,10 +306,10 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     db.prepare("UPDATE slots SET target = 'main' WHERE name = 'slot-b'").run()
     db.prepare("INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (12, 'Fix', '', 'p1', 'doing', 1, ?, 'test', ?)").run(at, at)
     // Started before 1.0's facts named a target: the slot's.
-    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'hive', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'hive/P1/P1-12-fix' }))
-    expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ line: 'hive/P1/P1-12-fix', target: 'main' })
-    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 2, 'Started', ?, 'hive', 'recorded', ?)").run(new Date(Date.parse(at) + 1000).toISOString(), JSON.stringify({ lease: 'l1', line: 'hive/P1/P1-12-fix', target: '1.0.0' }))
-    expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ line: 'hive/P1/P1-12-fix', target: '1.0.0' })
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'hive', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix' }))
+    expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ line: 'cw/P1/P1-12-fix', target: 'main' })
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 2, 'Started', ?, 'hive', 'recorded', ?)").run(new Date(Date.parse(at) + 1000).toISOString(), JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix', target: '1.0.0' }))
+    expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ line: 'cw/P1/P1-12-fix', target: '1.0.0' })
   })
   /** A claim as claimPlace makes it, its facts read before the write (as `before` has them). */
   const claim = (store: SlotStore, o: { run: string; existing?: { id: string; cwd: string; lease?: string } | null; auto?: boolean; head?: string | null; folder?: string; agent?: FolderAgent }) =>

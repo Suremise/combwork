@@ -12,15 +12,15 @@ describe('sessionOrigin', () => {
     expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', agentName: 'Old name' })?.label).toBe('Coder · Project folder')
     // The project folder in other case, as Windows may record it.
     expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: P.toUpperCase() })?.location).toBe('Project folder')
-    const wt = sessionOrigin(P, agents, { source: 'hive', agentId: 'a-2', cwd: WT, branch: 'hive/reviewer' })
-    expect(wt?.label).toBe('Reviewer · Worktree · hive/reviewer')
+    const wt = sessionOrigin(P, agents, { source: 'hive', agentId: 'a-2', cwd: WT, branch: 'cw/reviewer' })
+    expect(wt?.label).toBe('Reviewer · Worktree · cw/reviewer')
     expect(wt?.detail).toContain(`Ran in ${WT}`)
     expect(wt?.detail).toContain('a-2')
   })
 
   it("an agent added later with the same name or worktree isn't the one that ran it", () => {
     const replacement = [{ id: 'a-new', name: 'Coder' }]
-    expect(sessionOrigin(P, replacement, { source: 'hive', agentId: 'a-old', agentName: 'Coder', cwd: WT, branch: 'hive/coder' })?.label).toBe('Coder (removed) · Worktree · hive/coder')
+    expect(sessionOrigin(P, replacement, { source: 'hive', agentId: 'a-old', agentName: 'Coder', cwd: WT, branch: 'cw/coder' })?.label).toBe('Coder (removed) · Worktree · cw/coder')
     // Recorded before names were: no name is made up.
     const old = sessionOrigin(P, replacement, { source: 'hive', agentId: 'a-old' })
     expect(old?.label).toBe('Removed agent · Project folder')
@@ -43,7 +43,7 @@ describe('sessionOrigin', () => {
     const agents = [{ id: 'a-1', name: 'HB1' }]
     expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: `${slots}\\SLOT-B` }, folders)?.label).toBe('HB1 · Slot · slot-b')
     expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: `${slots}\\hr4` }, folders)?.location).toBe('Home · hr4')
-    expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: WT, branch: 'hive/coder' }, folders)?.location).toBe('Worktree · hive/coder')
+    expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: WT, branch: 'cw/coder' }, folders)?.location).toBe('Worktree · cw/coder')
     expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: P }, folders)?.location).toBe('Project folder')
   })
 

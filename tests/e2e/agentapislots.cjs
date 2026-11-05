@@ -89,7 +89,7 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const several = await api('GET', '/v1/projects/alpha/agents//activity')
     check('…with several: refused (400), saying to name it with "agent"', several.status === 400 && /several agents: say which one with "agent"/.test(several.body?.error ?? ''), JSON.stringify(several))
     // B2: a 0.9 agent with its own worktree, as an upgraded project has one, adopted as its carried slot hb2.
-    const b2 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'B2', branch: 'hive/hb2', workflowRole: 'builder' })
+    const b2 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'B2', branch: 'cw/hb2', workflowRole: 'builder' })
     const hb2 = (await inv('workspace:refresh')).projects.find((p) => same(p.path, alpha)).agents.find((a) => a.id === b2.id)?.worktree?.path
     check("B2's 0.9 worktree is there", !!hb2 && fs.existsSync(hb2), String(hb2))
     const carried = await op({ op: 'carry', agent: b2.id, slot: 'hb2', folder: hb2 })
@@ -128,9 +128,9 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     check("its own doc read reads slot-a's copy", /The slot copy/.test(await read(t2)), await read(t2))
     check('…from=project reads the project folder', /The project copy/.test(await read(t2, 'project')), await read(t2, 'project'))
     s = await status()
-    check('cw_project_status: B1 in slot-a, B2 in its carried hb2 on its branch, R1 in project', s.B1?.folder === 'slot-a' && s.B1.slot === 'slot-a' && s.B2?.folder === 'hb2' && s.B2.slot === 'hb2' && s.B2.branch === 'hive/hb2' && s.R1?.folder === 'project' && !s.R1.slot, JSON.stringify(s))
+    check('cw_project_status: B1 in slot-a, B2 in its carried hb2 on its branch, R1 in project', s.B1?.folder === 'slot-a' && s.B1.slot === 'slot-a' && s.B2?.folder === 'hb2' && s.B2.slot === 'hb2' && s.B2.branch === 'cw/hb2' && s.R1?.folder === 'project' && !s.R1.slot, JSON.stringify(s))
     const actB2 = await activity(b2.id)
-    check("B2's detail: in hb2, carried", actB2?.folder?.at === 'hb2' && actB2.folder.why === 'carried' && !('launchFolder' in actB2) && actB2.branch === 'hive/hb2', JSON.stringify(actB2))
+    check("B2's detail: in hb2, carried", actB2?.folder?.at === 'hb2' && actB2.folder.why === 'carried' && !('launchFolder' in actB2) && actB2.branch === 'cw/hb2', JSON.stringify(actB2))
     check('B1 stopped again', await stop(b1.id))
 
     // --- Storage: slot-a lent to B1, then free once its lease ends (kept on disk for the next card): counted both times.
@@ -152,7 +152,7 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const asToken = await until(async () => (fs.existsSync(asTokenFile) ? JSON.parse(fs.readFileSync(asTokenFile, 'utf8')).token : null), HUNG_MS)
     check('the Assistant starts, with its token', !!asToken)
     const before = (await inv('workspace:refresh')).projects.find((p) => same(p.path, alpha)).agents.length
-    for (const body of [{ location: 'new-worktree' }, { worktree: true }, { existingWorktree: hb2 }, { branch: 'hive/x' }]) {
+    for (const body of [{ location: 'new-worktree' }, { worktree: true }, { existingWorktree: hb2 }, { branch: 'cw/x' }]) {
       const r = await api('POST', '/v1/projects/alpha/agents', { name: 'X', ...body }, asToken)
       check(`add-agent with ${Object.keys(body)[0]} is refused, saying why`, r.status === 400 && /aren't pinned to worktrees in 1\.0/.test(JSON.stringify(r.body)), JSON.stringify(r))
     }

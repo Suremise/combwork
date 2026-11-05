@@ -558,7 +558,7 @@ function MarkdownPreview({ text, root, rel, onOpenRel }: PreviewProps) {
     if (!el) return
     for (const img of el.querySelectorAll('img')) {
       const src = img.getAttribute('src') ?? ''
-      if (!src || /^(https?:|data:|hive-img:)/i.test(src)) continue
+      if (!src || /^(https?:|data:|combwork-img:)/i.test(src)) continue
       const target = joinRel(dir, safeDecode(src.split(/[?#]/)[0]))
       img.setAttribute('src', imageUrl(`${root}\\${target.replace(/\//g, '\\')}`))
     }
@@ -702,7 +702,7 @@ function ImagePreview({ abs }: PreviewProps) {
 }
 
 function PdfPreview({ abs }: PreviewProps) {
-  // Chromium's PDF viewer doesn't run in a sandboxed frame; the source is hive-img:, which only serves images and PDFs from the workspace.
+  // Chromium's PDF viewer doesn't run in a sandboxed frame; the source is combwork-img:, which only serves images and PDFs from the workspace.
   // eslint-disable-next-line react/iframe-missing-sandbox
   return <iframe className="pdf-preview" src={imageUrl(abs)} title={tr(M.pdfPreview)} />
 }

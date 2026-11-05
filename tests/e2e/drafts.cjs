@@ -29,12 +29,12 @@ const HUNG_MS = 10000
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.appReady(page)
-  await page.evaluate((folder) => window.hive.invoke('workspace:open', folder), ws)
+  await page.evaluate((folder) => window.combwork.invoke('workspace:open', folder), ws)
   await sleep(800)
   fs.writeFileSync(note, '# Plan\n')
   fs.mkdirSync(path.dirname(server), { recursive: true })
   fs.writeFileSync(server, '{ "command": "node", "args": [] }\n')
-  await page.evaluate(() => window.hive.invoke('workspace:refresh'))
+  await page.evaluate(() => window.combwork.invoke('workspace:refresh'))
 
   const toolbar = page.locator('.split-main .editor-toolbar').first()
   const typeAtEnd = async (text) => {
@@ -106,7 +106,7 @@ const HUNG_MS = 10000
   check('mcp: unsaved edits kept after changing view', !!(await lib.until(unsaved, HUNG_MS)))
 
   // Quitting lists both and saves them.
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   const quit = (await lib.until(async () => { const t = await dialogText(); return /plan\.md/.test(t) && /demo\.json/.test(t) && t }, HUNG_MS)) || (await dialogText())
   check('quit: lists the unsaved note and server', /plan\.md/.test(quit) && /demo\.json/.test(quit), quit.replace(/\s+/g, ' ').slice(0, 200))
   // Combwork's part (saving both, then app.quit) and the process's exit are waited for separately (#424): the limits only

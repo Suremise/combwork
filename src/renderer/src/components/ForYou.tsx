@@ -70,7 +70,7 @@ const TIP_REQUESTS = 2
 export function ForYouChip({ items }: { items: ForYouItem[] | undefined }) {
   const projects = useStore((s) => s.workspace?.projects)
   if (!items?.length) return null
-  const who = (i: ForYouItem): string => (i.asker ? (projects?.find((p) => p.name.toLowerCase() === i.project.toLowerCase())?.agents.find((a) => a.id === i.asker)?.name ?? i.asker) : 'Hive') // i18n-ignore: the app's name
+  const who = (i: ForYouItem): string => (i.asker ? (projects?.find((p) => p.name.toLowerCase() === i.project.toLowerCase())?.agents.find((a) => a.id === i.asker)?.name ?? i.asker) : 'Combwork') // i18n-ignore: the app's name
   const text = tr(M.chipTip, { n: items.length, requests: items.map((i) => `${kindText(i)}: ${gist(requestText(i), 100)}`).join(' · ') })
   const tip = (
     <div className="for-you-tip">

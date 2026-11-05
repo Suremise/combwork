@@ -1213,7 +1213,7 @@ export class MergeQueue {
    * into it, or, with merge style Squash, it rebased onto the target, as Hive's commits are made (#1350: the project's
    * identity, the repository's hooks and signing, never a prompt). The result is the same change (§16.3.2's replay:
    * `sameChange`) or the card goes back to its builder: a conflict with the files, or a different change, both
-   * `notUpToDate`. The same: kept on `refs/hive/queue/<entry>` and recorded (`Updated`, carried), and the entry's test
+   * `notUpToDate`. The same: kept on `refs/cw/queue/<entry>` and recorded (`Updated`, carried), and the entry's test
    * merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a retest
    * after the target moved updates afresh, never on an earlier update.
    */
@@ -1262,7 +1262,7 @@ export class MergeQueue {
     if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: h }))) {
       return { fail: 'notSame', log: `${card.key}: ${revision.slice(0, 7)} brought up to date with ${target} (${expected.slice(0, 7)}) isn't the same change as reviewed: bring it up to date yourself and submit it again.` } // i18n-ignore: the card's log, agent-facing
     }
-    await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(entry.id)}`, h])
+    await this.git(this.project, ['update-ref', `refs/cw/queue/${refSafe(entry.id)}`, h])
     await this.write(card, (w) => {
       if (this.isOpen(w, entry)) w.fact('Updated', { entry: entry.id, from: revision, to: h, how: rebase ? 'rebased' : 'mergedTarget', carried: true }) // i18n-ignore: a fact's kind and codes, not text
     })
@@ -1284,7 +1284,7 @@ export class MergeQueue {
     // G19 (HI-1697): Hive's, or the branch's own (its commits since it left the target, merges left out).
     const how = this.commitMessage()
     const own = how === 'branch' ? await G.messages(this.project, `${base || (await this.mergeBaseOf(revision, expected))}..${revision}`) : []
-    if (isUnknown(own)) return again(`Hive couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
+    if (isUnknown(own)) return again(`Combwork couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
     const message = mergeMessage(how, { card, revision, updated, reviewers, messages: own })
     revision = updated ?? revision
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
@@ -1326,7 +1326,7 @@ export class MergeQueue {
     }
     const h = await G.head(f)
     if (isUnknown(h)) return again(gitSaid(h))
-    await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(card.key)}`, h])
+    await this.git(this.project, ['update-ref', `refs/cw/queue/${refSafe(card.key)}`, h])
     return { result: h }
   }
 
@@ -1387,7 +1387,7 @@ export class MergeQueue {
     if (!twoParents.ok) return again(twoParents.err)
     if (twoParents.out.trim()) return notUp('would land a merge commit (Rebase and fast-forward lands a linear history)') // i18n-ignore: the card's log, agent-facing
     if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: result }))) return notUp("isn't the same change as reviewed") // i18n-ignore: the card's log, agent-facing
-    await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(card.key)}`, result])
+    await this.git(this.project, ['update-ref', `refs/cw/queue/${refSafe(card.key)}`, result])
     return { result }
   }
 
@@ -1751,7 +1751,7 @@ export class MergeQueue {
     if (!changed.ok) return again(changed.err)
     const files = nulList(changed.out)
     const edited = await this.editedOf(folder, files)
-    if (!Array.isArray(edited)) return again(edited.err || `Hive couldn't read the status of ${folder}.`) // i18n-ignore: git's side of a pause, in English as git's messages are
+    if (!Array.isArray(edited)) return again(edited.err || `Combwork couldn't read the status of ${folder}.`) // i18n-ignore: git's side of a pause, in English as git's messages are
     if (edited.length) return { pause: 'unstagedChanges', files: edited }
 
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder })

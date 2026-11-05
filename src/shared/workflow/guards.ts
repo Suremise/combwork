@@ -75,7 +75,7 @@ const short = (r: string | null | undefined): string => (r ? r.slice(0, 7) : 'â€
  * amend that fixes it only when it is the folder's head: one other commits follow isn't amended, as that rewrites them.
  */
 export function trailerRefusal(key: string, u: { commit: string; head: boolean }): GuardRefusal {
-  return { rule: 'submit.trailer', values: { card: key, commit: short(u.commit), at: u.head ? 'head' : 'older', command: `git commit --amend --no-edit --trailer "Hive-Card: ${key}"` } } // i18n-ignore: a git command and select keys, as typed
+  return { rule: 'submit.trailer', values: { card: key, commit: short(u.commit), at: u.head ? 'head' : 'older', command: `git commit --amend --no-edit --trailer "Combwork-Card: ${key}"` } } // i18n-ignore: a git command and select keys, as typed
 }
 
 export function okBeforeApplies(r: Ruleset, labels: string[]): boolean {
@@ -160,7 +160,7 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     // Its last run's reason when it ran and didn't count (#1654): `none` when it didn't run or failed.
     const u = i.checkUncounted
     const why = { why: u?.whyNot ?? 'none', files: u?.changes?.length ? u.changes.join(', ') : 'none', copy: u?.isolatable ? 'yes' : 'no' } // i18n-ignore: select keys and paths, never shown as they are
-    return { rule: 'submit.checksPassed', values: { card: i.card.key, check: missing[0], revision: short(i.revision), command: `hive-progress --check ${missing[0]} --card ${i.card.key}`, ...why } } // i18n-ignore: a command, as typed
+    return { rule: 'submit.checksPassed', values: { card: i.card.key, check: missing[0], revision: short(i.revision), command: `cw-progress --check ${missing[0]} --card ${i.card.key}`, ...why } } // i18n-ignore: a command, as typed
   },
   'submit.identity': (i) => {
     const b = i.badIdentity

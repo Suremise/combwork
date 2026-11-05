@@ -32,7 +32,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')
   await inv('workspace:open', ws); await sleep(800)
   await inv('project:setActive', proj, true)
@@ -75,7 +75,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   check('Agent 1 running', !!a1().live)
 
   // Guard: Agent 2 can't take the conversation Agent 1 has open.
-  const err = await page.evaluate(([folder, id, a2id]) => window.hive.invoke('session:start', folder, { resumeId: id, agentId: a2id }).then(() => 'started', (e) => String(e.message ?? e)), [proj, st.sessionId, A2.id])
+  const err = await page.evaluate(([folder, id, a2id]) => window.combwork.invoke('session:start', folder, { resumeId: id, agentId: a2id }).then(() => 'started', (e) => String(e.message ?? e)), [proj, st.sessionId, A2.id])
   check('guard refuses a conversation open in another agent', /already open in Agent 1/.test(err), err)
   check('Agent 2 still stopped', !(await project()).agents.find((a) => a.id === A2.id).live)
 

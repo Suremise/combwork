@@ -56,7 +56,7 @@ function sampleValues(message: string): Record<string, string | number> {
   return out
 }
 
-const tree = (check: Partial<UnusedWorktree['check']>, branch: string | null = 'hive/b4'): UnusedWorktree => ({ path: 'D:/w/.worktrees/b4', branch, check: { removable: false, into: 'main', ...check } }) as UnusedWorktree
+const tree = (check: Partial<UnusedWorktree['check']>, branch: string | null = 'cw/b4'): UnusedWorktree => ({ path: 'D:/w/.worktrees/b4', branch, check: { removable: false, into: 'main', ...check } }) as UnusedWorktree
 
 describe('the workspace area', () => {
   it('has its messages, each with a note for translators, all under workspace.', () => {
@@ -147,12 +147,12 @@ describe("what Combwork works out follows the window's language; what agents rea
     expect(keepAwakeText(2)).toMatch(/^\[/)
     expect(unusedState(tree({ removable: true }))).toMatch(/^\[.*main.*\]$/)
     expect(changeOutcome('add', { started: false, cancelled: true }, null).message).toMatch(/^\[/)
-    expect(reuseNote({ reused: true, branch: 'hive/b4', base: 'main', upTo: '66ce11b0' } as never, tr)).toMatch(/^\[.*hive\/b4.*66ce11b.*\]$/)
+    expect(reuseNote({ reused: true, branch: 'cw/b4', base: 'main', upTo: '66ce11b0' } as never, tr)).toMatch(/^\[.*cw\/b4.*66ce11b.*\]$/)
   })
 
   it("a reused worktree's note stays English for the Agent API and the log (no tr given)", () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    expect(reuseNote({ reused: true, branch: 'hive/b4', base: 'main', upTo: '66ce11b0' } as never)).toBe('reused hive/b4, brought up to main at 66ce11b')
-    expect(reuseNote({ reused: false, branch: 'hive/b4' } as never)).toBe("made a new worktree, leaving hive/b4's unused one as it is (not checked)")
+    expect(reuseNote({ reused: true, branch: 'cw/b4', base: 'main', upTo: '66ce11b0' } as never)).toBe('reused cw/b4, brought up to main at 66ce11b')
+    expect(reuseNote({ reused: false, branch: 'cw/b4' } as never)).toBe("made a new worktree, leaving cw/b4's unused one as it is (not checked)")
   })
 })

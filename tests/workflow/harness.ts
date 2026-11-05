@@ -51,7 +51,7 @@ export function commit(cwd: string, files: Record<string, string>, message: stri
   for (const [f, c] of Object.entries(files)) put(cwd, f, c)
   sh(cwd, 'add', '-A')
   const who = opts.email ? ['-c', `user.email=${opts.email}`] : []
-  execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Hive-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe' })
+  execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Combwork-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe' })
   return sh(cwd, 'rev-parse', 'HEAD')
 }
 

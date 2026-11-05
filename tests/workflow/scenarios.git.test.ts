@@ -579,7 +579,7 @@ describe('workflow scenarios, Git', () => {
     expect(blocks(e.wf, card, run)).toBe('review')
     const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.checksPassed')
     expect(r.message).toMatch(/^Review refused: lint hasn't passed on [0-9a-f]{7}\.$/)
-    expect(r.next).toBe(`Run hive-progress --check lint --card ${card.key}, then submit again.`)
+    expect(r.next).toBe(`Run cw-progress --check lint --card ${card.key}, then submit again.`)
     const green = await runCheck(e.wf, { card, name: 'lint', by: 'B1', exec: async () => ({ ok: true }) })
     expect(green).toMatchObject({ counted: true, result: 'passed' })
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
@@ -589,7 +589,7 @@ describe('workflow scenarios, Git', () => {
     const e = pair({}, { preChecks: ['lint'], commands: { lint: 'npm run lint' } })
     const { card, folder } = await started(e)
     const revision = sh(folder, 'rev-parse', 'HEAD')
-    const command = `hive-progress --check lint --card ${card.key}`
+    const command = `cw-progress --check lint --card ${card.key}`
     const ran = async (data: Partial<FactData['CheckRan']>) => {
       const s = e.wf.state(card)
       await e.wf.write(card, e.wf.rulesetOf(card, s), 'agent:B1', (w) => w.fact('CheckRan', { name: 'lint', command: 'npm run lint', revision, tested: revision, result: 'passed', run: `run-${Math.random()}`, durationMs: 800, by: 'B1', counted: false, ...data }))
@@ -945,7 +945,7 @@ describe('a follow-up submitted in Review (HI-1832): the revision under review m
     expect(s.started?.builder).toBe('B1')
     // No move written, and its pin is the card's second.
     expect(e.store.facts(card.id).filter((f) => f.kind === 'Moved').map((f) => (f.data as FactData['Moved']).to)).toEqual(['active', 'review'])
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/2`).trim()).toBe(now)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/2`).trim()).toBe(now)
     // No lane holds it (HI-2046, HR1's round 1): R1 keeps it, carried onto the follow-up in the submit's write, and the
     // reviewer pool's pass tells it to start again (reviewerPool.test.ts), so nothing is woken here.
     expect(e.wakes).toEqual([])

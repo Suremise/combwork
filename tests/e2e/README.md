@@ -438,9 +438,18 @@ npm run e2e -- i18nshots                 # as part of a run (the full set, or --
 The e2e suites test the app on this machine. The **Sandbox checks** (`tests/sandbox`, #538; moved from the hive-mcp
 repo in HI-2298) test the **installer** on a clean Windows in Windows Sandbox:
 a fresh install and first launch, the first run with no CLIs (#474), a CLI appearing while Combwork runs (#472), an upgrade
-from the previous release with its settings kept, uninstall, and a new workspace. Two throwaway Sandboxes, about 3
-minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or credential goes in. It writes `report.md`
-(pass or fail per check, with screenshots) and passes only with every check run.
+from the previous release with its settings kept, uninstall, and a new workspace. Then the rename's acceptance test
+(scenario 9, `--only clean`, HI-2592): a clean install used as a new user would (first run, Claude Code on and an
+account, a workspace with a git project, an agent started briefly, a card, Settings, Copy Diagnostics, Export Board,
+quit), then searched for "hive" in any case, alone or joined (`tests/sandbox/clean.cjs`): file and folder names and
+text files in the install folder, `%APPDATA%\Combwork`, `%LOCALAPPDATA%\Combwork` and the workspace (`.git` too), the
+logs, the shortcuts, the registry (the app's keys whole, and every HKCU entry naming "hive" that wasn't there before
+the install), the agent's environment (`set` in its session), the window's text on each page visited, the Copy
+Diagnostics text and the exported board. It passes with no hit; each hit is listed with its place and text. app.asar is
+the one exception: its hits (the upgrade code that knows the 1.0 names) are counted in the report, never failed. Its git
+project uses this machine's Git for Windows, mapped read-only (`--git <its folder>`, by default the one on the PATH).
+Three throwaway Sandboxes, about 15 minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or
+credential goes in. It writes `report.md` (pass or fail per check, with screenshots) and passes only with every check run.
 
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the
   release-combwork skill), with the verdict and report folder commented on the release card.
@@ -458,7 +467,8 @@ minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or 
   the Sandbox, so the scripts that run inside (`tests/sandbox/inside`: the installer runs, the install record and the
   window driver `drive.cjs`) and the e2e fake CLIs are this checkout's. A change to what `drive.cjs` drives (Provider
   Setup's text, the banner, the views, `provider:info`, the Agent API routes) changes it in the same card:
-  `tests/sandboxChecks.test.ts` fails when one it relies on is gone. The report is `report.cjs`; the fresh-install
+  `tests/sandboxChecks.test.ts` fails when one it relies on is gone (`tests/sandboxClean.test.ts` for the clean step's,
+  and the search and its report, `inside/clean-scan.cjs` and `clean.cjs`). The report is `report.cjs`; the fresh-install
   comparison against a workspace of yours, `node tests/sandbox/compare-workspace.cjs --report <report folder>
   --workspace <workspace>`. Their unit tests (`tests/sandbox*.test.ts`) run in `npm test` against a fake server
   (`tests/sandbox/fake-server.cjs`); the Sandbox runs themselves stay a manual release step.

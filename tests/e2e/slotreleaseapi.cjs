@@ -80,7 +80,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     // B2: a 0.9 agent with its own worktree, adopted as its carried slot hb2 (as agentapislots does).
-    const b2 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'B2', branch: 'hive/hb2', workflowRole: 'builder' })
+    const b2 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'B2', branch: 'cw/hb2', workflowRole: 'builder' })
     const hb2 = (await inv('workspace:refresh')).projects.find((p) => same(p.path, alpha)).agents.find((a) => a.id === b2.id)?.worktree?.path
     const carried = hb2 && fs.existsSync(hb2) ? await op({ op: 'carry', agent: b2.id, slot: 'hb2', folder: hb2 }) : null
     check("B2's 0.9 worktree carried as its slot hb2", carried?.kind === 'carried', JSON.stringify(carried))
