@@ -81,7 +81,7 @@ async function advancedNotes(ctx) {
   const { page } = ctx
   fs.writeFileSync(await advancedFile(ctx), `${JSON.stringify({ format: 1, values: { 'cw.mcp.replySeconds': 5, 'codex.ready.placeholder': 'zzz nothing like it', 'hive.not.a.value': 1 }, madeFor: {} }, null, 2)}\n`)
   await openSection(ctx, 'advanced')
-  await advancedTab(ctx, 'hive')
+  await advancedTab(ctx, 'cw')
   await shown(ctx, page.locator('.advanced-row.invalid[data-advanced="cw.mcp.replySeconds"]'), 'the value that is not valid')
   await advancedTab(ctx, 'codex')
   await shown(ctx, page.locator('[data-advanced="codex.ready.placeholder"] .advanced-note.warn'), "the value that doesn't find the recorded text")
@@ -117,8 +117,8 @@ async function advancedTyped(ctx) {
 async function closeAdvancedTyped(ctx) {
   const state = await ctx.inv('advanced:state')
   if (state?.values?.['codex.rateLimits.field'] !== undefined) throw new Error('the refused value was saved')
-  // The next screens find Advanced on Combwork's tab again.
-  await advancedTab(ctx, 'hive')
+  // The next screens find Advanced on Combwork's tab again (its group id is cw since HI-2518).
+  await advancedTab(ctx, 'cw')
   await openSection(ctx, 'general')
 }
 
