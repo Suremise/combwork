@@ -16,26 +16,26 @@ vi.mock('../src/main/events', async (orig) => ({ ...(await orig<object>()), toas
 /** Paths whose calls fail, each with its error's code, as access denied, another program holding it or a bad disk would. */
 const { held, later, sync, async_ } = vi.hoisted(() => {
   const paths = new Map<string, string>()
-  /** Paths matching a pattern whose calls fail once `pass` of them have gone through (a later read failing). */
-  const after: { match: RegExp; code: string; pass: number }[] = []
-  const failing = (p: unknown): string | undefined => {
+  /** Paths matching a pattern whose calls (`call`'s alone, when named) fail once `pass` of them have gone through (a later read failing). */
+  const after: { match: RegExp; code: string; pass: number; call?: string }[] = []
+  const failing = (p: unknown, call: string): string | undefined => {
     const now = paths.get(String(p).toLowerCase())
     if (now) return now
-    const l = after.find((x) => x.match.test(String(p)))
+    const l = after.find((x) => x.match.test(String(p)) && (!x.call || x.call === call))
     if (!l) return undefined
     if (l.pass > 0) return void l.pass--
     return l.code
   }
   const failure = (p: unknown, code: string): Error => Object.assign(new Error(`${code}: refused, '${String(p)}' (test)`), { code })
-  const syncCall = <F extends (...a: any[]) => any>(real: F): F =>
+  const syncCall = <F extends (...a: any[]) => any>(real: F, call: string): F =>
     ((p: unknown, ...rest: unknown[]) => {
-      const code = failing(p)
+      const code = failing(p, call)
       if (code) throw failure(p, code)
       return real(p, ...rest)
     }) as F
-  const asyncCall = <F extends (...a: any[]) => Promise<any>>(real: F): F =>
+  const asyncCall = <F extends (...a: any[]) => Promise<any>>(real: F, call: string): F =>
     ((p: unknown, ...rest: unknown[]) => {
-      const code = failing(p)
+      const code = failing(p, call)
       return code ? Promise.reject(failure(p, code)) : real(p, ...rest)
     }) as F
   return { held: paths, later: after, sync: syncCall, async_: asyncCall }
@@ -43,11 +43,11 @@ const { held, later, sync, async_ } = vi.hoisted(() => {
 
 vi.mock('original-fs', async (orig) => {
   const real = await orig<typeof import('fs')>()
-  return { ...real, statSync: sync(real.statSync), renameSync: sync(real.renameSync) }
+  return { ...real, statSync: sync(real.statSync, 'statSync'), renameSync: sync(real.renameSync, 'renameSync') }
 })
 vi.mock('original-fs/promises', async (orig) => {
   const real = await orig<typeof import('fs/promises')>()
-  return { ...real, readFile: async_(real.readFile), rm: async_(real.rm), open: async_(real.open) }
+  return { ...real, readFile: async_(real.readFile, 'readFile'), rm: async_(real.rm, 'rm'), open: async_(real.open, 'open'), lstat: async_(real.lstat, 'lstat'), rename: async_(real.rename, 'rename') }
 })
 
 const base = tempDir('upgrade-io-')
@@ -276,6 +276,72 @@ describe("the old skill copies' markers and hashes (nameUpgradeProjects.ts)", ()
         expect(await projectNamesDone(c.folder)).toBe(true)
       })
     }
+  }
+
+  // HR2's round 2: a look at the folder moved aside failing on its own entry (lstat), not its content, at either check
+  // after the rename: put back all the same, never left aside where the next run wouldn't see it.
+  const ASIDE = /\.cw-old-[^\\/]+$/
+  const run = (folder: string): Promise<void> => upgradeWorkspace(folder, { only: folder, projects: [], stop: () => undefined, checkpoint: async () => ({ ok: true }), copyFolders: async () => [] })
+  const project = async (): Promise<Awaited<ReturnType<typeof oldCopy>>> => {
+    const c = await oldCopy()
+    write(join(c.folder, '.combwork', 'project.json'), '{}')
+    return c
+  }
+  /** How many looks at the folder moved aside one check makes (a retirement makes two checks there). */
+  const looksPerCheck = async (): Promise<number> => {
+    const c = await project()
+    later.push({ match: ASIDE, code: 'EIO', pass: 1000, call: 'lstat' })
+    await run(c.folder)
+    const looks = 1000 - later[0].pass
+    release()
+    expect(looks % 2).toBe(0)
+    return looks / 2
+  }
+  for (const code of CODES) {
+    for (const check of ['first', 'last'] as const) {
+      it(`${code} on the moved-aside folder's own entry at the ${check} check after the rename: put back at once, no record; released, the next run retires it`, async () => {
+        const pass = check === 'first' ? 0 : await looksPerCheck()
+        const c = await project()
+        later.push({ match: ASIDE, code, pass, call: 'lstat' })
+        await expect(run(c.folder)).rejects.toThrow(/couldn't finish renaming the projects'/)
+        expect(later[0].pass).toBe(0)
+        release()
+        expect(readdirSync(join(c.folder, '.agents', 'skills'))).toEqual(['hive-merge-ready'])
+        expect(readFileSync(join(c.dir, 'SKILL.md'), 'utf8')).toBe('# merge-ready')
+        expect(await projectNamesDone(c.folder)).toBe(false)
+        await run(c.folder)
+        expect(readdirSync(join(c.folder, '.agents', 'skills'))).toEqual([])
+        expect(await projectNamesDone(c.folder)).toBe(true)
+      })
+    }
+  }
+
+  it('an old copy an earlier run left set aside: put back and retired before the record is written', async () => {
+    const c = await project()
+    const { renameSync } = await import('fs')
+    const aside = join(c.folder, '.agents', 'skills', '.hive-merge-ready.cw-old-1-1')
+    renameSync(c.dir, aside)
+    await run(c.folder)
+    expect(readdirSync(join(c.folder, '.agents', 'skills'))).toEqual([])
+    expect(await projectNamesDone(c.folder)).toBe(true)
+  })
+
+  for (const code of CODES) {
+    it(`${code} putting back an old copy an earlier run left set aside: the step fails, nothing recorded; released, the next run finishes`, async () => {
+      const c = await project()
+      const { renameSync } = await import('fs')
+      const aside = join(c.folder, '.agents', 'skills', '.hive-merge-ready.cw-old-1-1')
+      renameSync(c.dir, aside)
+      hold(aside, code)
+      await expect(run(c.folder)).rejects.toThrow(/couldn't finish renaming the projects'/)
+      release()
+      expect(readdirSync(join(c.folder, '.agents', 'skills'))).toEqual(['.hive-merge-ready.cw-old-1-1'])
+      expect(readFileSync(join(aside, 'SKILL.md'), 'utf8')).toBe('# merge-ready')
+      expect(await projectNamesDone(c.folder)).toBe(false)
+      await run(c.folder)
+      expect(readdirSync(join(c.folder, '.agents', 'skills'))).toEqual([])
+      expect(await projectNamesDone(c.folder)).toBe(true)
+    })
   }
 
   it("a copy that differs is a change, not a failure: swapOut abandons it as the user's, and the step keeps it and goes on", async () => {

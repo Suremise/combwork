@@ -1072,22 +1072,26 @@ class Unreadable {
 }
 
 /**
- * What a path holds: its contentHash, null if nothing is there, or Unreadable when a read of it failed. Too large, or a
- * file of it gone as it was read, is a difference (a hash no expected one matches), not a failure.
+ * What a path holds: its contentHash, null if nothing is there, or Unreadable when a look at it failed, its own entry's
+ * included (HR2's round 2 on HI-2612: so a check after a rename puts the item back, never throws past it). Too large, or
+ * a file of it gone as it was read, is a difference (a hash no expected one matches), not a failure.
  */
 async function hashChecked(path: string): Promise<string | null | Unreadable> {
-  const there = await lstat(path).then(
-    () => true,
-    (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? false : Promise.reject(e))
-  )
-  if (!there) return null
+  try {
+    await lstat(path)
+  } catch (e) {
+    return (e as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? null : new Unreadable(e)
+  }
   return contentHash(path).catch((e: unknown) => (e instanceof ContentTooLarge || (e as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? '\0changed' : new Unreadable(e)))
 }
 
 /** What a path holds, to compare with what a swap expects: its contentHash, null if nothing is there. */
 async function hashOrNone(path: string): Promise<string | null> {
-  const h = await hashChecked(path)
-  return h instanceof Unreadable ? '\0unreadable' : h
+  const there = await lstat(path).then(
+    () => true,
+    (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? false : Promise.reject(e))
+  )
+  return there ? contentHash(path).catch(() => '\0unreadable') : null
 }
 
 const exists = (path: string): Promise<boolean> => lstat(path).then(() => true, () => false)
