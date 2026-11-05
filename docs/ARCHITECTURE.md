@@ -78,7 +78,7 @@ This document explains how Combwork is put together, for anyone changing the cod
 │ servers.ts      hook server (random port) + Agent API (configured port)      │
 │ skills.ts mcp.ts notes.ts git.ts files.ts   feature services                 │
 │ ipc.ts          typed IPC handlers        tray.ts   system tray              │
-│ updater.ts      Hive's own updates (electron-updater, GitHub Releases)       │
+│ updater.ts      Combwork's own updates (electron-updater, GitHub Releases)   │
 └──────────────┬───────────────────────────────────────────────▲──────────────┘
                │ IPC (preload bridge: window.combwork)              │ HTTP hooks
 ┌──────────────▼───────────────┐                  ┌────────────┴─────────────┐
@@ -740,7 +740,7 @@ counters (aggregated in memory, saved as a unit). A card's old `#N` needs no ali
 Cards of a workspace with no project (project '') have no project id: #1219 decides their key.
 
 **The card JSON contract** (`src/main/schema/cardRows.ts`): `composeCard(decomposeCard(n, doc))` stringifies to exactly
-the document the card's row holds today, so the Agent API's card (tasks.ts `clean` of it), Export Board and a 0.9.3 Hive
+the document the card's row holds today, so the Agent API's card (tasks.ts `clean` of it), Export Board and a 0.9.3
 reading an export see the same bytes. Each field of Combwork's form goes to its column or child table; anything else (a
 field Combwork doesn't know, a known one of another type, a string with a lone surrogate) is kept as JSON in `extra`. The
 keys' order is Combwork's (`CARD_KEYS`: clean's, with `projectId` after `project` and `archivedFor`/`archivedBatch` last)
@@ -922,7 +922,7 @@ Terminals for every project that has had a session stay mounted (hidden) so swit
 
 ## Windows app identity
 
-The installed app uses the app user model ID `it.surmise.combwork` (since 1.1, HI-2460; Hive Desktop's was `com.hive.desktop`) (the Start menu and desktop shortcuts carry it, and each window sets it with `setAppDetails`), which gives the taskbar button and notifications the app's displayed name and icon. Dev and test builds run as `electron.exe` and use `it.surmise.combwork.dev`, registered under `HKCU\Software\Classes\AppUserModelId` as "Combwork Dev" (`DEV_APP_NAME`). Sharing one ID made Windows show Electron's name and icon for the installed Hive. The displayed name is "Combwork" (`productName`, `shared/appName.ts`; HI-2458, after #443's "Hive Desktop"), the install folder `%LOCALAPPDATA%\Programs\Combwork` comes from `executableName` (`Combwork.exe`; Hive Desktop's was `Programs\Hive`, `Hive.exe`, which the Combwork installer removes: `build/hiveUpgrade.ps1`), and main sets the profile folder `%APPDATA%\Combwork` itself (`profileFolder()`; `%APPDATA%\Hive` as the fallback while the installer hasn't moved it, HI-2461), since Electron would take `productName` for it. The app ID keys the installer's uninstall entry, so an update replaces the old install; the move to a new app ID is why the Combwork installer removes Hive Desktop itself.
+The installed app uses the app user model ID `it.surmise.combwork` (since 1.1, HI-2460; Hive Desktop's was `com.hive.desktop`) (the Start menu and desktop shortcuts carry it, and each window sets it with `setAppDetails`), which gives the taskbar button and notifications the app's displayed name and icon. Dev and test builds run as `electron.exe` and use `it.surmise.combwork.dev`, registered under `HKCU\Software\Classes\AppUserModelId` as "Combwork Dev" (`DEV_APP_NAME`). Sharing one ID made Windows show Electron's name and icon for the installed app. The displayed name is "Combwork" (`productName`, `shared/appName.ts`; HI-2458, after #443's "Hive Desktop"), the install folder `%LOCALAPPDATA%\Programs\Combwork` comes from `executableName` (`Combwork.exe`; Hive Desktop's was `Programs\Hive`, `Hive.exe`, which the Combwork installer removes: `build/hiveUpgrade.ps1`), and main sets the profile folder `%APPDATA%\Combwork` itself (`profileFolder()`, HI-2461: Combwork's only, HI-2594; a 1.0's `%APPDATA%\Hive` is renamed to it once, by the installer or else the names upgrade at start), since Electron would take `productName` for it. The app ID keys the installer's uninstall entry, so an update replaces the old install; the move to a new app ID is why the Combwork installer removes Hive Desktop itself.
 
 ## Packaging and updates
 
