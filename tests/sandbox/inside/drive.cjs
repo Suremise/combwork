@@ -43,7 +43,7 @@ const KEPT_CARD = 'Made before the upgrade'
 const ADV = { app: { old: 'hive.mcp.replySeconds', now: 'cw.mcp.replySeconds', value: 600 }, ws: { old: 'hive.progress.lanesShown', now: 'cw.progress.lanesShown', value: 6 } }
 // Scenario 9 (HI-2587): the upgrade from a 1.1 release candidate (RC2), already partly converted (its profile, .combwork
 // and cw.* ids), its files' prefix s9. What 1.0 needs moving that an RC has done already isn't checked there.
-const FROM_RC = /^s9/.test(prefix || '')
+const FROM_RC = (prefix || '').startsWith('s9')
 // The workspace's folder as the release before made it: .hive in 1.0, .combwork in an RC.
 const TREE_BEFORE = FROM_RC ? '.combwork' : '.hive'
 // A skill copy the release before made in the project (its marker, HI-2587), for the upgrade to rename.
@@ -289,7 +289,7 @@ const steps = {
     fs.mkdirSync(path.join(KEPT_WS, COPY), { recursive: true })
     fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), '---\nname: cw-sandbox-check\n---\n')
     fs.writeFileSync(path.join(KEPT_WS, COPY, '.hive-copy'), JSON.stringify({ source: 'sandbox', hash: 'h' }) + '\n')
-    res.facts.keptWorkspace = { made: !!made, card, tree: TREE_BEFORE, logs: fs.readdirSync(path.join(PROFILE, 'logs')).filter((n) => /\.log$/.test(n)) }
+    res.facts.keptWorkspace = { made: !!made, card, tree: TREE_BEFORE, logs: fs.readdirSync(path.join(PROFILE, 'logs')).filter((n) => n.endsWith('.log')) }
     check('4.workspace-made', `Before the upgrade: a workspace with a project and a card, in ${TREE_BEFORE}, its board hive.db, the log hive.log`, !!made && typeof card?.number === 'number' && res.facts.keptWorkspace.logs.includes('hive.log'), JSON.stringify(res.facts.keptWorkspace))
     if (FROM_RC) return void (await shot('before-upgrade'))
     // Advanced overrides under the release before's hive.* ids (HI-2518), one at each level: Combwork's own (advanced.json
@@ -369,8 +369,8 @@ const steps = {
     const dir = path.join(KEPT_WS, '.combwork')
     const listed = (d) => (fs.existsSync(d) ? fs.readdirSync(d) : [])
     res.facts.names = { combwork: listed(dir), backups: listed(path.join(dir, 'backups')), logs: listed(path.join(PROFILE, 'logs')), copy: listed(path.join(KEPT_WS, COPY)) }
-    check('4.board-file', 'The board is .combwork\\combwork.db, with the card made before; no hive.db or its sidecars left', res.facts.names.combwork.includes('combwork.db') && !res.facts.names.combwork.some((n) => /^hive\.db/.test(n)) && !!card, JSON.stringify(res.facts.names.combwork))
-    check('4.board-backups', "The board's copies in backups take Combwork's names", !res.facts.names.backups.some((n) => /^hive-/.test(n)), JSON.stringify(res.facts.names.backups))
+    check('4.board-file', 'The board is .combwork\\combwork.db, with the card made before; no hive.db or its sidecars left', res.facts.names.combwork.includes('combwork.db') && !res.facts.names.combwork.some((n) => n.startsWith('hive.db')) && !!card, JSON.stringify(res.facts.names.combwork))
+    check('4.board-backups', "The board's copies in backups take Combwork's names", !res.facts.names.backups.some((n) => n.startsWith('hive-')), JSON.stringify(res.facts.names.backups))
     let log = ''
     try { log = fs.readFileSync(path.join(PROFILE, 'logs', 'combwork.log'), 'utf8') } catch { /* below */ }
     check('4.log-file', "The log is combwork.log, with the release before's lines in it (its start line and this one's); no hive.log left", !res.facts.names.logs.includes('hive.log') && new Set([...log.matchAll(/\b(?:Hive|Combwork) (\S+) starting/g)].map((m) => m[1])).size >= 2, JSON.stringify(res.facts.names.logs))
