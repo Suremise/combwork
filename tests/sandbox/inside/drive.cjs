@@ -42,8 +42,8 @@ const KEPT_CARD = 'Made before the upgrade'
 // Scenario 4's advanced overrides (HI-2518): set under the release before's hive.* ids, read back under cw.* after.
 const ADV = { app: { old: 'hive.mcp.replySeconds', now: 'cw.mcp.replySeconds', value: 600 }, ws: { old: 'hive.progress.lanesShown', now: 'cw.progress.lanesShown', value: 6 } }
 // Scenario 9 (HI-2587): the upgrade from a 1.1 release candidate (RC2), already partly converted (its profile, .combwork
-// and cw.* ids), its files' prefix s9. What 1.0 needs moving that an RC has done already isn't checked there.
-const FROM_RC = (prefix || '').startsWith('s9')
+// and cw.* ids), its files' prefix s10 (scenario 10; 9 is HI-2592's clean install). What 1.0 needs moving that an RC has done already isn't checked there.
+const FROM_RC = (prefix || '').startsWith('s10')
 // The workspace's folder as the release before made it: .hive in 1.0, .combwork in an RC.
 const TREE_BEFORE = FROM_RC ? '.combwork' : '.hive'
 // A skill copy the release before made in the project (its marker, HI-2587), for the upgrade to rename.

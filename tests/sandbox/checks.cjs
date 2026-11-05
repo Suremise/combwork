@@ -10,7 +10,7 @@
  *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|upgrade-rc] [--short <installer>] [--wait-min N]
  *        [--smart-app-control off] [--previous-rc <a 1.1 release candidate's installer>]
  *
- * --previous-rc (HI-2587): a 1.1 release candidate (RC2), partly converted to Combwork's names, for scenario 9: the upgrade
+ * --previous-rc (HI-2587): a 1.1 release candidate (RC2), partly converted to Combwork's names, for scenario 10: the upgrade
  * from it, run beside 1.0.0's (scenario 4) whenever it is given, so the names upgrade is checked from both.
  *
  * --hive (or HIVE_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
@@ -284,7 +284,7 @@ function steps(srv, ctx) {
   return { run, ps, drive, desktop, collect, record, readSac, install }
 }
 
-const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, 'upgrade-rc': 9 }
+const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, 'upgrade-rc': 10 }
 // How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
 // unit tests, whose fake server shows nothing, set it to 0.
 const SETTINGS_OPEN_MS = Number(process.env.HIVE_SANDBOX_TEST_SETTINGS_MS ?? 6000)
@@ -362,7 +362,7 @@ async function main(argv) {
     upgrade: srv => overPrevious(srv, 4, 's4', '--updated /S --force-run'),
     manual: srv => overPrevious(srv, 7, 's7', '/S --force-run'),
     // Over a 1.1 release candidate (HI-2587), installed as Combwork already: the names upgrade from a partly converted install.
-    'upgrade-rc': srv => overPrevious(srv, 9, 's9', '--updated /S --force-run', { installer: p.guestPreviousRc, exe: '%LOCALAPPDATA%\\Programs\\Combwork\\Combwork.exe' }),
+    'upgrade-rc': srv => overPrevious(srv, 10, 's10', '--updated /S --force-run', { installer: p.guestPreviousRc, exe: '%LOCALAPPDATA%\\Programs\\Combwork\\Combwork.exe' }),
     // The installer's edge cases over Hive Desktop (edges.ps1), then a notification under the new app ID (HI-2460).
     edges: async srv => {
       const s = steps(srv, ctx)

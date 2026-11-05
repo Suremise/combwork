@@ -447,7 +447,7 @@ minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or 
 - **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --hive "<the main checkout>"
   --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
   upgrade start; `--hive` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
-  <a 1.1 release candidate's installer>` adds scenario 9, the upgrade from that RC, so the names upgrade, HI-2587, is
+  <a 1.1 release candidate's installer>` adds scenario 10, the upgrade from that RC, so the names upgrade, HI-2587, is
   checked from 1.0.0 and from an RC alike: pass it for 1.1's release candidates). It drives the
   hive-mcp project's **windows-sandbox MCP server** over stdio as any MCP client does, starting its own copy of it, so
   it needs no MCP registration: `--server <its server.js>` (or `WSB_SERVER`), else the copy Combwork installed from the MCP

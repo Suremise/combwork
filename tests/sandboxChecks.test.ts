@@ -251,7 +251,7 @@ test('the previous installer: a release sorts above its prereleases, so 0.9.0 is
   assert.strictEqual(pick('Hive-Setup-0.9.0.exe'), 'Hive-Setup-0.9.1-rc.1.exe')
 })
 
-test('--previous-rc (HI-2587): a 1.1 release candidate adds scenario 9 beside the upgrade from 1.0; --only upgrade-rc needs it', () => {
+test('--previous-rc (HI-2587): a 1.1 release candidate adds scenario 10 beside the upgrade from 1.0; --only upgrade-rc needs it', () => {
   const s = scratch('previous-rc')
   const hive = path.join(s.dir, 'builds', 'hive')
   const dist = path.join(hive, 'dist')

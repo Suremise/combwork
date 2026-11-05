@@ -19,7 +19,7 @@ const SCENARIOS = {
   6: 'A new workspace in the fresh install (for the fresh-install comparison)',
   7: 'Install by hand over the previous release, running (/S --force-run)',
   8: "The installer's edge cases over the previous release, and a notification under the new app ID",
-  9: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old'
+  10: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old'
 }
 const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'upgrade-rc']
 /** The names upgrade's checks after an upgrade (HI-2587), from 1.0 and from a release candidate alike. */
@@ -39,7 +39,7 @@ const REQUIRED = {
   },
   upgrade: overPrevious(4, 's4'),
   manual: overPrevious(7, 's7'),
-  'upgrade-rc': overPrevious(9, 's9', true),
+  'upgrade-rc': overPrevious(10, 's10', true),
   edges: { drivers: { s8: { scenario: 8, ids: ['8.notification'], facts: ['exe'] } }, shots: ['s8-notified.png', 's8-desktop.jpg'] }
 }
 
@@ -142,7 +142,7 @@ function evaluate(meta, files) {
     }
   }
 
-  for (const [kind, n, pre] of [['upgrade', 4, 's4'], ['manual', 7, 's7'], ['upgrade-rc', 9, 's9']]) {
+  for (const [kind, n, pre] of [['upgrade', 4, 's4'], ['manual', 7, 's7'], ['upgrade-rc', 10, 's10']]) {
     if (!ran.includes(kind)) continue
     const prevRun = need(n, `${pre}-prev-run`)
     const prevSt = need(n, `${pre}-prev-state`)
@@ -225,7 +225,7 @@ function markdown(r) {
     '',
     `- Installer: \`${m.installer}\` (version ${m.installerVersion}${m.buildInfo ? `, code ${m.buildInfo.code}, branch ${m.buildInfo.branch}, built ${m.buildInfo.builtAt}` : ''})`,
     m.previous ? `- Previous release for the upgrade: \`${m.previous}\` (version ${m.previousVersion})` : null,
-    m.previousRc ? `- Release candidate for scenario 9's upgrade: \`${m.previousRc}\` (version ${m.previousRcVersion})` : null,
+    m.previousRc ? `- Release candidate for scenario 10's upgrade: \`${m.previousRc}\` (version ${m.previousRcVersion})` : null,
     `- Host Windows ${m.hostBuild}; network **off** in the Sandbox; fake CLIs only, nothing signed in.`,
     m.smartAppControl?.option === 'off' ? `- **Smart App Control in the Sandbox: ${m.smartAppControl.note}** (\`--smart-app-control off\`; state ${m.smartAppControl.state ?? 'unknown'}, read before each install). Inside the Sandbox only: the host isn't changed. Unsigned installers could run, so this run says nothing about signing.` : null,
     `- Scenarios run: ${(m.ran || []).filter(k => !(r.notRun || []).some(n => n.kind === k)).join(', ') || 'none'}. Took ${m.minutes} min.`,
