@@ -251,6 +251,26 @@ describe('diagnostics redaction of the log', () => {
     expect(redactLog(`${T} [tasks] #3 created by ${userText('You')}: ${userText('x')}`, ctx)).toBe(`${T} [tasks] #3 created by <text>: <text>`)
   })
 
+  it('a start line says Combwork since the rename (HI-2572), and one saying Hive still counts', () => {
+    const lines = [
+      `${T} [main] Hive 0.4.0 starting (Electron 44.5.1)`,
+      `${T} [tasks] #1 created by You: Confidential customer merger notes`,
+      `${T} [main] Combwork 1.1.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
+      `${T} [tasks] #2 created by ${userText('You')}: ${userText('Another secret plan')}`,
+      `${T} [main] Combwork 1.1.1 starting (Electron 44.5.1)`,
+      `${T} [tasks] #3 created by You: Unmarked again`
+    ]
+    expect(redactLog(lines.join('\n'), ctx).split('\n')).toEqual([
+      `${T} [main] Hive 0.4.0 starting (Electron 44.5.1)`,
+      `${T} [tasks] ${OLDER_LINE}`,
+      `${T} [main] Combwork 1.1.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
+      `${T} [tasks] #2 created by <text>: <text>`,
+      `${T} [main] Combwork 1.1.1 starting (Electron 44.5.1)`,
+      `${T} [tasks] ${OLDER_LINE}`
+    ])
+    expect(OLDER_LINE).toBe('<message left out: logged by an older version of Combwork>')
+  })
+
   it("an agent's launch arguments: by role, not by how they look", () => {
     const claude = ['--session-id', '0b6f5d1e-6d5a-4c1f-9a4e-1c2d3e4f5a6b', '--name', 'Merger', '--settings', 'D:\\ws\\a\\.combwork\\settings.json', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', 'ConfidentialMerger']
     const out = redactLog(`${T} [pty] spawn x: claude.exe ${JSON.stringify(argsForLog(claude))}`, ctx)

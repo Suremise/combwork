@@ -994,7 +994,7 @@ app.whenReady().then(async () => {
   setDateStyle({ date: config.settings.general.dateFormat, time: config.settings.general.timeFormat })
   Menu.setApplicationMenu(null)
   // Says the log marks the user's own text (userText()), so Copy Diagnostics can tell this run's lines from older ones.
-  log.info(`Hive ${app.getVersion()} starting (Electron ${process.versions.electron}; ${MARKED_LOG})`)
+  log.info(`Combwork ${app.getVersion()} starting (Electron ${process.versions.electron}; ${MARKED_LOG})`)
   for (const line of profileLines) log.info(line)
   logCrashDumps()
   // The last run's marker (#984): still there, it ended without quitting; then this run's own.

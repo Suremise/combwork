@@ -225,7 +225,7 @@ export function startRunMarker(): void {
   const watch = (w: BrowserWindow): void => void w.on('session-end', () => endRunMarker('Windows is ending the session')) // i18n-ignore: why, for hive.log
   for (const w of BrowserWindow.getAllWindows()) watch(w)
   app.on('browser-window-created', (_e, w) => watch(w))
-  app.on('will-quit', () => endRunMarker('Hive is quitting')) // i18n-ignore: why, for hive.log
+  app.on('will-quit', () => endRunMarker('Combwork is quitting')) // i18n-ignore: why, for hive.log
 }
 
 /** A normal end (quitting, an update, a restart, Windows ending the session): the marker goes, and isn't written again. */

@@ -124,7 +124,7 @@ const check = (name, ok, extra = '') => {
   }, HUNG_MS)
   check("it is idle again once Claude Code says it's waiting for input", idleAgain?.status === 'ready', JSON.stringify(idleAgain && { status: idleAgain.status }))
   const logFile = path.join(userData, 'logs', 'hive.log')
-  const said = await until(() => fs.existsSync(logFile) && /idle at its prompt while Hive showed it working; idle again \(hooks before: .*prompt/.test(fs.readFileSync(logFile, 'utf8')), HUNG_MS)
+  const said = await until(() => fs.existsSync(logFile) && /idle at its prompt while Combwork showed it working; idle again \(hooks before: .*prompt/.test(fs.readFileSync(logFile, 'utf8')), HUNG_MS)
   check('the log says what Combwork saw before', !!said)
   check('and it takes a task', (await task('work 1')).status === 200)
   const done = await live(alpha, id)

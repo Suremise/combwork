@@ -36,7 +36,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
 /** The log since the last start: this run's lines. */
 const thisRun = () => {
   const text = logText()
-  const at = text.lastIndexOf('] Hive ')
+  const at = Math.max(-1, ...[...text.matchAll(/\] Combwork \S+ starting \(/g)].map((m) => m.index))
   return at < 0 ? '' : text.slice(text.lastIndexOf('\n', at) + 1)
 }
 /**
@@ -173,7 +173,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       await inv('app:quit').catch(() => undefined)
       check('a normal quit ends the copy', await quitting.gone(HUNG_MS))
       check('…and removes the marker', !fs.existsSync(markerFile))
-      check('…saying why in hive.log', /Removed the running marker: Hive is quitting/.test(thisRun()))
+      check('…saying why in hive.log', /Removed the running marker: Combwork is quitting/.test(thisRun()))
       current = null
     }
     {

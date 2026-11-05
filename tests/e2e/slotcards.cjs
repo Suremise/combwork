@@ -182,7 +182,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const tb1 = await tokenOf(b1.id)
     const s1 = await intent(tb1, c1, 'start')
     // Its own start, or Combwork's for the lane's next card landing first (HI-1990: that start is its reply): slot-a either way.
-    check("card 1's start: built in slot-a, B1 told to end its turn there (or that Combwork started it)", s1.status === 200 && same(s1.body?.data?.folder, slotA) && /You'll continue in slot-a|Hive started [A-Z]+-\d+ for you, as your lane's next card/.test(JSON.stringify(s1.body)), JSON.stringify(s1.body))
+    check("card 1's start: built in slot-a, B1 told to end its turn there (or that Combwork started it)", s1.status === 200 && same(s1.body?.data?.folder, slotA) && /You'll continue in slot-a|Combwork started [A-Z]+-\d+ for you, as your lane's next card/.test(JSON.stringify(s1.body)), JSON.stringify(s1.body))
     const base1 = git(alpha, 'rev-parse', 'integration')
     check(`card 1's line ${line(c1, 'slot-one')} is made in slot-a from the target's head`, !!(await until(() => branchIn(slotA) === line(c1, 'slot-one'), HUNG_MS)) && git(slotA, 'rev-parse', 'HEAD') === base1, branchIn(slotA))
     check('card 1 records its slot and lease', ((await inv('tasks:facts', c1)).find((f) => f.kind === 'Started')?.data?.slot ?? '') === 'slot-a')

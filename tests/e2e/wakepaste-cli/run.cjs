@@ -122,7 +122,7 @@ module.exports = async function run(provider) {
     /** How many doorbells its screen shows for a message (`delivery`: one of them). */
     const copies = async (key, delivery) => (await doorbellIds(key)).filter((x) => x === delivery).length
     /** Combwork has written the whole line into the agent: its Enter too (Woke), or, for Codex, waiting for it to be drawn. */
-    const written = (from) => hiveLog().split('\n').slice(from).some((l) => (l.includes(id) && /\[watches\] Woke /.test(l)) || /the line Hive typed is in; Enter once it shows/.test(l))
+    const written = (from) => hiveLog().split('\n').slice(from).some((l) => (l.includes(id) && /\[watches\] Woke /.test(l)) || /the line Combwork typed is in; Enter once it shows/.test(l))
 
     await inv('session:start', proj, { agentId: id })
     await lib.cliStep(`${provider} starts`, { session: lib.ptyKey(proj, id) }, async () => {
@@ -187,7 +187,7 @@ module.exports = async function run(provider) {
       const since = (re) => hiveLog().split('\n').slice(logLines).some((l) => re.test(l))
       fs.writeFileSync(hold, '')
       const left = callApi('POST', `/v1/projects/alpha/agents/Tester/message`, { text: 'Last round: nothing to do. Read this, ack it, and reply with just: ok' })
-      check('put off: its doorbell is typed, and held before its Enter', !!(await lib.until(() => since(/the line Hive typed is held before its Enter/), HUNG_MS, 100)))
+      check('put off: its doorbell is typed, and held before its Enter', !!(await lib.until(() => since(/the line Combwork typed is held before its Enter/), HUNG_MS, 100)))
       // Its delivery's id, from the line in its input (the message's reply waits for the line).
       const m = await lib.until(async () => (await doorbellIds(key)).find((x) => !earlier.has(x)), HUNG_MS, 300)
       check('put off: …it shows in its input', !!m && (await copies(key, m)) === 1, await screen(key))

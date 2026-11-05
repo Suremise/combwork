@@ -80,11 +80,11 @@ const testedWith = (version) => fs.writeFileSync(manifest, JSON.stringify(versio
   check('installed older than tested: "Older than tested; consider updating."', (await shows('older')) && (await line.innerText()).includes('Tested with 2.2.0 · installed 2.1.999') && (await line.innerText()).includes(OLDER), await line.innerText().catch(() => ''))
   await shot('older')
   const diag = await inv('app:diagnostics')
-  check('Copy Diagnostics: the tested and installed versions', diag.includes('this Hive release was tested with 2.2.0 (2026-10-07); installed: older than tested') && /\*\*Claude Code\*\*: on; 2\.1\.999/.test(diag), diag.split('\n').filter((l) => /Claude Code|tested/.test(l)).join(' | '))
+  check('Copy Diagnostics: the tested and installed versions', diag.includes('this Combwork release was tested with 2.2.0 (2026-10-07); installed: older than tested') && /\*\*Claude Code\*\*: on; 2\.1\.999/.test(diag), diag.split('\n').filter((l) => /Claude Code|tested/.test(l)).join(' | '))
 
   await again(null)
   check('a release that names no tested version: no line', !!(await lib.until(async () => (await line.count()) === 0, 10000)) && (await inv('provider:info'))['claude-code'].tested === null)
-  check('…and diagnostics say so', (await inv('app:diagnostics')).includes('no tested version recorded for this Hive release'))
+  check('…and diagnostics say so', (await inv('app:diagnostics')).includes('no tested version recorded for this Combwork release'))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

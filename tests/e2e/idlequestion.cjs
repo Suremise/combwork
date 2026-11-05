@@ -149,7 +149,7 @@ const check = (name, ok, extra = '') => {
     // Its doorbell typed twice in all: the one the screen took, and once again; never a third time once it was read.
     const rangFor = doorbells().filter((r) => r.data.includes(`(${second.body?.id})`))
     check('…typed again exactly once', rangFor.length === 2, JSON.stringify(rangFor))
-    check('the user is told of no lost line (it was a delivery, typed again)', !notices().some((n) => /didn't get a line Hive typed/.test(JSON.stringify(n))))
+    check('the user is told of no lost line (it was a delivery, typed again)', !notices().some((n) => /didn't get a line Combwork typed/.test(JSON.stringify(n))))
   } catch (e) {
     check('the suite ran to the end', false, e?.stack ?? String(e))
   } finally {
