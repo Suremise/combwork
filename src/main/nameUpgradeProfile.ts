@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
+import { RUN_MARKER } from '../shared/unexpectedClose'
 import { NEW_ID, OLD_ID, upgradedAdvancedIds, upgradedOptions, upgradedRunName } from './storedNames'
 
 /**
@@ -10,8 +11,16 @@ import { NEW_ID, OLD_ID, upgradedAdvancedIds, upgradedOptions, upgradedRunName }
  * - **Stored values** (HI-2598, its design HI-2598/s9 §5; upgradeProfileFiles): config.json's workflow defaults, commands
  *   and Agent API switch, advanced.json's ids, and each workspace's kept progress runs, before anything reads them.
  * - **The run marker** (`running.json`, lastRun.ts): the version that wrote it, `hive` before 1.1, is `app`. Rewritten
- *   before the last run's marker is read (checkLastRun), so a 1.0 or RC run that ended without quitting is still told.
+ *   before the last run's marker is read (checkLastRun), so a 1.0 or RC run that ended without quitting is still told;
+ *   by upgradeProfileFiles, under its rule.
  */
+
+/** A run marker's data with its old key renamed; null when it has nothing old. */
+export function upgradedRunMarkerData(d: unknown): Record<string, unknown> | null {
+  if (!d || typeof d !== 'object' || Array.isArray(d) || !('hive' in d) || 'app' in d) return null
+  const { hive, ...rest } = d as Record<string, unknown>
+  return { ...rest, app: hive }
+}
 
 /** A run marker's text with its old key renamed; null when it has nothing old (or isn't JSON: read as it is). */
 export function upgradedRunMarker(text: string): string | null {
@@ -21,22 +30,12 @@ export function upgradedRunMarker(text: string): string | null {
   } catch {
     return null
   }
-  if (!d || typeof d !== 'object' || Array.isArray(d) || !('hive' in d) || 'app' in d) return null
-  const { hive, ...rest } = d as Record<string, unknown>
-  return JSON.stringify({ ...rest, app: hive })
+  const now = upgradedRunMarkerData(d)
+  return now ? JSON.stringify(now) : null
 }
 
-/** Rewrites the run marker in place when it has the old key. Never throws: the marker is read as it is then. */
-export function upgradeRunMarkerFile(file: string): void {
-  try {
-    const now = upgradedRunMarker(readFileSync(file, 'utf8'))
-    if (now === null) return
-    writeFileSync(`${file}.upgrading`, now)
-    renameSync(`${file}.upgrading`, file)
-  } catch {
-    // Missing or held: nothing to do, or the marker is read as it is.
-  }
-}
+/** Rewrites the run marker in place when it has the old key: whether it is settled (upgradeProfileFiles' rule). */
+export const upgradeRunMarkerFile = (file: string): boolean => rewrite(file, upgradedRunMarkerData, (d) => JSON.stringify(d))
 
 /**
  * A file rewritten in place (written beside it, then renamed over it) when `f` changes it: whether it is settled. Missing,
@@ -153,16 +152,19 @@ export function upgradedRuns(d: unknown): Record<string, unknown> | null {
 export function upgradeProfileFiles(profile: string): string[] {
   const failed: string[] = []
   const at = (file: string, f: (data: any) => unknown | null, text: (data: unknown) => string): void => void (rewrite(file, f, text) || failed.push(file))
+  at(join(profile, RUN_MARKER), upgradedRunMarkerData, (d) => JSON.stringify(d))
   const config = join(profile, 'config.json')
   at(config, upgradedConfig, (d) => JSON.stringify(d))
   // Its last good copy too: a damaged config.json is read from it (readKeptJsonSync), and that must be current as well.
   at(`${config}.bak`, upgradedConfig, (d) => JSON.stringify(d))
   at(join(profile, 'advanced.json'), upgradedAdvanced, (d) => `${JSON.stringify(d, null, 2)}\n`)
   let files: string[] = []
+  const history = join(profile, 'progress-history')
   try {
-    files = readdirSync(join(profile, 'progress-history')).filter((f) => f.endsWith('.json'))
-  } catch {
-    // none kept yet
+    files = readdirSync(history).filter((f) => f.endsWith('.json'))
+  } catch (e) {
+    // None kept yet; one that can't be listed now isn't settled (HR1's round 2): its runs would be dropped as read.
+    if ((e as NodeJS.ErrnoException)?.code !== 'ENOENT') failed.push(history)
   }
   for (const f of files) at(join(profile, 'progress-history', f), upgradedRuns, (d) => JSON.stringify(d))
   return failed

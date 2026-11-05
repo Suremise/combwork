@@ -2,9 +2,9 @@ import { readdir, readFile } from 'original-fs/promises'
 import { join, resolve } from 'path'
 import { CW_DIR } from '../shared/defaults'
 import { isTemplateFile } from '../shared/templates'
-import { withFileLock, writeKeptJson } from './fsutil'
+import { withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
-import { ifAbsent } from './nameUpgradeFiles'
+import { ifAbsent } from './fsPresence'
 import { OLD_ID, NEW_ID, upgradedAdvancedIds, upgradedOptions } from './storedNames'
 
 /**
@@ -118,7 +118,8 @@ async function rewriteJson(file: string, lock: string, f: (raw: unknown) => Obj 
       return true
     }
     const now = f(raw)
-    if (now) await writeKeptJson(file, now, { existing: true })
+    // A last good copy is written as it is (writeKeptJson would keep a copy of the copy).
+    if (now) await (file.endsWith('.bak') ? writeTextAtomic(file, `${JSON.stringify(now, null, 2)}\n`) : writeKeptJson(file, now, { existing: true }))
     return true
   })
 }
@@ -135,13 +136,14 @@ async function upgradeTemplates(host: string): Promise<boolean> {
 /** The workspace's values (the `files` step): workspace.json and the workspace's templates; whether all are settled. */
 export async function upgradeWorkspaceValues(ws: string): Promise<boolean> {
   const file = join(ws, CW_DIR, 'workspace.json')
-  const own = await rewriteJson(file, file, upgradedWorkspaceConfig)
+  // Its last good copy too: a damaged file is read from it (readKeptJson).
+  const own = (await rewriteJson(file, file, upgradedWorkspaceConfig)) && (await rewriteJson(`${file}.bak`, file, upgradedWorkspaceConfig))
   return (await upgradeTemplates(ws)) && own
 }
 
 /** A project's values (its part of the `projects` step): project.json, under mutateProjectConfig's lock, and its templates; whether all are settled. */
 export async function upgradeProjectValues(project: string): Promise<boolean> {
   const file = join(project, CW_DIR, 'project.json')
-  const own = await rewriteJson(file, file, upgradedProjectConfig)
+  const own = (await rewriteJson(file, file, upgradedProjectConfig)) && (await rewriteJson(`${file}.bak`, file, upgradedProjectConfig))
   return (await upgradeTemplates(project)) && own
 }

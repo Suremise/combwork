@@ -1,4 +1,3 @@
-import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { join } from 'path'
 import { CW_DIR } from '../shared/defaults'
@@ -7,6 +6,7 @@ import { boardFileNeeded, moveBoardFile, NEW_DB_FILE } from './boardFileMove'
 import { writeTextAtomic } from './fsutil'
 import { HiveError, errorText, hiveError } from './hiveError'
 import { createLogger } from './logger'
+import { present } from './fsPresence'
 import { upgradeWorkspaceFiles } from './nameUpgradeFiles'
 import { upgradeProject } from './nameUpgradeProjects'
 import { upgradeProjectValues, upgradeWorkspaceValues } from './nameUpgradeValues'
@@ -65,7 +65,7 @@ async function recorded(host: string): Promise<boolean> {
 
 /** Writes a host's record (its `.combwork` there): only under the move's lock, after the other processes' refusal (combworkMove.ts). */
 export const record = async (host: string): Promise<void> => {
-  if (existsSync(join(host, CW_DIR))) await writeTextAtomic(recordOf(host), JSON.stringify({ version: NAMES_VERSION, at: new Date().toISOString() }) + '\n')
+  if (present(join(host, CW_DIR))) await writeTextAtomic(recordOf(host), JSON.stringify({ version: NAMES_VERSION, at: new Date().toISOString() }) + '\n')
 }
 
 /** Whether a project's own steps have run (its record): looked at as a project comes into an open workspace. */
@@ -74,7 +74,7 @@ export const projectNamesDone = (host: string): Promise<boolean> => recorded(hos
 /** Whether a workspace may still have anything under an old name: looked at cheaply, on every open. */
 export async function workspaceNeeds(ws: string): Promise<boolean> {
   const dir = join(ws, CW_DIR)
-  if (!existsSync(dir)) return false
+  if (!present(dir)) return false
   return (await boardFileNeeded(dir)) || !(await recorded(ws))
 }
 
@@ -100,7 +100,7 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
       if (await upgradeProjectValues(only)) await record(only)
     })
   }
-  if (!existsSync(dir)) return
+  if (!present(dir)) return
   await step('board', o.stop, () => moveBoardFile(dir, o.checkpoint))
   // A file that couldn't be read now (another program holds it) is converted at the next open: no record till then.
   let settled = true
@@ -112,7 +112,7 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
   await step('projects', o.stop, async () => {
     // Each project, then each folder its agents worked in that the board's records name (slots, worktrees, copies: the
     // same repository's exclude file, already done, and their own skill copies).
-    const copyFolders = (await o.copyFolders(join(dir, NEW_DB_FILE))).filter((f) => existsSync(f))
+    const copyFolders = (await o.copyFolders(join(dir, NEW_DB_FILE))).filter((f) => present(f))
     for (const p of o.projects) {
       o.stop()
       await upgradeProject(p, [])

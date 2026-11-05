@@ -60,26 +60,38 @@ const alive = (pid: number): boolean => {
  * marker's name, so another process of the same profile (whose marker this one's own write replaces) counts too.
  */
 export function othersPresentByProcess(hiveDir: string, now = Date.now()): PresenceMarker[] {
+  // The move's refusal (HI-2598, the Assistant's note): only a folder or marker that isn't there is "nobody". One that
+  // can't be listed or read now throws, so the move fails and is tried again, never moving under another process.
   let names: string[]
   try {
     names = readdirSync(join(hiveDir, PRESENCE_DIR))
-  } catch {
-    return []
+  } catch (e) {
+    if (gone(e)) return []
+    throw e
   }
   const out: PresenceMarker[] = []
   for (const f of names) {
     if (!f.endsWith('.json')) continue
+    let text: string
     try {
-      const m = JSON.parse(readFileSync(join(hiveDir, PRESENCE_DIR, f), 'utf8')) as Partial<PresenceMarker>
+      text = readFileSync(join(hiveDir, PRESENCE_DIR, f), 'utf8')
+    } catch (e) {
+      if (gone(e)) continue // removed as its Combwork closed
+      throw e
+    }
+    try {
+      const m = JSON.parse(text) as Partial<PresenceMarker>
       const beat = Date.parse(String(m.heartbeat))
       if (typeof m.pid !== 'number' || m.pid === process.pid || !Number.isFinite(beat) || now - beat > STALE_MS || !alive(m.pid)) continue
       out.push(m as PresenceMarker)
     } catch {
-      // Being written, or not a marker: not a Hive's.
+      // Not a marker (written whole, by a rename): not a Combwork's.
     }
   }
   return out
 }
+
+const gone = (e: unknown): boolean => (e as NodeJS.ErrnoException | null)?.code === 'ENOENT'
 
 /** The fresh markers of other profiles: their heartbeat recent and their process running. */
 export function othersPresent(hiveDir: string, ownId: string, now = Date.now()): PresenceMarker[] {

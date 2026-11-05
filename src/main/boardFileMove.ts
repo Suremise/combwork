@@ -1,11 +1,10 @@
-import { existsSync } from 'original-fs'
 import { readdir, rename, rm, stat } from 'original-fs/promises'
 import { join } from 'path'
 import { msg, tr } from '../shared/i18n'
 import { toast } from './events'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
-import { ifAbsent } from './nameUpgradeFiles'
+import { ifAbsent, present } from './fsPresence'
 
 /**
  * The board's file renamed `hive.db` → `combwork.db` (HI-2587, its design HI-2587/s15, s20, s23, s26), with its copies in
@@ -55,7 +54,7 @@ const sizeOf = async (f: string): Promise<number | null> => {
 
 /** Whether the board's files in this `.combwork` still have an old name: the file, a sidecar of it, or a copy of it. */
 export async function boardFileNeeded(dir: string): Promise<boolean> {
-  if (existsSync(join(dir, OLD_DB_FILE)) || SIDECARS.some((s) => existsSync(join(dir, OLD_DB_FILE + s)))) return true
+  if (present(join(dir, OLD_DB_FILE)) || SIDECARS.some((s) => present(join(dir, OLD_DB_FILE + s)))) return true
   return (await oldBackups(dir)).length > 0
 }
 
@@ -93,8 +92,8 @@ async function leftovers(dir: string): Promise<string[]> {
 export async function moveBoardFile(dir: string, checkpoint: (file: string) => Promise<{ ok: boolean; error?: string }>): Promise<void> {
   const oldFile = join(dir, OLD_DB_FILE)
   const newFile = join(dir, NEW_DB_FILE)
-  if (existsSync(oldFile)) {
-    if (existsSync(newFile)) {
+  if (present(oldFile)) {
+    if (present(newFile)) {
       log.warn(`${userText(dir)} has both ${OLD_DB_FILE} and ${NEW_DB_FILE}: ${NEW_DB_FILE} is used, ${OLD_DB_FILE} is left as it is`)
       warnOnce(`both:${dir.toLowerCase()}`, tr(M.bothTitle, { folder: dir }), tr(M.bothBody))
       await moveBackups(dir)
@@ -108,14 +107,14 @@ export async function moveBoardFile(dir: string, checkpoint: (file: string) => P
       if (size) throw hiveError(M.notFolded, { file: oldFile, log: oldFile + s }, { kind: 'conflict' })
     }
     // Never onto a file that is there (Node's rename replaces it on Windows): looked at again, under the move's lock.
-    if (existsSync(newFile)) throw hiveError(M.notFolded, { file: oldFile, log: newFile }, { kind: 'conflict' })
+    if (present(newFile)) throw hiveError(M.notFolded, { file: oldFile, log: newFile }, { kind: 'conflict' })
     await rename(oldFile, newFile)
     log.info(`Renamed ${userText(oldFile)} to ${NEW_DB_FILE}`)
     await boardMoveTestHooks.after?.('renamed')
   }
   const kept = await leftovers(dir)
   if (kept.length) {
-    if (!existsSync(newFile)) throw hiveError(M.orphan, { file: kept[0] }, { kind: 'conflict' })
+    if (!present(newFile)) throw hiveError(M.orphan, { file: kept[0] }, { kind: 'conflict' })
     for (const f of kept) {
       log.warn(`${userText(f)} holds data beside ${NEW_DB_FILE}: left as it is`)
       warnOnce(`left:${f.toLowerCase()}`, tr(M.leftTitle, { file: f }), tr(M.leftBody))
@@ -129,7 +128,7 @@ async function moveBackups(dir: string): Promise<void> {
   const b = join(dir, 'backups')
   for (const n of await oldBackups(dir)) {
     const to = join(b, n.replace(/^hive-/, 'combwork-'))
-    if (existsSync(to)) continue
+    if (present(to)) continue
     await rename(join(b, n), to)
   }
 }

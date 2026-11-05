@@ -1,4 +1,3 @@
-import { existsSync } from 'original-fs'
 import { readdir, readFile, rename } from 'original-fs/promises'
 import { join } from 'path'
 import { EXCLUDE_COMMENT } from '../shared/hiveFolderMove'
@@ -6,7 +5,7 @@ import { COPY_MARKER, writeTextAtomic } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { gitDirOf, vcsOf } from './hiveVcs'
-import { ifAbsent } from './nameUpgradeFiles'
+import { ifAbsent, present } from './fsPresence'
 
 /**
  * The names upgrade's steps in a project and the folders its agents work in (HI-2587, nameUpgrade.ts), each looking at
@@ -86,7 +85,7 @@ export function upgradedExclude(text: string): string | null {
 async function oldMarkers(folder: string): Promise<string[]> {
   const skills = join(folder, '.agents', 'skills')
   const names = await readdir(skills).catch(ifAbsent([] as string[]))
-  return names.map((n) => join(skills, n)).filter((d) => existsSync(join(d, OLD_COPY_MARKER)) && !existsSync(join(d, COPY_MARKER)))
+  return names.map((n) => join(skills, n)).filter((d) => present(join(d, OLD_COPY_MARKER)) && !present(join(d, COPY_MARKER)))
 }
 
 async function excludeFile(host: string): Promise<string | null> {
@@ -101,7 +100,7 @@ async function excludeFile(host: string): Promise<string | null> {
  * comments. `host` null: the markers in `folders` only.
  */
 export async function upgradeProject(host: string | null, folders: readonly string[]): Promise<void> {
-  for (const f of host ? [host, ...folders] : folders) for (const d of await oldMarkers(f)) await rename(join(d, OLD_COPY_MARKER), join(d, COPY_MARKER)).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? undefined : Promise.reject(e)))
+  for (const f of host ? [host, ...folders] : folders) for (const d of await oldMarkers(f)) await rename(join(d, OLD_COPY_MARKER), join(d, COPY_MARKER)).catch(ifAbsent(undefined))
   if (!host) return
   const ex = await excludeFile(host)
   const text = ex ? await readFile(ex, 'utf8').catch(ifAbsent(null)) : null
