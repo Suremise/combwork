@@ -56,7 +56,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const consoleText = []
     page.on('console', (m) => consoleText.push(m.text()))
-    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
     await lib.openWorkspace(inv, page, ws1)
     const list = () => inv('connections:list')

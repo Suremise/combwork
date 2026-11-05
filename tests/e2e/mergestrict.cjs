@@ -92,7 +92,7 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
     check('S55: merged: Done', !!(await waitHung(async () => (await column(one.n)) === 'done')), JSON.stringify(await h.kinds(one.n)))
     const [up] = await facts(one.n, 'Updated')
     check('…brought up to date by the queue: Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === one.revision && up.data.how === 'mergedTarget', JSON.stringify(up))
-    check('…the update contains the moved target, and the merge brought it in, naming both revisions', ancestor(one.moved, up?.data?.to ?? one.revision) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Hive-Updated: ${up?.data?.to}`) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Hive-Revision: ${one.revision}`))
+    check('…the update contains the moved target, and the merge brought it in, naming both revisions', ancestor(one.moved, up?.data?.to ?? one.revision) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Combwork-Updated: ${up?.data?.to}`) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Combwork-Revision: ${one.revision}`))
     check("…the card's slot untouched: its HEAD and status as they were, its branch at the reviewed revision", untouched(one) && lib.git(fx.alpha, ['rev-parse', `refs/heads/${(await h.facts(one.n)).find((x) => x.kind === 'Started')?.data?.line}`]).trim() === one.revision)
     const key1 = (await h.card(one.n)).key
     check("…its entry's update ref dropped with the outcome", !!(await waitHung(() => !lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/queue/']).includes(`${key1}-e`))))

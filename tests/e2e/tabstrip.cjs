@@ -23,7 +23,7 @@ const LABELS = ['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'File
 const MORE = ['Memory', 'Skills', 'Templates', 'MCP']
 const SPARE = 12
 let failed = 0
-const inv2 = (page, ch, ...a) => page.evaluate(([c, args]) => window.hive.invoke(c, ...args), [ch, a])
+const inv2 = (page, ch, ...a) => page.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, a])
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)

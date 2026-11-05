@@ -7,7 +7,7 @@ import type { ToastTarget, WorkspaceInfo } from '../src/shared/types'
 /** What the window asked main for, in order. */
 const calls: { channel: string; args: unknown[] }[] = []
 ;(globalThis as unknown as { window: unknown }).window = {
-  hive: {
+  combwork: {
     invoke: (channel: string, ...args: unknown[]) => {
       calls.push({ channel, args })
       return Promise.resolve(null)

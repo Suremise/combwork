@@ -1410,7 +1410,7 @@ async function updateLocked(projectPath: string, branch: string, how: BranchUpda
     const target = at.out.trim()
     const card = (await lineCard(projectPath, branch))?.key
     // i18n-ignore: a commit message, in English
-    const message = ['-m', `Merge ${plan.target} into ${branch}`, ...(card ? ['-m', `Hive-Card: ${card}`] : [])]
+    const message = ['-m', `Merge ${plan.target} into ${branch}`, ...(card ? ['-m', `Combwork-Card: ${card}`] : [])]
     // Nothing of its own (behind only): brought up by a fast-forward, whichever was asked; a merge commit would hold nothing.
     const forward = plan.ahead === 0
     // A rebase moves only the branch it rebases (HR4's #1352 round 1: never another ref with `rebase.updateRefs` on).

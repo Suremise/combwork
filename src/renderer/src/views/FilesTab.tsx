@@ -17,7 +17,7 @@ import type { CardAttachment } from '@shared/cardAttachments'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
-import { cx, formatBytes, formatKeybinding, HIVE_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
+import { cx, formatBytes, formatKeybinding, FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
 import { HIVE_DIR } from '@shared/defaults'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
@@ -652,14 +652,14 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
     const items = selected.includes(e.relPath) ? selEntries : [e]
     if (!selected.includes(e.relPath)) setSelected([e.relPath])
     const paths = items.map((i) => absOf(project, i.relPath))
-    ev.dataTransfer.setData(HIVE_FILES_MIME, JSON.stringify({ project: project.path, rels: items.map((i) => i.relPath), paths }))
+    ev.dataTransfer.setData(FILES_MIME, JSON.stringify({ project: project.path, rels: items.map((i) => i.relPath), paths }))
     ev.dataTransfer.setData('text/plain', paths.map(quotePath).join(' '))
     ev.dataTransfer.effectAllowed = 'copyMove'
   }
 
   const dragOverDir = (ev: React.DragEvent, dir: string): void => {
     const dt = ev.dataTransfer
-    const internal = dt.types.includes(HIVE_FILES_MIME)
+    const internal = dt.types.includes(FILES_MIME)
     if (!internal && !dt.types.includes('Files')) return
     ev.preventDefault()
     ev.stopPropagation()
@@ -678,7 +678,7 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
     setDropTarget(null)
     window.clearTimeout(hoverTimer.current)
     const unchanged = unchangedSelection()
-    const internal = ev.dataTransfer.getData(HIVE_FILES_MIME)
+    const internal = ev.dataTransfer.getData(FILES_MIME)
     let out: string[] | undefined
     if (internal) {
       const data = JSON.parse(internal) as { project: string; rels?: string[]; paths: string[] }
@@ -692,7 +692,7 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
         out = await actions.attempt(tr(M.couldNotCopy), () => call('files:copy', project.path, data.rels!, dir))
       } else out = await actions.attempt(tr(M.couldNotCopy), () => call('files:import', project.path, data.paths, dir))
     } else {
-      const sources = [...ev.dataTransfer.files].map((f) => window.hive.pathForFile(f)).filter(Boolean)
+      const sources = [...ev.dataTransfer.files].map((f) => window.combwork.pathForFile(f)).filter(Boolean)
       if (sources.length) out = await actions.attempt(tr(M.couldNotCopyIn), () => call('files:import', project.path, sources, dir))
     }
     if (dir) expand(dir)
@@ -1227,7 +1227,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
                   onClick={() => setViewing(a)}
                   onContextMenu={(e) => menu.open(e, menuFor(a, { x: e.clientX, y: e.clientY }))}
                   onDragStart={(e) => {
-                    e.dataTransfer.setData(HIVE_FILES_MIME, JSON.stringify({ project: project.path, paths: [a.path] }))
+                    e.dataTransfer.setData(FILES_MIME, JSON.stringify({ project: project.path, paths: [a.path] }))
                     e.dataTransfer.setData('text/plain', quotePath(a.path))
                     e.dataTransfer.effectAllowed = 'copy'
                   }}

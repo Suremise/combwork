@@ -39,7 +39,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('Electron bundles Node 24.22.1 or later (CVE-2026-111497)', atLeast(node, '24.22.1'), node)
   // Setup dialog may show on a fresh profile; close any modal first.
   await page.keyboard.press('Escape'); await sleep(300)
-  await page.evaluate(() => window.hive.invoke('app:info')) // warm
+  await page.evaluate(() => window.combwork.invoke('app:info')) // warm
   await page.keyboard.press('F1')
   await page.locator('.split-list .row', { hasText: 'About Combwork' }).click()
   check('About shows MIT link', await becomes(() => page.locator('.about-licence a', { hasText: 'MIT License' }).isVisible()))
@@ -75,7 +75,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
   // Review finding: card text and the workspaces opened before stayed in the log. A card in one workspace,
   // then another workspace: neither the card's title nor the first workspace's names may be in the report.
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const secretWs = path.join(scratch, 'about-ConfidentialWorkspace'), otherWs = path.join(scratch, 'about-OtherWorkspace')
   for (const d of [secretWs, otherWs]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(path.join(secretWs, 'PrivateProject'))

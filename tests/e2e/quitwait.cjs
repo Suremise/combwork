@@ -38,7 +38,7 @@ async function launch(name) {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const agent = await lib.addAgent(inv, alpha, { name: 'Busy' })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
@@ -71,7 +71,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     const { app, page, inv, alpha, agent, live, ready } = await launch('wait')
     check('the agent starts', !!ready)
     check('it is working', !!(await keepBusy(inv, alpha, agent, live, 8)))
-    await page.evaluate(() => window.hive.invoke('app:quit'))
+    await page.evaluate(() => window.combwork.invoke('app:quit'))
     const dialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
     check('Quit asks, since an agent is working', !!(await until(async () => (await dialog.count()) === 1, 5000)))
     const waitButton = dialog.locator('button', { hasText: 'Quit when' })
@@ -131,7 +131,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
       check('and the status bar says so', !!(await until(async () => /Keeping the PC awake: 1 agent working/.test(await awakeItem.innerText().catch(() => '')), HUNG_MS)))
       await page.screenshot({ path: path.join(lib.WORK, 'quitwait-2-awake.png') })
     }
-    await page.evaluate(() => window.hive.invoke('app:quit'))
+    await page.evaluate(() => window.combwork.invoke('app:quit'))
     const dialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
     await until(async () => (await dialog.count()) === 1, 5000)
     await dialog.locator('button', { hasText: 'Quit when' }).click()
@@ -162,7 +162,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     const dialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
     const waitToQuit = async (secs) => {
       check('reopen: it is working', !!(await keepBusy(inv, alpha, agent, live, secs)))
-      await page.evaluate(() => window.hive.invoke('app:quit'))
+      await page.evaluate(() => window.combwork.invoke('app:quit'))
       await until(async () => (await dialog.count()) === 1, 5000)
       await dialog.locator('button', { hasText: 'Quit when' }).click()
       check('reopen: a quit is pending, the window hidden', !!(await until(async () => (await inv('app:quitState')).pending === true && !(await visible(app)), 5000)))
@@ -174,7 +174,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     await waitToQuit(30)
     // Quit Now while it waits: the dialog, listing the file, and Combwork still running.
     const closing = exited(app, 4000)
-    void page.evaluate(() => window.hive.invoke('app:quit')).catch(() => undefined)
+    void page.evaluate(() => window.combwork.invoke('app:quit')).catch(() => undefined)
     check('Quit Now during the wait asks about the file edited since, rather than quit', !!(await until(async () => (await dialog.count()) === 1 && /1 file has unsaved changes/.test(await dialog.innerText()), 5000)) && !(await closing))
     await page.screenshot({ path: path.join(lib.WORK, 'quitwait-3-reopened-unsaved.png') })
     await dialog.locator('button', { hasText: 'Cancel' }).click()
@@ -188,7 +188,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     // A second request while it asks (Quit, which means "now" while a quit waits, as a session event's check does): Combwork
     // says it brought the open dialog forward rather than ask again; then still one dialog, and still running.
     const before = reentries()
-    void page.evaluate(() => window.hive.invoke('app:quit')).catch(() => undefined)
+    void page.evaluate(() => window.combwork.invoke('app:quit')).catch(() => undefined)
     check('a second request while it asks is taken by the dialog already open', !!(await until(() => reentries() > before, HUNG_MS)))
     check('…once, and still running', (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1 && !closedAt)
     await dialog.locator('button.primary, button.danger').last().click()

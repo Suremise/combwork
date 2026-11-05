@@ -56,7 +56,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const [i1] = await integrated(one.n)
     check('…Integrated by Combwork with the result, the target at it', i1?.data?.by === 'hive' && i1.data.result === q.head(fx) && i1.data.target === 'integration', JSON.stringify(i1))
     const message = lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration'])
-    check("…a merge commit with Combwork's trailers, its revision the builder's", message.includes(`Hive-Card: ${(await h.card(one.n)).key}`) && message.includes(`Hive-Revision: ${one.revision}`), message)
+    check("…a merge commit with Combwork's trailers, its revision the builder's", message.includes(`Combwork-Card: ${(await h.card(one.n)).key}`) && message.includes(`Combwork-Revision: ${one.revision}`), message)
     check('…main untouched (the project folder\'s branch)', lib.git(fx.alpha, ['rev-parse', 'main']).trim() !== q.head(fx))
     const key1 = (await h.card(one.n)).key
     const refs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/']).split(/\r?\n/).filter(Boolean)

@@ -39,7 +39,7 @@ async function launch(name, config) {
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   // Starting an agent before Combwork has found its Claude Code fails (it did now and then on a busy machine).
   await lib.waitForProvider(inv)
@@ -81,7 +81,7 @@ const forceClose = async (app) => {
     const cardName = made.key ?? `#${card}`
     // Its sessions up and idle, so quitting finds them running.
     await untilReady(inv, 2)
-    await page.evaluate(() => window.hive.invoke('app:quit')) // same entry point as the tray's Quit Combwork
+    await page.evaluate(() => window.combwork.invoke('app:quit')) // same entry point as the tray's Quit Combwork
     const dialogShown = () => becomes(async () => (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1)
     check('dialog: shown in-app', await dialogShown())
     check('dialog: lists both sessions', await becomes(async () => (await page.locator('.quit-row').count()) === 2))
@@ -106,12 +106,12 @@ const forceClose = async (app) => {
     await page.locator('.dialog button', { hasText: 'Cancel' }).click()
     check('cancel: dialog closed, sessions still running', await becomes(async () => (await page.locator('.quit-row').count()) === 0 && (await inv('app:quitState')).request === null) && (await inv('session:live')).length === 2)
     // Escape also cancels.
-    await page.evaluate(() => window.hive.invoke('app:quit'))
+    await page.evaluate(() => window.combwork.invoke('app:quit'))
     await dialogShown()
     await page.keyboard.press('Escape')
     check('escape: cancels', await becomes(async () => (await inv('app:quitState')).request === null && (await page.locator('.quit-row').count()) === 0) && (await inv('session:live')).length === 2)
     // Don't ask again + Quit now.
-    await page.evaluate(() => window.hive.invoke('app:quit'))
+    await page.evaluate(() => window.combwork.invoke('app:quit'))
     await dialogShown()
     await page.locator('.quit-dontask input').check()
     const q = await lib.quitWatch(app)
@@ -148,7 +148,7 @@ const forceClose = async (app) => {
     await startIn(inv, path.join(ws, 'alpha'))
     // Its session up and idle, so quitting finds it running.
     await untilReady(inv, 1)
-    await page.evaluate(() => window.hive.invoke('app:quit'))
+    await page.evaluate(() => window.combwork.invoke('app:quit'))
     // The decision answers the quit request, so it waits for there to be one.
     await lib.until(async () => (await inv('app:quitState')).request !== null, HUNG_MS)
     const q = await lib.quitWatch(app)

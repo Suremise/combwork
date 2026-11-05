@@ -53,7 +53,7 @@ const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PRO
 
 let app
 let page
-const inv = (channel, ...args) => page.evaluate(([c, a]) => window.hive.invoke(c, ...a), [channel, args])
+const inv = (channel, ...args) => page.evaluate(([c, a]) => window.combwork.invoke(c, ...a), [channel, args])
 
 /** Combwork instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
 function closeRunningHive() {

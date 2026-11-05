@@ -190,7 +190,7 @@ const check = (name, ok, extra = '') => {
     // --- The Assistant's view: GET /v1/connections gives the limits and the rule (cw_connection list's lines).
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const conns = await lib.until(async () => {
-      const r = await fetch(`http://127.0.0.1:${PORT}/v1/connections`, { headers: { Authorization: `Bearer ${token}`, 'X-Hive-Workspace': encodeURIComponent(ws) } }).then((x) => x.json()).catch(() => null)
+      const r = await fetch(`http://127.0.0.1:${PORT}/v1/connections`, { headers: { Authorization: `Bearer ${token}`, 'X-Combwork-Workspace': encodeURIComponent(ws) } }).then((x) => x.json()).catch(() => null)
       return r?.usage?.length ? r : null
     }, HUNG_MS)
     const mine = conns?.usage?.find((u) => u.account === 'Max 1')

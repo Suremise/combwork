@@ -191,7 +191,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     await inWorkspace(w, () => tasks.updateTask(two, { column: 'doing', agent: 'a2' }, user))
     writeFileSync(join(repo, 'two.txt'), 'two\n')
     git(repo, 'add', '-A')
-    git(repo, 'commit', '-qm', 'for two', '-m', `Hive-Card: P-${two}`)
+    git(repo, 'commit', '-qm', 'for two', '-m', `Combwork-Card: P-${two}`)
     const sha = git(repo, 'rev-parse', 'HEAD')
     await reconcileNow(w, repo)
     expect(factsOf(w, two).find((f) => f.kind === 'CommitAttributed')).toMatchObject({ data: { commit: sha, how: 'trailer' } })
@@ -200,7 +200,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
   })
 
   // #1294: the runtime names cards by #1219's keys, a project's own numbers apart from the board's.
-  it("a project's cards by its key and their number there: the runtime's names, cardByKey (an old key, #N, the name form) and a Hive-Card trailer", async () => {
+  it("a project's cards by its key and their number there: the runtime's names, cardByKey (an old key, #N, the name form) and a Combwork-Card trailer", async () => {
     const { w, repo } = await workspace({ shared: true })
     await keys.keyProjects(w)
     const key = (await keys.projectKeyOf(w, repo))!
@@ -219,7 +219,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     await inWorkspace(w, () => tasks.updateTask(two, { column: 'doing', agent: 'a2' }, user))
     writeFileSync(join(repo, 'two.txt'), 'two\n')
     git(repo, 'add', '-A')
-    git(repo, 'commit', '-qm', 'for two', '-m', `Hive-Card: ${key}-2`)
+    git(repo, 'commit', '-qm', 'for two', '-m', `Combwork-Card: ${key}-2`)
     const sha = git(repo, 'rev-parse', 'HEAD')
     await reconcileNow(w, repo)
     expect(factsOf(w, two).find((f) => f.kind === 'CommitAttributed')).toMatchObject({ data: { commit: sha, how: 'trailer' } })

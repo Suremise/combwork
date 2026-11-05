@@ -81,7 +81,7 @@ function codexCommandLine(runId) {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     // The clipboard, stubbed (as copilotcopy): what Combwork wrote, what a read gives (__clip) and how often Combwork read it.
     await page.evaluate(() => {
       window.__copied = []

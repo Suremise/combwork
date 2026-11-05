@@ -84,7 +84,7 @@ const lines = (file) => {
       const key = (await card(n)).key
       const s = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/start`)
       fs.writeFileSync(path.join(alpha, 'a.ts'), `export const a = ${v}\n`)
-      gitIn(alpha, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', title, '-m', `Hive-Card: ${key}`)
+      gitIn(alpha, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', title, '-m', `Combwork-Card: ${key}`)
       const sub = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: `${title}: ready`, revision: gitIn(alpha, 'rev-parse', 'HEAD') })
       check(`B1 builds and submits ${key}`, s.status === 200 && sub.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, sub: sub.body }))
       cards.push(n)

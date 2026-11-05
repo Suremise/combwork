@@ -103,7 +103,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       keys[n] = (await card(n)).key
       const s = await call('POST', `/v1/tasks/${encodeURIComponent(keys[n])}/start`)
       fs.writeFileSync(path.join(alpha, 'a.ts'), `export const a = ${v}\n`)
-      gitIn(alpha, 'commit', '-qam', `card ${n}`, '-m', `Hive-Card: ${keys[n]}`)
+      gitIn(alpha, 'commit', '-qam', `card ${n}`, '-m', `Combwork-Card: ${keys[n]}`)
       const files = n === a ? ['probe.cjs', 'results.txt', 'shot.png'] : ['probe.cjs']
       const attached = await call('PATCH', `/v1/tasks/${n}`, { comment: 'The probe, its results and a screenshot.', attachments: files.map((f) => path.join(evidence, f)), reply: 'short' })
       const sub = await call('POST', `/v1/tasks/${encodeURIComponent(keys[n])}/submit`, { summary: `Card ${n} done.`, revision: gitIn(alpha, 'rev-parse', 'HEAD') })

@@ -582,7 +582,7 @@ function TileStrip({ project, focus }: { project: ProjectInfo; focus: string }) 
 }
 
 /** A strip row dragged (#1053): the strip's own, so the panes and page buttons don't take it. */
-const STRIP_DRAG = 'application/x-hive-strip-agent'
+const STRIP_DRAG = 'application/x-combwork-strip-agent'
 
 /** What a movable row of the strip needs (#1053): its drag state and handlers, and its menu. */
 interface StripDrag {

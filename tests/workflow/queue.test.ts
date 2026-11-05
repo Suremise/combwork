@@ -50,9 +50,9 @@ describe('the merge queue', () => {
     expect(s.stage).toBe('done')
     expect(s.integrated).toMatchObject({ by: 'hive', method: 'merge', result: mainHead(e) })
     const msg = sh(e.project, 'log', '-1', '--format=%B', 'main')
-    expect(msg).toContain(`Hive-Card: ${card.key}`)
-    expect(msg).toContain(`Hive-Revision: ${s.latest!.revision}`)
-    expect(msg).toContain('Hive-Reviewed-By: R1')
+    expect(msg).toContain(`Combwork-Card: ${card.key}`)
+    expect(msg).toContain(`Combwork-Revision: ${s.latest!.revision}`)
+    expect(msg).toContain('Combwork-Reviewed-By: R1')
     // The submitted revision is pinned.
     expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(s.latest!.revision)
   })

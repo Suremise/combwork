@@ -57,7 +57,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1300, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
 
     // An agent in a worktree of alpha: its copy of the plan differs from the project folder's.
@@ -195,7 +195,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     const page2 = await next
     await page2.waitForLoadState('domcontentloaded')
     await lib.appReady(page2)
-    await page2.evaluate((p) => window.hive.invoke('workspace:open', p), ws2)
+    await page2.evaluate((p) => window.combwork.invoke('workspace:open', p), ws2)
     const other = `${path.basename(ws2)}/gamma`
     const put = await fetch(`http://127.0.0.1:${PORT}/v1/shared/file?path=secret.md&workspace=${encodeURIComponent(path.basename(ws2))}`, { method: 'PUT', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: '# Secret\n\n## Other workspace\n\nWS2 SECRET\n' }) })
     check('the second workspace has a note', put.status === 200, String(put.status))

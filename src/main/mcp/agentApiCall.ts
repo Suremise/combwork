@@ -10,7 +10,7 @@ import { request as httpsRequest } from 'https'
 export interface ApiReply {
   status: number
   text: string
-  /** Hive's X-Hive-Notice header (#357: a new decision on the caller's card), URL-encoded, when it sent one. */
+  /** Combwork's X-Combwork-Notice header (#357: a new decision on the caller's card), URL-encoded, when it sent one. */
   notice?: string
 }
 
@@ -34,7 +34,7 @@ export function agentApiCall(url: string, method: string, headers: Record<string
       res.on('data', (c: Buffer) => chunks.push(c))
       res.on('end', () => {
         clearTimeout(deadline)
-        const notice = res.headers['x-hive-notice']
+        const notice = res.headers['x-combwork-notice']
         resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf8'), ...(typeof notice === 'string' && notice ? { notice } : {}) })
       })
       res.on('error', fail)
