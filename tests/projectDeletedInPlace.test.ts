@@ -254,4 +254,37 @@ describe('a project folder deleted in place (HI-2564)', () => {
       await disposeWorkspaceService(w)
     }
   })
+
+  // HR2's round 1: the delete begins while an intact project's refresh is under way, after it saw project.json. Its
+  // exclude line isn't written back: the check is made as each write is.
+  it('a refresh under way when the delete begins doesn’t make .git\\info again', async () => {
+    const ws = join(base, 'ws-overlap')
+    const p = project(ws, 'p', true)
+    const w = createWorkspaceService()
+    await w.open(ws)
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let reached = false
+    try {
+      await w.refreshesSettled()
+      configTestHooks.afterConfigSeen = async (at) => {
+        if (reached || at.toLowerCase() !== p.toLowerCase()) return
+        reached = true
+        await held
+      }
+      const refresh = w.refresh()
+      await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+      // Midway through a recursive delete: .combwork and .git\info gone, the rest of .git still there.
+      rmSync(combwork(p), { recursive: true, force: true })
+      rmSync(join(p, '.git', 'info'), { recursive: true, force: true })
+      release()
+      await refresh
+      expect(existsSync(combwork(p))).toBe(false)
+      expect(existsSync(join(p, '.git', 'info'))).toBe(false)
+    } finally {
+      release()
+      delete configTestHooks.afterConfigSeen
+      await disposeWorkspaceService(w)
+    }
+  })
 })

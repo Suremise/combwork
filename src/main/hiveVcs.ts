@@ -121,9 +121,11 @@ async function gitIgnores(projectPath: string, excludeFile: string): Promise<boo
  * whether it ignores it now (a line Hive wrote isn't proof: a `.gitignore` rule can bring .combwork back). Returns that, the
  * repository's working folder, whether Hive added the line and whether git confirmed it (`unconfirmed`: git couldn't be
  * asked, missing say, #346); null when no git repository holds the project. `readOnly` (HI-2564): asks only, writing
- * nothing (no info folder, no line): a project whose project.json went, which a refresh doesn't set up again.
+ * nothing (no info folder, no line): a project whose project.json went, which a refresh doesn't set up again. A function
+ * is asked at each write, as it is made, so a project.json that goes while this runs stops it too (HR2's round 1).
  */
-export async function ensureHiveExcluded(projectPath: string, opts: { readOnly?: boolean } = {}): Promise<{ excluded: boolean; root: string; added: boolean; unconfirmed?: boolean } | null> {
+export async function ensureHiveExcluded(projectPath: string, opts: { readOnly?: boolean | (() => boolean) } = {}): Promise<{ excluded: boolean; root: string; added: boolean; unconfirmed?: boolean } | null> {
+  const readOnly = (): boolean => (typeof opts.readOnly === 'function' ? opts.readOnly() : !!opts.readOnly)
   const found = vcsOf(projectPath)
   if (found?.kind !== 'git') return null
   const gd = await gitDirOf(found.root)
@@ -136,13 +138,14 @@ export async function ensureHiveExcluded(projectPath: string, opts: { readOnly?:
   } catch {
     // Only inside the git folder that is there (HI-2045): a project that is its own repository, deleted meanwhile,
     // fails with ENOENT rather than coming back as `.git\info`.
-    if (!opts.readOnly)
+    if (!readOnly())
       await mkdir(join(gd, 'info')).catch((e: NodeJS.ErrnoException) => {
         if (e.code !== 'EEXIST') throw e
       })
   }
   const has = hasExcludeLine(text, line)
-  if (opts.readOnly) {
+  // Asked again just before the line is appended, nothing awaited between.
+  if (readOnly()) {
     const ignored = await gitIgnores(projectPath, f)
     return { excluded: ignored ?? has, root: found.root, added: false, ...(ignored === null ? { unconfirmed: true } : {}) }
   }
@@ -265,7 +268,7 @@ let roots: { at: number; list: [string, string][] } | null = null
  * Whether the project's .combwork is kept out of version control, ensuring it for git first (at each refresh).
  * `readOnly` (HI-2564): asked only, nothing written (ensureHiveExcluded's).
  */
-export async function hiveVcs(projectPath: string, opts: { readOnly?: boolean } = {}): Promise<HiveVcs> {
+export async function hiveVcs(projectPath: string, opts: { readOnly?: boolean | (() => boolean) } = {}): Promise<HiveVcs> {
   // Sync folders change rarely: read them at most once a minute.
   if (!roots || Date.now() - roots.at > 60_000) roots = { at: Date.now(), list: syncRoots() }
   const sync = syncServiceOf(projectPath, roots.list)

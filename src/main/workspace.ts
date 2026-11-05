@@ -1734,8 +1734,9 @@ export class WorkspaceService {
       took('its branch', this.branch(projectPath)), // i18n-ignore: a part of a log line's timing
       took('its MCP servers', this.unmanagedMcp(projectPath)), // i18n-ignore: a part of a log line's timing
       took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
-      // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
-      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', hiveVcs(projectPath, { readOnly: gone }).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
+      // Ensured at each refresh, so a repository made later (git init) gets it too (#345). Not for one gone (HI-2564),
+      // asked again as each write is made: its project.json may go while this read runs (HR2's round 1).
+      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', hiveVcs(projectPath, { readOnly: () => gone || (this.setUpAt.has(projectPath.toLowerCase()) && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) }).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
     ])
     const info: ProjectInfo = {
       name: basename(projectPath),
