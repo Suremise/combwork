@@ -1280,26 +1280,48 @@ async function keepAsConflict(p: string, parent: string, name: string): Promise<
  * the place when the user's version was being put back), are removed only if `disposable` says they hold nothing of the
  * user's (Combwork's own copies; a version Combwork shipped); otherwise they are kept beside it as `<name>-conflict-<time>`, so
  * they can be found and recovered. Old ones are handled first, so the user's original takes its place before a backup.
+ *
+ * Only a confirmed answer moves anything (HI-2611, after HR2's round 4): `disposable` false is "not ours", but one that
+ * throws (access denied, a file held, a failed read), or a look at the place that fails other than by its absence, is
+ * unresolved, and the leftover stays where it is, as a name the next clean looks at again, never renamed into a conflict
+ * copy no retry would see. Says the leftovers still there, each by its name in `parent`: those unresolved, and those it
+ * couldn't move or remove now. A step that must not pass on an I/O failure (the names upgrade) fails on any.
  */
-export async function cleanSwaps(parent: string, disposable: (old: string, name: string) => Promise<boolean> = async () => true): Promise<void> {
+export async function cleanSwaps(parent: string, disposable: (old: string, name: string) => Promise<boolean> = async () => true): Promise<string[]> {
   let names: string[] = []
   try {
     names = await readdir(parent)
   } catch {
-    return
+    return []
   }
   const found = names.flatMap((n) => {
     const m = /^\.(.+)\.cw-(new|old|back)-\d+-\d+$/.exec(n)
     return m ? [{ n, name: m[1], kind: m[2] }] : []
   })
+  const left: string[] = []
   const order = { old: 0, back: 1, new: 2 } as Record<string, number>
   for (const { n, name, kind } of found.sort((a, b) => order[a.kind] - order[b.kind])) {
     const p = join(parent, n)
-    if (kind === 'new') await rm(p, { recursive: true, force: true }).catch(() => undefined)
-    else if (!(await exists(join(parent, name)))) await renameRetrying(p, join(parent, name)).catch(() => undefined)
-    else if (await disposable(p, name).catch(() => false)) await rm(p, { recursive: true, force: true }).catch(() => undefined)
-    else await keepAsConflict(p, parent, name)
+    const stays = (): void => void left.push(n)
+    if (kind === 'new') {
+      await rm(p, { recursive: true, force: true }).catch(stays)
+      continue
+    }
+    // Whether its place is empty: only an absence says so.
+    const filled = await lstat(join(parent, name)).then(
+      () => true,
+      (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' || e.code === 'ENOTDIR' ? false : null)
+    )
+    if (filled === null) stays()
+    else if (!filled) await renameRetrying(p, join(parent, name)).catch(stays)
+    else {
+      const ours = await disposable(p, name).catch(() => null)
+      if (ours === null) stays()
+      else if (ours) await rm(p, { recursive: true, force: true }).catch(stays)
+      else await keepAsConflict(p, parent, name)
+    }
   }
+  return left
 }
 
 /** The marker file in a copy Combwork made of a skill (Codex's .agents/skills copies): not part of the skill's content. */

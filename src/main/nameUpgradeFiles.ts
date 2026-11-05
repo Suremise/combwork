@@ -195,7 +195,8 @@ export async function retireRenamedSkills(dir: string, o: RetireOps = {}): Promi
   const skills = join(dir, 'skills')
   // An old-name copy a swapOut moved aside and couldn't put back (an earlier run's failure, HR2 on HI-2611) is put back
   // first, by the bundled sync's own rule (cleanSwaps: a leftover that is a version Combwork shipped holds nothing of the
-  // user's), so this run retires it. One still aside leaves the run unsettled: not retired, so not done.
+  // user's), so this run retires it. One still aside (one cleanSwaps couldn't look at, hash or move now: it leaves those
+  // where they are) leaves the run unsettled: not retired, so not done.
   const asideOf = (names: string[]): boolean => names.some((n) => Object.keys(RENAMED_SKILLS).some((id) => n.startsWith(`.${id}.cw-`)))
   const list = (): Promise<string[]> => readdir(skills).catch(ifAbsent([] as string[]))
   try {

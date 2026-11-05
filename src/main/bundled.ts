@@ -178,9 +178,15 @@ function shippedVersion(kind: BundledKind, folder?: string): (old: string, name:
   return async (old, name) => (history[kind][idOf(name)] ?? []).includes(await contentHash(old))
 }
 
-/** Cleans what a crash in a swap left where a kind's items are swapped in: its folder, and each dialect folder in it. */
+/**
+ * Cleans what a crash in a swap left where a kind's items are swapped in: its folder, and each dialect folder in it. A
+ * leftover it couldn't settle now (cleanSwaps) stays where it is, for the next sync.
+ */
 async function cleanKind(kind: BundledKind, folder: string): Promise<void> {
-  if (kind !== 'dialects') return cleanSwaps(folder, shippedVersion(kind))
+  if (kind !== 'dialects') {
+    await cleanSwaps(folder, shippedVersion(kind))
+    return
+  }
   for (const f of (await readdir(folder, { withFileTypes: true }).catch(() => [])).filter((e) => e.isDirectory() && DIALECT_FOLDER.test(e.name))) await cleanSwaps(join(folder, f.name), shippedVersion(kind, f.name))
 }
 

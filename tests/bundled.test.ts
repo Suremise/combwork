@@ -150,6 +150,25 @@ describe('swapping a folder in', () => {
     expect(readdirSync(parent).sort()).toEqual(['x', 'z'])
     expect(readFileSync(join(parent, 'x', 'SKILL.md'), 'utf8')).toBe('kept')
   })
+
+  it("leaves a leftover it can't settle where it is, and says so: only a confirmed answer moves one (HI-2611)", async () => {
+    const parent = join(dir, 'unsettled')
+    for (const n of ['a', 'b', 'c']) {
+      mkdirSync(join(parent, n), { recursive: true })
+      mkdirSync(join(parent, `.${n}.cw-old-1-1`), { recursive: true })
+      writeFileSync(join(parent, `.${n}.cw-old-1-1`, 'SKILL.md'), n)
+    }
+    const failed = Object.assign(new Error('EPERM: operation not permitted (test)'), { code: 'EPERM' })
+    // a: its test fails (unresolved, stays); b: confirmed ours (removed); c: confirmed not ours (kept as a conflict copy).
+    const left = await cleanSwaps(parent, async (_old, name) => (name === 'a' ? Promise.reject(failed) : name === 'b'))
+    expect(left).toEqual(['.a.cw-old-1-1'])
+    const now = readdirSync(parent).sort()
+    expect(now.filter((n) => !n.startsWith('c-conflict-'))).toEqual(['.a.cw-old-1-1', 'a', 'b', 'c'])
+    expect(now.filter((n) => n.startsWith('c-conflict-'))).toHaveLength(1)
+    // Its test answering now: settled.
+    expect(await cleanSwaps(parent, async () => true)).toEqual([])
+    expect(readdirSync(parent).filter((n) => n.startsWith('.'))).toEqual([])
+  })
 })
 
 describe('a workspace', () => {

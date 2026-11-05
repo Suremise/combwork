@@ -217,4 +217,35 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
       expect(record(dir)).toBe(names.NAMES_VERSION)
     })
   }
+
+  // HR2's round 4: the place filled with the user's own edit, and the shipped copy set aside by an earlier run. A failure
+  // hashing that copy is no answer: it stays aside (never made a conflict copy no retry sees), nothing is recorded, and
+  // once released the next open removes it, the user's copy untouched.
+  for (const code of ['EACCES', 'EPERM', 'EIO']) {
+    it(`${code} hashing a set-aside copy whose place the user's edit filled: left aside, not recorded; released, removed, the edit kept`, async () => {
+      const { dir, ws } = atV3()
+      const aside = join(dir, 'skills', '.use-hive-api.cw-old-1-1')
+      renameSync(join(dir, 'skills', 'use-hive-api'), aside)
+      const mine = `${OLD}\nMy own notes.\n`
+      mkdirSync(join(dir, 'skills', 'use-hive-api'))
+      writeFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), mine)
+      faults.push({ match: /\.use-hive-api\.cw-old-1-1[\\/]SKILL\.md$/, code, pass: 0 })
+      try {
+        await move.moveFolders(ws)
+        expect(faults[0].pass).toBe(0)
+      } finally {
+        faults.length = 0
+      }
+      expect(readdirSync(join(dir, 'skills')).sort()).toEqual(['.use-hive-api.cw-old-1-1', 'use-hive-api'])
+      expect(readFileSync(join(aside, 'SKILL.md'), 'utf8')).toBe(OLD)
+      expect(readFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), 'utf8')).toBe(mine)
+      expect(record(dir)).toBe(3)
+      expect(await names.workspaceNeeds(ws)).toBe(true)
+      await move.moveFolders(ws)
+      expect(readdirSync(join(dir, 'skills'))).toEqual(['use-hive-api'])
+      expect(readFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), 'utf8')).toBe(mine)
+      expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+      expect(record(dir)).toBe(names.NAMES_VERSION)
+    })
+  }
 })
