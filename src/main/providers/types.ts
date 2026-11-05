@@ -227,6 +227,12 @@ export interface Ask {
   text?: Text
   /** The tool call it is about (ToolEnd's `call`), when the CLI says: that call ending answers it. */
   call?: string
+  /**
+   * Read from the CLI's screen (its question by itself, HI-1959), not reported: it is there to see, so it is put to the
+   * person at once, even for a CLI whose terminal title otherwise says when one must act (HI-2609: Codex's offer of a
+   * cheaper model, which may not title its terminal).
+   */
+  onScreen?: true
 }
 
 /** A provider's hook call, turned into what Combwork tracks. */
@@ -299,6 +305,11 @@ export interface LiveDetails {
   modelName?: string
   /** The model's id as the CLI reports it (to learn its default effort, observedDefaultEffort). */
   modelId?: string
+  /**
+   * When the CLI recorded modelId (its record's time), where its records carry one (Codex's rollout): a record from before
+   * this launch (a resumed conversation's earlier turns) is never taken for a model switch (HI-2609). Absent: live.
+   */
+  modelAt?: string
   effort?: string
   costUsd?: number
   permissionMode?: PermissionMode

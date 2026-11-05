@@ -536,5 +536,7 @@
   "tips.workspaceMovedDefender.text": "Jeśli Combwork kazał Defenderowi pomijać foldery obszaru roboczego, Napraw… po przeniesieniu proponuje przenieść te wykluczenia do nowych folderów, z jednym pytaniem o uprawnienia administratora, żeby żadne nie zostało na folderze, którego już nie ma. Twoje własne wykluczenia zostają bez zmian.",
   "tips.workspaceMovedDefender.title": "Wykluczenia Defendera idą za przeniesionym obszarem roboczym",
   "tips.workspaceNotes.text": "Workspace notes, przypięta na górze Notatek wspólnych, jest na to, co dotyczy tego komputera, np. pełną ścieżkę. Każdy agent dostaje ją przy starcie, w każdym folderze, więc nie trzeba tego wpisywać do commitowanego AGENTS.md. Sekcja z nazwą projektu w nagłówku należy tylko do tego projektu.",
-  "tips.workspaceNotes.title": "Notatki o tym komputerze dla każdego agenta"
+  "tips.workspaceNotes.title": "Notatki o tym komputerze dla każdego agenta",
+  "tips.modelSwitched.title": "Agent na innym modelu jest oznaczony",
+  "tips.modelSwitched.text": "Jeśli agent trafi na inny model, niż dało mu połączenie (propozycja Codex tańszego modelu blisko Twojego limitu albo /model), jego stopka oznacza model ostrzeżeniem, a Aktywność pokazuje Model zmieniony. Uruchom agenta ponownie, aby wrócić."
 }

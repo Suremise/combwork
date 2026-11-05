@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AppSettings, CatalogModel, Account, EffortLevel, EffortOption, FallbackModel, ModelAlias, ProviderId } from './types'
+import type { AgentInstallInfo, AppSettings, CatalogModel, Account, EffortLevel, EffortOption, FallbackModel, ModelAlias, ModelSwitch, ProviderId } from './types'
 import { OLDER_VERSIONS } from './claude'
 import { fmt } from './i18n'
 import { msg } from './i18n/msg'
@@ -295,6 +295,36 @@ export function dialectModelId(provider: ProviderId, info: Info, chosen: string 
   const m = catalogModel(info, model)
   const id = (m?.resolved && aliasKey(m.value) === aliasKey(model) ? m.resolved : resolvedModel(info, model)).trim()
   return id || null
+}
+
+/**
+ * Suffixes a CLI adds to a model ID that leave it the same model (HI-2609): Claude Code's 1M context, "[1m]". Only these:
+ * any other suffix ("[preview]") stays part of the ID until it is known to be the same model.
+ */
+export const MODEL_ID_EQUIVALENT_SUFFIXES: readonly string[] = ['[1m]']
+
+/**
+ * A model ID's identity, to tell whether two IDs are the same model (HI-2609): trimmed, in lower case, without a suffix
+ * MODEL_ID_EQUIVALENT_SUFFIXES lists ("claude-opus-5-5[1m]" is "claude-opus-5-5"). Nothing else is dropped: another
+ * suffix, a snapshot date or another name is another model. Never a display name: two models can share one.
+ */
+export function modelIdentity(id: string): string {
+  const k = id.trim().toLowerCase()
+  const same = MODEL_ID_EQUIVALENT_SUFFIXES.find((s) => k.endsWith(s))
+  return same ? k.slice(0, -same.length) : k
+}
+
+/**
+ * Whether a running session reports another model than its launch gave it (HI-2609: Codex took a cheaper model at its
+ * rate-limit prompt, answered by a wake's Enter), by their IDs' identities (`modelIdentity`), an alias resolved through the
+ * CLI's catalogue first ("opus" → "claude-opus-5-5"). Null when they're the same model, or when Combwork can't tell: no
+ * model of its own given (its CLI's default), an alias the catalogue doesn't resolve, or nothing reported.
+ */
+export function modelSwitched(provider: ProviderId, launched: { model: string | null; own?: true } | null | undefined, running: string | null | undefined, info: Info): ModelSwitch | null {
+  if (!launched?.own || !launched.model?.trim() || !running?.trim()) return null
+  const given = dialectModelId(provider, info, launched.model)
+  if (!given) return null
+  return modelIdentity(given) === modelIdentity(running) ? null : { launched: given, running: running.trim() }
 }
 
 /** A model ID for a dialect file, as the dialog saves it (HI-2523), and what Combwork made of what was typed. */

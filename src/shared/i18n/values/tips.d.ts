@@ -338,6 +338,8 @@ interface CombworkMessageValues {
   'tips.messageReceipts.title': undefined
   'tips.modelFallbacks.text': undefined
   'tips.modelFallbacks.title': undefined
+  'tips.modelSwitched.text': undefined
+  'tips.modelSwitched.title': undefined
   'tips.modes.text': undefined
   'tips.modes.title': undefined
   'tips.moreAgents.text': { usual: number; most: number }

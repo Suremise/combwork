@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "Nie udało się anulować obserwowania",
   "panes.watchCell.agents": "koniec pracy: {agents}",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "Do scalenia: {work}"
+  "panes.worktree.toMerge": "Do scalenia: {work}",
+  "panes.footer.modelSwitched": "Uruchomiony z {launched}, modelem swojego połączenia; {provider} używa teraz {running}. Uruchom agenta ponownie, aby wrócić do {launched}."
 }

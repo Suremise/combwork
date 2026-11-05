@@ -788,6 +788,8 @@ If you use a subscription (a Claude plan for Claude Code, a ChatGPT plan for Cod
 
 Each agent's footer shows its model and **effort**, e.g. *Opus 5.5 (default) · High*: the model that actually runs, as the running session reports it, otherwise the model new sessions will use. An alias such as **Opus** shows as the model it stands for (*Opus 5.5*), with *chosen as Opus* in the tooltip; the model pickers list it as *Opus (Opus 5.5)*. *(default)* means nothing chose the model, so the CLI runs its own default; a model set on the agent's connection shows without it. With no effort chosen, the effort is the model's own default once the CLI has said it (*Medium (default)*).
 
+**Another model than it was started with.** If a running agent reports a model its connection didn't give it (Codex took its offer of a cheaper model, someone used `/model`, or the CLI fell back by itself), its footer shows the model it runs with a warning mark, and the hover says what it was started with. Its **Activity** tab shows *Model changed: GPT-6 Astra → GPT-6 Luna* while it lasts, and you're told once in a notification. Models are compared by their IDs, so two models with the same name still count as different. Restart the agent to go back to its connection's model.
+
 ### Performance metrics <a id="performance-metrics"></a>
 
 Combwork counts what its own parts cost, for each workspace: its Agent API's requests (how many, how long, how big), its tools' replies as the agents got them, what each session was given at launch (Combwork's guidance, the Assistant's mode, the skills), and its skill service's work, alongside the providers' own reported token usage. Only totals are kept, never prompts, replies, tokens or paths, for 30 days, in the workspace's database, `.combwork/combwork.db` (kept out of git; before 0.9, `.combwork/metrics/metrics.json`, which moves in the first time 0.9 opens the workspace, with the same numbers). Combwork doesn't guess token counts: what it measures is exact bytes and characters, and token usage is what the providers report.
@@ -2032,6 +2034,14 @@ Now and then, after a turn in **auto mode**, Claude Code (2.1.312 and later) off
 - Combwork types nothing into the agent while the question shows, and presses no Enter: Enter would answer it. Wakes and messages wait. Answer it in the agent's pane (Esc puts it off); once it's gone, the agent is idle again and what waited is typed.
 - If the question took a line Combwork had already typed, and the agent's input is empty once it's gone, Combwork types that line again: it waits **Lost line: wait** (2 seconds, **Settings → Advanced → Combwork**) to be sure the line wasn't taken after all. A line that was a message Combwork can't send again is shown to you in a notification, with its words. Your own text in the input is never cleared or typed over.
 - Claude Code asks again a week after **Not now**, and never after **Don't show again**. To not be offered it in Combwork's sessions at all, turn off **Settings → Advanced → Claude Code → Offer auto mode's environment setup**: Combwork's Claude Code agents are then started with the offer off for that launch (nothing is written to Claude Code's own files, and auto mode decides as before). `/auto-mode-setup` in an agent still runs it when you want.
+
+### When Codex offers a cheaper model <a id="when-codex-offers-a-cheaper-model"></a>
+
+When your account nears its usage limit, Codex can offer to switch to a cheaper model (*Approaching rate limits: Switch to … for lower credit usage?*), with that choice already selected, so the next Enter would take it. Your agent's connection decides its model, so Combwork keeps the offer out of the way:
+
+- Combwork starts each Codex agent with the offer turned off for that session. Nothing is written to Codex's own files, and Codex in your own terminal still offers it. To let Codex offer it in Combwork's sessions too, turn off **Settings → Advanced → Codex → Don't offer a cheaper model near the limit**.
+- If Codex shows it anyway, the agent shows **Needs input** with *Codex asks: Approaching rate limits*, as for Claude Code's question above. Combwork types nothing into it and presses no Enter; wakes and messages wait until you answer it in the agent's pane.
+- If an agent ends up on another model all the same (it took the offer, or someone used `/model`), its footer marks the model (below), and you're told once.
 
 A question or dialog of a CLI's own that Combwork doesn't recognise can take an agent's keys the same way. Before Combwork types into Claude Code, it checks that the agent's input takes a key. When three tries in a row get no answer, Combwork stops typing there:
 

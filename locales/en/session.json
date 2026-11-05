@@ -419,6 +419,14 @@
     "defaultMessage": "Permission mode changed to {modes}",
     "description": "A notice's title: the permission mode in Settings changed for running agents. {modes} is the new mode's name (several joined by \" / \")."
   },
+  "session.model.switched": {
+    "defaultMessage": "{cli} now runs {running}, not {launched}, which its connection gave it. Restart the agent to go back to {launched}.",
+    "description": "The notice that an agent runs another model (HI-2609): its coding agent ({cli}, e.g. Codex) changed model by itself or at a prompt of its own. {running} and {launched} are model names (\"GPT-6 Luna\"); its connection is the account Combwork started it on."
+  },
+  "session.model.switchedTitle": {
+    "defaultMessage": "{agent} runs another model",
+    "description": "A notice's title (HI-2609): an agent's coding agent now runs another model than Combwork started it with (its connection's). {agent} is the agent."
+  },
   "session.movedFresh.body": {
     "defaultMessage": "{n, plural, one {# conversation} other {# conversations}} started fresh: {n, plural, one {its folder} other {their folders}} moved with .hive to .combwork, so {n, plural, one {it} other {they}} can't continue there. The earlier ones are kept in Sessions to read.",
     "description": "The notice after a workspace's .hive folders moved to .combwork (HI-2462): conversations that ran in a folder inside one started new conversations instead of resuming. {n} counts them. Keep .hive and .combwork as they are; Sessions is a tab of the window."

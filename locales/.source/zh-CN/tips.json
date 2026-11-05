@@ -336,6 +336,8 @@
   "tips.messageReceipts.title": "See where a message got to",
   "tips.modelFallbacks.text": "Combwork asks Claude Code and Codex which models they have and which effort levels each takes. If a CLI can't say, the model, effort and price lists on its Settings page are yours to edit.",
   "tips.modelFallbacks.title": "New models without a Combwork update",
+  "tips.modelSwitched.text": "If an agent ends up on another model than its connection gave it (Codex's offer of a cheaper model near your limit, or /model), its footer marks the model with a warning and Activity says Model changed. Restart the agent to go back.",
+  "tips.modelSwitched.title": "An agent on another model is marked",
   "tips.modes.text": "Coordinator runs the agents, Planner shapes work, QA triager turns reports into cards, Release manager takes a release through its checklist. Switch mode from the panel at once, keeping the conversation, or write your own.",
   "tips.modes.title": "Modes for the Assistant",
   "tips.moreAgents.text": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Raise Maximum agents in Version Control → Workflow, up to {most, number}, then add them. Above {usual, number} it shows what they cost: the memory your running agents take, and how much is free.",

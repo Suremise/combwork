@@ -32,6 +32,8 @@ interface CombworkMessageValues {
   'activity.liveTip': undefined
   'activity.loadFailed': { error: string | number }
   'activity.loading': undefined
+  'activity.modelSwitch': { launched: string | number; running: string | number }
+  'activity.modelSwitch.tip': undefined
   'activity.noPrompt': undefined
   'activity.notEnded': { why: string; label: string | number }
   'activity.notRunning': undefined

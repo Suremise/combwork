@@ -284,6 +284,8 @@ interface CombworkMessageValues {
   'settings.advanced.codex.promptInput.timeoutSeconds.title': undefined
   'settings.advanced.codex.queue.hint.desc': undefined
   'settings.advanced.codex.queue.hint.title': undefined
+  'settings.advanced.codex.rateLimitNudge.hide.desc': undefined
+  'settings.advanced.codex.rateLimitNudge.hide.title': undefined
   'settings.advanced.codex.rateLimits.field.desc': undefined
   'settings.advanced.codex.rateLimits.field.title': undefined
   'settings.advanced.codex.rateLimits.usedPercent.desc': undefined
@@ -298,6 +300,10 @@ interface CombworkMessageValues {
   'settings.advanced.codex.retry.logTarget.title': undefined
   'settings.advanced.codex.retry.pattern.desc': undefined
   'settings.advanced.codex.retry.pattern.title': undefined
+  'settings.advanced.codex.screen.idleQuestion.desc': undefined
+  'settings.advanced.codex.screen.idleQuestion.title': undefined
+  'settings.advanced.codex.screen.idleQuestionChoice.desc': undefined
+  'settings.advanced.codex.screen.idleQuestionChoice.title': undefined
   'settings.advanced.codex.signIn.expired.desc': undefined
   'settings.advanced.codex.signIn.expired.title': undefined
   'settings.advanced.codex.subagent.item.desc': undefined

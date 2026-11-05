@@ -4,7 +4,7 @@
 // history". From what Combwork already has: the board, the session records, the agents' live state, a session's transcript
 // parse and Stop's tracking's processes.
 import type { AgentProcess } from './agentProcesses'
-import type { BackgroundTaskType, SessionListItem, SessionStatus, TranscriptItem, TranscriptTool } from './types'
+import type { BackgroundTaskType, ModelSwitch, ProviderId, SessionListItem, SessionStatus, TranscriptItem, TranscriptTool } from './types'
 import { maskText } from './redact'
 import type { ActivityHookBlock } from './hooks'
 
@@ -189,7 +189,7 @@ export interface ActivityFilter {
 export interface ActivityAgent {
   id: string
   name: string
-  live: { sessionId: string; sessionName?: string; startedAt?: string; status: SessionStatus; text: string; working: boolean; waiting: boolean; failed: boolean } | null
+  live: { sessionId: string; sessionName?: string; startedAt?: string; status: SessionStatus; text: string; working: boolean; waiting: boolean; failed: boolean; /** It runs another model than it was launched with (HI-2609), and its CLI. */ modelSwitch?: ModelSwitch & { provider: ProviderId } } | null
 }
 
 /** A card as the tab needs it: its builder's and reviewer's agent ids, in this project. */
@@ -295,6 +295,8 @@ export interface ActivityPart {
   processes: ActivityNode[]
   /** Its edit Combwork's file lock blocks now (HI-982), while that decision stands: none, or its latest. */
   blocks: ActivityHookBlock[]
+  /** It runs another model than it was launched with (HI-2609): the launched and the running model's IDs; null when not. */
+  modelSwitch: (ModelSwitch & { provider: ProviderId }) | null
   /** Its own processes left out (the CLI, its terminal, cw-mcp.js): shown with `showOwn`. */
   ownHidden: number
 }
@@ -329,7 +331,7 @@ export function buildActivityView(input: ActivityInput, agentId: string, opts: {
   for (const s of input.sessions) if (s.sub?.parentId) subs.set(s.sub.parentId, [...(subs.get(s.sub.parentId) ?? []), s])
 
   const part = (a: ActivityAgent, role: ActivityPart['role']): ActivityPart => {
-    const base: ActivityPart = { agentId: a.id, name: a.name, role, state: stateOf(a), line: a.live?.text ?? '', session: null, turn: null, doing: null, subagents: [], processes: [], blocks: (input.now.blocks ?? []).filter((b) => b.agentId === a.id), ownHidden: 0 }
+    const base: ActivityPart = { agentId: a.id, name: a.name, role, state: stateOf(a), line: a.live?.text ?? '', session: null, turn: null, doing: null, subagents: [], processes: [], blocks: (input.now.blocks ?? []).filter((b) => b.agentId === a.id), modelSwitch: a.live?.modelSwitch ? { launched: a.live.modelSwitch.launched, running: a.live.modelSwitch.running, provider: a.live.modelSwitch.provider } : null, ownHidden: 0 }
     const live = a.live
     if (!live) return base
     // Its session the list doesn't have yet (just started; the list is read again later): drawn from its live state.

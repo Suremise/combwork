@@ -1423,5 +1423,11 @@
   "settings.workspace.onOpen.title": "Beim Öffnen dieses Arbeitsbereichs ausführen",
   "settings.workspace.storage.desc": "Was Combwork für jedes Projekt des Arbeitsbereichs (das größte zuerst) und den Assistenten speichert: Sicherungen von Transkripten, archivierte Sitzungen, Anhänge und Worktrees. „Speicher“ öffnet die Seite eines Projekts, mit „Aufräumen…“ und „Bereinigen…“; „Bereinigen…“ entfernt hier alles, was Combwork für die Sitzungen des ganzen Arbeitsbereichs speichert.",
   "settings.workspace.storage.tip": "Im Hintergrund gemessen, ein Projekt nach dem anderen. Die eigenen Transkripte der Coding-Agenten (in ~/.claude, ~/.codex und ~/.copilot) werden nicht mitgezählt. Ausgeblendete Projekte sind nicht enthalten.",
-  "settings.workspace.storage.title": "Speicher"
+  "settings.workspace.storage.title": "Speicher",
+  "settings.advanced.codex.rateLimitNudge.hide.title": "Kein günstigeres Modell nahe dem Limit anbieten",
+  "settings.advanced.codex.rateLimitNudge.hide.desc": "Jeder Codex-Agent wird mit dem Angebot von Codex, zu einem günstigeren Modell zu wechseln, für diesen Start abgeschaltet gestartet, sodass er das Modell seiner Verbindung behält, wenn das Konto sein Limit erreicht. In die Dateien von Codex wird nichts geschrieben. Aus, kann Codex fragen, und der Agent wartet auf deine Antwort in seinem Terminal: Combwork tippt währenddessen nichts hinein.",
+  "settings.advanced.codex.screen.idleQuestion.title": "Bildschirm: Frage im Leerlauf",
+  "settings.advanced.codex.screen.idleQuestion.desc": "Der Titel einer Frage, die Codex zwischen zwei Durchgängen von sich aus zeigt, ohne einen Hook zu senden (sein Angebot eines günstigeren Modells nahe dem Limit des Kontos), in den zuletzt gezeichneten Zeilen. Solange sie mit einer ihrer Auswahlen (Bildschirm: Auswahl der Frage) zu sehen ist, wartet der Agent auf dich und Combwork tippt nichts hinein, denn Enter würde sie beantworten. Falsch, kann das Enter eines Weckrufs die Frage beantworten.",
+  "settings.advanced.codex.screen.idleQuestionChoice.title": "Bildschirm: Auswahl der Frage",
+  "settings.advanced.codex.screen.idleQuestionChoice.desc": "Eine der Auswahlen dieser Frage (Bildschirm: Frage im Leerlauf), wie Codex sie nummeriert. Beide müssen weit unten auf seinem Bildschirm und nicht in seiner Eingabe zu sehen sein, damit die Frage zählt, sodass dieselben Worte im Gespräch Combwork nicht am Tippen hindern."
 }

@@ -536,5 +536,7 @@
   "tips.workspaceMovedDefender.text": "Si Combwork hizo que Defender omitiera las carpetas del espacio de trabajo, Reparar… después de moverlo ofrece mover esas exclusiones a las carpetas nuevas, con una sola solicitud de administrador, para que ninguna quede en una carpeta que ya no existe. Las exclusiones que creaste tú se quedan como están.",
   "tips.workspaceMovedDefender.title": "Las exclusiones de Defender siguen a un espacio de trabajo movido",
   "tips.workspaceNotes.text": "Workspace notes, fijada arriba en Notas compartidas, es para lo que vale en este PC, como una ruta completa. Cada agente la recibe al iniciarse, en cualquier carpeta, así que no hace falta ponerla en un AGENTS.md con commit. Una sección titulada con el nombre de un proyecto es solo de ese proyecto.",
-  "tips.workspaceNotes.title": "Notas sobre este PC para cada agente"
+  "tips.workspaceNotes.title": "Notas sobre este PC para cada agente",
+  "tips.modelSwitched.title": "Un agente con otro modelo queda marcado",
+  "tips.modelSwitched.text": "Si un agente acaba con otro modelo distinto del que le dio su conexión (la oferta de Codex de un modelo más barato cerca de tu límite, o /model), su pie marca el modelo con un aviso y Actividad dice Modelo cambiado. Reinicia el agente para volver."
 }

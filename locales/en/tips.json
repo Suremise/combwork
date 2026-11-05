@@ -1347,6 +1347,14 @@
     "defaultMessage": "New models without a Combwork update",
     "description": "A tip's title."
   },
+  "tips.modelSwitched.text": {
+    "defaultMessage": "If an agent ends up on another model than its connection gave it (Codex's offer of a cheaper model near your limit, or /model), its footer marks the model with a warning and Activity says Model changed. Restart the agent to go back.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Codex is a product name; /model is its command: keep it. A connection is the account Combwork starts an agent on."
+  },
+  "tips.modelSwitched.title": {
+    "defaultMessage": "An agent on another model is marked",
+    "description": "A tip's title (HI-2609): an agent running another model than Combwork started it with."
+  },
   "tips.modes.text": {
     "defaultMessage": "Coordinator runs the agents, Planner shapes work, QA triager turns reports into cards, Release manager takes a release through its checklist. Switch mode from the panel at once, keeping the conversation, or write your own.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

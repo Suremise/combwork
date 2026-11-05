@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ACTIVITY_HOURS, activityTabs, buildActivityView, commandText, filetimeMs, keepGoneList, type ActivityAgent, type ActivityCard, type ActivityDetail, type ActivityInput, type ActivityNode, type ActivityNow, type ActivityPart, type ActivityState, type ActivityTabInfo, type ActivityTurns } from '@shared/activity'
 import { agentState, type AgentState } from '@shared/agentState'
+import { modelIdName } from '@shared/models'
 import { cardLabel } from '@shared/projectKeys'
 import { durationText } from '@shared/tasks'
 import type { ProjectInfo, SessionListItem } from '@shared/types'
@@ -168,7 +169,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
         const l = a.live
         if (!l) return { id: a.id, name: a.name, live: null }
         const state = agentState(l)
-        return { id: a.id, name: a.name, live: { sessionId: l.sessionId, sessionName: l.sessionName, startedAt: l.startedAt, status: l.status, text: statusText(l), working: state === 'working', waiting: state === 'waiting', failed: state === 'stalled' } }
+        return { id: a.id, name: a.name, live: { sessionId: l.sessionId, sessionName: l.sessionName, startedAt: l.startedAt, status: l.status, text: statusText(l), working: state === 'working', waiting: state === 'waiting', failed: state === 'stalled', ...(l.modelSwitch ? { modelSwitch: { launched: l.modelSwitch.launched, running: l.modelSwitch.running, provider: l.provider } } : {}) } }
       }),
     // Taken in at a tick that saw them change, and when an agent is added or removed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -455,6 +456,15 @@ export function PartView({ project, part: p, many, selected, onSelect, showOwn, 
           </div>
         </div>
       ))}
+      {p.modelSwitch && (
+        // Another model than it was launched with (HI-2609), while that lasts: its footer marks it too.
+        <div className="activity-row act-waiting" data-model-switch="yes" title={tr(M.modelSwitchTip)}>
+          <Icon name="warning" />
+          <div className="activity-row-text">
+            <div className="activity-row-title">{tr(M.modelSwitch, { launched: modelIdName(p.modelSwitch.provider, p.modelSwitch.launched, null), running: modelIdName(p.modelSwitch.provider, p.modelSwitch.running, null) })}</div>
+          </div>
+        </div>
+      )}
       {p.subagents.length > 0 && (
         <>
           <h3 className="activity-group" data-group="subagents">
@@ -699,6 +709,8 @@ const M = {
   writing: msg({ id: 'activity.writing', defaultMessage: 'Writing…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way, after it started writing its reply.' }),
   blockBlocked: msg({ id: 'activity.block.blocked', defaultMessage: '{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by agent {holder}}}', description: "In the Activity tab, under Now: Combwork's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it." }),
   blockAsked: msg({ id: 'activity.block.asked', defaultMessage: '{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by agent {holder}}}', description: "In the Activity tab, under Now: Combwork's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it." }),
+  modelSwitch: msg({ id: 'activity.modelSwitch', defaultMessage: 'Model changed: {launched} → {running}', description: 'In the Activity tab, under Now (HI-2609): the agent runs another model ({running}) than Combwork started it with ({launched}), its connection\'s. Both are model names ("GPT-6 Astra"); keep the arrow.' }),
+  modelSwitchTip: msg({ id: 'activity.modelSwitch.tip', defaultMessage: "Its coding agent changed model by itself or at a prompt of its own. Shown while it runs the other model; restart the agent to go back to its connection's.", description: 'Tooltip on the "Model changed" row in the Activity tab (HI-2609). Its connection is the account Combwork started the agent on.' }),
   blockFor: msg({ id: 'activity.block.for', defaultMessage: "Combwork's file lock · {time}", description: 'The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as "2 min").' }),
   blockTip: msg({ id: 'activity.block.tip', defaultMessage: "Shown while the lock stands: it goes once the other agent finishes, the agent tries again or moves on, or its turn ends. Its history is in the agent's ⋯ → Hooks…", description: 'Tooltip on a lock block in the Activity tab. ⋯ → Hooks… is the agent menu item: keep the arrow and the dots.' }),
   notRunning: msg({ id: 'activity.notRunning', defaultMessage: 'Not running', description: "In the Activity tab, under Now, for an agent that isn't running." }),

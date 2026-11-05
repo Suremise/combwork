@@ -106,6 +106,8 @@ interface CombworkMessageValues {
   'session.modeOffer.one': { agent: string | number }
   'session.modeOffer.switch': undefined
   'session.modeOffer.title': { modes: string | number }
+  'session.model.switched': { cli: string | number; running: string | number; launched: string | number }
+  'session.model.switchedTitle': { agent: string | number }
   'session.movedFresh.body': { n: number }
   'session.newConversation.didntStop': undefined
   'session.newConversation.notRunning': undefined

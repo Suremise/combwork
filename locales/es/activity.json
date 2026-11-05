@@ -30,6 +30,8 @@
   "activity.liveTip": "Ver en directo: muestra lo que se ejecuta a medida que cambia. La pestaña se abre congelada, una instantánea del momento en que la abriste.",
   "activity.loadFailed": "No se pudo cargar la actividad: {error}",
   "activity.loading": "Cargando…",
+  "activity.modelSwitch": "Modelo cambiado: {launched} → {running}",
+  "activity.modelSwitch.tip": "Su agente de código cambió de modelo por sí mismo o en una pregunta propia. Se muestra mientras usa el otro modelo; reinicia el agente para volver al de su conexión.",
   "activity.noPrompt": "(prompt sin texto)",
   "activity.notEnded": "{why, select, notOwn {{label} ya no es uno de los procesos de este agente: no se terminó nada.} cli {{label} es la CLI del agente: usa Detener para terminarla.} other {No se pudo terminar {label}: puede que siga en ejecución.}}",
   "activity.notRunning": "No se está ejecutando",

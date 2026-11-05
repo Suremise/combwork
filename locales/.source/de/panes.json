@@ -63,6 +63,7 @@
   "panes.footer.ctxValue": "ctx {value}",
   "panes.footer.handOverAdvice": "Hand it over to a new conversation: click for Hand Over to…, and choose the agent itself.",
   "panes.footer.handOverWhen": "{when, select, now {Hand it over to a new conversation: click for Hand Over to…, and choose the agent itself.} other {It can hand over to a new conversation when it has finished: not while it works, merges or is on a card loop's card.}}",
+  "panes.footer.modelSwitched": "Launched with {launched}, its connection's model; {provider} now runs {running}. Restart the agent to go back to {launched}.",
   "panes.footer.modelTip": "{chosenAs, select, none {} other {{model} · chosen as {chosenAs}. }}{provider} {effort, select, yes {model and effort} other {model}} {live, select, yes {of this session} other {for new sessions}}{reported, select, yes { (effort as the session reports it)} other {}}. Change them in {where}.",
   "panes.footer.reading": "Reading this conversation's usage…",
   "panes.footer.retryWaited": "This session has waited {minutes, plural, =0 {under a minute} one {# minute} other {# minutes}} in all for {provider} to retry rate-limited or failed requests ({waits, plural, one {# wait} other {# waits}}, the latest from {time}{ongoing, select, yes {, still waiting} other {}}): time not spent on its work.",

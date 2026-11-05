@@ -98,6 +98,7 @@ export const SUITES = [
   { name: 'codex-storepwsh', needs: ['codex'], noCombwork: 'runs codex sandbox itself' },
   { name: 'codexfolder' },
   { name: 'codexnewline' },
+  { name: 'codexnudge' },
   { name: 'codexoverrides', needs: ['codex'] },
   { name: 'codexownhooks', needs: ['codex'], noCombwork: "asks codex app-server's hooks/list itself, in a throwaway CODEX_HOME (#1285)" },
   { name: 'codexqueued' },

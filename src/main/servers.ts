@@ -1810,6 +1810,8 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     id: a.id,
     provider,
     ...inUse,
+    // Another model than its launch gave it (HI-2609): the model it was launched with, beside the one it runs.
+    ...(st?.modelSwitch ? { launchedModel: st.modelSwitch.launched } : {}),
     status: st?.status ?? 'stopped',
     statusMessage: statusMessageOf(st),
     ...(retryWaits ? { retryWaits } : {}),

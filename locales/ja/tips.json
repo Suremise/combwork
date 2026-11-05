@@ -536,5 +536,7 @@
   "tips.workspaceMovedDefender.text": "CombworkがDefenderにワークスペースのフォルダーをスキャンしないよう設定していた場合、移動後の「修復…」で、その除外を新しいフォルダーに移せます（管理者の確認は1回）。なくなったフォルダーに除外が残ることはありません。自分で作成した除外はそのまま残ります。",
   "tips.workspaceMovedDefender.title": "Defenderの除外は移動したワークスペースに付いていきます",
   "tips.workspaceNotes.text": "共有ノートの先頭に固定されたWorkspace notesは、フルパスなど、このマシンに固有のことを書く場所です。すべてのエージェントが、どのフォルダーでも起動時に受け取るので、コミットされるAGENTS.mdに書く必要はありません。プロジェクト名を見出しにしたセクションは、そのプロジェクトだけのものです。",
-  "tips.workspaceNotes.title": "このマシンについてのノートを全エージェントに"
+  "tips.workspaceNotes.title": "このマシンについてのノートを全エージェントに",
+  "tips.modelSwitched.title": "別のモデルのエージェントは印が付きます",
+  "tips.modelSwitched.text": "エージェントが接続の指定とは別のモデルで動いている場合（上限付近でのCodexの安いモデルの提案や/model）、フッターのモデルに警告が付き、「アクティビティ」に「モデル変更」と表示されます。戻すにはエージェントを再起動してください。"
 }

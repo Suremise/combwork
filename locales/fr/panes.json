@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "Impossible d’annuler la surveillance",
   "panes.watchCell.agents": "Fin du tour : {agents}",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "À fusionner : {work}"
+  "panes.worktree.toMerge": "À fusionner : {work}",
+  "panes.footer.modelSwitched": "Lancé avec {launched}, le modèle de sa connexion ; {provider} utilise maintenant {running}. Redémarre l’agent pour revenir à {launched}."
 }
