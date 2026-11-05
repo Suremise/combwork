@@ -65,12 +65,10 @@ describe('compilation', () => {
 
   it('every piece\'s refusal is three whole sentences from messages (the change sentence where a rule has one)', () => {
     for (const id of Object.keys(GUARDS)) expect(REFUSALS[id as keyof typeof REFUSALS], id).toBeDefined()
-    // The rule merge.hiveMerges keeps its stored id until HI-2598 converts it; its messages already have their new ids (HI-2589).
-    const named = (rule: string): string => (rule === 'merge.hiveMerges' ? 'merge.combworkMerges' : rule)
     for (const [rule, t] of Object.entries(REFUSALS)) {
-      expect(t.message.id).toBe(`workflow.refused.${named(rule)}.message`)
-      expect(t.next.id).toBe(`workflow.refused.${named(rule)}.next`)
-      if (t.change) expect(t.change.id).toBe(`workflow.refused.${named(rule)}.change`)
+      expect(t.message.id).toBe(`workflow.refused.${rule}.message`)
+      expect(t.next.id).toBe(`workflow.refused.${rule}.next`)
+      if (t.change) expect(t.change.id).toBe(`workflow.refused.${rule}.change`)
     }
     const r = refusal('requeue.allowed', { card: 'AM-12', revision: 'a3f2c1d', cause: 'requeueLimit', n: 2 })
     expect(r.message).toBe("AM-12 at a3f2c1d can't go back into the merge queue unchanged: it was sent back unchanged 2 times already.")
