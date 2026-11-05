@@ -527,6 +527,9 @@
   "tool.readTask.arg.comments": {
     "placeholders": {}
   },
+  "tool.readTask.arg.history": {
+    "placeholders": {}
+  },
   "tool.readTask.arg.latestComment": {
     "placeholders": {}
   },

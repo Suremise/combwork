@@ -231,9 +231,24 @@ const check = (name, ok, extra = '') => {
     check('a project with no agent on this CLI isn’t counted', (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1 && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
     // A Git repository in the trusted workspace folder (HI-2520): Claude Code asks for it anyway (a folder above a
     // repository doesn't cover it), so it needs Set Up, at its own folder, not the workspace's again. Then removed.
+    // Made outside the workspace and moved in, complete, as a real project arrives (HI-2565): made in place, its
+    // project.json was written while Combwork, already taking the folder on, wrote its own.
     const epsilon = path.join(ws1, 'epsilon')
-    lib.gitProject(epsilon)
-    projectWithAgent(epsilon)
+    const epsilonMade = path.join(path.dirname(ws1), 'epsilon-made')
+    fs.rmSync(epsilonMade, { recursive: true, force: true })
+    lib.gitProject(epsilonMade)
+    projectWithAgent(epsilonMade)
+    // A move refused while something has a file in it open for a moment (git's, the indexer) is tried again.
+    const movedIn = await lib.until(async () => {
+      try {
+        fs.renameSync(epsilonMade, epsilon)
+        return true
+      } catch (e) {
+        if (!['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e
+        return false
+      }
+    }, HUNG_MS)
+    check('a Git project moved into the trusted workspace folder', !!movedIn && fs.existsSync(path.join(epsilon, '.combwork', 'project.json')))
     await inv('workspace:refresh')
     check('a Git project in the trusted workspace folder: its agent put on it', await onPersonal(inv, epsilon))
     const epsilonReal = fs.realpathSync.native(epsilon)
@@ -408,6 +423,15 @@ const check = (name, ok, extra = '') => {
     await shots('after-remove')
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
+    // What the test copy did with epsilon's project.json (HI-2565): its log's lines on it, in the suite's own log.
+    const logged = (() => {
+      try {
+        return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split(/\r?\n/).filter((l) => /epsilon|project\.json/.test(l))
+      } catch {
+        return []
+      }
+    })()
+    if (logged.length) console.log(`Its log on epsilon and project.json:\n${logged.join('\n')}`)
   } finally {
     await app.close().catch(() => undefined)
   }

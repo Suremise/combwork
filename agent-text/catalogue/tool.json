@@ -467,14 +467,17 @@
   "tool.readTask.arg.comments": {
     "text": "Only the newest n."
   },
+  "tool.readTask.arg.history": {
+    "text": "Long; rarely needed."
+  },
   "tool.readTask.arg.latestComment": {
     "text": "Only the newest comment."
   },
   "tool.readTask.arg.summary": {
-    "text": "Each comment as its first line, with its whole length."
+    "text": "Each comment's first line, and its length."
   },
   "tool.readTask.description": {
-    "text": "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user), description, comments, links. comments, latestComment and summary read less; history=true adds history."
+    "text": "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user: agents' questions), description, comments, links. comments, latestComment and summary read less."
   },
   "tool.releaseSlot.arg.confirm": {
     "text": "A held writer: the slot and run the user agreed to, as list gave them."
