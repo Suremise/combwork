@@ -225,8 +225,8 @@ export function sayKeysOnce(ws: WorkspaceService): void {
   const life = ws.lifetime
   if (!path || !keysNoticeDue(ws)) return
   const keys = projectKeys(ws).filter((k) => k.current).map((k) => k.key).sort()
-  const title = tr(msg({ id: 'service.keys.noticeTitle', defaultMessage: 'Projects have keys now', description: "A quiet notice's title, once after the upgrade to Hive 1.0: each project now has a short key (letters such as HI or AM) its cards are named by (HI-12)." }))
-  const message = tr(msg({ id: 'service.keys.notice', defaultMessage: 'Cards are named by their project’s key: {keys}. Change a key in Project Settings; the old one keeps working.', description: "A quiet notice once after the upgrade to Hive 1.0. {keys}: the projects' keys, joined (HI, AM and WE)." }), { keys: fmt.list(keys) })
+  const title = tr(msg({ id: 'service.keys.noticeTitle', defaultMessage: 'Projects have keys now', description: "A quiet notice's title, once after the upgrade to 1.0: each project now has a short key (letters such as HI or AM) its cards are named by (HI-12)." }))
+  const message = tr(msg({ id: 'service.keys.notice', defaultMessage: 'Cards are named by their project’s key: {keys}. Change a key in Project Settings; the old one keeps working.', description: "A quiet notice once after the upgrade to 1.0. {keys}: the projects' keys, joined (HI, AM and WE)." }), { keys: fmt.list(keys) })
   ws.emit({ type: 'toast', toast: { id: randomUUID(), level: 'info', title, message, timestamp: new Date().toISOString(), quiet: true } })
   void boardWrite(ws, async () => {
     if (stillIn(ws, path, life)) keysNoticeSaid(ws)

@@ -167,7 +167,7 @@ class NotWanted extends Error {}
  * every status change), then renames it into place, so a reader never sees half of one. The rename is tried again while
  * the marker is held for a moment (HI-2201: a reader or a virus scanner had it open, the write that had a cw-progress
  * run's processes failed with EPERM, and the marker missed them until the next heartbeat). `wanted` is asked just before
- * each rename, with nothing awaited between: a marker removed meanwhile (Hive quitting) is never put back. So each try is
+ * each rename, with nothing awaited between: a marker removed meanwhile (Combwork quitting) is never put back. So each try is
  * synchronous, in the guard's turn (HR2's round 1: an asynchronous rename, started after the guard, could finish after
  * endRunMarker's removal and put the marker back); only the waits between tries are not. True if written.
  * `renameOnce` is the single rename (tests replace it).

@@ -261,7 +261,7 @@
   },
   "actions.mcp.deleteAdded": {
     "defaultMessage": "{where}: deleting it removes it there too.",
-    "description": "The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as \"Added in hive and for the Combwork Assistant\"."
+    "description": "The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as \"Added in demo and for the Combwork Assistant\"."
   },
   "actions.mcp.deleteMessage": {
     "defaultMessage": "Move {name}.json to the Recycle Bin, with its folder if it was added from a .zip? Projects will no longer be able to use it.",

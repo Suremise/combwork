@@ -79,7 +79,6 @@
   "session.long.notNowText": "It is working, merging or on a card loop's card, so its conversation isn't ended now. It can hand over to a new conversation when it has finished.",
   "session.long.notice": "Its transcript is {size}. {advice}",
   "session.long.noticeText": "Its transcript is {size} (over {limit, number} MB): it may slow down. {when, select, now {It can hand over to a new conversation: Hand Over to… lets you choose.} assistant {It can start a new conversation (⋯ → New Conversation) once it is idle.} other {It can hand over to a new conversation when it has finished.}}",
-  "session.long.toast": "Its transcript is {size}, which slows down the CLI and Hive. {advice}",
   "session.mergeSlot.holding": "Merging into {branch} (merge slot)",
   "session.mergeSlot.waiting": "Waiting for the merge slot",
   "session.mergeSlot.waitingForYou": "Waiting for the merge slot (you are merging)",

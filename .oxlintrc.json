@@ -32,7 +32,7 @@
       // Electron's fs opens an .asar file as an archive when it is stat-ed or read, and keeps it open until Combwork quits:
       // a project's build output (dist/win-unpacked/resources/app.asar) then can't be deleted or replaced (#246). Main
       // uses original-fs, which treats .asar files as plain files. The scripts that run as plain Node outside the asar
-      // (hive-mcp.js, hive-progress.js) use Node's fs.
+      // (cw-mcp.js, cw-progress.js) use Node's fs.
       "files": ["src/main/**/*.ts", "src/main/**/*.mts"],
       "rules": {
         "no-restricted-imports": ["error", { "paths": [

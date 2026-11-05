@@ -1435,7 +1435,7 @@ function replyError(id: unknown, code: number, message: string): void {
 
 // ---------------------------------------------------------------------------
 // Performance metrics: what each tool call gave the model (its final text), and the tool list as this session got it,
-// reported to Hive (POST /v1/metrics/mcp) a batch at a time, after the replies, with this session's own token. Only
+// reported to Combwork (POST /v1/metrics/mcp) a batch at a time, after the replies, with this session's own token. Only
 // sizes, times and outcomes: never arguments or replies. A report that can't be sent is dropped.
 // ---------------------------------------------------------------------------
 

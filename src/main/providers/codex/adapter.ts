@@ -501,7 +501,7 @@ export function codexMcpServer(name: string, def: McpServerDef, combwork: Combwo
 /** A native combwork server's keys for an HTTP server, which can't be taken out of Combwork's stdio one (Codex refuses the mix). */
 const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_headers', 'http_headers_helper', 'auth', 'oauth', 'oauth_resource', 'scopes', 'experimental_environment']
 
-/** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeCombwork). */
+/** Why a Codex agent can't start beside a native HTTP server named combwork (outrankNativeCombwork). */
 const NATIVE_CW = msg({
   id: 'providers.codex.nativeCombwork',
   defaultMessage: 'Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.',
@@ -509,8 +509,8 @@ const NATIVE_CW = msg({
 })
 
 /**
- * Hive's own combwork server over a native one of that name (the user's own [mcp_servers.hive] in these config files, #1281):
- * Codex merges Hive's `-c mcp_servers.hive={…}` into it key by key (0.163.0, probed: a whole table, an empty value or
+ * Combwork's own combwork server over a native one of that name (the user's own [mcp_servers.combwork] in these config files, #1281):
+ * Codex merges Combwork's `-c mcp_servers.combwork={…}` into it key by key (0.163.0, probed: a whole table, an empty value or
  * another transport can't take a key out), so Combwork's table gives every key the native one sets Combwork's value, and Combwork's
  * server wins whatever the isolation switch says:
  * - its tools: all of them shown (`enabled_tools`, `disabled_tools`; `enabled` is always set, combworkTable);

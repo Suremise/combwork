@@ -63,7 +63,7 @@ export interface WorkflowOptions {
   pushTarget: boolean
   /**
    * G19 (HI-1697; the branch's own by default since HI-1997): the message of the commit Combwork's merge makes (a merge commit, or a squash's commit): Combwork's, the
-   * card's key and title with its `Hive-` trailers, or the branch's own, with neither. Not a rule, as G18: left out of
+   * card's key and title with its `Combwork-` trailers, or the branch's own, with neither. Not a rule, as G18: left out of
    * every ruleset (`ruleOptions`), the queue reads it from the project's options as they are when it merges.
    */
   commitMessage: CommitMessage

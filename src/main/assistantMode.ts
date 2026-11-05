@@ -11,7 +11,7 @@ import { inWorkspace, workspace, workspaceOf } from './workspace'
 
 /**
  * Switching the Combwork Assistant's mode (#259): the workspace keeps the choice (its next launch uses the mode's
- * instructions), and a running Assistant is told at once, without a restart: Hive gives it "[Hive] Mode: …" with the
+ * instructions), and a running Assistant is told at once, without a restart: Combwork gives it "[CW] Mode: …" with the
  * mode's habits, a delivery (#649: a control notice for that launch, deliveries.ts) typed into its conversation, which
  * keeps its context. Offered only while it is idle and the user isn't typing there; otherwise when it next is (only the
  * latest switch is told). Its session stopping drops the message; the conversation records the mode once it is received.

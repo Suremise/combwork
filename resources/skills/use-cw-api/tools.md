@@ -171,6 +171,6 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 ## Developer console (`cw_console`)
 
 - What a CLI sent Combwork (hooks, status lines, transcript records, terminal markers, lines Combwork typed, its launch and exit, its Combwork tool calls), each next to what Combwork made of it, redacted (no prompt or reply text, commands, tokens or sign-in details).
-- The Assistant reads any agent of its workspace (`agent`, `project`), its own session (`source=assistant`) and Combwork's own events (`source=hive`: Agent API calls, merge slots, watches, Progress, refused hooks). An agent reads its own session.
+- The Assistant reads any agent of its workspace (`agent`, `project`), its own session (`source=assistant`) and Combwork's own events (`source=combwork`: Agent API calls, merge slots, watches, Progress, refused hooks). An agent reads its own session.
 - Combwork captures only while the user has the console open on a source; reading starts nothing, and the reply says when nothing is captured.
 - `read` (default): a line per event, the newest 30 the first time, then `since` carries on; `kinds` narrows them; `seq` gives up to 3 events in full. `sources` lists what you can read, whether it is captured and the arguments that read it (50 a page, `offset` for more).

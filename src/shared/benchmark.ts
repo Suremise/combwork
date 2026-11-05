@@ -274,7 +274,7 @@ export interface Sample {
   /** Each agent's Combwork calls in the measured window (HI-2186), the subject first. */
   agents?: AgentCalls[]
   usage: Measures | null
-  /** Whether the usage's cost was Hive's estimate. */
+  /** Whether the usage's cost was Combwork's estimate. */
   costEstimated: boolean
   /** How complete the measurement was: recording on, measurements dropped, what made it partial. */
   coverage: { recording: boolean | null; dropped: number; partial: string[] }

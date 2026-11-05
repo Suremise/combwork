@@ -300,7 +300,7 @@ let revocation: Promise<boolean> = Promise.resolve(true)
 
 /**
  * Revokes the helper that was lost (HI-2055): kept before any launch goes to its replacement, so a receipt it writes
- * later (it may still run: ended without our seeing it exit) frees nothing. Known at once in this Hive (the clear's guard
+ * later (it may still run: ended without our seeing it exit) frees nothing. Known at once in this Combwork (the clear's guard
  * reads it), durable once written.
  */
 function revokeHelper(helper: string): void {
@@ -342,7 +342,7 @@ const MAX_KEEPER_BYTES = 64 * 1024
 
 /**
  * A run's state as its keeper wrote it, taken only when whole and its own (HI-2055): the file named after the run, at
- * most MAX_KEEPER_BYTES, version 1, the run, its Hive (`hive`, the writer's "pid:started"), a helper this profile bound
+ * most MAX_KEEPER_BYTES, version 1, the run, its Combwork (`app`, the writer's "pid:started"), a helper this profile bound
  * that run to and hasn't revoked, `observed: complete`, and a state: "ended" with no member and total 0, or "live" with
  * its members by id, start time and name. Anything else, null: its writer stays held.
  */
@@ -388,7 +388,7 @@ export type KeeperObservation = { helper: string; members: AgentProcess[]; more:
 /**
  * A gone Combwork's run as its keeper observes it now (HI-2313): asked of the helper its run is bound to (unrevoked), over its
  * pipe, which it serves while it keeps; the keeper sweeps for the asking, never answering from a state written before.
- * Null unless the answer is whole and its own: one line, version 1, this run, that helper, the writer's Hive (`hive`,
+ * Null unless the answer is whole and its own: one line, version 1, this run, that helper, the writer's Combwork (`app`,
  * "pid:started"), `now` and `observed: complete`, every member by id, start time and name, its total at least those
  * described. Anything else (no binding, no pipe, no answer within KEEPER_ASK_MS, unsure, a job it doesn't hold): null,
  * and its writer stays held. It ends nothing; what it says is decided by the one rule (nothingHolds).
@@ -474,7 +474,7 @@ export async function pruneKeeperStates(now = Date.now()): Promise<void> {
 }
 
 /**
- * An earlier Hive's bindings that nothing can ever be read for (HI-2303): their helper has gone and wrote no state. Only
+ * An earlier Combwork's bindings that nothing can ever be read for (HI-2303): their helper has gone and wrote no state. Only
  * that helper writes a run's state, before it exits, so its absence once the helper is gone is final; a helper still
  * running (keeping), one whose state can't be told, or a state there (even a "live" one) keeps the binding. This lets
  * go what a slot removed while held, or a binding kept before bindings were kept by need, would otherwise keep forever.
@@ -1501,7 +1501,7 @@ export async function recordEndedLaunches(): Promise<void> {
   persist()
 }
 
-/** Whether this profile kept that an earlier Hive's run was seen to end (HI-1886): its job seen empty. */
+/** Whether this profile kept that an earlier Combwork's run was seen to end (HI-1886): its job seen empty. */
 export async function endedEarlier(run: string): Promise<boolean> {
   await readRecords()
   return endedRuns.includes(run)

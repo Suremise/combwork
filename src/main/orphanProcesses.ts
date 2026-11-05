@@ -265,7 +265,7 @@ const T = {
   running: agentMsg({
     id: 'notice.orphan.running',
     text: '{n, plural, one {A process your command started is} other {{count} processes your commands started are}} still running with the shell that started {n, plural, one {it} other {them}} gone: {list}. End {n, plural, one {it} other {them}} if not needed; Combwork won\'t.',
-    note: 'After "[Combwork] ", at the agent\'s next tool call or turn\'s end: processes its commands started still run with their shell gone (HI-2111), told once; Combwork doesn\'t end them. n and count: how many; list: each process (notice.orphan.process), joined by "; ".'
+    note: 'After "[CW] ", at the agent\'s next tool call or turn\'s end: processes its commands started still run with their shell gone (HI-2111), told once; Combwork doesn\'t end them. n and count: how many; list: each process (notice.orphan.process), joined by "; ".'
   })
 }
 

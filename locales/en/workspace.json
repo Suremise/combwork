@@ -749,7 +749,7 @@
   },
   "workspace.move.cardsBanner": {
     "defaultMessage": "{lines}, which was renamed or moved: the board still lists them under the old name.",
-    "description": "The banner when cards are listed under a project's old name ({lines}: \"9 cards of hive-website belong to website\", several separated by ;)."
+    "description": "The banner when cards are listed under a project's old name ({lines}: \"9 cards of demo-website belong to website\", several separated by ;)."
   },
   "workspace.move.cardsLine": {
     "defaultMessage": "{total, plural, one {{what} of {from} belongs to {to}} other {{what} of {from} belong to {to}}}",

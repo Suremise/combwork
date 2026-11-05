@@ -8,7 +8,7 @@ import { ConsoleRing, combworkSourceId, makeEvent, sessionSourceId, type Capture
  * at once without building its event, and no ring is kept, so a Combwork with no console open does no work and holds no
  * memory for it.
  *
- * Subscribers are the console's windows (and, with #638, their recordings). Readers (agents' and the Assistant's hive
+ * Subscribers are the console's windows (and, with #638, their recordings). Readers (agents' and the Assistant's Combwork
  * tools) subscribe to nothing: they read what an open console is capturing, and are told when it isn't. Every event is
  * redacted as it is kept (shared/devConsole.ts); a subscriber that opted into text (the user's own recording, or a window
  * while Settings → Advanced → Developer console: show text is on, #699) is sent a second copy with text kept, and only it.
@@ -67,7 +67,7 @@ export class DevConsole {
     return this.rings.has(source) || !!this.flight?.(source)
   }
 
-  /** The sources being captured whose ids start so ("hive:" for every workspace's Combwork events). */
+  /** The sources being captured whose ids start so ("combwork:" for every workspace's Combwork events). */
   capturedLike(prefix: string): string[] {
     return [...this.rings.keys()].filter((s) => s.startsWith(prefix))
   }

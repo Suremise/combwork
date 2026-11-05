@@ -171,7 +171,7 @@ const settingsLink = (c: React.ReactNode[]): React.ReactNode => (
 
 /**
  * A mode's name in the window: one Combwork ships (SHIPPED_MODE_NAMES, #806), in the window's language while its file still
- * has Hive's name for it; any other (the user's own, or one they renamed) as its file has it.
+ * has Combwork's name for it; any other (the user's own, or one they renamed) as its file has it.
  */
 export function modeName(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>): string {
   const shipped = p.bundled ? SHIPPED_MODE_NAMES[p.id] : undefined

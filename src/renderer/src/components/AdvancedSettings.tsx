@@ -20,7 +20,7 @@ import { TabPanel, Tabs } from './Tabs'
  * CLI version, says so, with Keep for the installed version. Values a workspace can set have a This workspace box too.
  * advanced.json holds the same values, Show developer features too: Open advanced.json edits them by hand, and the list
  * follows the file. `query` and `modifiedOnly` are Settings' own search and Modified only, on top of the list's. A
- * value that applies when Hive restarts, changed since this Hive started, offers Restart Hive (#676).
+ * value that applies when Combwork restarts, changed since this Combwork started, offers Restart Combwork (#676).
  */
 const T = {
   tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Combwork and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Combwork, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),

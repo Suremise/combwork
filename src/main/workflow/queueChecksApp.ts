@@ -1,5 +1,5 @@
 // The merge queue's checks in the app (#1349): queueChecks.ts wired to the Progress panel (each check a run of
-// "Hive (merge queue)" in the project), to a session command's environment, to Settings → Advanced's time limit and
+// "Combwork (merge queue)" in the project), to a session command's environment, to Settings → Advanced's time limit and
 // to the project's worktree setup command. #1348's queue host passes the result into its QueueConfig, with #1360's
 // recording spawn.
 

@@ -126,7 +126,7 @@ const stillWaits = (s: CardState, c: Pick<PassCard, 'design' | 'submission'>): b
 
 const passes = new Map<string, { again: boolean; done: Promise<void> }>()
 
-/** The project's pass: coalesced, one at a time per project in this Hive (asked again while it runs, it runs once more). */
+/** The project's pass: coalesced, one at a time per project in this Combwork (asked again while it runs, it runs once more). */
 export function settleReviewerPool(ws: WorkspaceService, projectPath: string): Promise<void> {
   const key = `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
   const now = passes.get(key)

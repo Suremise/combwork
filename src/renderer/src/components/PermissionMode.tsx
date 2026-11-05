@@ -33,7 +33,7 @@ export function openModeMenu(projectPath: string, agentId: string, anchor?: Elem
 
 /**
  * Confirms choosing a provider's no-guardrails mode (Claude Code's Bypass, Codex's Full Access). `where`: what will run
- * in it, as the sentence's subject (an agent's name), or the whole question (`message`, "New sessions of hive will run
+ * in it, as the sentence's subject (an agent's name), or the whole question (`message`, "New sessions of demo will run
  * every command…"), in the window's language.
  */
 export async function confirmDangerousMode(provider: ProviderId, mode: PermissionMode, where: string | { message: string }): Promise<boolean> {

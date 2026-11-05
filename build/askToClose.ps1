@@ -2,7 +2,7 @@
 # it: run by installer.nsh's customInit (the outer instance, as the user), bundled into the installer.
 #
 # Finds the main Combwork process of this install folder only (its exact executable, not a renderer or helper: no --type=),
-# writes Hive's request into its profile (written beside it, then renamed: Hive never reads half of one), waits for
+# writes the close request into its profile (written beside it, then renamed: the app never reads half of one), waits for
 # Combwork's acknowledgement, then for that process to exit (a handle on it, never its name). Combwork checks the request is for
 # it (its id, its start, its executable) and fresh, records and tells its agents, and quits.
 #

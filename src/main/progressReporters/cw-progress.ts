@@ -1,4 +1,4 @@
-// The hive-progress command (a .cmd and a sh script in Combwork's bin folder, on each session's PATH, start this with
+// The cw-progress command (a .cmd and a sh script in Combwork's bin folder, on each session's PATH, start this with
 // Combwork's own executable as Node): see wrapper.ts.
 // The session's dialect (HI-2065), loaded before the wrapper says anything: first, on purpose.
 import '../../shared/agentText/processDialect'

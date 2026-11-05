@@ -107,7 +107,7 @@ export function retryWaitText(st: (Pick<LiveSessionState, 'retryWait' | 'turn'> 
 }
 
 /**
- * "Status unknown: no hooks from Claude Code" for an agent whose hooks aren't reaching Hive (#1336); null otherwise. In
+ * "Status unknown: no hooks from Claude Code" for an agent whose hooks aren't reaching Combwork (#1336); null otherwise. In
  * the window's language with tr, else English (the Agent API's).
  */
 export function hooksMissingText(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr?: Tr): string | null {
@@ -118,7 +118,7 @@ export function hooksMissingText(st: Pick<LiveSessionState, 'hooksMissing' | 'pr
 }
 
 /**
- * What the window says of an agent whose hooks aren't reaching Hive (#1336): that its status may be wrong, why when
+ * What the window says of an agent whose hooks aren't reaching Combwork (#1336): that its status may be wrong, why when
  * Combwork can tell, and what to do. Null otherwise.
  */
 export function hooksMissingNote(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr: Tr): string | null {

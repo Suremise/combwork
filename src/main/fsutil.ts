@@ -1632,7 +1632,7 @@ export function isInUse(e: unknown): boolean {
   return ['EBUSY', 'EPERM', 'EACCES'].includes((e as NodeJS.ErrnoException)?.code ?? '')
 }
 
-/** Checks one of Hive's files can be moved (renamed aside and back), before any of a set goes. Throws if it can't. */
+/** Checks one of Combwork's files can be moved (renamed aside and back), before any of a set goes. Throws if it can't. */
 export async function movable(file: string): Promise<void> {
   const aside = `${file}.moving`
   await rename(file, aside)

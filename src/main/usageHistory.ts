@@ -462,7 +462,7 @@ class UsageHistory {
   }
 
   /**
-   * Records a session started outside Hive (no record: the Sessions list shows it), so its usage is read from the history
+   * Records a session started outside Combwork (no record: the Sessions list shows it), so its usage is read from the history
    * next time rather than its transcript; it never counts in totals.
    */
   ingestExternal(projectPath: string, ext: { id: string; provider: ProviderId; transcriptPath: string }): Promise<IngestResult | null> {

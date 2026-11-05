@@ -118,7 +118,7 @@ export interface ProviderCapabilities {
   backgroundWakes: boolean
   /**
    * The CLI sends a hook as it starts, before any prompt (Claude Code's SessionStart; Codex's and Copilot's come with the
-   * first prompt): none within a while of its start means its hooks aren't reaching Hive (#1336).
+   * first prompt): none within a while of its start means its hooks aren't reaching Combwork (#1336).
    */
   startHook?: boolean
   /**

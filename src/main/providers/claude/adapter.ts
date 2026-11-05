@@ -598,7 +598,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const added = [...(ctx.extraDirs ?? []), ...(containsPlace(ctx.cwd, plugin) ? [] : [plugin])]
     for (const d of added) args.push('--add-dir', d)
     // Only the workspace's servers; switched off (#1281), Claude Code's own load too, and the --mcp-config ones still win
-    // over its own of the same name, hive included (2.1.305: the user's and the project's are never started).
+    // over its own of the same name, combwork included (2.1.305: the user's and the project's are never started).
     args.push('--mcp-config', join(ctx.privateDir, 'mcp.json'))
     if (launchOverrides(ctx.overrides, CLAUDE_CODE, 'mcpIsolation')) args.push('--strict-mcp-config')
     args.push('--settings', join(ctx.privateDir, 'settings.json'))

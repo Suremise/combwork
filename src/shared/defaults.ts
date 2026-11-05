@@ -880,11 +880,11 @@ export function resumeRecord<R extends Pick<SessionRecord, 'id' | 'archived' | '
 /** What sessionLabel reads: a session record, list item, live session or resume target, with what is known of its titles. */
 export interface SessionNaming {
   id: string
-  /** Hive's name for it. */
+  /** Combwork's name for it. */
   name?: string | null
   /** The CLI's title (a /rename, else its own). */
   title?: string | null
-  /** The CLI's /rename name; undefined when not known (then it doesn't override Hive's name). */
+  /** The CLI's /rename name; undefined when not known (then it doesn't override Combwork's name). */
   customTitle?: string | null
   titleAtRename?: string | null
   /** When it started, for sessions with no name yet: the live session's start, else the record's creation. */
@@ -899,9 +899,9 @@ export function isAutoSessionName(name: string | null | undefined, projectName: 
 }
 
 /**
- * The name the session was given in the CLI (/rename) when it is newer than Hive's: Hive's name is automatic, or
- * the CLI's changed after the session was last renamed in Hive. Null when Hive's name stands. Hive passes its own
- * name to the CLI at launch (Claude Code's --name), so a CLI name that is Hive's, or automatic, is no rename.
+ * The name the session was given in the CLI (/rename) when it is newer than Combwork's: Combwork's name is automatic, or
+ * the CLI's changed after the session was last renamed in Combwork. Null when Combwork's name stands. Combwork passes its own
+ * name to the CLI at launch (Claude Code's --name), so a CLI name that is Combwork's, or automatic, is no rename.
  */
 export function cliRename(s: SessionNaming, projectName: string): string | null {
   const custom = s.customTitle !== undefined ? s.customTitle : s.usage?.customTitle
@@ -921,7 +921,7 @@ export function turnPushedCompaction(c: Pick<CompactionEvent, 'preTokens' | 'las
 }
 
 /**
- * A session's display name. The latest rename wins: a name given in Hive, until the CLI's own name (/rename)
+ * A session's display name. The latest rename wins: a name given in Combwork, until the CLI's own name (/rename)
  * changes after it; then the CLI's. Without either, the CLI's title, else when the session started ("2026-10-04 14:05",
  * in the user's date and time format).
  */

@@ -1,6 +1,6 @@
 // The merge queue's checks as Combwork's own runs (#1349, SPEC §16.9.1 steps 5 and 8, §16.13): the runner the queue calls
 // (`QueueConfig.runCheck` and `install`) for its own worktree. Each configured check (G9, its command from the options,
-// OP-24) and each install is a progress run attributed to "Hive (merge queue)", named for the card, the command and the
+// OP-24) and each install is a progress run attributed to "Combwork (merge queue)", named for the card, the command and the
 // result revision ("HI-12 · typecheck · a3f2c1d"), with its output in a bounded log file (Show log).
 //
 // - The environment is a session command's (the app passes `childEnv()`), never Combwork's own: no ELECTRON_RUN_AS_NODE and

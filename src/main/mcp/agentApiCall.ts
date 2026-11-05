@@ -19,7 +19,7 @@ export const REPLY_MS = 300_000
 
 /**
  * How long a stop waits for the user's answer (HI-1994): less than a call may take (REPLY_MS), so the caller hears it
- * timed out, rather than "Hive didn't reply" with the question left open.
+ * timed out, rather than "Combwork didn't reply" with the question left open.
  */
 export const STOP_ASK_MS = REPLY_MS - 30_000
 

@@ -384,7 +384,7 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
   const words = (r: ProgressRun): string => [runAgentName(r, tr), r.title, r.command ?? '', r.card ? cardName(r.card) : ''].join('\n')
   // The lane chosen, as it is now (its cards change between cards, #1270); one no longer shown leaves the filter.
   const lane = filter.lane ? lanes.find((l) => l.id === filter.lane) : undefined
-  // Agents by their runs' names; Hive's own runs as "Hive (merge queue)" (#1356 item 5).
+  // Agents by their runs' names; Combwork's own runs as "Combwork (merge queue)" (#1356 item 5).
   const agents = [...new Map(runs.filter((r) => runAgentKey(r)).map((r) => [runAgentKey(r)!, runAgentName(r, tr)])).entries()].sort((a, b) => a[1].localeCompare(b[1]))
   const goneLane = !!filter.lane && !lane
   const goneAgent = !!filter.agent && !agents.some(([id]) => id === filter.agent)
@@ -596,7 +596,7 @@ function CardGroup({ group: c, running, now, opened, flip }: { group: CardRuns; 
 
 /**
  * A run tried several times the same day (#1309), or the merge queue's checks of a card (HI-1701): one line, as a run's,
- * "B1 cardwork ×4 · 2 failed, then passed" or "Hive (merge queue) lint, typecheck"; opened, each run.
+ * "B1 cardwork ×4 · 2 failed, then passed" or "Combwork (merge queue) lint, typecheck"; opened, each run.
  */
 function GroupRow({ group: g, cardKey, now, opened, flip }: { group: RunGroup; cardKey: string | null; now: number; opened: ReadonlySet<string>; flip: (id: string) => void }) {
   const [open, setOpen] = useState(false)

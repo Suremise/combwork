@@ -14,7 +14,7 @@ import type { WorkspaceService } from './workspace'
 const log = createLogger('workspace')
 
 const M = {
-  busy: msg({ id: 'service.workspace.stillOpening', defaultMessage: '{name} is still opening: wait for it to finish, then try again.', description: "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0)." }),
+  busy: msg({ id: 'service.workspace.stillOpening', defaultMessage: '{name} is still opening: wait for it to finish, then try again.', description: "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to 1.0)." }),
   closing: msg({ id: 'service.workspace.stillClosing', defaultMessage: '{name} is still closing: wait for it to finish, then try again.', description: 'An error opening, making or closing a workspace while this window is still closing its workspace {name}.' })
 }
 

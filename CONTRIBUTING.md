@@ -17,7 +17,7 @@ Combwork's languages besides English are **drafted by AI**, and Combwork marks t
 
 | Where | What | Edit it? |
 |---|---|---|
-| `locales/<code>/<area>.json` | One language's translations for one area of Hive (settings, board, progress…): message id → text. | **Yes.** This is where translations go. |
+| `locales/<code>/<area>.json` | One language's translations for one area of Combwork (settings, board, progress…): message id → text. | **Yes.** This is where translations go. |
 | `locales/en/<area>.json` | The English source: each message's `defaultMessage`, and a `description` that tells you where it appears and what its placeholders are. | **No.** It is generated from the code (`npm run i18n:extract`). Read it, don't edit it. |
 | `locales/.source/<code>/<area>.json` | The English each translation was made from, so Combwork can tell when the English changed later. | Only through `npm run i18n:coverage -- --record` (below). |
 | `src/shared/i18n/languages.ts` | The list of languages: each one's own name, its AI mark and note, and its direction. | When you add a language. A maintainer takes a language's AI mark off once it has been reviewed (below). |
@@ -199,7 +199,7 @@ In short:
 ```bash
 npm install
 npx install-electron --no   # once: Electron downloads its binary when first needed
-npm run dev                 # Hive from source, beside an installed Hive (its own profile)
+npm run dev                 # Combwork from source, beside an installed Combwork (its own profile)
 npm run typecheck
 npm run lint
 npm test

@@ -243,7 +243,7 @@ export async function adoptHandovers(ws: WorkspaceService): Promise<Map<string, 
     // can't be read fails, never forgetting them all.
     const here = await handoverNames(at)
     stillOpen(at)
-    // Its name's case changed outside Hive (Explorer): the same file, its owner under the name it has now.
+    // Its name's case changed outside Combwork (Explorer): the same file, its owner under the name it has now.
     const byCase = new Map([...here].map((f) => [f.toLowerCase(), f]))
     for (const f of Object.keys(owners)) {
       if (here.has(f)) continue

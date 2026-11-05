@@ -15,7 +15,7 @@ const CLOSED = msg({ id: 'worktrees.names.closed', defaultMessage: 'The workspac
 
 /**
  * The workspace's record of its projects' names, by their stable ids (#514), in `.combwork/project-names.json` (a kept file):
- * each project's folder name as Hive last saw it and its earlier ones, and every rename Hive saw, numbered. It is the
+ * each project's folder name as Combwork last saw it and its earlier ones, and every rename Combwork saw, numbered. It is the
  * workspace's, not the project's: a copied folder (given an id of its own) brings none of it along. Renames are found by
  * id (a project seen under another name than its record's), so two projects that swapped names are two renames, never
  * copies. What keeps a project by its name or path follows each rename from it (projectRename.ts), and the records
@@ -172,7 +172,7 @@ export function ownerOfName(ws: WorkspaceService, folder: string): string | null
 }
 
 /**
- * Records that a project once had a folder name, though Hive never saw it renamed (#514): Repair found what was saved
+ * Records that a project once had a folder name, though Combwork never saw it renamed (#514): Repair found what was saved
  * under that name and gave it to the project (#508). In the record before anything else moves, so what is kept under
  * that name (handovers, kept comparisons) is given to the project however often that fails, and after a restart.
  */
@@ -189,7 +189,7 @@ export async function noteFormerName(ws: WorkspaceService, id: string, folder: s
     const p = j.projects[id] ?? (now ? (j.projects[id] = { name: basename(now), former: [] }) : null)
     if (!p) throw combworkError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }), undefined, { kind: 'notFound' })
     if (same(p.name, folder) || p.former.some((n) => same(n, folder))) return remember(ws, life, j)
-    // The oldest of its names: it had it before any Hive saw it renamed from.
+    // The oldest of its names: it had it before any Combwork saw it renamed from.
     p.former = [...p.former.slice(0, MAX_FORMER - 1), folder]
     await writeKeptJson(fileOf(path), j)
     remember(ws, life, j)

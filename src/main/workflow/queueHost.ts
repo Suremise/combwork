@@ -162,7 +162,7 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
   return host.running
 }
 
-/** This profile's name, as another Hive's panel says who runs a queue ("run by Hive-Dev"). */
+/** This profile's name, as another Combwork's panel says who runs a queue ("run by Combwork-Dev"). */
 export const profileName = (): string => basename(app.getPath('userData'))
 
 /** Tells the workspace's window that a target's queue changed (its model: queueControls.ts), for the panel and the card. */
@@ -377,7 +377,7 @@ function testHooks(projectPath: string, target: string): QueueHooks {
       // Once per run of Combwork: the entry tested again on the moved target then merges.
       if (raced) return
       raced = true
-      // A commit on the target made outside Hive (an empty one, on its tree), the ref moved to it.
+      // A commit on the target made outside Combwork (an empty one, on its tree), the ref moved to it.
       const head = await git(projectPath, ['rev-parse', `refs/heads/${target}`])
       const made = head.ok ? await git(projectPath, ['-c', 'user.name=Race', '-c', 'user.email=race@example.invalid', 'commit-tree', `${head.out.trim()}^{tree}`, '-p', head.out.trim(), '-m', 'race']) : null
       if (made?.ok) await git(projectPath, ['update-ref', `refs/heads/${target}`, made.out.trim(), head.out.trim()])
@@ -531,7 +531,7 @@ export function startQueueHosts(): void {
   // A workspace closing: its runners released first (their processes ended; from then on every write their runs try is
   // refused by the fence, so a check ended by the close never returns its card), then its runs waited for, briefly.
   const closing = async (path: string): Promise<void> => {
-    // Its watches of other Hives' runners end with it (a reopened workspace's hosts watch afresh).
+    // Its watches of other Combworks' runners end with it (a reopened workspace's hosts watch afresh).
     endWatches(path)
     await releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase())
     const runs = [...hosts.values()].filter((h) => h.wsPath.toLowerCase() === path.toLowerCase() && h.running).map((h) => h.running)

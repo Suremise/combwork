@@ -193,7 +193,7 @@ export interface AppSettings {
      * panel: Combwork's session guidance says so. Off, or with the panel off: only when the user asks. New sessions.
      */
     progressCommands: boolean
-    /** How dates show everywhere in Hive (session names, lists, tooltips, exports): 2026-10-04 by default. */
+    /** How dates show everywhere in Combwork (session names, lists, tooltips, exports): 2026-10-04 by default. */
     dateFormat: DateFormat
     /** How times show with them: 24-hour (14:05) by default. */
     timeFormat: TimeFormat
@@ -407,7 +407,7 @@ export interface AssistantUndoResult {
 export interface AssistantAction extends Partial<ActivityTarget> {
   id: string
   at: string
-  /** One line, e.g. "Started Agent 2 in hive". */
+  /** One line, e.g. "Started Agent 2 in demo". */
   text: string
   ok: boolean
   /** Why it failed or was refused, in full (its panel). */
@@ -687,7 +687,7 @@ export interface AppConfig {
   keyMasking?: { ever?: true; gap?: true }
   /** A version the user chose to skip; automatic checks don't offer it. */
   skippedUpdate?: string
-  /** Version that last ran, to say "Hive updated" once after an update. */
+  /** Version that last ran, to say "Combwork updated" once after an update. */
   lastRunVersion?: string
 }
 
@@ -764,7 +764,7 @@ export interface Account {
    * PC-wide sign-in (decision C), and a test copy's CLI test home (the test seam, connectionSeam.ts).
    */
   home?: 'cli'
-  /** The user's name for it ("Personal", "Hive overnight"). */
+  /** The user's name for it ("Personal", "Demo overnight"). */
   name: string
   createdAt: string
   accepted?: ConnectionIdentity
@@ -1126,7 +1126,7 @@ export interface BoardFold {
 
 export interface TaskComment {
   at: string
-  /** "You", "Assistant", or an agent ("Agent 2 (Claude Code) in hive"). */
+  /** "You", "Assistant", or an agent ("Agent 2 (Claude Code) in demo"). */
   by: string
   text: string
   /** A comment Combwork wrote itself (#845): its text as data, for the window; `text` is its English. */
@@ -1324,7 +1324,7 @@ export interface TaskDecision {
   text: string
   /** Always the user: an agent or the Assistant only records what the user decided. */
   decidedBy: 'user'
-  /** Who wrote it down: "You" (the user), "Assistant", or an agent ("B5 (hive)"). */
+  /** Who wrote it down: "You" (the user), "Assistant", or an agent ("B5 (demo)"). */
   recordedBy: string
   at: string
   /** When the user last changed its words. */
@@ -1410,7 +1410,7 @@ export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: str
 /** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */
 export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree?: boolean; name?: string; connection?: string }
 
-/** How a project leaves Hive (the main menu's Project → Remove Project…). */
+/** How a project leaves Combwork (the main menu's Project → Remove Project…). */
 export type ProjectRemoval = 'hide' | 'remove' | 'delete'
 
 /** What removing a project touches, for its dialog. */
@@ -1434,7 +1434,7 @@ export interface ProjectRemovalInfo {
   folders?: { of: ProjectFolderOf; path: string; kept: string | null; blocksDelete?: string }[]
 }
 
-/** A project folder holding what Remove from Hive packed into its .combwork/removed. */
+/** A project folder holding what Remove from Combwork packed into its .combwork/removed. */
 export interface RemovedData {
   at: string
   workspace: string
@@ -1741,7 +1741,7 @@ export interface HeldWriter {
   run: string
   /** The Combwork holding it: this one (`self`), or another and whether that one still runs (null: can't be told). */
   combwork: { pid: number; self: boolean; alive: boolean | null }
-  /** Its run is still live in this Hive (its session, or the processes it left still followed): Release is refused. */
+  /** Its run is still live in this Combwork (its session, or the processes it left still followed): Release is refused. */
   live: boolean
   /**
    * What Combwork lists of the processes its run left running: its leftovers (the agent's ⋯ lists them), or, its Combwork gone,
@@ -2082,7 +2082,7 @@ export interface UnusedWorktree {
   lastCommit?: { at: string; subject: string }
   /**
    * Who made it (#476): a Combwork agent's (the agent whose session last ran there, when one did; else it is in Combwork's
-   * worktrees folder), or not Hive (an agent's own `git worktree add`, a CLI subagent's isolation, the user's).
+   * worktrees folder), or not Combwork (an agent's own `git worktree add`, a CLI subagent's isolation, the user's).
    */
   origin?: UnusedWorktreeOrigin
   /**
@@ -2208,7 +2208,7 @@ export interface SessionRecord {
    */
   cards?: { number: number; title: string; review?: true }[]
   /**
-   * The CLI's own name for the session (SessionUsage.customTitle) when it was last renamed in Hive, null when it had
+   * The CLI's own name for the session (SessionUsage.customTitle) when it was last renamed in Combwork, null when it had
    * none. Once the CLI's name changes from this (a /rename since), it is the newer rename and wins (sessionLabel).
    */
   titleAtRename?: string | null
@@ -2422,7 +2422,7 @@ export interface LiveSessionState {
    * mode Combwork shows (permissionMode) starts as the one asked for at launch, so this says it was seen (#234).
    */
   modeObserved?: PermissionMode
-  /** The session's name in Hive (renamable in the Sessions tab and the agent's footer). */
+  /** The session's name in Combwork (renamable in the Sessions tab and the agent's footer). */
   sessionName?: string
   /** See SessionRecord.titleAtRename. */
   titleAtRename?: string | null
@@ -2539,7 +2539,7 @@ export interface LiveSessionState {
    */
   inputBlocked?: { since: string }
   /**
-   * Its CLI's hooks aren't reaching Hive (#1336), this launch: none came within a while of its start (a CLI that sends one
+   * Its CLI's hooks aren't reaching Combwork (#1336), this launch: none came within a while of its start (a CLI that sends one
    * then), or none after a prompt its CLI went to work on (its screen or its records show it). Combwork's status for it may be
    * wrong, so it shows as unknown and nothing is typed into it; any hook clears it. `why` when Combwork can tell: Combwork
    * refused its hooks (their token), its settings turn hooks off (`offIn`: where), or it is newer than Combwork was tested with.
@@ -3732,7 +3732,7 @@ export interface AgentApiInfo {
   viewers: ViewerToken[]
 }
 
-/** A read-only Agent API token for an app that shows Hive (Apiary): it reads and follows the workspace, never changes it. */
+/** A read-only Agent API token for an app that shows Combwork (Apiary): it reads and follows the workspace, never changes it. */
 export interface ViewerToken {
   id: string
   /** What the user called it ("Apiary"). */
@@ -3830,7 +3830,7 @@ export type CombworkEvent =
   | { type: 'branch-status'; projectPath: string; agentId: string; status: AgentBranchStatus | null }
   | { type: 'plan-usage'; provider: ProviderId; usage: PlanUsage; connection?: string }
   | { type: 'plan-usage-cleared'; connection: string }
-  /** Hive's accounts changed (HI-980: one added, renamed, removed, checked, or a workspace's choice of them): read them again. */
+  /** Combwork's accounts changed (HI-980: one added, renamed, removed, checked, or a workspace's choice of them): read them again. */
   | { type: 'connections-changed' }
   | { type: 'window-state'; maximized: boolean; focused: boolean; alwaysOnTop: boolean }
   /** A window opened or closed: how many there are now (File → Exit says it closes them all). */
@@ -3916,7 +3916,7 @@ export interface LaneInfo {
   rounds: number
   /** No change this long and the user is told. */
   waitMinutes: number
-  /** Who started it, as the board names them ("B1 (hive)", "Assistant", "You"). */
+  /** Who started it, as the board names them ("B1 (demo)", "Assistant", "You"). */
   startedBy: string
   startedAt: string
   updatedAt: string
@@ -4096,11 +4096,11 @@ export interface ProgressRun {
   /** The reporting agent's project (null for the Assistant and scripts). */
   projectPath: string | null
   agentId: string | null
-  /** Its agent's name, "Hive Assistant", or "Script". */
+  /** Its agent's name, "Combwork Assistant", or "Script". */
   agentName: string
   /**
    * `agentName` is a name Combwork gave the run, not one its caller has (#872): "Script" for an Agent API script, "Agent"
-   * for a kept run with no name, "Hive (slot <name>)" for a slot's warming (#1429, its `slot`). The window shows it in its
+   * for a kept run with no name, "Combwork (slot <name>)" for a slot's warming (#1429, its `slot`). The window shows it in its
    * language; the Agent API leaves this out (publicRun).
    */
   defaultName?: 'script' | 'agent' | 'mergeQueue' | 'slot' | 'copy'
@@ -4147,7 +4147,7 @@ export interface ProgressRun {
   /** A log or run record the reporter named (a path). */
   logPath: string | null
   /**
-   * Its title is its command line (hive-progress without --title), as its reporter said (#620): the Agent API names it by
+   * Its title is its command line (cw-progress without --title), as its reporter said (#620): the Agent API names it by
    * its program alone, since a command's arguments can hold a token or a prompt.
    */
   titleFromCommand?: true
@@ -4160,7 +4160,7 @@ export interface ProgressRun {
   revision?: string
   /** What was checked out where it ran when it started (a full commit id): the revision it actually tested (SPEC §16.13). */
   testedCheckout?: string
-  /** The check it was started as (`hive-progress --check <name>`: the project's configured command for that name ran). */
+  /** The check it was started as (`cw-progress --check <name>`: the project's configured command for that name ran). */
   check?: string
   /** The folder it ran in, as its reporter said. */
   folder?: string

@@ -110,7 +110,7 @@ const eventOfLabel = (label: string): string => label.split('_').map((w) => w.ch
 
 /**
  * Codex's own listing of a launch's hooks as rows: each with Codex's trust (trusted, untrusted, modified), its source
- * and file from its key (`<file>:<event>:<group>:<handler>`). `hive` is the command Hive passed for its own: an entry of
+ * and file from its key (`<file>:<event>:<group>:<handler>`). `combwork` is the command Combwork passed for its own: an entry of
  * the session flags running exactly that is Combwork's (its row is Combwork's, with Codex's trust), never another.
  */
 export function codexListedHooks(listed: readonly CodexListedHook[], combwork: { command: string; flagsFile: string }, secrets: readonly string[] = [], max = HOOK_ROWS_MAX): { rows: HookRow[]; combworkTrust: Map<string, HookStatus>; more: number } {

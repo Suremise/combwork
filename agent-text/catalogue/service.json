@@ -196,7 +196,7 @@
   },
   "service.combworkMove.phaseFailed": {
     "text": "Combwork moved this workspace's .hive folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.",
-    "note": "An error opening a workspace (HI-2462): its .hive folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.hiveMove.what.*); {error} says why, a sentence. Keep .hive and .combwork as they are.",
+    "note": "An error opening a workspace (HI-2462): its .hive folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.combworkMove.what.*); {error} says why, a sentence. Keep .hive and .combwork as they are.",
     "audience": "both"
   },
   "service.combworkVcs.cantList": {
@@ -881,7 +881,7 @@
   },
   "service.workspace.stillOpening": {
     "text": "{name} is still opening: wait for it to finish, then try again.",
-    "note": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0).",
+    "note": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to 1.0).",
     "audience": "both"
   }
 }

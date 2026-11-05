@@ -278,7 +278,7 @@ export class WorkspaceService {
    */
   private savedAt = new Map<string, number>()
   /**
-   * Each project's project.json writes by Hive (#1432), as the stamp of its last write and the root ticket it was written
+   * Each project's project.json writes by Combwork (#1432), as the stamp of its last write and the root ticket it was written
    * at: a reader compares the stamp it read before with now's, and can tell it changed. Bounded (#1498): forgotten when the
    * workspace closes, or a refresh finds the project gone; a project with none reads `configFloor`, the newest stamp ever
    * forgotten, and stamps only grow (`configStamp`, never reset), so a forgotten write still reads as a change, never as
@@ -1053,7 +1053,7 @@ export class WorkspaceService {
     }
   }
 
-  /** The workspace's project folders, without the ones hidden or removed from Hive (hidden: true lists only those). */
+  /** The workspace's project folders, without the ones hidden or removed from Combwork (hidden: true lists only those). */
   async listProjectPaths(opts: { hidden?: boolean } = {}): Promise<string[]> {
     // Its folder as the call began: one closing meanwhile still lists that folder's, never a null path.
     const path = this.path

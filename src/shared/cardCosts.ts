@@ -55,7 +55,7 @@ export function trackHolds(card: TaskCard, at: string): void {
 const COLUMN_BY_LABEL = new Map(TASK_COLUMNS.map((c) => [c.label.toLowerCase(), c.id]))
 const MOVED = /^Moved to (?:the (?:top|bottom) of )?(On Hold|Todo|Doing|Review|Passed|Done)\b/
 const CREATED = /^Created in (On Hold|Todo|Doing|Review|Passed|Done)\b/
-/** "HB5 (hive)": an agent's name as history gives who did it. */
+/** "B5 (demo)": an agent's name as history gives who did it. */
 const agentNamed = (by: string): string => by.replace(/\s+\([^()]*\)$/, '')
 
 /**

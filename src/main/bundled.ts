@@ -343,7 +343,7 @@ export async function restoreBundled(kind: BundledKind, id: string): Promise<voi
 export async function bundledStatus(kind: BundledKind, id: string, copyPath: string): Promise<BundledStatus> {
   const [copy, shipped] = await Promise.all([revisionOf(copyPath).catch(() => ''), revisionOf(itemPath(bundledDir(kind), kind, id))])
   if (copy === shipped) return { bundled: 'same' }
-  // Only a copy made from a version older than this one has an update here: one from a newer Hive (sharing the
+  // Only a copy made from a version older than this one has an update here: one from a newer Combwork (sharing the
   // workspace) or an unknown one doesn't, and Revert would take it back.
   const from = (await readManifest())?.[kind][id]?.from
   return from && olderThan(kind, id, from, shipped) ? { bundled: 'changed', updateAvailable: true } : { bundled: 'changed' }

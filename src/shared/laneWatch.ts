@@ -19,7 +19,7 @@ const T = {
   unblocked: agentMsg({ id: 'wake.lane.unblocked', text: '{card} is no longer blocked', note: 'A lane watch wake\'s event (#922): a lane\'s card\'s block lifted. card: "HI-12".' }),
   stalled: agentMsg({ id: 'wake.lane.stalled', text: '{card} is stalled', note: 'A lane watch wake\'s event: a lane\'s card stalled (why follows). card: "HI-12".' }),
   moved: agentMsg({ id: 'wake.lane.moved', text: '{card} is in {column}', note: 'A lane watch wake\'s event: a lane\'s card moved. card: "HI-12"; column: the board column\'s name ("Review").' }),
-  asked: agentMsg({ id: 'wake.lane.waitsForUser', text: '{card} waits for the user{who, select, agent { ({by} asks)} combwork { (Combwork asks)} other {}}', note: 'A lane watch wake\'s event (HI-1991): a new request for the user on a lane\'s card (what it asks follows). card: "HI-12"; who: agent (by: the asking agent\'s name), hive (Combwork asked), or none (not known).' }),
+  asked: agentMsg({ id: 'wake.lane.waitsForUser', text: '{card} waits for the user{who, select, agent { ({by} asks)} combwork { (Combwork asks)} other {}}', note: 'A lane watch wake\'s event (HI-1991): a new request for the user on a lane\'s card (what it asks follows). card: "HI-12"; who: agent (by: the asking agent\'s name), combwork (Combwork asked), or none (not known).' }),
   mergeDue: agentMsg({ id: 'wake.lane.mergeDue', text: 'all its cards passed: its merge is due', note: "A lane watch wake's event: every card of the lane passed, so its merge is due." }),
   mergeStalled: agentMsg({ id: 'wake.lane.mergeStalled', text: 'its merge is stalled', note: "A lane watch wake's event (#869): the lane's merge is due but nobody is doing it (why follows)." }),
   pausedMerge: agentMsg({ id: 'wake.lane.pausedMerge', text: 'paused for a merge: {status}', note: 'A lane watch wake\'s event (#1270): the lane waits for a card to merge. status: the lane\'s status ("waiting: HI-12 not merged").' }),
@@ -186,7 +186,7 @@ export function blockNewsAt(card: Pick<TaskCard, 'blocked' | 'history'> & Partia
   if (!card.blocked) return ''
   const set = card.history.findLast((h) => historyBlocked(h))?.at ?? ''
   const name = card.agentName
-  // A comment's author is its agent's name and project: "HB2 (hive)".
+  // A comment's author is its agent's name and project: "B2 (demo)".
   const said = name ? (card.comments?.findLast((c) => c.by === name || c.by.startsWith(`${name} (`))?.at ?? '') : ''
   return said > set ? said : set
 }

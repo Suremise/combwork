@@ -1,4 +1,4 @@
-// Codex's app server, asked one thing by Hive (HI-1757: a connection's sign-in check, a launch's hook check), owned from
+// Codex's app server, asked one thing by Combwork (HI-1757: a connection's sign-in check, a launch's hook check), owned from
 // before it runs until its end is confirmed, with the merge queue's machinery as it is (#1360: workflow/queueJobs.ts and
 // workflow/launcher.ts, on Combwork's process supervisor): a named, kill-on-close job, opened with no journal; a launcher put
 // in it before it is told to run Codex; the job ended and seen empty by the same supervisor that opened it (its instance

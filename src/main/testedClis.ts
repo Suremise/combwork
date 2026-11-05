@@ -30,7 +30,7 @@ export async function testedVersion(id: ProviderId): Promise<{ version: string; 
 }
 
 /**
- * A test copy of Hive (unpackaged, with a test profile) notes the CLI it selected, a JSON line per check, in
+ * A test copy of Combwork (unpackaged, with a test profile) notes the CLI it selected, a JSON line per check, in
  * CW_TEST_CLI_LOG (the e2e runner gives each suite one): the run record's real CLIs are what Combwork itself chose, the
  * standalone CLI its detection accepted, never a copy it rejected (#365), and the home it runs in (its sign-in and
  * config, #368: the record names each real suite's). Never in an installed Combwork.

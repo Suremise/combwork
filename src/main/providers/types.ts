@@ -508,7 +508,7 @@ export interface ProviderAdapter {
   /**
    * For CLIs whose terminal title says when a person must act (Codex's "Action Required"): a test of a title, for
    * this version of the CLI, and the launch (its override switches: a title Combwork didn't set isn't read). Null (or
-   * absent) when its title doesn't say: its hooks then tell Hive (see hookStatus).
+   * absent) when its title doesn't say: its hooks then tell Combwork (see hookStatus).
    */
   titleAttention?(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null
   lockReply(decision: LockDecision): Record<string, unknown>

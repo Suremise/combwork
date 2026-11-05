@@ -156,7 +156,7 @@ export interface Db {
   writer: DatabaseSync
   /** The connection queries use: it sees what was last committed, never a write still under way. */
   reader: DatabaseSync
-  /** The schema version of a file saved by a newer Hive (opened read-only), else null. */
+  /** The schema version of a file saved by a newer Combwork (opened read-only), else null. */
   newer: number | null
   /** A group of steps this file waits for, not approved (opened read-only), else null. */
   pending: PendingGroup | null
@@ -226,7 +226,7 @@ const backupName = (family: string, version: number, at: Date): string => `${fam
 /** What follows `<family>-v` in a copy's name: its version and time. */
 const BACKUP_REST = /^\d+-(\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z)\.db$/
 
-/** The family a group's copy is kept under (`hive-before-1.0`): never pruned, and apart from the file's own three. */
+/** The family a group's copy is kept under (`combwork-before-1.0`): never pruned, and apart from the file's own three. */
 export const groupBackupFamily = (family: string, group: string): string => `${family}-before-${group}`
 
 /** The copies of a family in `dir`, oldest first: only names of the family's exact form, never another's or anything else. */
@@ -428,7 +428,7 @@ export function soleCopy(file: string, dir: string, family: string, version: num
 }
 
 /**
- * Opens (or makes) a database file with its two connections, set up and migrated. A file saved by a newer Hive (a
+ * Opens (or makes) a database file with its two connections, set up and migrated. A file saved by a newer Combwork (a
  * schema version this build doesn't know) is opened read-only and migrated not at all: `newer` says its version, and
  * every write to it fails. So is one whose group of steps wasn't approved (`pending`). A group refused for another
  * connection on the file throws DbInUseError, the file as it was.

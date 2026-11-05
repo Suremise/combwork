@@ -110,7 +110,7 @@ export function whyNoLine(projectPath: string, agentId: string, need: DeliveryNe
   // Its CLI's own question on its screen (HI-1959), before its status says so: Enter would answer it.
   if (sessions.cliAsks(projectPath, agentId)) return say(T.cliAsks)
   if (sessions.launchTaskWaiting(projectPath, agentId)) return say(T.launchTask)
-  // A doorbell before its hive tools have connected is a turn that can't read the inbox (#865: a resumed Claude Code).
+  // A doorbell before its Combwork tools have connected is a turn that can't read the inbox (#865: a resumed Claude Code).
   if (sessions.combworkToolsWaiting(projectPath, agentId)) return say(T.toolsWaiting)
   // Its folder being changed under it (#646: a Git switch or pull): no turn of Combwork's starts there until that is done.
   const changing = folderChanging(st.cwd)
