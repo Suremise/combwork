@@ -90,7 +90,7 @@
   },
   "providers.readiness.notInstalled": {
     "text": "{provider} is not installed.",
-    "note": "Provider Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code).",
+    "note": "Provider Setup and Settings → Providers: Combwork didn't find the coding agent's CLI. {provider} is its name (Claude Code).",
     "audience": "both"
   },
   "providers.readiness.signedOut": {
@@ -105,7 +105,7 @@
   },
   "providers.settings.hooksOff": {
     "text": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Combwork's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Combwork doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
-    "note": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them.",
+    "note": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them.",
     "audience": "both"
   },
   "providers.settings.noFile": {
@@ -115,7 +115,7 @@
   },
   "providers.settings.noValue": {
     "text": "The last --settings in Extra arguments has no value. Give it a settings file or inline JSON (--settings '''<file or JSON>'''), or remove it in Agent Settings or Settings → Claude Code.",
-    "note": "Starting a Claude Code agent is refused: its extra arguments end with --settings and nothing after it. Keep --settings as it is, and the straight quotes around <file or JSON>: each three apostrophes show one (ICU); the words file or JSON may be translated; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them.",
+    "note": "Starting a Claude Code agent is refused: its extra arguments end with --settings and nothing after it. Keep --settings as it is, and the straight quotes around <file or JSON>: each three apostrophes show one (ICU); the words file or JSON may be translated; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them.",
     "audience": "both"
   },
   "providers.settings.notAFile": {
@@ -130,12 +130,12 @@
   },
   "providers.settings.notList": {
     "text": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} sets {key} to something other than a list, which stops Combwork's hooks reaching it. Make it a list ([ … ]) or remove it in Agent Settings or Settings → Claude Code.",
-    "note": "Starting a Claude Code agent is refused: a hook allowlist in its settings isn't a list. {key} is the setting's name. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them. Keep [ … ] as it is.",
+    "note": "Starting a Claude Code agent is refused: a hook allowlist in its settings isn't a list. {key} is the setting's name. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them. Keep [ … ] as it is.",
     "audience": "both"
   },
   "providers.settings.notObject": {
     "text": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} isn't a settings object ('{ … }'). Fix it or remove it in Agent Settings or Settings → Claude Code.",
-    "note": "Starting a Claude Code agent is refused: its settings aren't an object. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them. Keep { … } as it is.",
+    "note": "Starting a Claude Code agent is refused: its settings aren't an object. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them. Keep { … } as it is.",
     "audience": "both"
   },
   "providers.settings.tooLarge": {
@@ -150,7 +150,7 @@
   },
   "providers.unknown": {
     "text": "Unknown provider \"{provider}\". It may need a newer version of Combwork.",
-    "note": "An agent or a setting names a coding-agent CLI this version of Hive doesn't know, as when a newer Hive wrote it. {provider} is the id.",
+    "note": "An agent or a setting names a coding-agent CLI this version of Combwork doesn't know, as when a newer Combwork wrote it. {provider} is the id.",
     "audience": "both"
   }
 }

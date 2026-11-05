@@ -489,7 +489,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'cw.recorder.unknown',
     group: 'cw',
     title: msg({ id: 'settings.advanced.hive.recorder.unknown.title', defaultMessage: 'Flight recorder: capture something unknown from a CLI', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens." }),
-    desc: msg({ id: 'settings.advanced.hive.recorder.unknown.desc', defaultMessage: "Save a capture when a CLI sends a hook or a status line with a field Combwork doesn't know: often the first sign that a CLI update changed something.", description: 'What the advanced setting "Flight recorder: capture something unknown from a CLI" does (Settings → Advanced). A hook and a status line are what a CLI sends Hive as it works.' }),
+    desc: msg({ id: 'settings.advanced.hive.recorder.unknown.desc', defaultMessage: "Save a capture when a CLI sends a hook or a status line with a field Combwork doesn't know: often the first sign that a CLI update changed something.", description: 'What the advanced setting "Flight recorder: capture something unknown from a CLI" does (Settings → Advanced). A hook and a status line are what a CLI sends Combwork as it works.' }),
     kind: 'boolean',
     default: false,
     applies: 'now'
@@ -571,7 +571,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: HEAP_SNAPSHOT_NEAR_LIMIT,
     group: 'cw',
     title: msg({ id: 'settings.advanced.hive.heapSnapshotNearLimit.title', defaultMessage: 'Save a memory snapshot if Combwork is about to run out of memory', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.hive.heapSnapshotNearLimit.desc', defaultMessage: "When Combwork's main process nears its memory limit, it writes a snapshot of its memory to the heap folder in Combwork's profile before it closes, to find out what filled it. A snapshot can be several gigabytes, holds whatever Combwork had in memory (card text, transcripts, possibly tokens) and stays on this PC; Combwork keeps the newest two. Takes effect when Combwork restarts.", description: 'What the advanced setting "Save a memory snapshot if Hive is about to run out of memory" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    desc: msg({ id: 'settings.advanced.hive.heapSnapshotNearLimit.desc', defaultMessage: "When Combwork's main process nears its memory limit, it writes a snapshot of its memory to the heap folder in Combwork's profile before it closes, to find out what filled it. A snapshot can be several gigabytes, holds whatever Combwork had in memory (card text, transcripts, possibly tokens) and stays on this PC; Combwork keeps the newest two. Takes effect when Combwork restarts.", description: 'What the advanced setting "Save a memory snapshot if Combwork is about to run out of memory" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'boolean',
     default: false,
     applies: 'restart'
@@ -592,7 +592,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'cw.progress.replySeconds',
     group: 'cw',
     title: msg({ id: 'settings.advanced.hive.progress.replySeconds.title', defaultMessage: "cw-progress: Combwork's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. cw-progress is the command agents run long commands and checks through: keep it as it is." }),
-    desc: msg({ id: 'settings.advanced.hive.progress.replySeconds.desc', defaultMessage: "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"cw-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
+    desc: msg({ id: 'settings.advanced.hive.progress.replySeconds.desc', defaultMessage: "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
     kind: 'number',
     default: 15,
     min: 1,
@@ -663,7 +663,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'cw.hooks.missingSeconds',
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.title', defaultMessage: 'Hooks missing: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Hooks: the calls an agent's coding agent makes to Hive as it works." }),
+    title: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.title', defaultMessage: 'Hooks missing: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Hooks: the calls an agent's coding agent makes to Combwork as it works." }),
     desc: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.desc', defaultMessage: "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Combwork says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.", description: 'What the advanced setting "Hooks missing: wait" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 60,
@@ -675,7 +675,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'cw.lostLine.steadySeconds',
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Hive typed into an agent's terminal." }),
+    title: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal." }),
     desc: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.desc', defaultMessage: "A line Combwork typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Combwork types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.", description: 'What the advanced setting "Lost line: wait" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959).' }),
     kind: 'number',
     default: 2,
@@ -875,7 +875,7 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.hive.workflow.enforce.desc',
       defaultMessage: "Combwork keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Combwork sees a card's work merged or changed outside Combwork. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Combwork only records what happens to each card's work, without moving cards or waking agents for it.",
-      description: 'What the advanced setting "Workflow rules are enforced" does, and what turning it off does (Settings → Advanced). Version Control is the name of a tab in Project Settings, and Review, Approved and Done are board stages: use them as Hive shows them.'
+      description: 'What the advanced setting "Workflow rules are enforced" does, and what turning it off does (Settings → Advanced). Version Control is the name of a tab in Project Settings, and Review, Approved and Done are board stages: use them as Combwork shows them.'
     }),
     kind: 'boolean',
     default: true,
@@ -885,11 +885,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'cw.workflow.updateAgentBranch',
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.workflow.updateAgentBranch.title', defaultMessage: "Bring an agent's branch up to date after a squash merge", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A squash merge puts a card's commits into the target as one new commit, so the agent's own branch (in its worktree) still has the old ones; Hive can move the branch to the target before the agent's next card." }),
+    title: msg({ id: 'settings.advanced.hive.workflow.updateAgentBranch.title', defaultMessage: "Bring an agent's branch up to date after a squash merge", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A squash merge puts a card's commits into the target as one new commit, so the agent's own branch (in its worktree) still has the old ones; Combwork can move the branch to the target before the agent's next card." }),
     desc: msg({
       id: 'settings.advanced.hive.workflow.updateAgentBranch.desc',
       defaultMessage: "When a card from an agent's own worktree was squashed into its target, the agent's branch still has its commits, so its next card in the lane would include them. On, Combwork moves the branch to the target before the next card starts, once the agent is idle, its runs have ended and its worktree is clean, and only when everything on it is in the target: anything else, it asks you under For you. Off, Combwork asks you every time: approve to let it move the branch once, or decline and do it yourself. Combwork never moves a branch with workflow rules turned off.",
-      description: 'What the advanced setting "Bring an agent\'s branch up to date after a squash merge" does (Settings → Advanced). For you is the board\'s list of what waits for the user: use it as Hive shows it.'
+      description: 'What the advanced setting "Bring an agent\'s branch up to date after a squash merge" does (Settings → Advanced). For you is the board\'s list of what waits for the user: use it as Combwork shows it.'
     }),
     kind: 'boolean',
     default: true,
@@ -899,8 +899,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'cw.merge.lockWaitSeconds',
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.merge.lockWaitSeconds.title', defaultMessage: 'Merges: wait for another Combwork', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Another Hive: the installed Hive and a dev or test Hive on the same machine." }),
-    desc: msg({ id: 'settings.advanced.hive.merge.lockWaitSeconds.desc', defaultMessage: "How long a merge, or another change to a repository's branches (a pull, switching branch, moving an agent's branch), waits while another Combwork on this computer is merging into the same repository. After it, nothing is changed and Combwork says which Combwork holds the repository: try again once it has finished. Combwork never takes the repository from a Combwork that is still running.", description: 'What the advanced setting "Merges: wait for another Hive" is for, and what happens when the wait ends (Settings → Advanced).' }),
+    title: msg({ id: 'settings.advanced.hive.merge.lockWaitSeconds.title', defaultMessage: 'Merges: wait for another Combwork', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Another Combwork: the installed Combwork and a dev or test Combwork on the same machine." }),
+    desc: msg({ id: 'settings.advanced.hive.merge.lockWaitSeconds.desc', defaultMessage: "How long a merge, or another change to a repository's branches (a pull, switching branch, moving an agent's branch), waits while another Combwork on this computer is merging into the same repository. After it, nothing is changed and Combwork says which Combwork holds the repository: try again once it has finished. Combwork never takes the repository from a Combwork that is still running.", description: 'What the advanced setting "Merges: wait for another Combwork" is for, and what happens when the wait ends (Settings → Advanced).' }),
     kind: 'number',
     default: 30,
     min: 1,
@@ -912,7 +912,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: QUEUE_CHECK_MINUTES,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.queue.checkMinutes.title', defaultMessage: 'Merge queue: longest a merge check runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Hive runs on a card's merged result before it moves the target." }),
+    title: msg({ id: 'settings.advanced.hive.queue.checkMinutes.title', defaultMessage: 'Merge queue: longest a merge check runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Combwork runs on a card's merged result before it moves the target." }),
     desc: msg({
       id: 'settings.advanced.hive.queue.checkMinutes.desc',
       defaultMessage: 'How long the merge queue lets one merge check or install run before it ends it. A check ended this way is a failure of the environment, not of the work: the card comes back marked so, and its builder can send the same revision back into the queue. Raise it when a project’s checks really take longer; too long, and a hung check holds the queue up that long.',
@@ -976,7 +976,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: QUEUE_SIGN_SECONDS,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.queue.signSeconds.title', defaultMessage: 'Merge queue: longest a signed merge commit takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\"). The merge commit is the commit Hive's merge queue makes when it merges a card; signed means the repository is set to sign commits (GPG or SSH)." }),
+    title: msg({ id: 'settings.advanced.hive.queue.signSeconds.title', defaultMessage: 'Merge queue: longest a signed merge commit takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\"). The merge commit is the commit Combwork's merge queue makes when it merges a card; signed means the repository is set to sign commits (GPG or SSH)." }),
     desc: msg({
       id: 'settings.advanced.hive.queue.signSeconds.desc',
       defaultMessage: 'When a repository signs its commits, how long the merge queue waits for its merge commit, hooks included, before it takes the signer to be waiting for a passphrase. It then ends the commit, changes nothing in the target and pauses the queue with “signing waits for you”. Raise it when signing or the repository’s commit hooks really take longer; too long, and a signer waiting for you holds the queue up that long.',
@@ -1000,7 +1000,7 @@ const SOURCES: readonly AdvancedSource[] = [
       id: 'settings.advanced.hive.queue.checkedOutTarget.desc',
       defaultMessage:
         "When the branch the merge queue merges into is checked out in a folder (the project folder's main, say), merging changes that folder's files too. Ask each time waits, once a card is tested and ready, for you to approve updating the folder in For you. Automatically updates it at once. Either way the queue first checks that no agent is working in the folder, that it is on that branch and that you have no changes in the files the merge changes, and pauses if not. One rare race, another program switching that folder's branch in the same instant, can leave the merged files in the other branch; Combwork then says so and lists them. A branch checked out nowhere is always merged at once.",
-      description: 'What the advanced setting "Merge queue: merge into a checked-out branch" does (Settings → Advanced, under Combwork). Ask each time and Automatically are the setting\'s choices: use the words its list shows. For you is a place in Hive.'
+      description: 'What the advanced setting "Merge queue: merge into a checked-out branch" does (Settings → Advanced, under Combwork). Ask each time and Automatically are the setting\'s choices: use the words its list shows. For you is a place in Combwork.'
     }),
     kind: 'choice',
     choices: [
@@ -1014,11 +1014,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: SLOTS_REMOVE_IDLE,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.slots.removeIdle.title', defaultMessage: 'Remove idle slots after a day', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A slot is a worktree Hive lends to a card or a lane and gets back when it ends; free ones are kept ready." }),
+    title: msg({ id: 'settings.advanced.hive.slots.removeIdle.title', defaultMessage: 'Remove idle slots after a day', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A slot is a worktree Combwork lends to a card or a lane and gets back when it ends; free ones are kept ready." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.removeIdle.desc',
       defaultMessage: "A project keeps as many slots as it has builders. A free slot beyond that, unused for a day, is removed: its archive command runs first, and it is kept if that fails. Combwork never removes one with an agent or a process in it, a lease, a merge in flight, or work that isn't committed and merged. Turned off, idle slots stay until you remove them.",
-      description: 'What the advanced setting "Remove idle slots after a day" does (Settings → Advanced, under Combwork). A slot is a worktree Hive lends to a card or a lane; a lease is one loan of it.'
+      description: 'What the advanced setting "Remove idle slots after a day" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane; a lease is one loan of it.'
     }),
     kind: 'boolean',
     default: true,
@@ -1027,11 +1027,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: SLOTS_RENAME_ADOPTED,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.slots.renameAdopted.title', defaultMessage: 'Rename adopted worktrees to slot names', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. At the upgrade to 1.0, agents' own worktrees became slots (worktrees Hive lends to a card or a lane), keeping their folder names." }),
+    title: msg({ id: 'settings.advanced.hive.slots.renameAdopted.title', defaultMessage: 'Rename adopted worktrees to slot names', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. At the upgrade to 1.0, agents' own worktrees became slots (worktrees Combwork lends to a card or a lane), keeping their folder names." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.renameAdopted.desc',
       defaultMessage: "At the upgrade to 1.0 your agents' worktrees became slots, keeping their folders (hb2). Once one is free, with no agent or process in it, Combwork renames its folder to a slot's name (slot-c), moving its cards' work and the agents' conversations with it, so a slot named after one agent isn't lent to another. Turned off, they keep their names.",
-      description: 'What the advanced setting "Rename adopted worktrees to slot names" does (Settings → Advanced, under Combwork). A slot is a worktree Hive lends to a card or a lane. Keep hb2 and slot-c as they are (folder names).'
+      description: 'What the advanced setting "Rename adopted worktrees to slot names" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane. Keep hb2 and slot-c as they are (folder names).'
     }),
     kind: 'boolean',
     default: true,
@@ -1040,7 +1040,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: SLOTS_DELETE_MERGED,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.slots.deleteMergedLines.title', defaultMessage: "Delete a card's branch once it's merged", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Each card built in a slot (a worktree Hive lends) gets a branch of its own." }),
+    title: msg({ id: 'settings.advanced.hive.slots.deleteMergedLines.title', defaultMessage: "Delete a card's branch once it's merged", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Each card built in a slot (a worktree Combwork lends) gets a branch of its own." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.deleteMergedLines.desc',
       defaultMessage: "Each card built in a slot works on a branch of its own, such as cw/AM/AM-12-fix-the-login. Once the card is Done and its target branch contains the branch's work (a squash merge too), Combwork deletes the branch and notes it on the card. A branch with work that isn't merged, or checked out somewhere, is never deleted. Turned off, the branches stay.",
@@ -1053,11 +1053,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: SLOTS_SETUP_MINUTES,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.slots.setupMinutes.title', defaultMessage: 'Slots: longest a setup command runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"60 min\"). A slot is a worktree Hive lends to a card or a lane." }),
+    title: msg({ id: 'settings.advanced.hive.slots.setupMinutes.title', defaultMessage: 'Slots: longest a setup command runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"60 min\"). A slot is a worktree Combwork lends to a card or a lane." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.setupMinutes.desc',
       defaultMessage: "How long Combwork lets a slot's setup command, a dependency install or its archive command run before it ends it. A slot whose setup was ended this way isn't lent until it is set up again; an archive command ended so keeps its slot.",
-      description: 'What the advanced setting "Slots: longest a setup command runs" does (Settings → Advanced, under Combwork). A slot is a worktree Hive lends to a card or a lane.'
+      description: 'What the advanced setting "Slots: longest a setup command runs" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane.'
     }),
     kind: 'number',
     default: 60,
@@ -1070,7 +1070,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: LANES_UNWATCHED_NOTICE,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.lanes.unwatchedNotice.title', defaultMessage: 'Lanes: remind the Assistant to watch them', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A lane is a card loop: a builder and a reviewer taking cards in turn; the Assistant is the Hive Assistant." }),
+    title: msg({ id: 'settings.advanced.hive.lanes.unwatchedNotice.title', defaultMessage: 'Lanes: remind the Assistant to watch them', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A lane is a card loop: a builder and a reviewer taking cards in turn; the Assistant is the Combwork Assistant." }),
     desc: msg({
       id: 'settings.advanced.hive.lanes.unwatchedNotice.desc',
       defaultMessage: "When the Assistant may control agents (Settings → Assistant → Control) and is about to end its turn while lanes are running and no watch of its covers them, Combwork keeps it going once to say so, naming the lanes' builders, so it watches them before it finishes. At Look and advise the lanes are yours to run, and it isn't told. Turned off, its turn ends as its CLI ends it, and nothing wakes it about those lanes until it watches them again.",
@@ -1088,7 +1088,7 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.hive.processes.orphanNotice.desc',
       defaultMessage: "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
-      description: 'What the advanced setting "Processes left running: tell me and the agent" does (Settings → Advanced, under Combwork). Activity is a tab of Hive\'s; End It is its button.'
+      description: 'What the advanced setting "Processes left running: tell me and the agent" does (Settings → Advanced, under Combwork). Activity is a tab of Combwork\'s; End It is its button.'
     }),
     kind: 'boolean',
     default: true,
@@ -1102,7 +1102,7 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.hive.lanes.gentleEnd.desc',
       defaultMessage: "When a lane's last card merges (or the lane is abandoned), Combwork waits for its builder's turn to end, tells it the lane is finished with each card's merge commit, then ends its CLI with the CLI's own exit command, killing it only if it doesn't exit. Its slot stays its until then. Turned off, Combwork stops the builder's session as soon as it is first idle, as before.",
-      description: 'What the advanced setting "Lanes: let the builder finish when its lane ends" does (Settings → Advanced, under Combwork). A lane is a card loop; a slot is a worktree Hive lends to a card or a lane.'
+      description: 'What the advanced setting "Lanes: let the builder finish when its lane ends" does (Settings → Advanced, under Combwork). A lane is a card loop; a slot is a worktree Combwork lends to a card or a lane.'
     }),
     kind: 'boolean',
     default: true,
@@ -1131,7 +1131,7 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.hive.lanes.freshStartWaitMinutes.desc',
       defaultMessage: "A lane starts its agents in new conversations. One that is busy as the lane starts (in a turn, or reading a message Combwork just gave it) is started once it is free, for up to this long. After that Combwork stops trying: the lane's row says so, and you retry it there or end the lane. Combwork never interrupts a turn for it, and never gives the lane's cards to the old conversation.",
-      description: 'What the advanced setting "Lanes: longest Hive waits to start a busy agent afresh" does (Settings → Advanced, under Combwork). A lane is a card loop.'
+      description: 'What the advanced setting "Lanes: longest Combwork waits to start a busy agent afresh" does (Settings → Advanced, under Combwork). A lane is a card loop.'
     }),
     kind: 'number',
     default: 10,
@@ -1153,7 +1153,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: COPIES_REVIEW,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.copies.review.title', defaultMessage: 'Reviewers review in review copies', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A review copy is a folder Hive keeps at the exact revision a reviewer reviews, which nothing else writes." }),
+    title: msg({ id: 'settings.advanced.hive.copies.review.title', defaultMessage: 'Reviewers review in review copies', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A review copy is a folder Combwork keeps at the exact revision a reviewer reviews, which nothing else writes." }),
     desc: msg({
       id: 'settings.advanced.hive.copies.review.desc',
       defaultMessage: "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (cw-progress --check with --isolated) use the same copies either way.",
@@ -1166,7 +1166,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: COPIES_QUIET_WAIT,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.copies.quietWaitMinutes.title', defaultMessage: 'Copies: wait for one to be free', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"10 min\"). A copy is a folder Hive keeps at one revision for a review or an isolated check." }),
+    title: msg({ id: 'settings.advanced.hive.copies.quietWaitMinutes.title', defaultMessage: 'Copies: wait for one to be free', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"10 min\"). A copy is a folder Combwork keeps at one revision for a review or an isolated check." }),
     desc: msg({
       id: 'settings.advanced.hive.copies.quietWaitMinutes.desc',
       defaultMessage: 'A returned review or check copy is used again only once nothing is running in it: no run, no process its check started, its reviewer idle. Past this many minutes, a check waiting for a copy says which copy is still in use and by what. Combwork never resets a copy something is still running in.',
@@ -1182,7 +1182,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: NONE_BASELINE_SECONDS,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.none.baselineSeconds.title', defaultMessage: 'No version control: longest read of the project', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"120 s\"). In a project without version control, Hive reads every file of the project in the background when a card starts." }),
+    title: msg({ id: 'settings.advanced.hive.none.baselineSeconds.title', defaultMessage: 'No version control: longest read of the project', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"120 s\"). In a project without version control, Combwork reads every file of the project in the background when a card starts." }),
     desc: msg({
       id: 'settings.advanced.hive.none.baselineSeconds.desc',
       defaultMessage: "In a project without version control, Combwork reads the project's files in the background when a card starts, when it is submitted, and when a check of it starts and ends, to find what changed outside the card's files. A read that takes longer than this is stopped: the card starts or is submitted without that list, and the check doesn't count.",
@@ -1213,11 +1213,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: ASSISTANT_START_VIEW,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.assistant.startView.title', defaultMessage: "The Assistant starts with Combwork's start view", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The start view is what Hive tells the Hive Assistant of the workspace's state as it starts." }),
+    title: msg({ id: 'settings.advanced.hive.assistant.startView.title', defaultMessage: "The Assistant starts with Combwork's start view", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The start view is what Combwork tells the Combwork Assistant of the workspace's state as it starts." }),
     desc: msg({
       id: 'settings.advanced.hive.assistant.startView.desc',
       defaultMessage: "While the Assistant's journal is on, Combwork gives it a short view of the workspace when it starts and after each compaction: what is under way and waiting, and the journal's recent entries. Turned off, it gets none from its next start or compaction on, a running Assistant too, and reads what it needs with its tools.",
-      description: 'What the advanced setting "The Assistant starts with Hive\'s start view" does (Settings → Advanced, under Combwork).'
+      description: 'What the advanced setting "The Assistant starts with Combwork\'s start view" does (Settings → Advanced, under Combwork).'
     }),
     kind: 'boolean',
     default: true,
@@ -1227,7 +1227,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: JOURNAL_BUILDS,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.journal.builds.title', defaultMessage: 'Record builds in the journal', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The journal is the Hive Assistant's record of decisions and events; builds are installers made from Hive's own source code." }),
+    title: msg({ id: 'settings.advanced.hive.journal.builds.title', defaultMessage: 'Record builds in the journal', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The journal is the Combwork Assistant's record of decisions and events; builds are installers made from Combwork's own source code." }),
     desc: msg({
       id: 'settings.advanced.hive.journal.builds.desc',
       defaultMessage: "When Combwork's own installer is built from its source code (npm run dist, or npm run release), Combwork writes the build into the Assistant's journal as its own entry: the version, the commit, what kind of build it was and where the installer is. Only a successful build is written, and only while the journal is on with events in its scope. Turned off, builds aren't written, and a build left for Combwork while it was closed is dropped when the workspace opens.",
@@ -1240,7 +1240,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: CARD_TITLE_NUDGE,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.cards.titleNudgeChars.title', defaultMessage: "Suggest a shorter title past", description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Hive suggests a shorter one." }),
+    title: msg({ id: 'settings.advanced.hive.cards.titleNudgeChars.title', defaultMessage: "Suggest a shorter title past", description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Combwork suggests a shorter one." }),
     desc: msg({
       id: 'settings.advanced.hive.cards.titleNudgeChars.desc',
       defaultMessage: "When an agent or the Assistant gives a card a title longer than this, Combwork keeps it and tells the agent a shorter one would be better: a long title is cut in git's history, where it becomes the merge commit's subject, and on the board. The titles you write yourself are never questioned. 0 turns the suggestion off.",
@@ -1256,7 +1256,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: PROMPT_AS_TYPED,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.prompt.asTyped.title', defaultMessage: 'Send prompts as typed', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the prompts Hive itself types into agents' CLIs." }),
+    title: msg({ id: 'settings.advanced.hive.prompt.asTyped.title', defaultMessage: 'Send prompts as typed', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the prompts Combwork itself types into agents' CLIs." }),
     desc: msg({
       id: 'settings.advanced.hive.prompt.asTyped.desc',
       defaultMessage: "Combwork puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Combwork types those key by key, where a line break would send the prompt early and a tab complete a word. For Codex, Typed prompts: line breaks (under Codex) can press a new-line key instead. Other control characters are left out either way: they would press keys.",
@@ -1273,7 +1273,7 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.hive.prompt.clearDraft.desc',
       defaultMessage: "Before Combwork types a prompt or Compact into an agent's CLI, it presses Ctrl+U, which clears what is in the CLI's input, and it presses it again to take back a prompt it stopped part-way. Turned off, Combwork never presses it: text left in the CLI's input stays in front of what Combwork types and is sent with it, a prompt stopped part-way stays in the input, and Compact can fail behind a draft. Changing Codex's mode still clears its input first, as its menu needs.",
-      description: 'What the advanced setting "Clear the CLI\'s draft before Hive types" does (Settings → Advanced, under Combwork). Ctrl+U names keys: use the key names your language uses. Compact is a command\'s name: use it as Hive shows it.'
+      description: 'What the advanced setting "Clear the CLI\'s draft before Combwork types" does (Settings → Advanced, under Combwork). Ctrl+U names keys: use the key names your language uses. Compact is a command\'s name: use it as Combwork shows it.'
     }),
     kind: 'boolean',
     default: true,
@@ -1287,7 +1287,7 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.hive.terminal.allKeysToCli.desc',
       defaultMessage: "In an agent's pane, Combwork's own shortcuts (Settings → Keyboard Shortcuts) take their keys, apart from those the CLI uses itself. Turned on, every key goes to the CLI, except the command palette's shortcut (Show All Commands), which stays Combwork's so every command is still in reach. Ctrl+C and Ctrl+V have their own setting.",
-      description: 'What the advanced setting "All keys go to the CLI" does (Settings → Advanced, under Combwork). Show All Commands is a command\'s name and Settings → Keyboard Shortcuts a place in Hive: use them as Hive shows them. Ctrl+C and Ctrl+V name keys.'
+      description: 'What the advanced setting "All keys go to the CLI" does (Settings → Advanced, under Combwork). Show All Commands is a command\'s name and Settings → Keyboard Shortcuts a place in Combwork: use them as Combwork shows them. Ctrl+C and Ctrl+V name keys.'
     }),
     kind: 'boolean',
     default: false,
@@ -1296,7 +1296,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: OSC52_POLICY,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.terminal.osc52.title', defaultMessage: 'A CLI putting text on the clipboard', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: what Hive does when an agent's CLI asks to set the clipboard (OSC 52)." }),
+    title: msg({ id: 'settings.advanced.hive.terminal.osc52.title', defaultMessage: 'A CLI putting text on the clipboard', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: what Combwork does when an agent's CLI asks to set the clipboard (OSC 52)." }),
     desc: msg({
       id: 'settings.advanced.hive.terminal.osc52.desc',
       defaultMessage: "An agent's CLI can put text on the clipboard (OSC 52) just after you press a key or click in its pane, as Copilot does when you copy its own selection. Allow takes it at once; Ask each time shows you the text first, to copy or not; Block takes none. A CLI can never read the clipboard, whatever this says.",
@@ -1314,7 +1314,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: RAW_CARD_START,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.prompt.rawCardStart.title', defaultMessage: "A card's start in its own words", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: what Hive types into an agent when a card is started on it." }),
+    title: msg({ id: 'settings.advanced.hive.prompt.rawCardStart.title', defaultMessage: "A card's start in its own words", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: what Combwork types into an agent when a card is started on it." }),
     desc: msg({
       id: 'settings.advanced.hive.prompt.rawCardStart.desc',
       defaultMessage: "When a card is started on an agent, Combwork gives it the card wrapped in its own words: which card it is on the board, what it depends on and which docs to read first, and which skill to follow. Turned on, the agent gets only the card's title and description, and what you wrote when you started it. Combwork's other prompts (its wakes and messages) stay as they are: they are how Combwork and its agents talk.",
@@ -1329,11 +1329,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: CW_GUIDANCE,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.guidance.title', defaultMessage: "Combwork's guidance for agents", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the instructions Hive gives project agents on how to work with it." }),
+    title: msg({ id: 'settings.advanced.hive.guidance.title', defaultMessage: "Combwork's guidance for agents", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the instructions Combwork gives project agents on how to work with it." }),
     desc: msg({
       id: 'settings.advanced.hive.guidance.desc',
       defaultMessage: "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
-      description: 'What the advanced setting "Hive\'s guidance for agents" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs\' names, combwork the name of Combwork\'s MCP server and developer_instructions a Codex setting: keep them.'
+      description: 'What the advanced setting "Combwork\'s guidance for agents" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs\' names, combwork the name of Combwork\'s MCP server and developer_instructions a Codex setting: keep them.'
     }),
     kind: 'boolean',
     default: true,
@@ -1343,7 +1343,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: DELIVER_WORKSPACE_NOTES,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.notes.deliverWorkspaceNotes.title', defaultMessage: 'Deliver workspace notes to agents', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Hive gives every agent the shared note Workspace notes when it starts." }),
+    title: msg({ id: 'settings.advanced.hive.notes.deliverWorkspaceNotes.title', defaultMessage: 'Deliver workspace notes to agents', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Combwork gives every agent the shared note Workspace notes when it starts." }),
     desc: msg({
       id: 'settings.advanced.hive.notes.deliverWorkspaceNotes.desc',
       defaultMessage: "Each agent and the Assistant get the shared note Workspace notes in their instructions when they start, on every CLI and in whichever folder they work: notes about this machine that no committed file should hold. A project's agents get the parts for everyone and their own project's section. Turned off, or with the note empty, nothing is added, from each agent's next session.",
@@ -1372,7 +1372,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: CARD_ATTACHMENT_MAX_ID,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.cards.attachmentMax.title', defaultMessage: 'Card attachments: largest file', description: "An advanced setting's title (Settings → Advanced), followed by its value in bytes: the largest file Hive keeps with a card (pasted, dropped or attached to it)." }),
+    title: msg({ id: 'settings.advanced.hive.cards.attachmentMax.title', defaultMessage: 'Card attachments: largest file', description: "An advanced setting's title (Settings → Advanced), followed by its value in bytes: the largest file Combwork keeps with a card (pasted, dropped or attached to it)." }),
     desc: msg({
       id: 'settings.advanced.hive.cards.attachmentMax.desc',
       defaultMessage: "The largest file Combwork keeps with a card, in bytes: pasted or dropped into the card, attached from an agent's pane, or given by an agent or the Assistant. A larger file is refused, saying so. Files already kept stay.",
@@ -1424,18 +1424,18 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: SKILLS_REMOVE_IDLE_COPIES,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.title', defaultMessage: "Remove Combwork's skill copies when no agent works in the folder", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the copies of Hive's skills it puts in a folder for Codex and Copilot." }),
+    title: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.title', defaultMessage: "Remove Combwork's skill copies when no agent works in the folder", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the copies of Combwork's skills it puts in a folder for Codex and Copilot." }),
     desc: msg({
       id: 'settings.advanced.hive.skills.removeIdleCopies.desc',
       defaultMessage:
         "Codex and Copilot read Combwork's skills from copies Combwork puts in each agent's folder (.agents/skills/cw-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Combwork's agents in a folder stops, Combwork can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Combwork made, and nobody changed since, are removed: never your own skills.",
-      description: 'What the advanced setting "Remove Hive\'s skill copies when no agent works in the folder" does (Settings → Advanced, under Combwork). Codex, Copilot and Claude Code are CLIs\' names and .agents/skills/cw-… a folder: keep them. Slots only, Everywhere and Never are the setting\'s choices: use the words its list shows.'
+      description: 'What the advanced setting "Remove Combwork\'s skill copies when no agent works in the folder" does (Settings → Advanced, under Combwork). Codex, Copilot and Claude Code are CLIs\' names and .agents/skills/cw-… a folder: keep them. Slots only, Everywhere and Never are the setting\'s choices: use the words its list shows.'
     }),
     kind: 'choice',
     choices: [
-      { value: 'slots', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.slots', defaultMessage: 'Slots only', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": in every folder but the project folder.' }) },
-      { value: 'everywhere', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.everywhere', defaultMessage: 'Everywhere', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": in the project folder too.' }) },
-      { value: 'never', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.never', defaultMessage: 'Never', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": copies stay, as before.' }) }
+      { value: 'slots', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.slots', defaultMessage: 'Slots only', description: 'A choice of the advanced setting "Remove Combwork\'s skill copies when no agent works in the folder": in every folder but the project folder.' }) },
+      { value: 'everywhere', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.everywhere', defaultMessage: 'Everywhere', description: 'A choice of the advanced setting "Remove Combwork\'s skill copies when no agent works in the folder": in the project folder too.' }) },
+      { value: 'never', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.never', defaultMessage: 'Never', description: 'A choice of the advanced setting "Remove Combwork\'s skill copies when no agent works in the folder": copies stay, as before.' }) }
     ],
     default: 'slots',
     applies: 'now'
@@ -1445,11 +1445,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: INBOX_SWITCH_ID.checkpoints,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.inbox.checkpoints.title', defaultMessage: 'Tell a working agent at the end of a tool', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Hive tells a busy agent what has arrived in its inbox each time one of its tool calls ends." }),
+    title: msg({ id: 'settings.advanced.hive.inbox.checkpoints.title', defaultMessage: 'Tell a working agent at the end of a tool', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Combwork tells a busy agent what has arrived in its inbox each time one of its tool calls ends." }),
     desc: msg({
       id: 'settings.advanced.hive.inbox.checkpoints.desc',
       defaultMessage: "When something arrives in a working agent's inbox, Combwork tells it at the end of its next tool call, in that tool's reply, so it can read it without stopping. Turned off, a working agent isn't told until its turn ends or it is idle; nothing is lost, as it stays in the inbox. A project can set its own in Project Settings → Sessions.",
-      description: 'What the advanced setting "Tell a working agent at the end of a tool" does (Settings → Advanced, under Combwork). Project Settings → Sessions names a section of the project\'s settings: use its name as Hive shows it.'
+      description: 'What the advanced setting "Tell a working agent at the end of a tool" does (Settings → Advanced, under Combwork). Project Settings → Sessions names a section of the project\'s settings: use its name as Combwork shows it.'
     }),
     kind: 'boolean',
     default: true,
@@ -1458,11 +1458,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: INBOX_SWITCH_ID.stopContinuation,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.inbox.stopContinuation.title', defaultMessage: 'Keep an agent going when it stops with unread items', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Hive makes it carry on and read them." }),
+    title: msg({ id: 'settings.advanced.hive.inbox.stopContinuation.title', defaultMessage: 'Keep an agent going when it stops with unread items', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Combwork makes it carry on and read them." }),
     desc: msg({
       id: 'settings.advanced.hive.inbox.stopContinuation.desc',
       defaultMessage: "When an agent is about to end its turn with items in its inbox it hasn't read, Combwork keeps it going to read them first, once a turn: Codex and Copilot by holding their stop back, Claude Code by adding a line to its stop. Turned off, the turn ends as the CLI ends it, and the items wait in the inbox for an idle wake. A project can set its own in Project Settings → Sessions.",
-      description: 'What the advanced setting "Keep an agent going when it stops with unread items" does (Settings → Advanced, under Combwork). Codex, Copilot and Claude Code are CLIs\' names: keep them. Project Settings → Sessions names a section of the project\'s settings: use its name as Hive shows it.'
+      description: 'What the advanced setting "Keep an agent going when it stops with unread items" does (Settings → Advanced, under Combwork). Codex, Copilot and Claude Code are CLIs\' names: keep them. Project Settings → Sessions names a section of the project\'s settings: use its name as Combwork shows it.'
     }),
     kind: 'boolean',
     default: true,
@@ -1471,11 +1471,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: INBOX_SWITCH_ID.idleWakes,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.inbox.idleWakes.title', defaultMessage: 'Wake an idle agent', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Hive types a short line into an idle agent's terminal to tell it something has arrived in its inbox." }),
+    title: msg({ id: 'settings.advanced.hive.inbox.idleWakes.title', defaultMessage: 'Wake an idle agent', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Combwork types a short line into an idle agent's terminal to tell it something has arrived in its inbox." }),
     desc: msg({
       id: 'settings.advanced.hive.inbox.idleWakes.desc',
       defaultMessage: "When something arrives in an idle agent's inbox, Combwork types one short line into its terminal saying so, which wakes it. Card loops' wakes (the workflow option Wake reviewers and builders) and card watches' are such wakes. Turned off, nothing is typed for anything waiting: it stays in the inbox, the agent's pane shows how many, and its Deliver Now types the line once. A card started on an agent, or a task given to it now, is still typed. A project can set its own in Project Settings → Sessions.",
-      description: 'What the advanced setting "Wake an idle agent" does (Settings → Advanced, under Combwork). Wake reviewers and builders names a workflow option and Project Settings → Sessions a section, Deliver Now a menu item: use their names as Hive shows them.'
+      description: 'What the advanced setting "Wake an idle agent" does (Settings → Advanced, under Combwork). Wake reviewers and builders names a workflow option and Project Settings → Sessions a section, Deliver Now a menu item: use their names as Combwork shows them.'
     }),
     kind: 'boolean',
     default: true,
@@ -1485,7 +1485,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: USAGE_TIMELINE_DETAIL_DAYS,
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.usage.timelineDetailDays.title', defaultMessage: 'Usage history: keep full detail for', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in days (\"14 days\"). The usage history is the record Hive keeps of what each session used." }),
+    title: msg({ id: 'settings.advanced.hive.usage.timelineDetailDays.title', defaultMessage: 'Usage history: keep full detail for', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in days (\"14 days\"). The usage history is the record Combwork keeps of what each session used." }),
     desc: msg({
       id: 'settings.advanced.hive.usage.timelineDetailDays.desc',
       defaultMessage: "How long the usage history keeps when each request happened, to the second, after a session ends. Past it, a session's use over time is kept in 1-hour steps, so the history stays small. Totals, tokens and costs stay exact; only where a card's or lane's share began or ended inside an hour is less exact, for sessions that old.",
@@ -1639,7 +1639,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'claude-code.accounts.onboardedField',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.title', defaultMessage: 'Connections: set-up field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.desc', defaultMessage: "The field of a connection folder's `.claude.json` that says Claude Code's first-run screens were answered there (read only). Wrong, every Claude Code connection shows \"Needs set up\" in Settings → Accounts & Connections.", description: 'What the advanced setting "Connections: set-up field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `.claude.json` as it is (a file name); "Needs set up" is a state Hive shows: use its name as Hive shows it.' }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.desc', defaultMessage: "The field of a connection folder's `.claude.json` that says Claude Code's first-run screens were answered there (read only). Wrong, every Claude Code connection shows \"Needs set up\" in Settings → Accounts & Connections.", description: 'What the advanced setting "Connections: set-up field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `.claude.json` as it is (a file name); "Needs set up" is a state Combwork shows: use its name as Combwork shows it.' }),
     kind: 'field',
     default: 'hasCompletedOnboarding',
     applies: 'now',
@@ -1649,7 +1649,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'claude-code.accounts.trustField',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.accounts.trustField.title', defaultMessage: 'Connections: trusted folder field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.trustField.desc', defaultMessage: "The field of a folder's entry under `projects` in a connection folder's `.claude.json` that says Claude Code was told to trust that folder (read only). Wrong, every Claude Code connection on in a workspace shows \"Needs set up\" in Settings → Accounts & Connections.", description: 'What the advanced setting "Connections: trusted folder field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `projects` and `.claude.json` as they are; "Needs set up" is a state Hive shows: use its name as Hive shows it.' }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.trustField.desc', defaultMessage: "The field of a folder's entry under `projects` in a connection folder's `.claude.json` that says Claude Code was told to trust that folder (read only). Wrong, every Claude Code connection on in a workspace shows \"Needs set up\" in Settings → Accounts & Connections.", description: 'What the advanced setting "Connections: trusted folder field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `projects` and `.claude.json` as they are; "Needs set up" is a state Combwork shows: use its name as Combwork shows it.' }),
     kind: 'field',
     default: 'hasTrustDialogAccepted',
     applies: 'now',
@@ -1690,7 +1690,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'claude-code.connections.remoteModels',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.connections.remoteModels.title', defaultMessage: 'Connections: Ollama cloud models', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Ollama is a product's name; its cloud models run on ollama.com." }),
-    desc: msg({ id: 'settings.advanced.claude-code.connections.remoteModels.desc', defaultMessage: "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.", description: 'What the advanced setting "Connections: Ollama cloud models" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; "free (local)" is how Hive shows the cost of sessions run only on this PC.' }),
+    desc: msg({ id: 'settings.advanced.claude-code.connections.remoteModels.desc', defaultMessage: "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.", description: 'What the advanced setting "Connections: Ollama cloud models" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; "free (local)" is how Combwork shows the cost of sessions run only on this PC.' }),
     kind: 'pattern',
     // A tag of `cloud`, or one ending in `-cloud` (Ollama's earlier cloud models), never a name's own `-cloud`.
     default: String.raw`:(?:[\w.]+-)?cloud$`,
@@ -1993,8 +1993,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.memory.realPath',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.memory.realPath.title', defaultMessage: 'Auto memory by its real path on connections', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with." }),
-    desc: msg({ id: 'settings.advanced.claude-code.memory.realPath.desc', defaultMessage: "A connection's projects folder is a link to Claude Code's own, so Claude Code asked you before each memory it saved there. Each Claude Code agent on a connection is given its project's auto memory folder by its real path: the same folder, so it saves memories without asking, as it does without a connection. Nothing more is allowed, and nothing is written to Claude Code's files. Off, Claude Code asks before each memory on a connection.", description: "What the advanced setting \"Auto memory by its real path on connections\" is for, and what happens when it is off (Settings → Advanced, HI-1899). Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with; \"projects\" is a folder's name: keep it." }),
+    title: msg({ id: 'settings.advanced.claude-code.memory.realPath.title', defaultMessage: 'Auto memory by its real path on connections', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Combwork signs a CLI in with." }),
+    desc: msg({ id: 'settings.advanced.claude-code.memory.realPath.desc', defaultMessage: "A connection's projects folder is a link to Claude Code's own, so Claude Code asked you before each memory it saved there. Each Claude Code agent on a connection is given its project's auto memory folder by its real path: the same folder, so it saves memories without asking, as it does without a connection. Nothing more is allowed, and nothing is written to Claude Code's files. Off, Claude Code asks before each memory on a connection.", description: "What the advanced setting \"Auto memory by its real path on connections\" is for, and what happens when it is off (Settings → Advanced, HI-1899). Auto memory is Claude Code's own notes it keeps per project; a connection is an account Combwork signs a CLI in with; \"projects\" is a folder's name: keep it." }),
     kind: 'boolean',
     default: true,
     applies: 'sessions',
@@ -2015,7 +2015,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'codex.trust.perLaunch',
     group: 'codex',
     title: msg({ id: 'settings.advanced.codex.trust.perLaunch.title', defaultMessage: "Trust Combwork's folders on each launch", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.codex.trust.perLaunch.desc', defaultMessage: "Each Codex agent is started with its own folder (its project, slot or review copy) trusted for that launch, so Codex doesn't ask whether to trust it. Nothing is written to Codex's files. Off, Codex asks once per project on each connection, and Set Up walks you through them.", description: 'What the advanced setting "Trust Hive\'s folders on each launch" is for, and what happens when it is off (Settings → Advanced, HI-1871). A slot and a review copy are folders Hive lends to agents.' }),
+    desc: msg({ id: 'settings.advanced.codex.trust.perLaunch.desc', defaultMessage: "Each Codex agent is started with its own folder (its project, slot or review copy) trusted for that launch, so Codex doesn't ask whether to trust it. Nothing is written to Codex's files. Off, Codex asks once per project on each connection, and Set Up walks you through them.", description: 'What the advanced setting "Trust Combwork\'s folders on each launch" is for, and what happens when it is off (Settings → Advanced, HI-1871). A slot and a review copy are folders Combwork lends to agents.' }),
     kind: 'boolean',
     default: true,
     applies: 'sessions',
@@ -2429,7 +2429,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.prompt.newlineKey',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.prompt.newlineKey.title', defaultMessage: 'Typed prompts: line breaks', description: "An advanced setting's title (Settings → Advanced), listed under Codex: what Hive presses for a line break in a prompt it types into Codex." }),
+    title: msg({ id: 'settings.advanced.codex.prompt.newlineKey.title', defaultMessage: 'Typed prompts: line breaks', description: "An advanced setting's title (Settings → Advanced), listed under Codex: what Combwork presses for a line break in a prompt it types into Codex." }),
     desc: msg({
       id: 'settings.advanced.codex.prompt.newlineKey.desc',
       defaultMessage:
@@ -2440,8 +2440,8 @@ const SOURCES: readonly AdvancedSource[] = [
     choices: [
       { value: 'auto', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.auto', defaultMessage: 'Automatic', description: 'A choice of the advanced setting "Typed prompts: line breaks": Alt+Enter with a Codex version it was tried with, spaces with others.' }) },
       { value: 'spaces', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.spaces', defaultMessage: 'Spaces', description: 'A choice of the advanced setting "Typed prompts: line breaks": each line break becomes a space.' }) },
-      { value: 'alt-enter', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.altEnter', defaultMessage: 'Alt+Enter', description: 'A choice of the advanced setting "Typed prompts: line breaks": Hive presses Alt+Enter for each line break (a key: name it as your language does).' }) },
-      { value: 'ctrl-j', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.ctrlJ', defaultMessage: 'Ctrl+J', description: 'A choice of the advanced setting "Typed prompts: line breaks": Hive presses Ctrl+J for each line break (a key: name it as your language does).' }) }
+      { value: 'alt-enter', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.altEnter', defaultMessage: 'Alt+Enter', description: 'A choice of the advanced setting "Typed prompts: line breaks": Combwork presses Alt+Enter for each line break (a key: name it as your language does).' }) },
+      { value: 'ctrl-j', label: msg({ id: 'settings.advanced.codex.prompt.newlineKey.ctrlJ', defaultMessage: 'Ctrl+J', description: 'A choice of the advanced setting "Typed prompts: line breaks": Combwork presses Ctrl+J for each line break (a key: name it as your language does).' }) }
     ],
     default: 'auto',
     applies: 'now',
@@ -2509,7 +2509,7 @@ const SOURCES: readonly AdvancedSource[] = [
         msg({
           id: 'settings.advanced.codexPermissions.desc',
           defaultMessage: "The label Codex's /permissions menu shows for its {label} preset. Combwork types the number beside it to give an agent the {mode} mode; wrong, Combwork can't find it, and says so rather than choosing another.",
-          description: "What the advanced setting is for (Settings → Advanced, under Codex). {label} is Codex's own name for a preset and {mode} Hive's id for the mode (read-only, ask…), both in English: keep them as they are."
+          description: "What the advanced setting is for (Settings → Advanced, under Codex). {label} is Codex's own name for a preset and {mode} Combwork's id for the mode (read-only, ask…), both in English: keep them as they are."
         }),
         { label, mode }
       ),
@@ -2813,7 +2813,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('claude-code', 'promptSnapshotOff'),
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.override.promptSnapshotOff.title', defaultMessage: 'Resume the Assistant with its current instructions', description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default." }),
+    title: msg({ id: 'settings.advanced.claude-code.override.promptSnapshotOff.title', defaultMessage: 'Resume the Assistant with its current instructions', description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.claude-code.override.promptSnapshotOff.desc',
       defaultMessage: "When the Assistant's conversation resumes, Combwork starts Claude Code with --system-prompt-snapshot off, so the Assistant follows its role and Control settings as they are now. Turned off, Combwork leaves the flag out and Claude Code keeps sending the instructions it recorded when the conversation began, until it compacts: a change to the Assistant's settings may not reach it until then. --system-prompt-snapshot in Extra arguments wins either way.",
@@ -2828,7 +2828,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('codex', 'terminalTitle'),
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.override.terminalTitle.title', defaultMessage: "Set Codex's terminal title", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default." }),
+    title: msg({ id: 'settings.advanced.codex.override.terminalTitle.title', defaultMessage: "Set Codex's terminal title", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.codex.override.terminalTitle.desc',
       defaultMessage: "Combwork gives Codex's sessions their terminal title items (Terminal title items, as tui.terminal_title), whatever your own Codex config says, and tells from the title when Codex needs you (\"Action Required\"). Turned off, your Codex config decides the title, and Combwork tells when Codex needs you from its hooks instead, as it does for Codex versions before 0.160. Codex's setup in Provider Setup keeps Combwork's title, which it waits on.",
@@ -2843,7 +2843,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('copilot', 'noAutoUpdate'),
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.override.noAutoUpdate.title', defaultMessage: "Don't let Copilot update itself", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default." }),
+    title: msg({ id: 'settings.advanced.copilot.override.noAutoUpdate.title', defaultMessage: "Don't let Copilot update itself", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.noAutoUpdate.desc',
       defaultMessage: "Combwork starts Copilot with --no-auto-update and COPILOT_AUTO_UPDATE=false (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Provider Setup updates it when you choose. Turned off, Combwork sets neither and Copilot updates itself as it would outside Combwork (your own COPILOT_AUTO_UPDATE still applies).",
@@ -2861,7 +2861,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('copilot', 'allMcpInstructions'),
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.override.allMcpInstructions.title', defaultMessage: "Include every MCP server's instructions", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
+    title: msg({ id: 'settings.advanced.copilot.override.allMcpInstructions.title', defaultMessage: "Include every MCP server's instructions", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Combwork's overrides of the CLI, on by default. MCP is a protocol's name." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.allMcpInstructions.desc',
       defaultMessage: "Combwork starts Copilot with --allow-all-mcp-server-instructions, so Copilot puts the combwork server's instructions (Combwork's guidance for agents) in its system prompt, and the instructions of the other servers its agents get too. Turned off, Copilot includes only the servers it allows by itself, and Combwork gives its guidance as custom instructions instead.",
@@ -2878,11 +2878,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('claude-code', 'preApproveHiveTools'),
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.override.preApproveHiveTools.title', defaultMessage: "Pre-approve the Assistant's Combwork tools", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default." }),
+    title: msg({ id: 'settings.advanced.claude-code.override.preApproveHiveTools.title', defaultMessage: "Pre-approve the Assistant's Combwork tools", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.claude-code.override.preApproveHiveTools.desc',
       defaultMessage: "When the Assistant runs on Claude Code, Combwork passes --allowedTools with the Combwork tools its Control settings let it use without asking, so Claude Code doesn't ask before them. Turned off, Claude Code asks before each Combwork tool as its own permission mode says. Control still decides what the Assistant may do either way. Agents' Combwork tools are never pre-approved on Claude Code.",
-      description: 'What the advanced setting "Pre-approve the Assistant\'s Hive tools" does (Settings → Advanced, under Claude Code). --allowedTools is a command-line option: keep it. Control is the name of the Assistant\'s settings page.'
+      description: 'What the advanced setting "Pre-approve the Assistant\'s Combwork tools" does (Settings → Advanced, under Claude Code). --allowedTools is a command-line option: keep it. Control is the name of the Assistant\'s settings page.'
     }),
     kind: 'boolean',
     default: true,
@@ -2896,7 +2896,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('claude-code', 'mcpIsolation'),
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
+    title: msg({ id: 'settings.advanced.claude-code.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Combwork's overrides of the CLI, on by default. MCP is a protocol's name." }),
     desc: msg({
       id: 'settings.advanced.claude-code.override.mcpIsolation.desc',
       defaultMessage: "Combwork starts Claude Code with --strict-mcp-config, so its sessions get only the MCP servers the workspace gives them. Turned off, the servers in your own Claude Code config and the project's .mcp.json load beside them, as they would outside Combwork (Claude Code may ask you to approve a project's new servers first). The workspace's servers, Combwork's own combwork server among them, win over yours of the same name.",
@@ -2912,11 +2912,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('claude-code', 'statusLine'),
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.override.statusLine.title', defaultMessage: "Combwork's status line in place of yours", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. The status line is the line Claude Code shows under its input." }),
+    title: msg({ id: 'settings.advanced.claude-code.override.statusLine.title', defaultMessage: "Combwork's status line in place of yours", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Combwork's overrides of the CLI, on by default. The status line is the line Claude Code shows under its input." }),
     desc: msg({
       id: 'settings.advanced.claude-code.override.statusLine.desc',
       defaultMessage: "Combwork starts Claude Code with a status line of its own, which sends Combwork the session's model, context, cost and plan limits for the agent's footer and shows nothing under the input. Turned off, the status line in your Claude Code settings shows again: Combwork's command still reads the status, then runs yours with the same input Claude Code gives it and shows what it prints. With no status line of yours, nothing changes.",
-      description: 'What the advanced setting "Hive\'s status line in place of yours" does (Settings → Advanced, under Claude Code).'
+      description: 'What the advanced setting "Combwork\'s status line in place of yours" does (Settings → Advanced, under Claude Code).'
     }),
     kind: 'boolean',
     default: true,
@@ -2927,7 +2927,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('copilot', 'mcpIsolation'),
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
+    title: msg({ id: 'settings.advanced.copilot.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Combwork's overrides of the CLI, on by default. MCP is a protocol's name." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.mcpIsolation.desc',
       defaultMessage: "Combwork starts Copilot with --disable-builtin-mcps, and --disable-mcp-server for each server in your own Copilot config and the project's, so its sessions get only the MCP servers the workspace gives them. Turned off, those and Copilot's built-in GitHub servers load beside them, as they would outside Combwork. The workspace's servers, Combwork's own combwork server among them, win over yours of the same name.",
@@ -2945,11 +2945,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('codex', 'preApproveHiveTools'),
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.override.preApproveHiveTools.title', defaultMessage: "Pre-approve Combwork's tools", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default." }),
+    title: msg({ id: 'settings.advanced.codex.override.preApproveHiveTools.title', defaultMessage: "Pre-approve Combwork's tools", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.codex.override.preApproveHiveTools.desc',
       defaultMessage: "Combwork gives Codex its combwork server with its tools approved (for the Assistant, only those its Control settings let it use without asking), so Codex doesn't ask before them in any mode. Turned off, Codex asks before them as its own approval policy says. What an agent or the Assistant may do with them is still decided by Combwork.",
-      description: 'What the advanced setting "Pre-approve Hive\'s tools" does (Settings → Advanced, under Codex). combwork is the name of Combwork\'s MCP server. Control is the name of the Assistant\'s settings page.'
+      description: 'What the advanced setting "Pre-approve Combwork\'s tools" does (Settings → Advanced, under Codex). combwork is the name of Combwork\'s MCP server. Control is the name of the Assistant\'s settings page.'
     }),
     kind: 'boolean',
     default: true,
@@ -2960,7 +2960,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('codex', 'mcpIsolation'),
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
+    title: msg({ id: 'settings.advanced.codex.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Combwork's overrides of the CLI, on by default. MCP is a protocol's name." }),
     desc: msg({
       id: 'settings.advanced.codex.override.mcpIsolation.desc',
       defaultMessage: "Combwork's Codex sessions get the MCP servers the workspace gives them, and Combwork turns off the ones in your own Codex config and the project's (enabled=false, for those sessions only). Turned off, those load beside the workspace's too, as they would outside Combwork. Combwork's own combwork server always wins over one of yours with that name.",
@@ -2975,11 +2975,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('copilot', 'preApproveHiveTools'),
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.override.preApproveHiveTools.title', defaultMessage: "Pre-approve Combwork's tools", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default." }),
+    title: msg({ id: 'settings.advanced.copilot.override.preApproveHiveTools.title', defaultMessage: "Pre-approve Combwork's tools", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Combwork's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.preApproveHiveTools.desc',
       defaultMessage: "Combwork starts Copilot with --allow-tool for Combwork's tools (for the Assistant, only those its Control settings let it use without asking), so Copilot doesn't ask before them in any mode. Turned off, Copilot asks before them as its own permission mode says. What an agent or the Assistant may do with them is still decided by Combwork.",
-      description: 'What the advanced setting "Pre-approve Hive\'s tools" does (Settings → Advanced, under GitHub Copilot). --allow-tool is a command-line option: keep it. Control is the name of the Assistant\'s settings page.'
+      description: 'What the advanced setting "Pre-approve Combwork\'s tools" does (Settings → Advanced, under GitHub Copilot). --allow-tool is a command-line option: keep it. Control is the name of the Assistant\'s settings page.'
     }),
     kind: 'boolean',
     default: true,
@@ -2990,7 +2990,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: overrideId('copilot', 'stripGitHubTokens'),
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.override.stripGitHubTokens.title', defaultMessage: 'Keep GH_TOKEN and GITHUB_TOKEN from Copilot', description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. GH_TOKEN and GITHUB_TOKEN are environment variables: keep them." }),
+    title: msg({ id: 'settings.advanced.copilot.override.stripGitHubTokens.title', defaultMessage: 'Keep GH_TOKEN and GITHUB_TOKEN from Copilot', description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Combwork's overrides of the CLI, on by default. GH_TOKEN and GITHUB_TOKEN are environment variables: keep them." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.stripGitHubTokens.desc',
       defaultMessage: "Combwork leaves GH_TOKEN and GITHUB_TOKEN, which other tools set, out of Copilot's environment, so a token left there never signs Copilot agents in to another account; COPILOT_GITHUB_TOKEN, set for Copilot, is kept. Turned off, Copilot gets them and signs in with them before its own login, as it would outside Combwork, and Provider Setup shows that sign-in.",
@@ -3239,7 +3239,7 @@ export function sampleMissText(def: AdvancedDef, value: unknown): Text | null {
   const cli = s.source ?? groupName(def.group)
   if (def.kind === 'list' && Array.isArray(value) && s.fields)
     return withValues(
-      msg({ id: 'settings.advanced.miss.list', defaultMessage: '{cli} {version} sent {missing}, which this list doesn\'t have (it sent {fields}). Fine if {cli} has changed since.', description: "Under an advanced setting listing the fields Hive knows a CLI sends, when the CLI was recorded sending one it leaves out (Settings → Advanced). {cli} is the CLI's name, {version} its version; {missing} and {fields} are field names, as the CLI sends them." }),
+      msg({ id: 'settings.advanced.miss.list', defaultMessage: '{cli} {version} sent {missing}, which this list doesn\'t have (it sent {fields}). Fine if {cli} has changed since.', description: "Under an advanced setting listing the fields Combwork knows a CLI sends, when the CLI was recorded sending one it leaves out (Settings → Advanced). {cli} is the CLI's name, {version} its version; {missing} and {fields} are field names, as the CLI sends them." }),
       { cli, version: s.version, missing: s.fields.filter((f) => !value.includes(f)).join(', '), fields: s.fields.join(', ') }
     )
   if (def.kind === 'field')
@@ -3387,9 +3387,9 @@ export function advancedFileText(values: Record<string, unknown>, madeFor: Recor
 
 /** Why advanced.json can't be used (#850): Settings shows it in its language (AdvancedState.fileErrorText), the log and the Assistant's tools in English. */
 const FILE_PROBLEM = {
-  notJson: msg({ id: 'service.advanced.notJson', defaultMessage: "advanced.json isn't valid JSON ({error}).", description: "Above Settings → Advanced's list: Hive's advanced settings file (advanced.json, a file name: keep it) can't be read as JSON; {error} is the JSON reader's own words (English, with no full stop of its own). A sentence of its own: more follows it." }),
+  notJson: msg({ id: 'service.advanced.notJson', defaultMessage: "advanced.json isn't valid JSON ({error}).", description: "Above Settings → Advanced's list: Combwork's advanced settings file (advanced.json, a file name: keep it) can't be read as JSON; {error} is the JSON reader's own words (English, with no full stop of its own). A sentence of its own: more follows it." }),
   notObject: msg({ id: 'service.advanced.notObject', defaultMessage: 'advanced.json should hold an object: {example}.', description: "Above Settings → Advanced's list: advanced.json (a file name: keep it) holds JSON that isn't an object; {example} is what it should look like (JSON: keep it)." }),
-  newer: msg({ id: 'service.advanced.newer', defaultMessage: 'advanced.json is from a newer Combwork (format {format}): this one reads format {supported}.', description: "Above Settings → Advanced's list: advanced.json (a file name: keep it) was written by a newer version of Hive, in a format ({format}) this one can't read ({supported} is the one it reads)." }),
+  newer: msg({ id: 'service.advanced.newer', defaultMessage: 'advanced.json is from a newer Combwork (format {format}): this one reads format {supported}.', description: "Above Settings → Advanced's list: advanced.json (a file name: keep it) was written by a newer version of Combwork, in a format ({format}) this one can't read ({supported} is the one it reads)." }),
   notValues: msg({ id: 'service.advanced.notValues', defaultMessage: 'advanced.json\'s "values" should be an object of setting → value.', description: "Above Settings → Advanced's list: the \"values\" field of advanced.json (keep both as they are) isn't a set of settings and their values." })
 }
 const fileProblem = (t: Text): { error: string; errorText: Text } => ({ error: englishText(t), errorText: t })
@@ -3441,7 +3441,7 @@ export function advancedTakesText(d: AdvancedDef): Text {
       if (d.paths) return msg({ id: 'settings.advanced.takes.folders', defaultMessage: 'Folders, each a full path, separated by semicolons (a variable such as %LOCALAPPDATA% at the start is filled in).', description: 'What an advanced setting takes (Settings → Advanced): a list of folders. %LOCALAPPDATA% is a Windows variable: keep it.' })
       return msg({ id: 'settings.advanced.takes.list', defaultMessage: 'Names separated by commas.', description: 'What an advanced setting takes (Settings → Advanced).' })
     case 'text':
-      return msg({ id: 'settings.advanced.takes.text', defaultMessage: 'Text, found as it is.', description: "What an advanced setting takes (Settings → Advanced): text Hive looks for on a CLI's screen, as it is." })
+      return msg({ id: 'settings.advanced.takes.text', defaultMessage: 'Text, found as it is.', description: "What an advanced setting takes (Settings → Advanced): text Combwork looks for on a CLI's screen, as it is." })
     case 'boolean':
       return msg({ id: 'settings.advanced.takes.boolean', defaultMessage: 'On or off (true or false).', description: 'What an advanced setting takes (Settings → Advanced). true and false are the values as written in advanced.json: keep them.' })
     case 'choice':

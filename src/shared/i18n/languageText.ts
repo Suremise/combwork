@@ -5,7 +5,7 @@
 import { msg } from './msg'
 
 export const LANGUAGE_TEXT = {
-  title: msg({ id: 'language.setting.title', defaultMessage: 'Language', description: "The setting's title in Settings → General. In any language but English, Hive adds \"(Language)\" after it, so someone who can't read the language can find the way back." }),
+  title: msg({ id: 'language.setting.title', defaultMessage: 'Language', description: "The setting's title in Settings → General. In any language but English, Combwork adds \"(Language)\" after it, so someone who can't read the language can find the way back." }),
   desc: msg({ id: 'language.setting.desc', defaultMessage: "The language Combwork shows. Automatic follows Windows' display languages.", description: "Under the Language setting's title." }),
   tip: msg({
     id: 'language.setting.tip',
@@ -14,5 +14,5 @@ export const LANGUAGE_TEXT = {
   }),
   automatic: msg({ id: 'language.automatic', defaultMessage: 'Automatic (Windows: {language})', description: "The first choice in the language list. {language} is the language it picks now, by that language's own name (Deutsch, Polski)." }),
   forced: msg({ id: 'language.forced', defaultMessage: 'Combwork was started in {language} (--lang): this setting applies from its next start.', description: 'Under the language list when a start option chose the language. {language} is its code (pl, en-XA). --lang is a start option: keep it as it is.' }),
-  restart: msg({ id: 'language.restart', defaultMessage: "Combwork's own text has changed language. Chromium's parts (the PDF viewer, date pickers) follow when Combwork next starts.", description: 'Under the language list after the language was changed, until Hive restarts. Chromium is the browser engine Hive is built on: keep the name.' })
+  restart: msg({ id: 'language.restart', defaultMessage: "Combwork's own text has changed language. Chromium's parts (the PDF viewer, date pickers) follow when Combwork next starts.", description: 'Under the language list after the language was changed, until Combwork restarts. Chromium is the browser engine Combwork is built on: keep the name.' })
 }

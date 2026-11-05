@@ -63,7 +63,7 @@ CW_PROGRESS=0 turns reporting off.`,
   revisionForm: agentMsg({
     id: 'progress.revision.form',
     text: 'revision is a commit (its id, or a name git knows)',
-    note: "Checked with git itself when Hive can't check it (reporting off, outside Hive), in the same words as Hive's refusal (check.link.revisionForm)."
+    note: "Checked with git itself when Combwork can't check it (reporting off, outside Combwork), in the same words as Combwork's refusal (check.link.revisionForm)."
   }),
   nothingCheckedOut: agentMsg({
     id: 'progress.revision.nothingCheckedOut',
@@ -79,17 +79,17 @@ CW_PROGRESS=0 turns reporting off.`,
   slow: agentMsg({
     id: 'progress.unanswered.slow',
     text: 'Combwork is slow to answer: no reply {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} in {seconds} s{retried, select, yes {, asked {asked} times} other {}}, so nothing was run. Try again; Settings → Advanced → "cw-progress: Combwork\'s reply time" gives it longer.',
-    note: "HI-1892: Hive is there but busy. lend: yes for an isolated check's copy (#1435), else the check's command (check) was asked for. retried: yes when it was asked more than once (asked)."
+    note: "HI-1892: Combwork is there but busy. lend: yes for an isolated check's copy (#1435), else the check's command (check) was asked for. retried: yes when it was asked more than once (asked)."
   }),
   refused: agentMsg({
     id: 'progress.unanswered.refused',
     text: "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (connection {refused, select, yes {refused} other {not allowed: {detail}}} at {url}), so nothing was run. Is Combwork running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.",
-    note: "HI-1892: nothing listens at Hive's address, or this process may not reach it. refused: yes for a refused connection, else detail is the error's code (EACCES, EPERM). url: Hive's address."
+    note: "HI-1892: nothing listens at Combwork's address, or this process may not reach it. refused: yes for a refused connection, else detail is the error's code (EACCES, EPERM). url: Combwork's address."
   }),
   answered: agentMsg({
     id: 'progress.unanswered.answered',
     text: "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (Combwork answered {status, select, none {with an error} other {{status}}}), so nothing was run.",
-    note: 'HI-1892: Hive answered with no link (an older Hive without the call, an error). status: its HTTP status, or none.'
+    note: 'HI-1892: Combwork answered with no link (an older Combwork without the call, an error). status: its HTTP status, or none.'
   }),
   failed: agentMsg({
     id: 'progress.unanswered.failed',
@@ -99,14 +99,14 @@ CW_PROGRESS=0 turns reporting off.`,
   noStart: agentMsg({
     id: 'progress.unrecorded.noStart',
     text: "Combwork didn't take this run's report (no reply in time), so check {check} wasn't recorded: run it again.",
-    note: "HI-1892: Hive never took the run's start."
+    note: "HI-1892: Combwork never took the run's start."
   }),
   noReply: agentMsg({
     id: 'progress.unrecorded.noReply',
     text: "Combwork didn't confirm it recorded check {check} (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.",
     note: "HI-1892: the run's finish got no reply, sent twice."
   }),
-  refusedResult: agentMsg({ id: 'progress.unrecorded.refused', text: "Combwork refused this run's result, so check {check} may not be recorded: run it again.", note: "HI-1892: Hive answered the finish with an error." }),
+  refusedResult: agentMsg({ id: 'progress.unrecorded.refused', text: "Combwork refused this run's result, so check {check} may not be recorded: run it again.", note: "HI-1892: Combwork answered the finish with an error." }),
   endedBefore: agentMsg({
     id: 'progress.unrecorded.endedBefore',
     text: "Combwork recorded check {check}, but its reply was lost, so how it counted isn't known.",
@@ -141,11 +141,11 @@ CW_PROGRESS=0 turns reporting off.`,
     text: "--check runs the project's command for {check}, which only Combwork knows: run it in a session Combwork started, with reporting on.",
     note: '#1220.'
   }),
-  waiting: agentMsg({ id: 'progress.check.waiting', text: 'waiting for {what}', note: '#1435: no check copy is free. what: what it waits for, in Hive\'s words.' }),
+  waiting: agentMsg({ id: 'progress.check.waiting', text: 'waiting for {what}', note: '#1435: no check copy is free. what: what it waits for, in Combwork\'s words.' }),
   exitCode: agentMsg({ id: 'progress.run.exitCode', text: 'exit code {code}', note: "A failed run's detail, stored with the run (the Default's words, whoever reads it)." }),
   launcherDidntStart: agentMsg({ id: 'progress.isolated.launcherDidntStart', text: "the check's launcher didn't start", note: '#1435.' }),
-  notRunError: agentMsg({ id: 'progress.isolated.notRun', text: "the check wasn't run: {why}", note: "#1435: the launcher wasn't put in its copy's job. why: Hive's reason, or the error." }),
-  notRunStatus: agentMsg({ id: 'progress.isolated.notRunStatus', text: "the check wasn't run: Combwork answered {status}", note: "#1435: Hive answered with an error and no reason. status: its HTTP status." }),
+  notRunError: agentMsg({ id: 'progress.isolated.notRun', text: "the check wasn't run: {why}", note: "#1435: the launcher wasn't put in its copy's job. why: Combwork's reason, or the error." }),
+  notRunStatus: agentMsg({ id: 'progress.isolated.notRunStatus', text: "the check wasn't run: Combwork answered {status}", note: "#1435: Combwork answered with an error and no reason. status: its HTTP status." }),
   notRunUnreachable: agentMsg({ id: 'progress.isolated.notRunUnreachable', text: "the check wasn't run: Combwork couldn't be reached ({detail})", note: "#1435. detail: the error's message." }),
   commandNotFound: agentMsg({ id: 'progress.run.commandNotFound', text: '{file}: command not found', note: "The command doesn't exist (ENOENT), as a shell says it; exit code 127." })
 }

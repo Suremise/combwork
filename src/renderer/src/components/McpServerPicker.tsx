@@ -10,11 +10,11 @@ const M = {
   search: msg({ id: 'mcp.picker.search', defaultMessage: 'Search by name, description or tag', description: "The search box of the MCP view and of the Add server picker (HI-2059): finds servers by their name, description or tags." }),
   filter: msg({ id: 'mcp.picker.filter', defaultMessage: 'Show', description: "Accessible name of the filter beside the MCP servers' search box (All, Added somewhere, Added nowhere)." }),
   all: msg({ id: 'mcp.picker.all', defaultMessage: 'All', description: "The MCP servers' filter: every server." }),
-  added: msg({ id: 'mcp.picker.added', defaultMessage: 'Added somewhere', description: "The MCP servers' filter: servers added to a project or the Hive Assistant." }),
-  nowhere: msg({ id: 'mcp.picker.nowhere', defaultMessage: 'Added nowhere', description: "The MCP servers' filter: servers added to no project and not to the Hive Assistant." }),
-  errors: msg({ id: 'mcp.picker.errors', defaultMessage: 'With problems', description: "The MCP view's filter: servers whose definition Hive can't use." }),
+  added: msg({ id: 'mcp.picker.added', defaultMessage: 'Added somewhere', description: "The MCP servers' filter: servers added to a project or the Combwork Assistant." }),
+  nowhere: msg({ id: 'mcp.picker.nowhere', defaultMessage: 'Added nowhere', description: "The MCP servers' filter: servers added to no project and not to the Combwork Assistant." }),
+  errors: msg({ id: 'mcp.picker.errors', defaultMessage: 'With problems', description: "The MCP view's filter: servers whose definition Combwork can't use." }),
   choose: msg({ id: 'mcp.picker.choose', defaultMessage: 'Choose a server to see what it runs.', description: 'The Add server picker (HI-2059) before a server is chosen; Add stays greyed out until one is.' }),
-  allAdded: msg({ id: 'mcp.picker.allAdded', defaultMessage: 'Every server in the workspace is added here already.', description: 'The Add server picker (HI-2059) when every workspace server is added to this project or the Hive Assistant.' }),
+  allAdded: msg({ id: 'mcp.picker.allAdded', defaultMessage: 'Every server in the workspace is added here already.', description: 'The Add server picker (HI-2059) when every workspace server is added to this project or the Combwork Assistant.' }),
   noMatch: msg({ id: 'mcp.picker.noMatch', defaultMessage: 'No server matches.', description: "The MCP servers' list when nothing matches the search and filter." }),
   runs: msg({ id: 'mcp.picker.runs', defaultMessage: 'It runs:', description: 'The Add server picker (HI-2059): above what the chosen server runs (its command, address, folder, environment).' })
 }

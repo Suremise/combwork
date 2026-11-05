@@ -41,7 +41,7 @@ const log = createLogger('copies')
 /** The folder a project's copies are in, under its worktrees folder: fixed, so a reviewer's grant never changes. */
 export const COPIES_DIR = 'copies'
 /** What a lease's operation taken over from a gone holder leaves as the copy's error: stored, so said in the Default. */
-export const INTERRUPTED = agentMsg({ id: 'copy.error.interrupted', text: 'its reset was interrupted', note: "A check or review copy's error, kept on the copy, when its reset was taken over from a Hive that is gone (#1435)." })
+export const INTERRUPTED = agentMsg({ id: 'copy.error.interrupted', text: 'its reset was interrupted', note: "A check or review copy's error, kept on the copy, when its reset was taken over from a Combwork that is gone (#1435)." })
 
 /** Text kept on a copy, a lease or a request for any reader (dialects, HI-2065): said in the Default. */
 const sayStored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
@@ -54,7 +54,7 @@ export const COPY_TEXT = {
   off: agentMsg({ id: 'copy.refusal.off', text: 'review copies are off (Settings → Advanced, Reviewers review in review copies)', note: 'Why a reviewer gets no review copy: the advanced setting is off. Names the setting as the window shows it.' }),
   setupFailed: agentMsg({ id: 'copy.refusal.setupFailed', text: "{copy}'s setup failed: {error}", note: "Why a copy was not lent: its setup failed. {error} is why (copy.error.*, git's or the command's)." }),
   closed: agentMsg({ id: 'copy.error.closed', text: 'the workspace closed', note: "Why a copy wasn't set up, or an isolated check's copy wasn't leased: its workspace closed." }),
-  notListed: agentMsg({ id: 'copy.error.notListed', text: 'its folder is there but git does not list it as a worktree', note: "A copy's error: its folder exists but isn't a worktree git knows, so Hive leaves it alone." }),
+  notListed: agentMsg({ id: 'copy.error.notListed', text: 'its folder is there but git does not list it as a worktree', note: "A copy's error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone." }),
   worktreeAdd: agentMsg({ id: 'copy.error.worktreeAdd', text: 'git worktree add: {error}', note: "A copy's setup error: `git worktree add` failed. {error} is git's first line, else failed." }),
   checkout: agentMsg({ id: 'copy.error.checkout', text: 'git checkout: {error}', note: "A copy's reset error: `git checkout` of the revision failed. {error} is git's first line, else failed." }),
   clean: agentMsg({ id: 'copy.error.clean', text: 'git clean: {error}', note: "A copy's reset error: `git clean` failed. {error} is git's first line, else failed." }),

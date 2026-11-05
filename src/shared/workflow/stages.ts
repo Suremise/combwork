@@ -33,7 +33,7 @@ export const STAGE_TEXT: Record<StageId, Msg> = {
   active: msg({ id: 'workflow.stage.active', defaultMessage: 'Active', description: 'A stage of the board (glossary 2.2: Active, was Doing): cards being worked on.' }),
   review: msg({ id: 'workflow.stage.review', defaultMessage: 'Review', description: 'A stage of the board (glossary 2.2: Review): cards waiting for, or in, review.' }),
   approved: msg({ id: 'workflow.stage.approved', defaultMessage: 'Approved', description: 'A stage of the board (glossary 2.2: Approved, was Passed): cards whose work passed review (or your OK) and isn’t merged yet.' }),
-  merging: msg({ id: 'workflow.stage.merging', defaultMessage: 'Merging', description: "A stage of the board inside Approved (glossary 2.2: Merging): cards in Hive's merge queue." }),
+  merging: msg({ id: 'workflow.stage.merging', defaultMessage: 'Merging', description: "A stage of the board inside Approved (glossary 2.2: Merging): cards in Combwork's merge queue." }),
   done: msg({ id: 'workflow.stage.done', defaultMessage: 'Done', description: 'A stage of the board (glossary 2.2: Done): cards whose work is merged, or accepted.' })
 }
 

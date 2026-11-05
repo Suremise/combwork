@@ -77,8 +77,8 @@ export interface BenchContext {
 const M = {
   closed: msg({ id: 'service.benchmarks.closed', defaultMessage: 'The workspace was closed or switched: nothing was changed.', description: 'An error on the Performance page: the workspace closed, or another opened in its window, while kept comparisons were being changed; nothing changed.' }),
   cantRead: msg({ id: 'service.benchmarks.cantRead', defaultMessage: 'The kept comparisons can’t be read: {error}', description: "An error on the Performance page: the list of kept comparisons (benchmarks kept to compare) can't be read; {error} is why (the system's words)." }),
-  why: msg({ id: 'service.benchmarks.why', defaultMessage: '{why, select, missing {the list of kept comparisons was missing} damaged {the list of kept comparisons was damaged} entry {an entry of the list of kept comparisons was damaged} other {the list of kept comparisons had too many entries}}', description: "Why Hive rebuilt the list of kept comparisons from their files: it was missing, damaged, had a damaged entry, or had too many entries. A clause, lower case (it follows \"Recovered:\")." }),
-  recovered: msg({ id: 'service.benchmarks.recovered', defaultMessage: 'Recovered: {reason}. {n, plural, one {# kept comparison is} other {# kept comparisons are}} listed again{setAside, select, yes {; the old list is kept as index.damaged-….json} other {}}', description: "A note on the Performance page's Compare after Hive rebuilt its list of kept comparisons: {reason} says why, {n} how many are listed again; with setAside, the damaged list was kept beside it as index.damaged-….json (a file name: keep it)." }),
+  why: msg({ id: 'service.benchmarks.why', defaultMessage: '{why, select, missing {the list of kept comparisons was missing} damaged {the list of kept comparisons was damaged} entry {an entry of the list of kept comparisons was damaged} other {the list of kept comparisons had too many entries}}', description: "Why Combwork rebuilt the list of kept comparisons from their files: it was missing, damaged, had a damaged entry, or had too many entries. A clause, lower case (it follows \"Recovered:\")." }),
+  recovered: msg({ id: 'service.benchmarks.recovered', defaultMessage: 'Recovered: {reason}. {n, plural, one {# kept comparison is} other {# kept comparisons are}} listed again{setAside, select, yes {; the old list is kept as index.damaged-….json} other {}}', description: "A note on the Performance page's Compare after Combwork rebuilt its list of kept comparisons: {reason} says why, {n} how many are listed again; with setAside, the damaged list was kept beside it as index.damaged-….json (a file name: keep it)." }),
   strays: msg({ id: 'service.benchmarks.strays', defaultMessage: '{n, plural, one {# file not in the list was moved to quarantine/.} other {# files not in the list were moved to quarantine/.}}', description: 'A note on the Performance page: kept comparison files the list had no entry for were moved to the quarantine/ folder (a folder name: keep it).' }),
   invalid: msg({ id: 'service.benchmarks.invalid', defaultMessage: '{n, plural, one {# file that couldn’t be read was moved to quarantine/.} other {# files that couldn’t be read were moved to quarantine/.}}', description: "A note on the Performance page: kept comparison files that couldn't be read were moved to the quarantine/ folder (a folder name: keep it)." }),
   overflow: msg({ id: 'service.benchmarks.overflow', defaultMessage: '{n, plural, one {# more than can be listed was moved to quarantine/.} other {# more than can be listed were moved to quarantine/.}}', description: 'A note on the Performance page: kept comparisons past the most that can be listed were moved to the quarantine/ folder (a folder name: keep it).' })
@@ -180,7 +180,7 @@ function acceptable(index: Index): boolean {
 }
 
 async function writeIndex(ctx: BenchContext, index: Index): Promise<void> {
-  if (!acceptable(index)) throw hiveError(msg({ id: 'service.benchmarks.unwritable', defaultMessage: 'Combwork refused to write a list of kept comparisons it couldn’t read back: nothing was changed.', description: "An error on the Performance page: the list of kept comparisons Hive was about to write wouldn't read back as valid, so it wasn't written." }))
+  if (!acceptable(index)) throw hiveError(msg({ id: 'service.benchmarks.unwritable', defaultMessage: 'Combwork refused to write a list of kept comparisons it couldn’t read back: nothing was changed.', description: "An error on the Performance page: the list of kept comparisons Combwork was about to write wouldn't read back as valid, so it wasn't written." }))
   await commit(ctx, join(ctx.dir, 'index.json'), JSON.stringify(index, null, 2))
 }
 
@@ -296,7 +296,7 @@ async function reconcile(ctx: BenchContext, index: Index, files: Set<string>): P
     if (e.state === 'removing') {
       if (await removeFile(ctx, e.id)) {
         changed = true
-        notice(ctx, tr(msg({ id: 'service.benchmarks.removalFinished', defaultMessage: 'An interrupted removal was finished.', description: 'A note on the Performance page: removing a kept comparison was interrupted earlier, and Hive finished it.' })))
+        notice(ctx, tr(msg({ id: 'service.benchmarks.removalFinished', defaultMessage: 'An interrupted removal was finished.', description: 'A note on the Performance page: removing a kept comparison was interrupted earlier, and Combwork finished it.' })))
       } else next.push(e)
       continue
     }
@@ -436,7 +436,7 @@ function keep(ctx: BenchContext, a: Artifact): Promise<KeptEntry> {
       const gone = new Set<string>()
       for (const e of evicted) if (await removeFile(ctx, e.id)) gone.add(e.id)
       if (gone.size) await writeIndex(ctx, { ...index, entries: [...others, ...evicted.filter((e) => !gone.has(e.id)).map((e) => ({ ...e, state: 'removing' as const, txn })), entry] }).catch((err) => log.warn('recording evicted comparisons as removed', err))
-      if (gone.size < evicted.length) notice(ctx, tr(msg({ id: 'service.benchmarks.evictedStays', defaultMessage: 'An evicted comparison couldn’t be removed yet: Combwork will try again.', description: "A note on the Performance page: an old comparison taken off the list to make room couldn't be deleted yet; Hive tries again later." })))
+      if (gone.size < evicted.length) notice(ctx, tr(msg({ id: 'service.benchmarks.evictedStays', defaultMessage: 'An evicted comparison couldn’t be removed yet: Combwork will try again.', description: "A note on the Performance page: an old comparison taken off the list to make room couldn't be deleted yet; Combwork tries again later." })))
     }
     return entry
   })

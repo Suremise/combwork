@@ -130,7 +130,7 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
 
 /** A slot run's errors (dialects, HI-2447): its end's error, kept on the slot by the pool (said in the Default there). */
 const T = {
-  noSupervisor: agentMsg({ id: 'slot.run.noSupervisor', text: "Combwork's process supervisor isn't running, so it can't run a slot's commands", note: "A slot's or copy's setup error: Hive runs their commands in a job of its own, and can't now." }),
+  noSupervisor: agentMsg({ id: 'slot.run.noSupervisor', text: "Combwork's process supervisor isn't running, so it can't run a slot's commands", note: "A slot's or copy's setup error: Combwork runs their commands in a job of its own, and can't now." }),
   noJob: agentMsg({ id: 'slot.run.noJob', text: "its job couldn't be made: {problem}", note: "A slot's or copy's setup error: the job its command runs in couldn't be made. {problem} is why." }),
   closed: agentMsg({ id: 'slot.run.closed', text: 'the workspace closed', note: "A slot's or copy's setup error: its workspace closed before its command ran." }),
   merged: agentMsg({ id: 'slot.laneEnd.merged', text: '{card} merged at {commit}', note: "A card in slot.laneEnd.note's list: merged, with its merge commit's first 12 characters." }),

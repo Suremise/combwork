@@ -5,7 +5,7 @@
   },
   "freshResume.detail": {
     "defaultMessage": "{assistant, select, yes {The Assistant starts a new conversation instead, and the old one stays in its conversations to read.} other {{agent} starts a new conversation instead. It carries on the agent's work (its watch, messages and tasks), and the old conversation stays in Sessions to read.}}",
-    "description": "Under the question when Resume is pressed on a conversation that cannot continue (HI-2540): what starting a new one does. assistant yes: the Hive Assistant (its conversations: the list in its panel); other: an agent ({agent}: its name). Sessions is a tab of the window: keep it as the window names it."
+    "description": "Under the question when Resume is pressed on a conversation that cannot continue (HI-2540): what starting a new one does. assistant yes: the Combwork Assistant (its conversations: the list in its panel); other: an agent ({agent}: its name). Sessions is a tab of the window: keep it as the window names it."
   },
   "freshResume.message": {
     "defaultMessage": "{why, select, moved {This conversation ran in a folder that moved with .hive to .combwork, so it can't continue there.} other {This conversation started before Combwork renamed the tools agents use, so it can't continue.}}",

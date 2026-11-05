@@ -12,7 +12,7 @@ const M = {
   titleSentence: msg({ id: 'git.hiveVcs.titleSentence', defaultMessage: '{title}.', description: "The .combwork notice's title as the first sentence of the notice, in bold: {title} with the full stop your language ends a sentence with." }),
   excluded: msg({ id: 'git.hiveVcs.excludedDone', defaultMessage: '{project}: .combwork excluded from git', description: "Notification after Exclude in the .combwork notice. {project} is the project's name." }),
   excludeFailed: msg({ id: 'git.hiveVcs.excludeFailed', defaultMessage: "Couldn't exclude .combwork", description: 'Title of an error notification: Exclude in the .combwork notice failed.' }),
-  untrackTitle: msg({ id: 'git.hiveVcs.untrackTitle', defaultMessage: '{count, plural, one {Untrack this file?} other {Untrack these # files?}}', description: "Title of the confirmation before Hive stops git tracking files in the project's .combwork." }),
+  untrackTitle: msg({ id: 'git.hiveVcs.untrackTitle', defaultMessage: '{count, plural, one {Untrack this file?} other {Untrack these # files?}}', description: "Title of the confirmation before Combwork stops git tracking files in the project's .combwork." }),
   untrackMessage: msg({
     id: 'git.hiveVcs.untrackMessage',
     defaultMessage: '{count, plural, one {Combwork runs git rm --cached on it in {project}, and nothing else: git stops tracking it and stages its removal from the repository. The file stays on disk. Commit afterwards to finish.} other {Combwork runs git rm --cached on them in {project}, and nothing else: git stops tracking them and stages their removal from the repository. The files stay on disk. Commit afterwards to finish.}}',
@@ -24,7 +24,7 @@ const M = {
   untracked: msg({ id: 'git.hiveVcs.untracked', defaultMessage: '{project}: .combwork untracked', description: "Notification after untracking .combwork's files. {project} is the project's name." }),
   untrackedDetail: msg({ id: 'git.hiveVcs.untrackedDetail', defaultMessage: 'Commit the change to finish (git commit). The files are still on disk.', description: 'Under "{project}: .combwork untracked". Keep git commit as it is.' }),
   untrackFailed: msg({ id: 'git.hiveVcs.untrackFailed', defaultMessage: "Couldn't untrack .combwork", description: 'Title of an error notification.' }),
-  checking: msg({ id: 'git.hiveVcs.checking', defaultMessage: 'Checking…', description: 'The Untrack… button while Hive lists the files git tracks in .combwork.' }),
+  checking: msg({ id: 'git.hiveVcs.checking', defaultMessage: 'Checking…', description: 'The Untrack… button while Combwork lists the files git tracks in .combwork.' }),
   untrackButton: msg({ id: 'git.hiveVcs.untrackButton', defaultMessage: 'Untrack…', description: "Button in the .combwork notice: stops git tracking .combwork's files, after a confirmation." }),
   excluding: msg({ id: 'git.hiveVcs.excluding', defaultMessage: 'Excluding…', description: 'The Exclude button while it runs.' }),
   exclude: msg({ id: 'git.hiveVcs.exclude', defaultMessage: 'Exclude', description: "Button in the .combwork notice: adds .combwork to the git repository's exclude file." }),

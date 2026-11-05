@@ -94,7 +94,7 @@ export function removeWorktreeText(worktree: BatchWorktree): string {
   const check = worktree.check
   if (check?.removable) return tr(msg({ id: 'agents.batch.worktreeRemovable', defaultMessage: '{branch}: merged and clean', description: "Remove All's Worktree column: the agent's branch ({branch}) is merged and has no changes, so it can be deleted." }), { branch: worktree.branch })
   if (check?.reason) return tr(msg({ id: 'agents.batch.worktreeKept', defaultMessage: '{branch}: always kept ({why})', description: "Remove All's Worktree column: the agent's branch ({branch}) is kept, and why ({why})." }), { branch: worktree.branch, why: check.reason })
-  return tr(msg({ id: 'agents.batch.worktreeUnchecked', defaultMessage: "{branch}: always kept (couldn't be checked)", description: "Remove All's Worktree column: the agent's branch ({branch}) is kept because Hive couldn't check it." }), { branch: worktree.branch })
+  return tr(msg({ id: 'agents.batch.worktreeUnchecked', defaultMessage: "{branch}: always kept (couldn't be checked)", description: "Remove All's Worktree column: the agent's branch ({branch}) is kept because Combwork couldn't check it." }), { branch: worktree.branch })
 }
 
 export interface BatchResult {

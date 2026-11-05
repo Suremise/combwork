@@ -20,7 +20,7 @@ export { findSecretWarnings }
 
 /** MCP servers' refusals and what a server runs, in the window's language (#849); the Agent API's list reads `error` in English. */
 const M = {
-  invalidName: msg({ id: 'mcp.error.invalidName', defaultMessage: 'Invalid server name', description: 'An error: an MCP server name Hive refuses.' }),
+  invalidName: msg({ id: 'mcp.error.invalidName', defaultMessage: 'Invalid server name', description: 'An error: an MCP server name Combwork refuses.' }),
   badName: msg({ id: 'content.mcp.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" and "hive" are reserved.', description: 'An error adding an MCP server: its name has a character a server name can\'t have, is too long, or is combwork or hive (Combwork\'s own server and its name before HI-2463: keep them).' }),
   exists: msg({ id: 'content.mcp.exists', defaultMessage: 'A server named "{name}" already exists', description: 'An error making a new MCP server: the workspace has one called {name}.' }),
   notJson: msg({ id: 'content.mcp.notJson', defaultMessage: "{file} isn't valid JSON ({reason}).", description: "An error adding an MCP server from a file: its definition {file} can't be read as JSON. {reason} is the JSON reader's own words (English)." }),
@@ -171,10 +171,10 @@ export async function checkShown(name: string, expected: McpShown): Promise<void
   // The installation (a replace writes a new file, even with the same text and new code beside it) and the text.
   const revision = await mcpRevision(path)
   const now = await readFile(path, 'utf8').then((t) => JSON.parse(t) as unknown, () => null)
-  if (!usable(now) || !revision || revision !== expected.revision || JSON.stringify(now) !== JSON.stringify(expected.def)) throw hiveError(msg({ id: 'content.mcp.changedAdd', defaultMessage: '{name} has changed since it was shown to you. Check what it runs and add it again.', description: 'An error adding an MCP server to a project or the Hive Assistant: its definition ({name} is the server) changed after Hive showed what it runs, so it is not added until checked again.' }), { name }, { kind: 'conflict' })
+  if (!usable(now) || !revision || revision !== expected.revision || JSON.stringify(now) !== JSON.stringify(expected.def)) throw hiveError(msg({ id: 'content.mcp.changedAdd', defaultMessage: '{name} has changed since it was shown to you. Check what it runs and add it again.', description: 'An error adding an MCP server to a project or the Combwork Assistant: its definition ({name} is the server) changed after Combwork showed what it runs, so it is not added until checked again.' }), { name }, { kind: 'conflict' })
 }
 
-const noServer = (name: string): Error => hiveError(msg({ id: 'mcp.error.noServerAdd', defaultMessage: 'The workspace has no MCP server named {name}.', description: 'An error adding a server to a project or the Hive Assistant. {name} is its name.' }), { name }, { kind: 'notFound' })
+const noServer = (name: string): Error => hiveError(msg({ id: 'mcp.error.noServerAdd', defaultMessage: 'The workspace has no MCP server named {name}.', description: 'An error adding a server to a project or the Combwork Assistant. {name} is its name.' }), { name }, { kind: 'notFound' })
 
 /**
  * Adds a workspace server to a project or the Hive Assistant (HI-2059): it runs there from their next session. In a turn
@@ -257,8 +257,8 @@ const listed = mcpNames
 export async function sayMcpAddedOnce(ws: WorkspaceService): Promise<void> {
   const n = ws.config.mcp.droppedNotice
   if (!n) return
-  const title = tr(msg({ id: 'service.mcp.addedTitle', defaultMessage: 'MCP servers are now added where they run', description: "A quiet notice's title, once after the upgrade that made a workspace's MCP servers added to projects and the Hive Assistant, in place of switches." }))
-  const message = tr(msg({ id: 'service.mcp.addedDropped', defaultMessage: 'Each project and the Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.', description: "A quiet notice once after the upgrade that made MCP servers added to projects and the Hive Assistant: nothing that ran changed; {n} choices remembered for servers the workspace had switched off were not carried over. \"MCP tab\" as Hive names it." }), { n })
+  const title = tr(msg({ id: 'service.mcp.addedTitle', defaultMessage: 'MCP servers are now added where they run', description: "A quiet notice's title, once after the upgrade that made a workspace's MCP servers added to projects and the Combwork Assistant, in place of switches." }))
+  const message = tr(msg({ id: 'service.mcp.addedDropped', defaultMessage: 'Each project and the Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.', description: "A quiet notice once after the upgrade that made MCP servers added to projects and the Combwork Assistant: nothing that ran changed; {n} choices remembered for servers the workspace had switched off were not carried over. \"MCP tab\" as Combwork names it." }), { n })
   ws.emit({ type: 'toast', toast: { id: randomUUID(), level: 'info', title, message, timestamp: new Date().toISOString(), quiet: true } })
   await inWorkspace(ws, () => ws.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, droppedNotice: undefined } })))
 }
@@ -276,7 +276,7 @@ async function allProjectPaths(): Promise<string[]> {
  */
 async function membershipOf(projectPath: string, name: string): Promise<ProjectConfig['mcp'] | null> {
   const file = join(projectPath, CW_DIR, 'project.json')
-  const unreadable = (e: unknown): Error => hiveError(msg({ id: 'mcp.error.cannotClear', defaultMessage: "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.", description: 'An error replacing, creating or deleting an MCP server (HI-2059): a project\'s settings file could not be read, so Hive could not make sure the server is removed there, and changed nothing. {project} is the project\'s folder name, {name} the server.' }), { project: basename(projectPath), name }, { kind: 'conflict', cause: e })
+  const unreadable = (e: unknown): Error => hiveError(msg({ id: 'mcp.error.cannotClear', defaultMessage: "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.", description: 'An error replacing, creating or deleting an MCP server (HI-2059): a project\'s settings file could not be read, so Combwork could not make sure the server is removed there, and changed nothing. {project} is the project\'s folder name, {name} the server.' }), { project: basename(projectPath), name }, { kind: 'conflict', cause: e })
   const exists = await stat(file).then(
     () => true,
     (e: NodeJS.ErrnoException) => {
@@ -513,7 +513,7 @@ export function serverFromZip(data: Uint8Array): { def: McpServerDef; files: Map
     const tops = new Set(names.map((n) => norm(n).split('/')[0]))
     const top = tops.size === 1 ? [...tops][0] : null
     found = top ? at(`${top}/`) : undefined
-    if (!top || !found) throw hiveError(msg({ id: 'content.mcp.zipNoDefinition', defaultMessage: 'No {files} found. A server .zip has its definition at its top level, or inside one folder.', description: 'An error adding an MCP server from a .zip without a definition where Hive looks. {files} are the file names it looks for, joined with "or".' }), { files: { list: MCP_ZIP_DEFINITIONS_SHOWN, type: 'disjunction' } })
+    if (!top || !found) throw hiveError(msg({ id: 'content.mcp.zipNoDefinition', defaultMessage: 'No {files} found. A server .zip has its definition at its top level, or inside one folder.', description: 'An error adding an MCP server from a .zip without a definition where Combwork looks. {files} are the file names it looks for, joined with "or".' }), { files: { list: MCP_ZIP_DEFINITIONS_SHOWN, type: 'disjunction' } })
     prefix = `${top}/`
     folder = top
   }

@@ -25,9 +25,9 @@ const M = {
   title: msg({ id: 'agents.branchMerge.title', defaultMessage: 'Merge a branch', description: 'Title of the Merge dialog for merges outside cards (#1450): it picks a branch and the branch to merge it into.' }),
   branch: msg({ id: 'agents.branchMerge.branch', defaultMessage: 'Branch', description: 'The Merge dialog for merges outside cards: the label of the branch to merge (a card\'s line in a slot, an old agent worktree\'s branch, any local branch).' }),
   into: msg({ id: 'agents.branchMerge.into', defaultMessage: 'Into', description: 'The Merge dialog for merges outside cards: the label of the branch to merge it into (the target).' }),
-  inSlot: msg({ id: 'agents.branchMerge.inSlot', defaultMessage: '{branch} (in {slot})', description: 'A branch in the Merge dialog\'s list, checked out in one of Hive\'s slots ({slot}: its name, slot-a).' }),
+  inSlot: msg({ id: 'agents.branchMerge.inSlot', defaultMessage: '{branch} (in {slot})', description: 'A branch in the Merge dialog\'s list, checked out in one of Combwork\'s slots ({slot}: its name, slot-a).' }),
   line: msg({ id: 'agents.branchMerge.group.line', defaultMessage: "Cards' lines", description: "A group in the Merge dialog's branch list: branches made for cards (their lines)." }),
-  carried: msg({ id: 'agents.branchMerge.group.carried', defaultMessage: "Agents' old worktrees", description: "A group in the Merge dialog's branch list: branches of agents' 0.9 worktrees that Hive carried into its slots." }),
+  carried: msg({ id: 'agents.branchMerge.group.carried', defaultMessage: "Agents' old worktrees", description: "A group in the Merge dialog's branch list: branches of agents' 0.9 worktrees that Combwork carried into its slots." }),
   other: msg({ id: 'agents.branchMerge.group.other', defaultMessage: 'Other branches', description: "A group in the Merge dialog's branch list: every other local branch." }),
   none: msg({ id: 'agents.branchMerge.none', defaultMessage: 'There is no other branch to merge.', description: 'The Merge dialog for merges outside cards when the repository has no branch but the one the project folder is on.' }),
   loading: msg({ id: 'agents.branchMerge.loading', defaultMessage: 'Reading the branches…', description: 'The Merge dialog for merges outside cards while it lists the branches.' }),
@@ -48,16 +48,16 @@ const M = {
   message: msg({ id: 'agents.branchMerge.message', defaultMessage: 'Commit message', description: "Label of the merge's commit message in the Merge dialog." }),
   cancel: msg({ id: 'agents.branchMerge.cancel', defaultMessage: 'Cancel', description: 'Button: closes the Merge dialog without merging.' }),
   close: msg({ id: 'agents.branchMerge.close', defaultMessage: 'Close', description: 'Button: closes the Merge dialog after a merge that would conflict.' }),
-  anyway: msg({ id: 'agents.branchMerge.anyway', defaultMessage: 'Merge anyway…', description: "A button in the Merge dialog when Hive's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)." }),
+  anyway: msg({ id: 'agents.branchMerge.anyway', defaultMessage: 'Merge anyway…', description: "A button in the Merge dialog when Combwork's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)." }),
   anywayConfirm: msg({ id: 'agents.branchMerge.anywayConfirm', defaultMessage: 'Merge anyway', description: 'The button confirming Merge anyway (a merge outside the merge queue). Keep it short.' }),
-  anywayTitle: msg({ id: 'agents.branchMerge.anywayTitle', defaultMessage: 'Merge {card} outside the merge queue?', description: "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Hive's merge queue merges. Glossary 2.5: merge queue." }),
+  anywayTitle: msg({ id: 'agents.branchMerge.anywayTitle', defaultMessage: 'Merge {card} outside the merge queue?', description: "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Combwork's merge queue merges. Glossary 2.5: merge queue." }),
   anywayMessage: msg({ id: 'agents.branchMerge.anywayMessage', defaultMessage: 'Combwork merges this card through its queue, after its merge checks pass on the merged result. Merging it here skips them. It is recorded on the card as an override, and the queue takes its entry out once it sees the merge.', description: 'The confirmation before Merge anyway in the Merge dialog. Glossary 2.3: merge checks; 2.4: override.' }),
-  conflict: msg({ id: 'agents.branchMerge.conflict', defaultMessage: 'Merging would conflict. Nothing was changed. These files were changed on both {branch} and {into}:', description: 'The Merge dialog after a merge that would conflict: Hive tried it and changed nothing; the files follow.' }),
+  conflict: msg({ id: 'agents.branchMerge.conflict', defaultMessage: 'Merging would conflict. Nothing was changed. These files were changed on both {branch} and {into}:', description: 'The Merge dialog after a merge that would conflict: Combwork tried it and changed nothing; the files follow.' }),
   merged: msg({ id: 'agents.branchMerge.merged', defaultMessage: 'Merged {branch} into {into}', description: "A notification's title after a merge from the Merge dialog for merges outside cards." }),
   failed: msg({ id: 'agents.branchMerge.failed', defaultMessage: 'Could not merge', description: "An error's title: merging a branch from the Merge dialog failed." })
 }
 
-export const QUEUE_MERGES = msg({ id: 'agents.mergeDialog.queueMerges', defaultMessage: 'Combwork merges {card} through the merge queue. Merge anyway merges it here instead.', description: "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Hive's merge queue under its rules. Glossary 2.5: merge queue." })
+export const QUEUE_MERGES = msg({ id: 'agents.mergeDialog.queueMerges', defaultMessage: 'Combwork merges {card} through the merge queue. Merge anyway merges it here instead.', description: "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Combwork's merge queue under its rules. Glossary 2.5: merge queue." })
 
 /** The card on the branch when Hive merges it (#1357, OP-13): where it stands in the queue. */
 export function QueueCardNote({ c }: { c: BranchQueueCard }) {

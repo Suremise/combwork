@@ -70,7 +70,7 @@ const LOCK_FILES = ['package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml'
 /** Folder names in a project's worktrees folder a slot never takes: #1435's review and check copies. */
 const RESERVED = new Set(['copies'])
 /** What a warming taken over from a holder that is gone leaves as its error (never ready): stored, so said in the Default. */
-export const INTERRUPTED = agentMsg({ id: 'slot.error.interrupted', text: 'its setup was interrupted', note: "A slot's setup error, kept on the slot, when the setup was taken over from a Hive that is gone (#1429). Read by agents and in the log." })
+export const INTERRUPTED = agentMsg({ id: 'slot.error.interrupted', text: 'its setup was interrupted', note: "A slot's setup error, kept on the slot, when the setup was taken over from a Combwork that is gone (#1429). Read by agents and in the log." })
 /** Why nothing is lent or made while the project's Delete holds its slots (#1447). */
 export const DELETING = agentMsg({ id: 'slot.error.deleting', text: 'the project is being deleted', note: 'Why a slot isn\'t ready: the project\'s Delete holds its slots (#1447). The end of slot.refusal.notReady ("… isn\'t ready (…)").' })
 
@@ -85,7 +85,7 @@ const T = {
   inUse: agentMsg({ id: 'slot.refusal.inUse', text: '{slot} is in use by {agent} for {what}', note: "A start's wait: the slot named is lent to another agent. {what} is the card's key or slot.refusal.lane." }),
   agentLeased: agentMsg({ id: 'slot.refusal.agentLeased', text: 'this agent already builds in {slot} for {what}', note: 'A start refused: one agent, one slot (HI-1762). {what} is the card\'s key or slot.refusal.lane.' }),
   warming: agentMsg({ id: 'slot.refusal.warming', text: '{slot} is being set up', note: "A start's wait: the slot's setup is running." }),
-  busy: agentMsg({ id: 'slot.refusal.busy', text: "{held, select, session {{slot} still has a session in it} process {{slot} still has a process running in it (a file or a folder in it open)} broker {{slot} still has a process running in it (a file or a folder in it open): Windows Sandbox's broker ({name}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {{slot} has a session or a process in it}}", note: "A start's wait: something still runs in a free slot, so it isn't lent (HI-2466: held, what: a session, a process, or not known). broker (HI-2467): Windows Sandbox's broker ({name}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Hive tries again until it is free." }),
+  busy: agentMsg({ id: 'slot.refusal.busy', text: "{held, select, session {{slot} still has a session in it} process {{slot} still has a process running in it (a file or a folder in it open)} broker {{slot} still has a process running in it (a file or a folder in it open): Windows Sandbox's broker ({name}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {{slot} has a session or a process in it}}", note: "A start's wait: something still runs in a free slot, so it isn't lent (HI-2466: held, what: a session, a process, or not known). broker (HI-2467): Windows Sandbox's broker ({name}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Combwork tries again until it is free." }),
   notReady: agentMsg({ id: 'slot.refusal.notReady', text: "{slot} isn't ready ({why})", note: "A start's wait or refusal: the slot isn't ready. {why} is its setup's error, else its state." }),
   setupFailed: agentMsg({ id: 'slot.refusal.setupFailed', text: "{slot}'s setup failed: {error}", note: "A start refused: the slot's setup failed. {error} is why (one of slot.error.*, git's or the command's)." }),
   opLost: agentMsg({ id: 'slot.error.opLost', text: 'the operation no longer holds {slot}', note: "An operation on a slot stopped because another took the slot over (#1429). Caught by the pool; in the log if it ever escapes." }),
@@ -96,10 +96,10 @@ const T = {
   takeoverNotReady: agentMsg({ id: 'slot.takeover.notReady', text: "isn't ready ({state})", note: "As slot.takeover.gone: the slot isn't lent. {state} is its state's id (ready, dirty…)." }),
   takeoverLent: agentMsg({ id: 'slot.takeover.lent', text: 'is lent again', note: 'As slot.takeover.gone: another lease has it.' }),
   takeoverOtherRun: agentMsg({ id: 'slot.takeover.otherRun', text: 'has another run in it now', note: 'As slot.takeover.gone: another run writes there now.' }),
-  takeoverOtherHive: agentMsg({ id: 'slot.takeover.otherHive', text: "is held by another Combwork's run", note: 'As slot.takeover.gone: a run of another Hive (another profile) holds it.' }),
+  takeoverOtherHive: agentMsg({ id: 'slot.takeover.otherHive', text: "is held by another Combwork's run", note: 'As slot.takeover.gone: a run of another Combwork (another profile) holds it.' }),
   takeoverHolds: agentMsg({ id: 'slot.takeover.holdsLease', text: "can't be taken over while its agent holds another lease", note: 'As slot.takeover.gone: one agent, one slot (HI-1762).' }),
   closed: agentMsg({ id: 'slot.error.closed', text: 'the workspace closed', note: "A slot's setup or preparation stopped: its workspace closed. Kept on the slot as its error." }),
-  notListed: agentMsg({ id: 'slot.error.notListed', text: 'its folder is there but git does not list it as a worktree', note: "A slot's setup error: its folder exists but isn't a worktree git knows, so Hive leaves it alone." }),
+  notListed: agentMsg({ id: 'slot.error.notListed', text: 'its folder is there but git does not list it as a worktree', note: "A slot's setup error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone." }),
   gitRead: agentMsg({ id: 'slot.error.gitRead', text: "git couldn't read {what}", note: "A slot's setup or preparation error: git couldn't read a branch or HEAD. {what} is the branch's name, or HEAD." }),
   worktreeAdd: agentMsg({ id: 'slot.error.worktreeAdd', text: 'git worktree add: {error}', note: "A slot's setup error: `git worktree add` failed. {error} is git's first line, else failed." }),
   setupNotEnded: agentMsg({ id: 'slot.error.setupNotEnded', text: 'processes its setup started could not be ended', note: "A slot's setup error: its setup command ended, but processes it started are still running." }),
@@ -118,9 +118,9 @@ const T = {
   archiveNoStart: agentMsg({ id: 'slot.archive.noStart', text: "couldn't start", note: "Why a slot is kept, not removed: its archive command couldn't be started." }),
   archiveExit: agentMsg({ id: 'slot.archive.exit', text: 'exited with code {code}', note: "Why a slot is kept, not removed: its archive command failed. {code} is its exit code." }),
   removeFailed: agentMsg({ id: 'slot.remove.failed', text: 'git worktree remove failed', note: "Why a slot is kept, not removed: `git worktree remove` refused and said nothing." }),
-  noTarget: agentMsg({ id: 'slot.check.noTarget', text: 'no target branch', note: "Why Hive can't tell whether a slot's work is merged: the project has no default branch." }),
-  noBranch: agentMsg({ id: 'slot.check.noBranch', text: 'no {target}', note: "Why Hive can't tell whether a slot's work is merged: its target branch doesn't exist. {target} is its name." }),
-  noBase: agentMsg({ id: 'slot.check.noBase', text: 'no merge base with {target}', note: "Why Hive can't tell whether a slot's work is merged: it shares no history with its target branch." })
+  noTarget: agentMsg({ id: 'slot.check.noTarget', text: 'no target branch', note: "Why Combwork can't tell whether a slot's work is merged: the project has no default branch." }),
+  noBranch: agentMsg({ id: 'slot.check.noBranch', text: 'no {target}', note: "Why Combwork can't tell whether a slot's work is merged: its target branch doesn't exist. {target} is its name." }),
+  noBase: agentMsg({ id: 'slot.check.noBase', text: 'no merge base with {target}', note: "Why Combwork can't tell whether a slot's work is merged: it shares no history with its target branch." })
 }
 
 export type SlotState = 'creating' | 'ready' | 'lent' | 'dirty' | 'gone' | 'removing'

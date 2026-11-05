@@ -41,7 +41,7 @@
   },
   "brief.record.byHive": {
     "text": "{agent} is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.",
-    "note": "HI-2029: a running builder, the rules on: Hive gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Hive's start)."
+    "note": "HI-2029: a running builder, the rules on: Combwork gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Combwork's start)."
   },
   "brief.record.cleared": {
     "text": "Its brief is cleared.",
@@ -97,7 +97,7 @@
   },
   "brief.rule.finish.hiveMerges": {
     "text": "Combwork merges each approved card.",
-    "note": "Finish: Hive merges."
+    "note": "Finish: Combwork merges."
   },
   "brief.rule.finish.notChecked": {
     "text": "Combwork does not check merges: report each one with cw_report_merge.",
@@ -145,7 +145,7 @@
   },
   "brief.start.builderStarted": {
     "text": "{agent} wasn't running: started it on the lane.",
-    "note": "The lane change's reply: the lane's builder wasn't running, so Hive started it with brief.start.builderPrompt."
+    "note": "The lane change's reply: the lane's builder wasn't running, so Combwork started it with brief.start.builderPrompt."
   },
   "brief.start.byUser": {
     "text": "the user",
@@ -153,7 +153,7 @@
   },
   "brief.start.firstCard": {
     "text": "Combwork started this card for you: it is your lane's first card. Use card-loop as its builder (cw_lane next names your cards).",
-    "note": "HI-2029: with the rules on, Hive starts a lane's first card on its builder itself. The note of the card's start prompt."
+    "note": "HI-2029: with the rules on, Combwork starts a lane's first card on its builder itself. The note of the card's start prompt."
   },
   "brief.start.fromUser": {
     "text": "the user",
@@ -161,7 +161,7 @@
   },
   "brief.start.nextCard": {
     "text": "Combwork started this card for you: it is your lane's next card, after {card} went Done.",
-    "note": "Hive starts a lane's next card on its builder once the one before it is Done. The note of the card's start prompt."
+    "note": "Combwork starts a lane's next card on its builder once the one before it is Done. The note of the card's start prompt."
   },
   "brief.start.notGiven": {
     "text": "{agent}'s brief wasn't given ({state})",

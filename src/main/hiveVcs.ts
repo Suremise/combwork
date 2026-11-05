@@ -216,7 +216,7 @@ const RM_CHUNK = 100
  */
 export async function untrackHive(projectPath: string, confirmed: string[]): Promise<number> {
   const found = vcsOf(projectPath)
-  if (found?.kind !== 'git') throw hiveError(msg({ id: 'service.hiveVcs.noRepo', defaultMessage: 'No git repository holds this project.', description: "An error untracking the project's .combwork folder (Hive's own files) from git: the project isn't in a git repository." }))
+  if (found?.kind !== 'git') throw hiveError(msg({ id: 'service.hiveVcs.noRepo', defaultMessage: 'No git repository holds this project.', description: "An error untracking the project's .combwork folder (Combwork's own files) from git: the project isn't in a git repository." }))
   const now = await trackedHiveFiles(projectPath, found.root, { fresh: true })
   if (now === null) {
     const problem = gitProblemData(gitTool())
@@ -225,7 +225,7 @@ export async function untrackHive(projectPath: string, confirmed: string[]): Pro
       : hiveError(msg({ id: 'service.hiveVcs.cantList', defaultMessage: "Git couldn't list the files it tracks in .combwork.", description: "An error untracking the project's .combwork folder from git: git couldn't list them. Keep .combwork as it is (a folder name)." }))
   }
   const shown = new Set(Array.isArray(confirmed) ? confirmed.filter((f) => typeof f === 'string') : [])
-  if (now.length !== shown.size || now.some((f) => !shown.has(f))) throw hiveError(msg({ id: 'service.hiveVcs.changed', defaultMessage: 'The files git tracks in .combwork changed since you were shown them: nothing was untracked. Look again.', description: "An error untracking the project's .combwork folder from git: the list of its tracked files changed after Hive showed it, so nothing changed. Keep .combwork as it is." }), undefined, { kind: 'conflict' })
+  if (now.length !== shown.size || now.some((f) => !shown.has(f))) throw hiveError(msg({ id: 'service.hiveVcs.changed', defaultMessage: 'The files git tracks in .combwork changed since you were shown them: nothing was untracked. Look again.', description: "An error untracking the project's .combwork folder from git: the list of its tracked files changed after Combwork showed it, so nothing changed. Keep .combwork as it is." }), undefined, { kind: 'conflict' })
   try {
     for (let i = 0; i < now.length; i += RM_CHUNK) {
       const r = await git(projectPath, ['--literal-pathspecs', 'rm', '--cached', '--quiet', '--', ...now.slice(i, i + RM_CHUNK)])

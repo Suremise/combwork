@@ -61,7 +61,7 @@
   },
   "runtime.start.laneStarted": {
     "text": "Combwork started {card} for you, as your lane's next card: carry on with it.",
-    "note": "HI-2092: a lane's builder starting the card Hive had already started for it: its start's warning."
+    "note": "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning."
   },
   "runtime.start.slotMove": {
     "text": "You'll continue in {slot}, on {line}: Combwork makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.",

@@ -1,7 +1,7 @@
 {
   "worktrees.agent.badPlacement": {
     "text": "The panes can't be placed like that in this layout.",
-    "note": "An error: saving where the user put the agents' panes in a layout (dragging a pane to another cell) was given a layout or places Hive doesn't know.",
+    "note": "An error: saving where the user put the agents' panes in a layout (dragging a pane to another cell) was given a layout or places Combwork doesn't know.",
     "audience": "both"
   },
   "worktrees.agent.badWorkflowRole": {
@@ -41,7 +41,7 @@
   },
   "worktrees.agent.notPinned": {
     "text": "Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.",
-    "note": "An error: an agent was to be added in a worktree of its own (a new or an existing one), which 1.0 doesn't do: Hive lends a working folder (a slot) to each card or lane instead (glossary 2.5: slot, lane).",
+    "note": "An error: an agent was to be added in a worktree of its own (a new or an existing one), which 1.0 doesn't do: Combwork lends a working folder (a slot) to each card or lane instead (glossary 2.5: slot, lane).",
     "audience": "both"
   },
   "worktrees.agent.providerChangedMeanwhile": {
@@ -76,7 +76,7 @@
   },
   "worktrees.agent.unknownProvider": {
     "text": "Unknown provider \"{provider}\".",
-    "note": "An error: {provider} is not a coding-agent CLI this Hive knows (Claude Code, Codex…).",
+    "note": "An error: {provider} is not a coding-agent CLI this Combwork knows (Claude Code, Codex…).",
     "audience": "both"
   },
   "worktrees.badBranchName": {

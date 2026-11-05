@@ -13,7 +13,7 @@ const M = {
   week: msg({ id: 'project.period.week', defaultMessage: '{days, plural, one {# day} other {# days}}', description: 'A period of the usage figures: the last seven days ({days} is 7), today included.' }),
   month: msg({ id: 'project.period.month', defaultMessage: '{days, plural, one {# day} other {# days}}', description: 'A period of the usage figures: the last thirty days ({days} is 30), today included.' }),
   all: msg({ id: 'project.period.all', defaultMessage: 'All time', description: 'A period of the usage figures: everything recorded.' }),
-  unknown: msg({ id: 'project.cost.unknown', defaultMessage: 'Unknown', description: 'A cost Hive cannot work out: no price is known for the model.' }),
+  unknown: msg({ id: 'project.cost.unknown', defaultMessage: 'Unknown', description: 'A cost Combwork cannot work out: no price is known for the model.' }),
   belowCent: msg({ id: 'project.cost.belowCent', defaultMessage: '< {cent}', description: 'A cost under one cent. {cent} is one cent in dollars, such as "$0.01".' }),
   other: msg({ id: 'project.chart.other', defaultMessage: 'Other ({count})', description: 'In the usage chart by project: the projects not shown on their own. {count} is how many.' }),
   withFree: msg({ id: 'project.cost.withFree', defaultMessage: '{cost} + free (local)', description: 'A total cost ("$1.20") that also covers sessions run only on a model server on this PC (Ollama, for example), which cost nothing (HI-1772).' })

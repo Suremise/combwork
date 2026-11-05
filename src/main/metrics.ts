@@ -1069,10 +1069,10 @@ const toPart = (p: PartData): MetricsPart => ({ api: Object.values(p.api), mcp: 
 
 /** What Hive doesn't measure (#850): the window's text, and its English for agents (`notMeasured`), item for item. */
 const NOT_MEASURED_TEXT = [
-  msg({ id: 'service.metrics.notTokens', defaultMessage: 'Provider tokens per Combwork tool or per guidance part: providers report a session’s usage, not what each part of its context cost.', description: "On the Performance page, under What isn't measured: Hive can't tell how many tokens each of its tools or guidance parts cost." }),
+  msg({ id: 'service.metrics.notTokens', defaultMessage: 'Provider tokens per Combwork tool or per guidance part: providers report a session’s usage, not what each part of its context cost.', description: "On the Performance page, under What isn't measured: Combwork can't tell how many tokens each of its tools or guidance parts cost." }),
   msg({ id: 'service.metrics.notNetwork', defaultMessage: 'Provider network traffic: Combwork starts the CLIs; it is not a proxy between them and their providers.', description: "On the Performance page, under What isn't measured: the coding agent CLIs' own network traffic." }),
   msg({ id: 'service.metrics.notCliContext', defaultMessage: 'Context a CLI adds itself (its own system prompt, tool definitions, files it reads).', description: "On the Performance page, under What isn't measured: what a coding agent CLI puts in its model's context itself." }),
-  msg({ id: 'service.metrics.notSkillReads', defaultMessage: 'Whether a model read a skill: delivered skills are counted, reading one is not observable.', description: "On the Performance page, under What isn't measured: whether a model read a skill Hive gave it." }),
+  msg({ id: 'service.metrics.notSkillReads', defaultMessage: 'Whether a model read a skill: delivered skills are counted, reading one is not observable.', description: "On the Performance page, under What isn't measured: whether a model read a skill Combwork gave it." }),
   msg({ id: 'service.metrics.notTransport', defaultMessage: 'HTTP headers and transport: request sizes are the body bytes received, response sizes the JSON body written (an aborted reply may not all have been sent).', description: "On the Performance page, under What isn't measured: the Agent API's request and response sizes count only the bodies." })
 ]
 // agent-stored: metricsForAgents says each for the agent reading the report (servers.ts)

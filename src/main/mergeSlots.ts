@@ -4,7 +4,7 @@ import { msg, tr } from '../shared/i18n'
 
 /** The window's notice that a merge slot expired (HI-2320: in the language Hive shows). */
 const EXPIRED = {
-  title: msg({ id: 'main.mergeSlot.expiredTitle', defaultMessage: "{agent}'s merge slot expired", description: "A notice's title: an agent ({agent}) held the merge slot longer than its limit without reporting progress, so Hive gave it to the next agent in line." }),
+  title: msg({ id: 'main.mergeSlot.expiredTitle', defaultMessage: "{agent}'s merge slot expired", description: "A notice's title: an agent ({agent}) held the merge slot longer than its limit without reporting progress, so Combwork gave it to the next agent in line." }),
   body: msg({ id: 'main.mergeSlot.expiredBody', defaultMessage: '{agent} held the merge slot for {branch} longer than its limit without reporting progress, so it went to the next in line. Check whether its merge finished.', description: "The notice that an agent's merge slot expired. {agent} is the agent, {branch} the branch it was merging into." })
 }
 

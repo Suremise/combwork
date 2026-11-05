@@ -312,7 +312,7 @@
   },
   "api.change.activateProject": {
     "text": "activate the project {project}",
-    "note": "What an Assistant's change is called: in its refusals (\"Only the Hive Assistant can …\", \"don't let you …\") and, capitalised, in its activity."
+    "note": "What an Assistant's change is called: in its refusals (\"Only the Combwork Assistant can …\", \"don't let you …\") and, capitalised, in its activity."
   },
   "api.change.addAgent": {
     "text": "add an agent to {project}"
@@ -595,7 +595,7 @@
   },
   "api.done.addedAgentBrief": {
     "text": "Added {agent} to {project}{started, select, yes { and started it} no {; it didn't start} other {}}",
-    "note": "The event stream's line, in Hive's own words: never why it didn't start (#763)."
+    "note": "The event stream's line, in Combwork's own words: never why it didn't start (#763)."
   },
   "api.done.addedConnection": {
     "text": "Made the connection {connection} on {account}"
@@ -884,7 +884,7 @@
   },
   "api.mergeSlot.moveName": {
     "text": "merge slot",
-    "note": "The refused move's name, in the workflow's refusal of a Hive-merged card's merge slot."
+    "note": "The refused move's name, in the workflow's refusal of a Combwork-merged card's merge slot."
   },
   "api.mergeSlot.noBranch": {
     "text": "The project folder isn't on a branch: name the branch to merge into."

@@ -265,7 +265,7 @@ const T = {
   running: agentMsg({
     id: 'notice.orphan.running',
     text: '{n, plural, one {A process your command started is} other {{count} processes your commands started are}} still running with the shell that started {n, plural, one {it} other {them}} gone: {list}. End {n, plural, one {it} other {them}} if not needed; Combwork won\'t.',
-    note: 'After "[Hive] ", at the agent\'s next tool call or turn\'s end: processes its commands started still run with their shell gone (HI-2111), told once; Hive doesn\'t end them. n and count: how many; list: each process (notice.orphan.process), joined by "; ".'
+    note: 'After "[Combwork] ", at the agent\'s next tool call or turn\'s end: processes its commands started still run with their shell gone (HI-2111), told once; Combwork doesn\'t end them. n and count: how many; list: each process (notice.orphan.process), joined by "; ".'
   })
 }
 
@@ -277,5 +277,5 @@ export function setOrphansForTests(runId: string, orphans: Orphan[] | null): voi
 
 const M = {
   title: msg({ id: 'session.orphan.title', defaultMessage: '{agent} left {command} running for {time}', description: "A notice's title (HI-2111): a process an agent's command started is still running with the shell that started it gone. {agent} is the agent's name; {command} what the process runs, cut short; {time} how long it has run (\"12 min\")." }),
-  body: msg({ id: 'session.orphan.body', defaultMessage: 'Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.', description: "The notice that an agent left a process running (HI-2111). {pid} is its process id. Activity is a tab of Hive's; End It is a button there." })
+  body: msg({ id: 'session.orphan.body', defaultMessage: 'Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.', description: "The notice that an agent left a process running (HI-2111). {pid} is its process id. Activity is a tab of Combwork's; End It is a button there." })
 }

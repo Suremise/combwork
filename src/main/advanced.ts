@@ -257,7 +257,7 @@ export class AdvancedStore {
   /** Sets an override now: only inside transact (or set), in a change's turn. */
   async setNow(id: string, raw: unknown): Promise<void> {
     const def = advancedDef(id)
-    if (!def) throw hiveError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Hive has none with the id {id}.' }), { id }, { kind: 'notFound' })
+    if (!def) throw hiveError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Combwork has none with the id {id}.' }), { id }, { kind: 'notFound' })
     if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixFirst', defaultMessage: '{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.', description: "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
     const values = { ...this.values }
     const madeFor = { ...this.madeFor }
@@ -355,7 +355,7 @@ export class AdvancedStore {
 
   /** Why advanced.json can't be used, as text (its English when it came from before #850). */
   private fileText(): Text {
-    return this.fileErrorText ?? withValues(msg({ id: 'service.advanced.asIs', defaultMessage: '{problem}', description: "Why advanced.json can't be used, in English (kept from before Hive translated it). Keep it as {problem} alone." }), { problem: this.fileError ?? '' })
+    return this.fileErrorText ?? withValues(msg({ id: 'service.advanced.asIs', defaultMessage: '{problem}', description: "Why advanced.json can't be used, in English (kept from before Combwork translated it). Keep it as {problem} alone." }), { problem: this.fileError ?? '' })
   }
 
   /** Help → Copy Diagnostics: how many overrides, which (Hive's names, no values), and which need a look. */

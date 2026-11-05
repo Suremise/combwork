@@ -18,7 +18,7 @@ export function windowTitle(title: string, count: number): string {
   return count > 0 ? `(${count}) ${title}` : title
 }
 
-const NEED_YOU = msg({ id: 'workspace.taskbar.needYou', defaultMessage: '{count, plural, one {# needs you} other {# need you}}', description: "What the taskbar badge over Hive's icon says to screen readers: how many things wait for you (requests on cards and agents stopped at a prompt, a sign-in, a question or an error). Keep it short." })
+const NEED_YOU = msg({ id: 'workspace.taskbar.needYou', defaultMessage: '{count, plural, one {# needs you} other {# need you}}', description: "What the taskbar badge over Combwork's icon says to screen readers: how many things wait for you (requests on cards and agents stopped at a prompt, a sign-in, a question or an error). Keep it short." })
 
 /** What the badge says to screen readers. */
 export function badgeDescription(count: number): string {

@@ -76,29 +76,29 @@ const T = {
   task: agentMsg({ id: 'doorbell.count.task', text: '{n, plural, one {{count} task} other {{count} tasks}}{cards}', note: 'Tasks waiting in the inbox, in a notice\'s counts. cards: " (HI-12, HI-14)", the cards they are about, or nothing.' }),
   handover: agentMsg({ id: 'doorbell.count.handover', text: '{n, plural, one {{count} handover} other {{count} handovers}}{cards}', note: 'Handovers waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
   answer: agentMsg({ id: 'doorbell.count.answer', text: '{n, plural, one {{count} answer} other {{count} answers}}{cards}', note: "The user's answers waiting in the inbox, in a notice's counts. cards: \" (HI-12)\", or nothing." }),
-  rebrief: agentMsg({ id: 'doorbell.count.message', text: '{n, plural, one {{count} message} other {{count} messages}}{cards}', note: 'Messages (from the user, an agent or Hive: a brief, a lane change) waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
+  rebrief: agentMsg({ id: 'doorbell.count.message', text: '{n, plural, one {{count} message} other {{count} messages}}{cards}', note: 'Messages (from the user, an agent or Combwork: a brief, a lane change) waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
   'card-event': agentMsg({ id: 'doorbell.count.cardEvent', text: '{n, plural, one {{count} card event} other {{count} card events}}{cards}', note: 'Card events (a wake: a watched card changed) waiting in the inbox, in a notice\'s counts. cards: " (HI-12)", or nothing.' }),
-  control: agentMsg({ id: 'doorbell.count.notice', text: '{n, plural, one {{count} notice} other {{count} notices}}{cards}', note: "Hive's notices waiting in the inbox, in a notice's counts. cards: \" (HI-12)\", or nothing." }),
+  control: agentMsg({ id: 'doorbell.count.notice', text: '{n, plural, one {{count} notice} other {{count} notices}}{cards}', note: "Combwork's notices waiting in the inbox, in a notice's counts. cards: \" (HI-12)\", or nothing." }),
   idsMore: agentMsg({ id: 'doorbell.ids.more', text: '{ids} and {more} more', note: 'Delivery ids in a notice past the first 20: the first 20 ("m1, m2"), then how many more.' }),
   checkpoint: agentMsg({
     id: 'doorbell.notice.checkpoint',
     text: '{what}. Call cw_inbox now to read {n, plural, one {it} other {them}}{ack, select, yes {; act on {n, plural, one {it} other {them}} and ack {n, plural, one {it} other {them}}} other {}}, then carry on.',
-    note: 'After the fixed "[Hive] New in your inbox: ", in a hook\'s reply after a tool call while the agent works. what: the counts by kind with their ids ("1 task (m12)"); n: how many; ack: yes when one needs acking (#903, #1530).'
+    note: 'After the fixed "[Combwork] New in your inbox: ", in a hook\'s reply after a tool call while the agent works. what: the counts by kind with their ids ("1 task (m12)"); n: how many; ack: yes when one needs acking (#903, #1530).'
   }),
   drain: agentMsg({
     id: 'doorbell.notice.drain',
     text: 'Before you finish: your inbox has {what} you haven\'t read. Call cw_inbox{ack, select, yes {, act on {n, plural, one {it} other {them}} and ack {n, plural, one {it} other {them}}} other { and act on {n, plural, one {it} other {them}}}} before you end your turn.',
-    note: 'After "[Hive] ", as the agent\'s turn ends with its inbox unread (the Stop drain). what: the counts by kind with their ids; n: how many; ack: yes when one needs acking (#903, #1530).'
+    note: 'After "[Combwork] ", as the agent\'s turn ends with its inbox unread (the Stop drain). what: the counts by kind with their ids; n: how many; ack: yes when one needs acking (#903, #1530).'
   }),
   doorbell: agentMsg({
     id: 'doorbell.notice.doorbell',
     text: '{what}. Call cw_inbox to read {n, plural, one {it} other {them}}{ack, select, yes {, act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}} other {}}.',
-    note: 'The doorbell, after the fixed "[Hive] New in your inbox: ": one line typed into an idle agent as its prompt. what: the counts by kind with their ids ("1 task (m12)"); n: how many; ack: yes when one needs acking (#903, #1530).'
+    note: 'The doorbell, after the fixed "[Combwork] New in your inbox: ": one line typed into an idle agent as its prompt. what: the counts by kind with their ids ("1 task (m12)"); n: how many; ack: yes when one needs acking (#903, #1530).'
   }),
   lanes: agentMsg({
     id: 'doorbell.notice.lanesUnwatched',
     text: 'Lanes are running ({shown}) and nothing will wake you about them: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) before you finish.',
-    note: "After \"[Hive] \": the Assistant's notice as its turn ends with lanes running and no watch on them (HI-2069). shown: the builders' names (\"HB1, HB2 and 3 more\"), or how many lanes (lanesCount)."
+    note: "After \"[Combwork] \": the Assistant's notice as its turn ends with lanes running and no watch on them (HI-2069). shown: the builders' names (\"HB1, HB2 and 3 more\"), or how many lanes (lanesCount)."
   }),
   namesMore: agentMsg({ id: 'doorbell.lanes.namesMore', text: '{names} and {more} more', note: "The lanes' builders past the first 10, in the unwatched lanes notice: the first 10 (\"HB1, HB2\"), then how many more." }),
   lanesCount: agentMsg({ id: 'doorbell.lanes.count', text: '{n, plural, one {{count} lane} other {{count} lanes}}', note: "The unwatched lanes notice's count of lanes when no builder's name is left to show (an emoji's)." })

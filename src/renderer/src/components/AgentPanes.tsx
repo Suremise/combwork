@@ -209,7 +209,7 @@ const RESUME = msg({ id: 'panes.resume.button', defaultMessage: 'Resume', descri
 const NEW_SESSION = msg({ id: 'panes.session.new', defaultMessage: 'New Session', description: 'Button and menu item (an agent\'s pane): starts the agent in a new conversation. Keep it short.' })
 const RESUME_SESSION = msg({ id: 'panes.resume.pick', defaultMessage: 'Resume a Session…', description: "Menu item (an agent's pane): opens the session picker to resume one of its sessions." })
 const MERGE = msg({ id: 'panes.agent.merge', defaultMessage: 'Merge…', description: "Button and menu item (a worktree agent's pane): opens the merge dialog for its branch." })
-const HOOKS = msg({ id: 'panes.menu.hooks', defaultMessage: 'Hooks…', description: "Menu item (an agent's menu): opens its Hooks dialog: the hooks its session has, and what Hive received from them. The … says it opens a dialog: keep it." })
+const HOOKS = msg({ id: 'panes.menu.hooks', defaultMessage: 'Hooks…', description: "Menu item (an agent's menu): opens its Hooks dialog: the hooks its session has, and what Combwork received from them. The … says it opens a dialog: keep it." })
 const AGENT_SETTINGS = msg({ id: 'panes.agent.settings', defaultMessage: 'Agent Settings…', description: "Menu item and button (an agent's pane): opens the agent's settings." })
 const STOP = msg({ id: 'panes.agent.stop', defaultMessage: 'Stop', description: "Button and menu item (an agent's pane): stops the agent's session (the conversation is kept). Keep it short." })
 
@@ -490,7 +490,7 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
     { label: tr(msg({ id: 'panes.menu.handOver', defaultMessage: 'Hand Over to…', description: "Menu item (an agent's menu): hands its work over to another agent or a new conversation." })), icon: 'arrow-swap', onClick: () => set({ handOverFor: { project: project.path, agentId: a.id } }) },
     ...moveItems(project, a),
     // A slot its ended run still holds (#1506): the same item, for the user's explicit recovery; a carried slot's after it.
-    ...(a.heldSlot ? [{ label: tr(msg({ id: 'panes.menu.releaseHeld', defaultMessage: 'Release Slot…', description: "Menu item (an agent's menu): a slot the agent's last session there still holds (it ended, but Hive doesn't know everything it started has) is freed for other work (asks first, showing what Hive knows)." })), icon: 'unlock', detail: a.heldSlot, onClick: () => void actions.releaseHeldSlot(project.path, a.heldSlot!) }] : []),
+    ...(a.heldSlot ? [{ label: tr(msg({ id: 'panes.menu.releaseHeld', defaultMessage: 'Release Slot…', description: "Menu item (an agent's menu): a slot the agent's last session there still holds (it ended, but Combwork doesn't know everything it started has) is freed for other work (asks first, showing what Combwork knows)." })), icon: 'unlock', detail: a.heldSlot, onClick: () => void actions.releaseHeldSlot(project.path, a.heldSlot!) }] : []),
     ...(a.carriedSlot && a.carriedSlot !== a.heldSlot ? [{ label: tr(msg({ id: 'panes.menu.releaseSlot', defaultMessage: 'Release Slot…', description: "Menu item (an agent's menu): its own worktree from before 1.0, kept for it as a slot since the upgrade, stops being kept for it (asks first)." })), icon: 'unlock', detail: a.carriedSlot, onClick: () => void actions.releaseCarriedSlot(project.path, a.id) }] : []),
     { separator: true },
     { label: tr(AGENT_SETTINGS), icon: 'settings', onClick: () => set({ agentSettingsFor: { project: project.path, agentId: a.id } }) },
@@ -658,7 +658,7 @@ function paneItems(project: ProjectInfo, a: AgentInfo, left: AgentLeftovers | un
         sub(
           [
             ...(n ? [{ header: true, label: wakes ? tr(msg({ id: 'panes.messages.tip', defaultMessage: "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with cw_inbox.", description: "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). cw_inbox is a tool's name: keep it." }), { n, agent: a.name }) : tr(msg({ id: 'panes.messages.tipNoWakes', defaultMessage: "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet", description: "The heading of the menu of an agent's unread messages when the setting Wake an idle agent is off (a hint line under it says so): how many ({n}) for the agent ({agent}: its name)." }), { n, agent: a.name }) }] : []),
-            ...(n && !wakes ? [{ label: tr(msg({ id: 'panes.messages.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of an agent's unread messages menu, when the setting Wake an idle agent is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them." })), disabled: true }] : []),
+            ...(n && !wakes ? [{ label: tr(msg({ id: 'panes.messages.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of an agent's unread messages menu, when the setting Wake an idle agent is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Combwork shows them." })), disabled: true }] : []),
             ...inbox.unread.map((m) => ({ label: tr(msg({ id: 'panes.messages.line', defaultMessage: '{id} from {from} ({state, select, queued {waiting} offered {typed, not fetched or acked yet} other {its offer not confirmed}}): {text}', description: "A message left for an agent, in the menu of its unread messages: its id, who from ({from}), its state (waiting; typed into the agent but not fetched or acked; or offered but not confirmed), and the start of its text ({text}, the sender's own words)." }), { id: m.id, from: m.from, state: m.state, text: m.text }), disabled: true })),
             ...(overdue ? [{ label: overdue, disabled: true }] : []),
             ...(waiting && !wakes && a.live ? [{ separator: true }, { label: tr(msg({ id: 'panes.messages.deliverNow', defaultMessage: 'Deliver Now', description: "Menu item on an agent's unread messages, shown while the setting Wake an idle agent is off: types the line telling the agent of them into its terminal, once." })), icon: 'send', onClick: deliver }] : []),
@@ -728,7 +728,7 @@ function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): Menu
   const full = project.agents.length >= agentLimit(project)
   return all.length
     ? all.flatMap((t) => [
-        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Combwork} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
+        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Combwork} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Combwork: one of Combwork's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
         ...t.agents.map((a, i) => ({
           // Their names as this project's, as main made them with its key (HI-1948: Hive's own are patterns of it, HI-B1);
           // none from main, `{key}` stays.
@@ -749,7 +749,7 @@ function templateMenuItems(project: ProjectInfo, all: TemplateEntry[]): MenuEntr
         const here = all.filter((t) => t.scope === scope)
         return here.length
           ? [
-              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, hive {Combwork's templates} workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above Hive's own templates (#1436), those kept in the workspace, or in this project." }), { scope }) },
+              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, hive {Combwork's templates} workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above Combwork's own templates (#1436), those kept in the workspace, or in this project." }), { scope }) },
               ...here.map((t) => ({ label: templateTitle(t), icon: 'library', detail: shownProblem(t) ?? tr(msg({ id: 'panes.template.detail', defaultMessage: '{n, plural, one {# agent} other {# agents}} · {layout}', description: "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")." }), { n: t.agents.length, layout: layoutName(t.layout) }), disabled: !!t.problem, onClick: () => void actions.loadTemplate(project.path, t) }))
             ]
           : []
@@ -792,7 +792,7 @@ function RetryTip({ live, large }: { live: LiveSessionState; large: boolean }) {
       </div>
       {large && w.status === 429 && (
         <div className="faint">
-          {tr(msg({ id: 'panes.header.retryLarge', defaultMessage: 'This conversation is large, and each request sends all of it. A new conversation (a handover, then a fresh session) sends less, which can help under a rate limit.', description: "Tooltip of a pane's status while its coding agent is rate-limited and its conversation is large: a suggestion, not something Hive does." }))}
+          {tr(msg({ id: 'panes.header.retryLarge', defaultMessage: 'This conversation is large, and each request sends all of it. A new conversation (a handover, then a fresh session) sends less, which can help under a rate limit.', description: "Tooltip of a pane's status while its coding agent is rate-limited and its conversation is large: a suggestion, not something Combwork does." }))}
         </div>
       )}
       {/* How long it has been at it (HI-1973): since this wait's first try, when that was before the latest. */}
@@ -1255,9 +1255,9 @@ export function useWidth<T extends HTMLElement>(): [(el: T | null) => void, numb
   return [ref, w]
 }
 
-const INPUT_BLOCKED = msg({ id: 'panes.header.inputBlocked', defaultMessage: 'Its input takes no keys', description: "A pane's status: keys Hive typed into the agent's input didn't reach it (something on its screen takes them). Keep it short." })
-const TRY_INPUT = msg({ id: 'panes.header.inputRetry', defaultMessage: 'Try again', description: "Button beside a pane's status when the agent's input takes no keys: Hive checks once that its input takes keys again (after the user answered what took them). Keep it short." })
-const MARK_IDLE = msg({ id: 'panes.header.markIdle', defaultMessage: 'Mark idle', description: "Button beside a pane's unknown state, and an item of its ⋯ menu: tells Hive the agent is idle (its terminal shows it at its prompt). Keep it short." })
+const INPUT_BLOCKED = msg({ id: 'panes.header.inputBlocked', defaultMessage: 'Its input takes no keys', description: "A pane's status: keys Combwork typed into the agent's input didn't reach it (something on its screen takes them). Keep it short." })
+const TRY_INPUT = msg({ id: 'panes.header.inputRetry', defaultMessage: 'Try again', description: "Button beside a pane's status when the agent's input takes no keys: Combwork checks once that its input takes keys again (after the user answered what took them). Keep it short." })
+const MARK_IDLE = msg({ id: 'panes.header.markIdle', defaultMessage: 'Mark idle', description: "Button beside a pane's unknown state, and an item of its ⋯ menu: tells Combwork the agent is idle (its terminal shows it at its prompt). Keep it short." })
 
 /** The header's width from which its card shows (tests/e2e/paneheader.cjs measures every width). */
 const CARD_FROM = 200
@@ -1366,8 +1366,8 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
         </span>
       ) : live?.untakenLine ? (
         // A line Hive typed that its CLI didn't take (#430): the user sees to it, nothing more is typed meanwhile.
-        <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Combwork typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Combwork types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Hive typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>
-          <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.untaken', defaultMessage: "A line Combwork typed wasn't taken", description: "A pane's status: a line Hive typed into the agent's CLI wasn't taken." }))}</span>
+        <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Combwork typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Combwork types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Combwork typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>
+          <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.untaken', defaultMessage: "A line Combwork typed wasn't taken", description: "A pane's status: a line Combwork typed into the agent's CLI wasn't taken." }))}</span>
         </Tooltip>
       ) : retryWaitText(live, Date.now(), tr) ? (
         // Its CLI waits to retry its model request (HI-1972): what it waits on and until when, rather than "Working…".
@@ -1410,7 +1410,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
       ) : !live && !failure && a.start && 'waiting' in a.start ? (
         // Its start waits for its slot (HI-2304): what holds it, in English as Hive says it.
         <Tooltip content={a.start.waiting}>
-          <span className="faint pane-status asks slot-held">{tr(msg({ id: 'panes.header.slotHeld', defaultMessage: 'Waiting for its slot', description: "A pane's status (HI-2304): Hive will start or resume the agent in its slot (a worktree Hive lends it) once the processes another run left running there have ended. The tooltip says what holds it." }))}</span>
+          <span className="faint pane-status asks slot-held">{tr(msg({ id: 'panes.header.slotHeld', defaultMessage: 'Waiting for its slot', description: "A pane's status (HI-2304): Combwork will start or resume the agent in its slot (a worktree Combwork lends it) once the processes another run left running there have ended. The tooltip says what holds it." }))}</span>
         </Tooltip>
       ) : (
         <SignInTip live={live}>
@@ -1660,7 +1660,7 @@ export function PaneFooter({
                 ...contextLines(usage, live?.autoCompact, tr),
                 tr(msg({ id: 'panes.footer.compactions', defaultMessage: '{n, plural, one {# compaction so far} other {# compactions so far}}{over, select, yes { — consider compacting} other {}}', description: "A line of the hover of a pane footer's context: how many times the conversation was compacted, and (over the user's threshold) a suggestion to compact." }), { n: usage.compactions.length, over: over ? 'yes' : 'no' }),
                 ...(bytes !== undefined && !long ? [tr(msg({ id: 'panes.footer.transcriptLine', defaultMessage: 'Transcript: {size}', description: "A line of the hover of a pane footer's context: the size of the conversation's transcript ({size}: \"12 MB\")." }), { size: formatSize(bytes) })] : []),
-                ...(usage.stale ? [tr(msg({ id: 'panes.footer.stale', defaultMessage: 'Couldn’t read it again just now: this may be behind.', description: "A line of the hover of a pane footer's context: Hive couldn't read the usage again, so the numbers may be old." }))] : []),
+                ...(usage.stale ? [tr(msg({ id: 'panes.footer.stale', defaultMessage: 'Couldn’t read it again just now: this may be behind.', description: "A line of the hover of a pane footer's context: Combwork couldn't read the usage again, so the numbers may be old." }))] : []),
                 ...(onContext ? [] : ['', tr(msg({ id: 'panes.footer.compactionHistory', defaultMessage: 'Click to view compaction history', description: "The last line of the hover of a pane footer's context: clicking shows the session's compactions in the Overview." }))])
               ].join('\n')}
             </span>
@@ -1703,7 +1703,7 @@ export function PaneFooter({
           key="cost"
           content={
             <span style={{ whiteSpace: 'pre-line' }}>
-              {`${estimated ? tr(msg({ id: 'panes.footer.costEstimated', defaultMessage: 'API-equivalent cost of this session, estimated by Combwork from its tokens', description: "Hover of a pane footer's cost (≈): Hive estimated it from the session's tokens at API prices." })) : tr(msg({ id: 'panes.footer.costReported', defaultMessage: 'API-equivalent cost of this session, as the provider reports it', description: "Hover of a pane footer's cost: the provider reported it, at API prices." }))}${costClick ? `\n\n${tr(COST_CLICK)}` : ''}`}
+              {`${estimated ? tr(msg({ id: 'panes.footer.costEstimated', defaultMessage: 'API-equivalent cost of this session, estimated by Combwork from its tokens', description: "Hover of a pane footer's cost (≈): Combwork estimated it from the session's tokens at API prices." })) : tr(msg({ id: 'panes.footer.costReported', defaultMessage: 'API-equivalent cost of this session, as the provider reports it', description: "Hover of a pane footer's cost: the provider reported it, at API prices." }))}${costClick ? `\n\n${tr(COST_CLICK)}` : ''}`}
             </span>
           }
         >

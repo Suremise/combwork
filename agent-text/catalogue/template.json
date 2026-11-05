@@ -73,7 +73,7 @@
   },
   "template.load.needsGit": {
     "text": "Its workflow is for Git and this project has no version control: set up Git in the project's Version Control first (that is the user's choice), or load with workflow: false for its agents alone.",
-    "note": "Why a template's workflow can't be loaded (HI-1910): Hive never sets up Git for the Assistant."
+    "note": "Why a template's workflow can't be loaded (HI-1910): Combwork never sets up Git for the Assistant."
   },
   "template.load.notYet": {
     "text": "The template can't be loaded yet: {blocked}",

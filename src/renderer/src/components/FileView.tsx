@@ -38,7 +38,7 @@ const M = {
   discardMessage: msg({ id: 'files.view.discardMessage', defaultMessage: 'Reload {name} from disk and discard your unsaved changes?', description: 'Confirmation before reloading a file. {name} is the file name.' }),
   reload: msg({ id: 'files.view.reload', defaultMessage: 'Reload', description: 'Button: reads the file from disk again, dropping unsaved edits.' }),
   saveTip: msg({ id: 'files.view.saveTip', defaultMessage: 'Save (Ctrl+S)', description: 'Tooltip on the Save button. Keep Ctrl+S as it is.' }),
-  binary: msg({ id: 'files.view.binary', defaultMessage: 'This is a binary file.', description: 'Shown in place of a file Hive cannot show as text.' }),
+  binary: msg({ id: 'files.view.binary', defaultMessage: 'This is a binary file.', description: 'Shown in place of a file Combwork cannot show as text.' }),
   tooLarge: msg({ id: 'files.view.tooLarge', defaultMessage: 'This file is too large to open here ({size}).', description: 'Shown in place of a file too large for the editor. {size} is its size, such as "12.4 MB".' }),
   notUtf8: msg({ id: 'files.view.notUtf8', defaultMessage: "This file isn't UTF-8 text, so Combwork can't edit it without changing its characters.", description: 'Shown in place of a text file in another encoding (such as Windows-1252), which the editor would corrupt on save. UTF-8 is the encoding\'s name: keep it as it is.' }),
   openInApp: msg({ id: 'files.view.openInApp', defaultMessage: 'Open it in its default app instead.', description: 'Under "This is a binary file." or "This file is too large to open here", above an Open button.' }),

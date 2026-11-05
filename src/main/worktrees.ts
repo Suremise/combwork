@@ -339,35 +339,35 @@ export async function worktreeCheck(projectPath: string, wt: WorktreeRef, reads?
   const into = reads ? await reads.primaryBranchStrict().catch(() => null) : await primaryBranch(projectPath)
   // Git that can't run says nothing about the repository: that is the reason, not "no main branch" (#346).
   const unusable = (reason: () => string): WorktreeCheck => ({ removable: false, into, reason: gitProblemText(gitTool()) ?? reason() })
-  if (!into) return unusable(() => tr(msg({ id: 'worktrees.why.noMain', defaultMessage: 'the repository has no main branch (main or master) to check it against', description: "Why Hive keeps a worktree (it can't tell it is merged): the repository has no main branch. main and master are branch names: keep them. A clause, lower case." })))
+  if (!into) return unusable(() => tr(msg({ id: 'worktrees.why.noMain', defaultMessage: 'the repository has no main branch (main or master) to check it against', description: "Why Combwork keeps a worktree (it can't tell it is merged): the repository has no main branch. main and master are branch names: keep them. A clause, lower case." })))
   const listed = await (reads ? reads.worktrees() : listWorktrees(projectPath))
   // By real paths (#389): git lists the long name, while Hive may have been given a short (8.3) one, a junction or a symlink.
-  if (samePlace(wt.path, projectPath) || !listed.some((l) => samePlace(l.path, wt.path) && l.branch === wt.branch)) return unusable(() => tr(msg({ id: 'worktrees.why.notListed', defaultMessage: "git doesn't list it as a worktree on {branch}", description: "Why Hive keeps a worktree: git doesn't list it as one of the project's worktrees on its branch {branch}. A clause, lower case." }), { branch: wt.branch }))
-  if (!existsSync(wt.path)) return { removable: false, into, reason: tr(msg({ id: 'worktrees.why.folderMissing', defaultMessage: 'its folder is missing', description: "Why Hive doesn't remove a worktree: its folder is gone. A clause, lower case." })) }
+  if (samePlace(wt.path, projectPath) || !listed.some((l) => samePlace(l.path, wt.path) && l.branch === wt.branch)) return unusable(() => tr(msg({ id: 'worktrees.why.notListed', defaultMessage: "git doesn't list it as a worktree on {branch}", description: "Why Combwork keeps a worktree: git doesn't list it as one of the project's worktrees on its branch {branch}. A clause, lower case." }), { branch: wt.branch }))
+  if (!existsSync(wt.path)) return { removable: false, into, reason: tr(msg({ id: 'worktrees.why.folderMissing', defaultMessage: 'its folder is missing', description: "Why Combwork doesn't remove a worktree: its folder is gone. A clause, lower case." })) }
   // Both commits, so what is checked is fixed: the deletion is guarded against either branch moving afterwards.
   const tipOfBranch = (b: string): Promise<string | null> => (reads ? reads.tip(b) : tipOf(projectPath, b))
   const [tip, intoTip] = await Promise.all([tipOfBranch(wt.branch), tipOfBranch(into)])
   const [ahead, dirty] = tip && intoTip ? await Promise.all([unmergedCommits(projectPath, intoTip, tip), reads ? reads.dirty(wt.path) : dirtyCount(wt.path)]) : [null, null]
-  if (!tip || !intoTip || ahead === null || dirty === null) return unusable(() => tr(msg({ id: 'worktrees.why.cantCheck', defaultMessage: "git couldn't check {branch}", description: "Why Hive keeps a worktree: git couldn't check its branch {branch} for unmerged commits or uncommitted files. A clause, lower case." }), { branch: wt.branch }))
+  if (!tip || !intoTip || ahead === null || dirty === null) return unusable(() => tr(msg({ id: 'worktrees.why.cantCheck', defaultMessage: "git couldn't check {branch}", description: "Why Combwork keeps a worktree: git couldn't check its branch {branch} for unmerged commits or uncommitted files. A clause, lower case." }), { branch: wt.branch }))
   return ahead || dirty ? { removable: false, into, reason: workLeft(ahead, dirty, into), ahead, dirty, tip, intoTip } : { removable: true, into, tip, intoTip, ahead: 0, dirty: 0 }
 }
 
 /** What a worktree holds that its main branch doesn't, in the window's language: "2 commits not merged into main and 1 uncommitted file". */
 export function workLeft(ahead: number, dirty: number, into: string): string {
   const parts = [
-    ahead ? tr(msg({ id: 'worktrees.why.notMerged', defaultMessage: '{n, plural, one {# commit} other {# commits}} not merged into {into}', description: "Why Hive keeps a worktree: commits on its branch that the branch {into} doesn't have. A clause, lower case; it may be joined with the uncommitted files in a list." }), { n: ahead, into }) : '',
-    dirty ? tr(msg({ id: 'worktrees.why.uncommitted', defaultMessage: '{n, plural, one {# uncommitted file} other {# uncommitted files}}', description: 'Why Hive keeps a worktree: files changed in it and not committed. A clause, lower case; it may be joined with the unmerged commits in a list.' }), { n: dirty }) : ''
+    ahead ? tr(msg({ id: 'worktrees.why.notMerged', defaultMessage: '{n, plural, one {# commit} other {# commits}} not merged into {into}', description: "Why Combwork keeps a worktree: commits on its branch that the branch {into} doesn't have. A clause, lower case; it may be joined with the uncommitted files in a list." }), { n: ahead, into }) : '',
+    dirty ? tr(msg({ id: 'worktrees.why.uncommitted', defaultMessage: '{n, plural, one {# uncommitted file} other {# uncommitted files}}', description: 'Why Combwork keeps a worktree: files changed in it and not committed. A clause, lower case; it may be joined with the unmerged commits in a list.' }), { n: dirty }) : ''
   ].filter(Boolean)
   return fmt.list(parts)
 }
 
 /** A removal's reason when nothing was checked. The window's. */
-export const notChecked = (): string => tr(msg({ id: 'worktrees.why.notChecked', defaultMessage: 'not checked', description: "Why Hive kept a worktree: it wasn't checked for unmerged or uncommitted work. A clause, lower case." }))
+export const notChecked = (): string => tr(msg({ id: 'worktrees.why.notChecked', defaultMessage: 'not checked', description: "Why Combwork kept a worktree: it wasn't checked for unmerged or uncommitted work. A clause, lower case." }))
 
 /** Why the refs a check rested on no longer hold, or null when both still point at the commits checked. */
 async function refsMoved(projectPath: string, wt: WorktreeRef, into: string, tip: string, intoTip: string): Promise<string | null> {
   const [t, m] = await Promise.all([tipOf(projectPath, wt.branch), tipOf(projectPath, into)])
-  const changed = msg({ id: 'worktrees.why.changed', defaultMessage: '{branch} changed since it was checked', description: "Why Hive kept a worktree or its branch: the branch {branch} moved after Hive checked it was merged. A clause, lower case." })
+  const changed = msg({ id: 'worktrees.why.changed', defaultMessage: '{branch} changed since it was checked', description: "Why Combwork kept a worktree or its branch: the branch {branch} moved after Combwork checked it was merged. A clause, lower case." })
   return t !== tip ? tr(changed, { branch: wt.branch }) : m !== intoTip ? tr(changed, { branch: into }) : null
 }
 
@@ -401,7 +401,7 @@ export async function removeCheckedWorktree(projectPath: string, wt: WorktreeRef
   if (!check.removable || !into || !tip || !intoTip) return { deleted: false, reason: check.reason ?? notChecked() }
   const now = await primaryBranch(projectPath)
   if (now !== into || (expectInto !== undefined && expectInto !== into)) {
-    return { deleted: false, reason: tr(msg({ id: 'worktrees.why.mainMoved', defaultMessage: '{gone, select, yes {the main branch is gone, not {expected} as checked} other {the main branch is {now}, not {expected} as checked}}', description: "Why Hive kept a worktree: the repository's main branch is another one ({now}) than the one checked ({expected}), or it is gone (gone: yes). A clause, lower case." }), { gone: now ? 'no' : 'yes', now: now ?? '', expected: expectInto ?? into }) }
+    return { deleted: false, reason: tr(msg({ id: 'worktrees.why.mainMoved', defaultMessage: '{gone, select, yes {the main branch is gone, not {expected} as checked} other {the main branch is {now}, not {expected} as checked}}', description: "Why Combwork kept a worktree: the repository's main branch is another one ({now}) than the one checked ({expected}), or it is gone (gone: yes). A clause, lower case." }), { gone: now ? 'no' : 'yes', now: now ?? '', expected: expectInto ?? into }) }
   }
   const moved = await refsMoved(projectPath, wt, into, tip, intoTip)
   if (moved) return { deleted: false, reason: moved }
@@ -456,7 +456,7 @@ export async function mergeWorktree(projectPath: string, wt: WorktreeRef, opts: 
   const dirty = existsSync(wt.path) ? await dirtyCount(wt.path) : 0
   // Git can't say what is uncommitted there: merging (and removing the worktree afterwards) could lose it.
   if (dirty === null) return { ok: false, error: tr(msg({ id: 'worktrees.merge.cantCheck', defaultMessage: "Git couldn't check the worktree for uncommitted changes (git status failed in {folder}). Fix it, then merge again.", description: "Why nothing was merged: git couldn't say what is uncommitted in the worktree's folder {folder}." }), { folder: wt.path }) }
-  if (dirty > 0) return { ok: false, uncommitted: dirty, error: tr(msg({ id: 'worktrees.merge.uncommitted', defaultMessage: "Nothing was merged: {files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.", description: "Why nothing was merged: the worktree has uncommitted files ({files}: how many). Hive merges only committed work; stash is git's word (git stash)." }), { files: dirty }) }
+  if (dirty > 0) return { ok: false, uncommitted: dirty, error: tr(msg({ id: 'worktrees.merge.uncommitted', defaultMessage: "Nothing was merged: {files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.", description: "Why nothing was merged: the worktree has uncommitted files ({files}: how many). Combwork merges only committed work; stash is git's word (git stash)." }), { files: dirty }) }
   let checkedOut: string | null
   try {
     checkedOut = await checkedOutBranch(projectPath)

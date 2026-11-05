@@ -25,11 +25,11 @@
   },
   "inbox.again.restart": {
     "text": "Combwork restarted while offering it",
-    "note": "Why a delivery may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while it was being offered."
+    "note": "Why a delivery may repeat (#649), after the doorbell (inbox.offer.again): Combwork stopped while it was being offered."
   },
   "inbox.again.typing": {
     "text": "Combwork restarted while typing it",
-    "note": "Why a watch's wake may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while typing it."
+    "note": "Why a watch's wake may repeat (#649), after the doorbell (inbox.offer.again): Combwork stopped while typing it."
   },
   "inbox.cardEvents.counted": {
     "text": "{n, plural, one {{count} change} other {{count} changes}}, read the card",
@@ -57,7 +57,7 @@
   },
   "inbox.create.projectFull": {
     "text": "This project already has {max} deliveries waiting or not acked, the most Combwork keeps.",
-    "note": "Why a delivery isn't made: its project has as many live deliveries as Hive keeps. max: that many."
+    "note": "Why a delivery isn't made: its project has as many live deliveries as Combwork keeps. max: that many."
   },
   "inbox.create.tooLong": {
     "text": "It is too long to give an agent ({length} characters, at most {max}).",
@@ -105,7 +105,7 @@
   },
   "inbox.ended.uncertainRestart": {
     "text": "may not have reached it: Combwork stopped while offering it",
-    "note": "Why a delivery is uncertain (#649), as its sender reads it: Hive stopped while it was being offered; it is offered once more."
+    "note": "Why a delivery is uncertain (#649), as its sender reads it: Combwork stopped while it was being offered; it is offered once more."
   },
   "inbox.expired.late": {
     "text": "not received in time",
@@ -161,59 +161,59 @@
   },
   "inbox.message.tooMany": {
     "text": "{agent} already has {max} messages waiting, the most Combwork keeps for an agent: wait until they are delivered (cw_agent_activity), or cancel them.",
-    "note": "A message left for an agent refused: as many as Hive keeps for it already wait. agent: its name; max: how many."
+    "note": "A message left for an agent refused: as many as Combwork keeps for it already wait. agent: its name; max: how many."
   },
   "inbox.noLine.cliAsks": {
     "text": "its CLI shows a question for the user, which a line would answer",
-    "note": "Why Hive could not type a line into an agent now (HI-1959), in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now (HI-1959), in the reply of the call that wanted it."
   },
   "inbox.noLine.folder": {
     "text": "its folder is being changed ({what})",
-    "note": "Why Hive could not type a line into an agent now (#646), in the reply of the call that wanted it. what: what is changing the agent's folder (a Git switch or pull)."
+    "note": "Why Combwork could not type a line into an agent now (#646), in the reply of the call that wanted it. what: what is changing the agent's folder (a Git switch or pull)."
   },
   "inbox.noLine.hooksMissing": {
     "text": "its CLI's hooks aren't reaching Combwork, so Combwork can't tell when it is free",
-    "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.inputBlocked": {
     "text": "something on its screen is taking its keys, and it waits for the user to answer it there",
-    "note": "Why Hive could not type a line into an agent now (HI-2191), in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now (HI-2191), in the reply of the call that wanted it."
   },
   "inbox.noLine.launchTask": {
     "text": "its CLI hasn't taken its launch's task yet",
-    "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.lineWaiting": {
     "text": "its CLI hasn't taken the line Combwork typed before",
-    "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.notRunning": {
     "text": "it isn't running",
-    "note": "Why Hive could not type a line (a delivery given now, Deliver Now) into an agent, in the reply of the call that wanted it: the agent named."
+    "note": "Why Combwork could not type a line (a delivery given now, Deliver Now) into an agent, in the reply of the call that wanted it: the agent named."
   },
   "inbox.noLine.status": {
     "text": "it is {status}",
-    "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it. status: the agent's status, as Hive names it (working, starting…)."
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it. status: the agent's status, as Combwork names it (working, starting…)."
   },
   "inbox.noLine.toolsWaiting": {
     "text": "its Combwork tools haven't connected yet",
-    "note": "Why Hive could not type a line into an agent now (#865), in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now (#865), in the reply of the call that wanted it."
   },
   "inbox.noLine.typing": {
     "text": "Combwork is already typing a line into it",
-    "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.userTyping": {
     "text": "the user has just typed in its terminal and may still be writing there",
-    "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.wakeFirst": {
     "text": "a watch's wake goes first",
-    "note": "Why Hive could not type a line into an agent now (#1432): a watch's wake is being made for it, in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now (#1432): a watch's wake is being made for it, in the reply of the call that wanted it."
   },
   "inbox.noLine.watching": {
     "text": "it is waiting on cards, and takes no new work until it is woken",
-    "note": "Why Hive could not type a line into an agent now: it waits on a watch, in the reply of the call that wanted it."
+    "note": "Why Combwork could not type a line into an agent now: it waits on a watch, in the reply of the call that wanted it."
   },
   "inbox.offer.again": {
     "text": "({ids} again: {why}, so {n, plural, one {it} other {they}} may repeat.)",
@@ -253,7 +253,7 @@
   },
   "inbox.relay.check": {
     "text": "For you to check: {said} If it grants a change {asker} can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.",
-    "note": "The Assistant's line when the user answered or approved an agent's question and nothing on the card says what is needed (HI-1734): Hive never reads consent into a reply. said: what the user did (inbox.relay.said); asker: the asking agent's name."
+    "note": "The Assistant's line when the user answered or approved an agent's question and nothing on the card says what is needed (HI-1734): Combwork never reads consent into a reply. said: what the user did (inbox.relay.said); asker: the asking agent's name."
   },
   "inbox.relay.decision": {
     "text": "Recorded as the card's decision, whole: <<<{decision}>>>",

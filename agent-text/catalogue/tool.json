@@ -154,7 +154,7 @@
   },
   "tool.createHandover.reply.saved": {
     "text": "Handover saved as {path}.{hasSuggest, select, yes { {suggest}} other {}}",
-    "note": "{path}: as cw_read_shared_note takes it. {suggest}: for the Assistant with its journal off, once, the journal to suggest (#1032), as Hive words it."
+    "note": "{path}: as cw_read_shared_note takes it. {suggest}: for the Assistant with its journal off, once, the journal to suggest (#1032), as Combwork words it."
   },
   "tool.createProject.arg.name": {
     "text": "Folder name."

@@ -62,8 +62,8 @@ export function chainGuidanceRevision(): string {
 
 const S = {
   notDelivered: agentMsg({ id: 'contract.skill.notDelivered', text: 'it was not delivered', note: "Why a skill a launch asked for isn't as asked: its launch didn't deliver it (the launch record, the Agent API's status)." }),
-  nobody: agentMsg({ id: 'contract.skill.nobody', text: 'nobody gets it: {why}', note: "A Hive skill whose header can't be read or names an unknown audience (the Agent API's status). why: the problem." }),
-  tooBig: agentMsg({ id: 'contract.skill.tooBig', text: 'too big to check: {why}', note: "A Hive skill too big to hash (the Agent API's status). why: its size and the limit." })
+  nobody: agentMsg({ id: 'contract.skill.nobody', text: 'nobody gets it: {why}', note: "A Combwork skill whose header can't be read or names an unknown audience (the Agent API's status). why: the problem." }),
+  tooBig: agentMsg({ id: 'contract.skill.tooBig', text: 'too big to check: {why}', note: "A Combwork skill too big to hash (the Agent API's status). why: its size and the limit." })
 }
 
 /**

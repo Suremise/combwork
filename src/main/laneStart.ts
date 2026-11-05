@@ -66,7 +66,7 @@ const A = {
     text: 'Use card-loop as the builder of lane {lane}: cw_lane next names your card.',
     note: "HR2's HI-1900 round 1: a running lane updated while its builder isn't running starts it with one line naming its lane, as coordinate-agents had the Assistant do."
   }),
-  builderStarted: agentMsg({ id: 'brief.start.builderStarted', text: "{agent} wasn't running: started it on the lane.", note: "The lane change's reply: the lane's builder wasn't running, so Hive started it with brief.start.builderPrompt." }),
+  builderStarted: agentMsg({ id: 'brief.start.builderStarted', text: "{agent} wasn't running: started it on the lane.", note: "The lane change's reply: the lane's builder wasn't running, so Combwork started it with brief.start.builderPrompt." }),
   builderFailed: agentMsg({
     id: 'brief.start.builderFailed',
     text: "{agent} isn't running and couldn't be started ({error}): start it for the lane to go on.",
@@ -75,7 +75,7 @@ const A = {
   byHive: agentMsg({
     id: 'brief.record.byHive',
     text: "{agent} is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.",
-    note: "HI-2029: a running builder, the rules on: Hive gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Hive's start)."
+    note: "HI-2029: a running builder, the rules on: Combwork gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Combwork's start)."
   }),
   tell: agentMsg({
     id: 'brief.record.tell',

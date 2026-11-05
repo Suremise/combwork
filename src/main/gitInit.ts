@@ -117,7 +117,7 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
     if (!check.resume) {
       const init = await git(projectPath, ['init', '-q', '-b', 'main'])
       if (!init.ok) throw stop(msg({ id: 'main.gitInit.failed.init', defaultMessage: "couldn't initialise the repository", description: 'What failed in making a git repository, a clause (main.gitInit.stoppedAfter).' }), gitProblemData(gitTool()) ?? gitSaid(init))
-      done.push(msg({ id: 'main.gitInit.step.init', defaultMessage: 'initialised a git repository on main', description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Hive capitalises the first of the list. main is the branch\'s name: keep it.' }))
+      done.push(msg({ id: 'main.gitInit.step.init', defaultMessage: 'initialised a git repository on main', description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Combwork capitalises the first of the list. main is the branch\'s name: keep it.' }))
       log.info(`Initialised a git repository in ${userText(projectPath)}`)
     }
 
@@ -145,7 +145,7 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
       if (!r.ok) throw stop(withValues(msg({ id: 'main.gitInit.failed.config', defaultMessage: "couldn't set {key}", description: 'What failed in making a git repository, a clause (main.gitInit.stoppedAfter). {key} is a git setting (user.name, user.email).' }), { key }), gitSaid(r))
       saved = true
     }
-    if (saved) done.push(msg({ id: 'main.gitInit.step.identity', defaultMessage: "set this repository's commit identity", description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Hive capitalises the first of the list: the name and email the commits are made as.' }))
+    if (saved) done.push(msg({ id: 'main.gitInit.step.identity', defaultMessage: "set this repository's commit identity", description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Combwork capitalises the first of the list: the name and email the commits are made as.' }))
     const now = saved ? await repoIdentity(projectPath) : has
     const lacking = (['name', 'email'] as const).filter((k) => !now[k])
     // Nothing else is written yet: the dialog asks for it, and taking the repository on from here finishes the job.
@@ -164,7 +164,7 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
       } catch (e) {
         throw stop(msg({ id: 'main.gitInit.failed.gitignore', defaultMessage: "couldn't write the .gitignore", description: 'What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .gitignore is a file name.' }), (e as NodeJS.ErrnoException).code ?? String(e))
       }
-      done.push(withValues(msg({ id: 'main.gitInit.step.gitignore', defaultMessage: 'added {gitignore}', description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Hive capitalises the first of the list. {gitignore} names the starter .gitignore (a Node .gitignore).' }), { gitignore: gitignoreNameText(choice) }))
+      done.push(withValues(msg({ id: 'main.gitInit.step.gitignore', defaultMessage: 'added {gitignore}', description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Combwork capitalises the first of the list. {gitignore} names the starter .gitignore (a Node .gitignore).' }), { gitignore: gitignoreNameText(choice) }))
     }
 
     const add = await git(projectPath, ['add', '-A', '--', '.'])
@@ -188,8 +188,8 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
       )
     done.push(
       count
-        ? withValues(msg({ id: 'main.gitInit.step.commit', defaultMessage: '{n, plural, one {committed # file} other {committed # files}}', description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Hive capitalises the first of the list. {n} is how many files the first commit has.' }), { n: count })
-        : msg({ id: 'main.gitInit.step.empty', defaultMessage: 'made an empty first commit', description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Hive capitalises the first of the list.' })
+        ? withValues(msg({ id: 'main.gitInit.step.commit', defaultMessage: '{n, plural, one {committed # file} other {committed # files}}', description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Combwork capitalises the first of the list. {n} is how many files the first commit has.' }), { n: count })
+        : msg({ id: 'main.gitInit.step.empty', defaultMessage: 'made an empty first commit', description: 'A step that worked in making a git repository: a clause in a list of them ("Initialised a git repository on main, added a Node .gitignore and committed 3 files."); Combwork capitalises the first of the list.' })
     )
     log.info(`Made the first commit in ${userText(projectPath)} (${count} files)`)
 

@@ -26,12 +26,12 @@
   },
   "mcp.catalog.mismatch": {
     "text": "{name}'s download doesn't match its catalogue (its size or checksum differ): not installed.",
-    "note": "An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Hive used none of it. {name} is the server.",
+    "note": "An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Combwork used none of it. {name} is the server.",
     "audience": "both"
   },
   "mcp.catalog.needs": {
     "text": "{name} can't run on this PC: {needs}.",
-    "note": "An error installing a server from an MCP catalogue (HI-545): a requirement Hive checked is not met. {needs} lists them.",
+    "note": "An error installing a server from an MCP catalogue (HI-545): a requirement Combwork checked is not met. {needs} lists them.",
     "audience": "both"
   },
   "mcp.catalog.notInstalled": {
@@ -81,12 +81,12 @@
   },
   "mcp.error.cannotClear": {
     "text": "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.",
-    "note": "An error replacing, creating or deleting an MCP server (HI-2059): a project's settings file could not be read, so Hive could not make sure the server is removed there, and changed nothing. {project} is the project's folder name, {name} the server.",
+    "note": "An error replacing, creating or deleting an MCP server (HI-2059): a project's settings file could not be read, so Combwork could not make sure the server is removed there, and changed nothing. {project} is the project's folder name, {name} the server.",
     "audience": "both"
   },
   "mcp.error.invalidName": {
     "text": "Invalid server name",
-    "note": "An error: an MCP server name Hive refuses.",
+    "note": "An error: an MCP server name Combwork refuses.",
     "audience": "both"
   },
   "mcp.error.noProject": {
@@ -96,7 +96,7 @@
   },
   "mcp.error.noServerAdd": {
     "text": "The workspace has no MCP server named {name}.",
-    "note": "An error adding a server to a project or the Hive Assistant. {name} is its name.",
+    "note": "An error adding a server to a project or the Combwork Assistant. {name} is its name.",
     "audience": "both"
   }
 }

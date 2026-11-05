@@ -39,7 +39,7 @@ const SOURCE = 'assistant-ask'
 const ASSISTANT = 'assistant'
 
 const M = {
-  title: msg({ id: 'service.assistantAsk.title', defaultMessage: "{card}: the Assistant didn't get an agent's request", description: "A notification's title (a banner, a Windows notification), HI-1866: an agent asked the Hive Assistant for something on card {card} (its key, such as HI-12), and the request couldn't reach the Assistant." })
+  title: msg({ id: 'service.assistantAsk.title', defaultMessage: "{card}: the Assistant didn't get an agent's request", description: "A notification's title (a banner, a Windows notification), HI-1866: an agent asked the Combwork Assistant for something on card {card} (its key, such as HI-12), and the request couldn't reach the Assistant." })
 }
 
 /** The Assistant's line (agent-facing): who asked, on which card, the request whole, and that it is an agent's, not the user's. */

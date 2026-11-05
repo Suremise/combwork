@@ -48,7 +48,7 @@ export function agentRuntime(st: Pick<LiveSessionState, 'runtime' | 'turn' | 'ba
 export function unknownStateText(st: Pick<LiveSessionState, 'turn'> | null | undefined, now = Date.now(), tr?: Tr): string | null {
   if (st?.turn?.state !== 'unknown') return null
   const minutes = st.turn.silentSince ? minutesSince(st.turn.silentSince, now) : null
-  if (tr) return tr(msg({ id: 'panes.runtime.silent', defaultMessage: 'Silent {known, select, yes {{minutes, number}} other {?}} min · state unknown', description: "An agent's status (its pane, the agents table): Hive has heard nothing of its turn for {minutes} minutes (? when it can't tell: known is no) and can't tell what it is doing. Keep it short." }), { known: minutes === null ? 'no' : 'yes', minutes: minutes ?? 0 })
+  if (tr) return tr(msg({ id: 'panes.runtime.silent', defaultMessage: 'Silent {known, select, yes {{minutes, number}} other {?}} min · state unknown', description: "An agent's status (its pane, the agents table): Combwork has heard nothing of its turn for {minutes} minutes (? when it can't tell: known is no) and can't tell what it is doing. Keep it short." }), { known: minutes === null ? 'no' : 'yes', minutes: minutes ?? 0 })
   return `Silent ${minutes ?? '?'} min · state unknown` // i18n-ignore: agent-facing (the Agent API's agent state)
 }
 
@@ -113,7 +113,7 @@ export function retryWaitText(st: (Pick<LiveSessionState, 'retryWait' | 'turn'> 
 export function hooksMissingText(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr?: Tr): string | null {
   if (!st?.hooksMissing) return null
   const provider = providerDescriptor(st.provider).name
-  if (tr) return tr(msg({ id: 'panes.runtime.hooksMissing', defaultMessage: 'Status unknown: no hooks from {provider}', description: "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so Hive can't tell what it is doing. Keep it short." }), { provider })
+  if (tr) return tr(msg({ id: 'panes.runtime.hooksMissing', defaultMessage: 'Status unknown: no hooks from {provider}', description: "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing), so Combwork can't tell what it is doing. Keep it short." }), { provider })
   return `Status unknown: no hooks from ${provider}` // i18n-ignore: agent-facing (the Agent API's agent state)
 }
 
@@ -133,7 +133,7 @@ export const HOOKS_MISSING_NOTE = msg({
   defaultMessage:
     "Combwork isn't hearing from {provider}'s hooks, so its status may be wrong. {why, select, refused {Combwork refused its hooks: they didn't carry this session's token.} off {{where} turns hooks off (disableAllHooks).} newer {This {provider} is newer than the version Combwork was tested with, and an update may have changed its hooks.} other {{after, select, start {None came after it started.} other {None came after a prompt it went to work on.}}}} Until its hooks arrive, Combwork types nothing into it. Restart the session; if this happens again, update Combwork, or check {provider}'s settings for hooks turned off.",
   description:
-    "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing). why: Hive refused them (a security token didn't match); the settings file {where} (its name, such as \"managed settings\") turns hooks off (disableAllHooks is the setting's name: keep it); the coding agent is newer than the one Hive was tested with; else what showed it (after: no hook after its start, or after a prompt). Keep the select keys."
+    "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). why: Combwork refused them (a security token didn't match); the settings file {where} (its name, such as \"managed settings\") turns hooks off (disableAllHooks is the setting's name: keep it); the coding agent is newer than the one Combwork was tested with; else what showed it (after: no hook after its start, or after a prompt). Keep the select keys."
 })
 
 /**

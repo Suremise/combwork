@@ -16,7 +16,7 @@ export function shouldKeepAwake(working: number, setting: KeepAwakeSetting | und
   return setting === 'always' || !onBattery
 }
 
-const AWAKE = msg({ id: 'workspace.statusBar.keepAwake', defaultMessage: 'Keeping the PC awake: {working, plural, one {# agent} other {# agents}} working', description: "The status bar's note while Hive keeps Windows from sleeping because agents are working (Settings → General → Keep the PC awake)." })
+const AWAKE = msg({ id: 'workspace.statusBar.keepAwake', defaultMessage: 'Keeping the PC awake: {working, plural, one {# agent} other {# agents}} working', description: "The status bar's note while Combwork keeps Windows from sleeping because agents are working (Settings → General → Keep the PC awake)." })
 
 /** The status bar's note while it does. */
 export function keepAwakeText(working: number): string {

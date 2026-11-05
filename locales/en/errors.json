@@ -1,11 +1,11 @@
 {
   "errors.assistantUndo.gone": {
     "defaultMessage": "That change of the Assistant's is no longer kept: changes are kept for 7 days.",
-    "description": "An error: the user asked to undo a change the Hive Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more."
+    "description": "An error: the user asked to undo a change the Combwork Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more."
   },
   "errors.assistantUndo.which": {
     "defaultMessage": "Choose one change of the Assistant's to undo, or one message's changes.",
-    "description": "An error: the window asked to undo the Hive Assistant's changes without saying which: one change, or all the changes made for one of the user's messages."
+    "description": "An error: the window asked to undo the Combwork Assistant's changes without saying which: one change, or all the changes made for one of the user's messages."
   },
   "errors.changes.notFile": {
     "defaultMessage": "{file} isn't a file of {folder}.",
@@ -13,7 +13,7 @@
   },
   "errors.commands.otherWorkspace": {
     "defaultMessage": "This window shows another workspace now, so the commands you changed weren't saved.",
-    "description": "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Hive didn't save it into the wrong one."
+    "description": "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Combwork didn't save it into the wrong one."
   },
   "errors.console.hidden": {
     "defaultMessage": "The developer console is hidden: turn on Settings → Advanced → Show developer features.",
@@ -21,7 +21,7 @@
   },
   "errors.console.notRecording": {
     "defaultMessage": "Not a developer console recording",
-    "description": "Showing a developer console recording that isn't one of Hive's."
+    "description": "Showing a developer console recording that isn't one of Combwork's."
   },
   "errors.console.notSource": {
     "defaultMessage": "Not a developer console source this window can record",
@@ -29,7 +29,7 @@
   },
   "errors.console.sourcesList": {
     "defaultMessage": "The sources to watch must be a list.",
-    "description": "The developer console asked to watch sources in a form Hive doesn't take (a programming error, rarely seen)."
+    "description": "The developer console asked to watch sources in a form Combwork doesn't take (a programming error, rarely seen)."
   },
   "errors.dialects.notDialect": {
     "defaultMessage": "{path} isn't a dialect file Combwork can change.",
@@ -129,7 +129,7 @@
   },
   "errors.file.outsideWorkspace": {
     "defaultMessage": "Combwork can only read and write files inside the workspace, and the agents' instruction, memory and skill files.",
-    "description": "Refusal to open or save a file outside what Hive may touch."
+    "description": "Refusal to open or save a file outside what Combwork may touch."
   },
   "errors.hive.cantList": {
     "defaultMessage": "Git couldn't list the files it tracks in .combwork.",
@@ -145,7 +145,7 @@
   },
   "errors.image.not": {
     "defaultMessage": "Not an image",
-    "description": "Copy image: the file isn't an image Hive can read."
+    "description": "Copy image: the file isn't an image Combwork can read."
   },
   "errors.lane.builderRequired": {
     "defaultMessage": "A lane's builder is required",
@@ -165,15 +165,15 @@
   },
   "errors.log.notFullPath": {
     "defaultMessage": "The run reported its log without a full path: {path}",
-    "description": "Progress panel: a run gave its log as a relative path, which Hive won't open. {path} is that path."
+    "description": "Progress panel: a run gave its log as a relative path, which Combwork won't open. {path} is that path."
   },
   "errors.log.notText": {
     "defaultMessage": "Combwork opens only text logs and reports, not {file}: use Show in folder.",
-    "description": "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it."
+    "description": "Progress panel: a run's log isn't a text file, so Combwork won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it."
   },
   "errors.merge.queueMerges": {
     "defaultMessage": "Combwork merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.",
-    "description": "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue."
+    "description": "Refusal of a Merge of an agent's branch whose card Combwork's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Combwork shows it. Glossary 2.5: merge queue."
   },
   "errors.mergeSlot.holdRequired": {
     "defaultMessage": "Which hold to release is required",
@@ -197,7 +197,7 @@
   },
   "errors.provider.unknown": {
     "defaultMessage": "Unknown provider \"{provider}\".",
-    "description": "A call named a coding-agent CLI this version of Hive doesn't know. {provider} is the id it gave."
+    "description": "A call named a coding-agent CLI this version of Combwork doesn't know. {provider} is the id it gave."
   },
   "errors.tips.notChange": {
     "defaultMessage": "Not a tips change.",

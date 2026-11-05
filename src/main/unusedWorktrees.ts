@@ -54,9 +54,9 @@ export function hiveWorktreeOf(projectPath: string, path: string): 'copy' | 'que
 /** Why Hive won't touch a listed worktree folder (null: it may), whoever uses it. */
 async function unsafe(projectPath: string, path: string): Promise<string | null> {
   const ws = workspaceOf(projectPath)
-  if (contains(path, projectPath) || (ws.path && contains(path, ws.path))) return tr(msg({ id: 'main.unused.why.contains', defaultMessage: 'it contains the project or the workspace', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." }))
+  if (contains(path, projectPath) || (ws.path && contains(path, ws.path))) return tr(msg({ id: 'main.unused.why.contains', defaultMessage: 'it contains the project or the workspace', description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." }))
   const projects = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))]
-  if (projects.some((p) => key(p) === key(path)) || workspace.isAssistantHome(path)) return tr(msg({ id: 'main.unused.why.otherProject', defaultMessage: 'it is another project of the workspace', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." }))
+  if (projects.some((p) => key(p) === key(path)) || workspace.isAssistantHome(path)) return tr(msg({ id: 'main.unused.why.otherProject', defaultMessage: 'it is another project of the workspace', description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." }))
   return null
 }
 
@@ -141,7 +141,7 @@ async function claimQueueFolder(projectPath: string, path: string): Promise<stri
 }
 
 /** Why a merge queue folder isn't removed: a runner has it, or may be taking it (#1644). */
-const QUEUE_BUSY = msg({ id: 'main.unused.why.queueBusy', defaultMessage: 'the merge queue is using it', description: "Why Hive won't remove a folder from Unused worktrees (#1644): it is the merge queue's working folder, and the queue is merging in it or starting to (it may have started since the list was read). A clause. Glossary: merge queue." })
+const QUEUE_BUSY = msg({ id: 'main.unused.why.queueBusy', defaultMessage: 'the merge queue is using it', description: "Why Combwork won't remove a folder from Unused worktrees (#1644): it is the merge queue's working folder, and the queue is merging in it or starting to (it may have started since the list was read). A clause. Glossary: merge queue." })
 
 /** Whether a process with this id runs (a quick look: a pid given again keeps a folder hidden, never shows a used one). */
 const running = (pid: number): boolean => {
@@ -259,11 +259,11 @@ async function candidates(projectPath: string, reads?: wt.RepoReads): Promise<{ 
 }
 
 /** Why a folder isn't removed or merged from here once it stopped being an unused worktree (#1450, HR3's round 1). */
-const NOT_UNUSED = msg({ id: 'main.unused.why.notUnused', defaultMessage: "it isn't one of the project's unused worktrees now (an agent's conversation, a review copy or the merge queue may use it)", description: "Why Hive won't remove or merge a folder from Unused worktrees (#1450): it isn't listed any more, as a conversation can resume there, it is one of Hive's copies, or the merge queue holds it. A clause." })
-const SESSION_IN = msg({ id: 'main.unused.why.session', defaultMessage: 'a session runs in it', description: "Why Hive won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause." })
+const NOT_UNUSED = msg({ id: 'main.unused.why.notUnused', defaultMessage: "it isn't one of the project's unused worktrees now (an agent's conversation, a review copy or the merge queue may use it)", description: "Why Combwork won't remove or merge a folder from Unused worktrees (#1450): it isn't listed any more, as a conversation can resume there, it is one of Combwork's copies, or the merge queue holds it. A clause." })
+const SESSION_IN = msg({ id: 'main.unused.why.session', defaultMessage: 'a session runs in it', description: "Why Combwork won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause." })
 
 /** Why a folder an agent's 0.9 worktree is isn't removed or merged from here. */
-const OWNED = msg({ id: 'main.unused.why.owned', defaultMessage: 'an agent works in it now', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })
+const OWNED = msg({ id: 'main.unused.why.owned', defaultMessage: 'an agent works in it now', description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })
 
 /** Whether a session of this Hive runs in a folder (or one inside it) now. */
 const sessionIn = (folder: string): boolean => liveSessions.liveStates().some((s) => !!s.cwd && contains(folder, s.cwd))
@@ -292,38 +292,38 @@ export async function unusedBranchOf(projectPath: string, path: string): Promise
 }
 
 /** Why the pool or Hive couldn't check a slot or folder (#1450), a clause. */
-const CANT_CHECK = msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Combwork couldn't check it ({detail})", description: "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause." })
+const CANT_CHECK = msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Combwork couldn't check it ({detail})", description: "Why Combwork won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause." })
 
 /** Why a slot has no Remove anyway (#1450): only the pool's guarded clean-up removes it. */
-const SLOT_GUARDED = msg({ id: 'main.unused.why.slotGuarded', defaultMessage: 'it is a slot, which Combwork removes only when it is clean and its work is merged', description: "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause." })
+const SLOT_GUARDED = msg({ id: 'main.unused.why.slotGuarded', defaultMessage: 'it is a slot, which Combwork removes only when it is clean and its work is merged', description: "Why Combwork won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause." })
 
 /** Why the pool keeps a slot (#1450), in the window's language: a row's reason, and Remove's refusal. */
 export async function keptText(projectPath: string, k: SlotKept): Promise<string> {
   switch (k.why) {
     case 'leased': {
       const agent = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === k.agent)?.name ?? k.agent
-      return tr(msg({ id: 'main.unused.slot.leased', defaultMessage: 'it is lent to agent {agent}', description: "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause. A noun before the name (glossary §1 rule 4)." }), { agent })
+      return tr(msg({ id: 'main.unused.slot.leased', defaultMessage: 'it is lent to agent {agent}', description: "Why Combwork won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause. A noun before the name (glossary §1 rule 4)." }), { agent })
     }
     case 'session':
-      return tr(msg({ id: 'main.unused.slot.session', defaultMessage: 'a session runs in it ({detail})', description: "Why Hive won't remove a slot listed in Unused worktrees: an agent's session runs in it ({detail}: the agent and its state). A clause." }), { detail: k.detail })
+      return tr(msg({ id: 'main.unused.slot.session', defaultMessage: 'a session runs in it ({detail})', description: "Why Combwork won't remove a slot listed in Unused worktrees: an agent's session runs in it ({detail}: the agent and its state). A clause." }), { detail: k.detail })
     case 'process':
-      return tr(msg({ id: 'main.unused.slot.process', defaultMessage: 'a process still has it open', description: "Why Hive won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause." }))
+      return tr(msg({ id: 'main.unused.slot.process', defaultMessage: 'a process still has it open', description: "Why Combwork won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause." }))
     case 'inFlight':
-      return tr(msg({ id: 'main.unused.slot.inFlight', defaultMessage: 'card {card}, which it held, is still being merged', description: "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its key, such as HI-12) that worked in it. A clause." }), { card: cardNamesOf(workspaceOf(projectPath))(k.card) })
+      return tr(msg({ id: 'main.unused.slot.inFlight', defaultMessage: 'card {card}, which it held, is still being merged', description: "Why Combwork won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its key, such as HI-12) that worked in it. A clause." }), { card: cardNamesOf(workspaceOf(projectPath))(k.card) })
     case 'dirty':
-      return tr(msg({ id: 'main.unused.slot.dirty', defaultMessage: "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}", description: "Why Hive won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause." }), { files: k.files })
+      return tr(msg({ id: 'main.unused.slot.dirty', defaultMessage: "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}", description: "Why Combwork won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause." }), { files: k.files })
     case 'unmerged':
-      return tr(msg({ id: 'main.unused.slot.unmerged', defaultMessage: "it has commits that aren't on {target}", description: "Why Hive won't remove a slot listed in Unused worktrees: its commit isn't contained in its target branch ({target}). A clause." }), { target: k.target })
+      return tr(msg({ id: 'main.unused.slot.unmerged', defaultMessage: "it has commits that aren't on {target}", description: "Why Combwork won't remove a slot listed in Unused worktrees: its commit isn't contained in its target branch ({target}). A clause." }), { target: k.target })
     case 'cantCheck':
       return tr(CANT_CHECK, { detail: k.detail })
     case 'archiveFailed':
-      return tr(msg({ id: 'main.unused.slot.archiveFailed', defaultMessage: 'its archive command failed ({error})', description: "Why Hive didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause." }), { error: k.error })
+      return tr(msg({ id: 'main.unused.slot.archiveFailed', defaultMessage: 'its archive command failed ({error})', description: "Why Combwork didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause." }), { error: k.error })
     case 'busy':
-      return tr(msg({ id: 'main.unused.slot.busy', defaultMessage: 'Combwork is setting it up or removing it now', description: "Why Hive won't remove a slot listed in Unused worktrees: another operation of Hive's has it. A clause." }))
+      return tr(msg({ id: 'main.unused.slot.busy', defaultMessage: 'Combwork is setting it up or removing it now', description: "Why Combwork won't remove a slot listed in Unused worktrees: another operation of Combwork's has it. A clause." }))
     case 'gitRefused':
-      return tr(msg({ id: 'main.unused.slot.gitRefused', defaultMessage: "git didn't remove it ({detail})", description: "Why Hive didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause." }), { detail: k.detail })
+      return tr(msg({ id: 'main.unused.slot.gitRefused', defaultMessage: "git didn't remove it ({detail})", description: "Why Combwork didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause." }), { detail: k.detail })
     case 'editedSkillCopy':
-      return tr(msg({ id: 'main.unused.slot.editedSkillCopy', defaultMessage: "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Combwork's} other {its skill folders {names} aren't unchanged copies of Combwork's}}", description: "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named cw-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. cw-merge-ready; {copies}: how many. A clause." }), { copies: k.copies.length, names: fmt.list(k.copies) })
+      return tr(msg({ id: 'main.unused.slot.editedSkillCopy', defaultMessage: "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Combwork's} other {its skill folders {names} aren't unchanged copies of Combwork's}}", description: "Why Combwork didn't remove a slot listed in Unused worktrees (#1500): Combwork removed its own skill copies from the slot's .agents/skills, but a folder named cw-… is left there (changed since Combwork copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. cw-merge-ready; {copies}: how many. A clause." }), { copies: k.copies.length, names: fmt.list(k.copies) })
   }
 }
 
@@ -334,7 +334,7 @@ export async function keptText(projectPath: string, k: SlotKept): Promise<string
  */
 async function detachedCheck(projectPath: string, path: string, reads: wt.RepoReads): Promise<UnusedWorktree['check']> {
   const [dirty, alone] = await Promise.all([reads.dirty(path), unreferencedCommits(path)])
-  return { removable: false, into: await reads.primaryBranchStrict().catch(() => null), reason: gitProblem() ?? tr(msg({ id: 'main.unused.why.detached', defaultMessage: 'it is not on a branch (detached HEAD)', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause. detached HEAD is git's term." })), ...(dirty === null ? {} : { dirty }), ...(alone === null ? {} : { ahead: alone }) }
+  return { removable: false, into: await reads.primaryBranchStrict().catch(() => null), reason: gitProblem() ?? tr(msg({ id: 'main.unused.why.detached', defaultMessage: 'it is not on a branch (detached HEAD)', description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause. detached HEAD is git's term." })), ...(dirty === null ? {} : { dirty }), ...(alone === null ? {} : { ahead: alone }) }
 }
 
 /**
@@ -502,7 +502,7 @@ const SNAPSHOT_MAX_BYTES = 4 * 1024 ** 3
 async function fingerprint(root: string): Promise<string> {
   const h = createHash('sha256')
   const index = await gitReading(root, ['ls-files', '--stage', '-z'])
-  if (!index.ok) throw new Error(tr(msg({ id: 'main.unused.noIndex', defaultMessage: "git couldn't list its index ({why})", description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds. {why} is git's message. index is git's term." }), { why: index.err.split(/\r?\n/)[0] || tr(msg({ id: 'main.unused.gitFailed', defaultMessage: '{command} failed', description: "Why git couldn't do something, when it said nothing itself. {command} is the git command: keep it." }), { command: 'ls-files' }) }))
+  if (!index.ok) throw new Error(tr(msg({ id: 'main.unused.noIndex', defaultMessage: "git couldn't list its index ({why})", description: "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds. {why} is git's message. index is git's term." }), { why: index.err.split(/\r?\n/)[0] || tr(msg({ id: 'main.unused.gitFailed', defaultMessage: '{command} failed', description: "Why git couldn't do something, when it said nothing itself. {command} is the git command: keep it." }), { command: 'ls-files' }) }))
   h.update('index\0').update(index.buf)
   let entries = 0
   let bytes = 0
@@ -515,7 +515,7 @@ async function fingerprint(root: string): Promise<string> {
       if (!rel && e.name === '.git') continue
       const r = rel ? `${rel}/${e.name}` : e.name
       const kind = e.isSymbolicLink() ? 'l' : e.isDirectory() ? 'd' : 'f'
-      if (++entries > SNAPSHOT_MAX_ENTRIES) throw new Error(tr(msg({ id: 'main.unused.tooMany', defaultMessage: 'it holds more than {n, number} files and folders, too many to check', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause. {n} is the limit." }), { n: SNAPSHOT_MAX_ENTRIES }))
+      if (++entries > SNAPSHOT_MAX_ENTRIES) throw new Error(tr(msg({ id: 'main.unused.tooMany', defaultMessage: 'it holds more than {n, number} files and folders, too many to check', description: "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause. {n} is the limit." }), { n: SNAPSHOT_MAX_ENTRIES }))
       found.push({ rel: r, kind })
       if (kind === 'd') dirs.push(r)
     }
@@ -527,7 +527,7 @@ async function fingerprint(root: string): Promise<string> {
     if (f.kind === 'l') h.update(await readlink(abs))
     else if (f.kind === 'f') {
       const size = (await lstat(abs)).size
-      if ((bytes += size) > SNAPSHOT_MAX_BYTES) throw new Error(tr(msg({ id: 'main.unused.tooBig', defaultMessage: 'it holds more than {n, number} GB of files, too much to check', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause. {n} is the limit." }), { n: SNAPSHOT_MAX_BYTES / 1024 ** 3 }))
+      if ((bytes += size) > SNAPSHOT_MAX_BYTES) throw new Error(tr(msg({ id: 'main.unused.tooBig', defaultMessage: 'it holds more than {n, number} GB of files, too much to check', description: "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause. {n} is the limit." }), { n: SNAPSHOT_MAX_BYTES / 1024 ** 3 }))
       h.update(`${size}\0`)
       await new Promise<void>((res, rej) => {
         const s = createReadStream(abs)
@@ -547,10 +547,10 @@ async function snapshot(projectPath: string, path: string): Promise<Snapshot> {
   }
   const head = await git(path, ['rev-parse', '--verify', '--quiet', 'HEAD'])
   const tip = head.ok ? head.out.trim() : ''
-  if (!tip) fail(tr(msg({ id: 'main.unused.read.head', defaultMessage: 'git could not read its HEAD', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). HEAD is git's term." })))
+  if (!tip) fail(tr(msg({ id: 'main.unused.read.head', defaultMessage: 'git could not read its HEAD', description: "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). HEAD is git's term." })))
   const sym = await git(path, ['symbolic-ref', '--quiet', 'HEAD'])
   // Exit 1 with nothing said: detached. Anything else that fails: can't tell.
-  if (!sym.ok && !(sym.code === 1 && !sym.err)) fail(tr(msg({ id: 'main.unused.read.branch', defaultMessage: 'git could not read its branch', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)." })))
+  if (!sym.ok && !(sym.code === 1 && !sym.err)) fail(tr(msg({ id: 'main.unused.read.branch', defaultMessage: 'git could not read its branch', description: "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)." })))
   // The full ref, cut: `--short` says heads/x beside a tag x, which would exclude no branch below (HI-2426).
   const branch = sym.ok ? branchOfRef(sym.out) : null
   // Strictly: a main branch git couldn't look for is not "none" (that would count the commits against no branch).
@@ -561,13 +561,13 @@ async function snapshot(projectPath: string, path: string): Promise<Snapshot> {
     fail((e as Error).message)
   }
   const intoTip = into ? await wt.tipOf(projectPath, into) : null
-  if (into && !intoTip) fail(tr(msg({ id: 'main.unused.read.base', defaultMessage: 'git could not read {branch}', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). {branch} is the project's main branch." }), { branch: into }))
+  if (into && !intoTip) fail(tr(msg({ id: 'main.unused.read.base', defaultMessage: 'git could not read {branch}', description: "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). {branch} is the project's main branch." }), { branch: into }))
   // On a branch: its commits not on the main branch (a squash merge counting). Detached, or no main branch: the commits
   // no branch, tag or remote branch has.
   const ahead = branch && intoTip ? await wt.unmergedCommits(projectPath, intoTip, tip) : await unreferencedCommits(path, branch ?? undefined)
-  if (ahead === null) fail(tr(msg({ id: 'main.unused.read.commits', defaultMessage: 'git could not count its commits', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)." })))
+  if (ahead === null) fail(tr(msg({ id: 'main.unused.read.commits', defaultMessage: 'git could not count its commits', description: "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck)." })))
   const dirty = await wt.dirtyCount(path)
-  if (dirty === null) fail(tr(msg({ id: 'main.unused.read.status', defaultMessage: 'git status failed', description: "Why Hive couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). git status is a command: keep it." })))
+  if (dirty === null) fail(tr(msg({ id: 'main.unused.read.status', defaultMessage: 'git status failed', description: "Why Combwork couldn't check what one of the Overview's unused worktrees (Remove, Remove anyway, Merge) holds: a clause (main.unused.cantCheck). git status is a command: keep it." })))
   let files = ''
   try {
     files = await fingerprint(path)
@@ -604,7 +604,7 @@ function takePreview(token: string): { ok: true; preview: { project: string; at:
 export async function removalPreview(projectPath: string, path: string): Promise<UnusedWorktreePreview> {
   projectPath = workspace.assertProject(projectPath)
   const listed = (await wt.listWorktrees(projectPath)).find((w) => key(w.path) === key(path))
-  if (!listed || key(listed.path) === key(projectPath)) throw new Error(gitProblem() ?? tr(msg({ id: 'main.unused.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })))
+  if (!listed || key(listed.path) === key(projectPath)) throw new Error(gitProblem() ?? tr(msg({ id: 'main.unused.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })))
   const isSlot = await placesOf(projectPath).then(
     (p) => p.slots.has(key(listed.path)),
     () => true
@@ -665,14 +665,14 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
     const slot = places.slots.get(key(path))
     if (slot) {
       if (opts.force !== undefined) return { deleted: false, reason: tr(SLOT_GUARDED) }
-      if (!slot.kind || !places.pool) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.slotInUse', defaultMessage: 'it is a slot in use', description: "Why Hive won't remove a slot from Unused worktrees (#1450): it is lent, protected or busy now (it changed since it was listed). A clause." })) }
+      if (!slot.kind || !places.pool) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.slotInUse', defaultMessage: 'it is a slot in use', description: "Why Combwork won't remove a slot from Unused worktrees (#1450): it is lent, protected or busy now (it changed since it was listed). A clause." })) }
       const kept = await places.pool.remove(slot.name)
       if (kept) return { deleted: false, reason: await keptText(projectPath, kept) }
       log.info(`Removed slot ${userText(slot.name)} from Unused Worktrees`)
       return { deleted: true }
     }
     const listed = (await wt.listWorktrees(projectPath)).find((w) => key(w.path) === key(path))
-    if (!listed || key(listed.path) === key(projectPath)) return { deleted: false, reason: gitProblem() ?? tr(msg({ id: 'main.unused.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })) }
+    if (!listed || key(listed.path) === key(projectPath)) return { deleted: false, reason: gitProblem() ?? tr(msg({ id: 'main.unused.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })) }
     // Still listed (a home whose conversation can resume, a copy or a live queue folder never is), checked now.
     const why = (await unsafe(projectPath, listed.path)) ?? (await stillUnused(projectPath, listed.path))
     if (why) return { deleted: false, reason: why }
@@ -714,7 +714,7 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
       done = branch && !branch.ok ? { deleted: true, branchKept: true, reason: tr(msg({ id: 'main.unused.branchKept', defaultMessage: 'git kept {branch}: {why}', description: "After Remove anyway removed one of the Overview's unused worktrees (Remove, Remove anyway, Merge): its branch, {branch}, stayed. {why} is git's message." }), { branch: snap.branch ?? '', why: branch.err.split(/\r?\n/)[0] || tr(msg({ id: 'main.unused.gitFailed', defaultMessage: '{command} failed', description: "Why git couldn't do something, when it said nothing itself. {command} is the git command: keep it." }), { command: 'update-ref' }) }) } : { deleted: true }
       log.info(`Removed unused worktree ${userText(listed.path)} anyway (${snap.ahead} commits only it held, ${snap.dirty} uncommitted files)`)
     } else {
-      if (!listed.branch) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.detached', defaultMessage: 'it is not on a branch (detached HEAD)', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause. detached HEAD is git's term." })) }
+      if (!listed.branch) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.detached', defaultMessage: 'it is not on a branch (detached HEAD)', description: "Why Combwork won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause. detached HEAD is git's term." })) }
       const tree: wt.WorktreeRef = { path: listed.path, branch: listed.branch, base: '' }
       const check = await wt.worktreeCheck(projectPath, tree)
       const queueBusy = await claimQueueFolder(projectPath, listed.path)

@@ -70,7 +70,7 @@ const T = {
   line: agentMsg({
     id: 'wake.decision.line',
     text: '{cards} from the user: read {one, select, yes {it} other {them}} (cw_read_task) {reviewer, select, yes {before your next verdict on {n, plural, one {it} other {them}}.} other {and carry on from where you asked.}}',
-    note: '#401: the line after "[Hive] " given to an agent waiting for the user (or a decision wake, #1266) when the user\'s decisions were recorded on its cards. cards: each card\'s decisions (notice.decision.card), joined by ", "; one: yes for a single decision on one card; reviewer: yes when the agent only reviews those cards (HI-2261: told to carry on, a reviewer that had asked nothing made the decided change itself); n: how many cards.'
+    note: '#401: the line after "[Combwork] " given to an agent waiting for the user (or a decision wake, #1266) when the user\'s decisions were recorded on its cards. cards: each card\'s decisions (notice.decision.card), joined by ", "; one: yes for a single decision on one card; reviewer: yes when the agent only reviews those cards (HI-2261: told to carry on, a reviewer that had asked nothing made the decided change itself); n: how many cards.'
   })
 }
 

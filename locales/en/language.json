@@ -9,7 +9,7 @@
   },
   "language.restart": {
     "defaultMessage": "Combwork's own text has changed language. Chromium's parts (the PDF viewer, date pickers) follow when Combwork next starts.",
-    "description": "Under the language list after the language was changed, until Hive restarts. Chromium is the browser engine Hive is built on: keep the name."
+    "description": "Under the language list after the language was changed, until Combwork restarts. Chromium is the browser engine Combwork is built on: keep the name."
   },
   "language.setting.desc": {
     "defaultMessage": "The language Combwork shows. Automatic follows Windows' display languages.",
@@ -21,6 +21,6 @@
   },
   "language.setting.title": {
     "defaultMessage": "Language",
-    "description": "The setting's title in Settings → General. In any language but English, Hive adds \"(Language)\" after it, so someone who can't read the language can find the way back."
+    "description": "The setting's title in Settings → General. In any language but English, Combwork adds \"(Language)\" after it, so someone who can't read the language can find the way back."
   }
 }

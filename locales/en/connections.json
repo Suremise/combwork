@@ -49,7 +49,7 @@
   },
   "connections.intro.text": {
     "defaultMessage": "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Combwork no longer uses the sign-in of your own terminal, which stays as it is.",
-    "description": "A one-time banner in the main window (HI-1774; HI-2108): coding agents now each run on an account (a sign-in Hive keeps, Settings → Accounts & Connections) and none has been added yet. {clis} names the coding agent CLIs, joined (\"Claude Code and Codex\")."
+    "description": "A one-time banner in the main window (HI-1774; HI-2108): coding agents now each run on an account (a sign-in Combwork keeps, Settings → Accounts & Connections) and none has been added yet. {clis} names the coding agent CLIs, joined (\"Claude Code and Codex\")."
   },
   "connections.mark.anotherMark": {
     "defaultMessage": "Running on another connection than the one chosen",
