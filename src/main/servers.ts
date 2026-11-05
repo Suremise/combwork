@@ -2979,7 +2979,10 @@ route('GET', '/v1/tasks', async ({ query }) => {
   const short = query.get('view') === 'short'
   const waiting = short ? new Map<number, ForYouItem[]>() : forYouOfCards(workspace, cards.map((c) => c.number))
   const views = await Promise.all(cards.map((c) => taskView(c, agents, waiting)))
-  return short ? views.map(taskRow) : views
+  if (short) return views.map(taskRow)
+  // HI-2568: whole cards without their history (historyEntries counts it), so the listing doesn't grow with every card's
+  // changes; ?history=true keeps it.
+  return query.get('history') === 'true' ? views : views.map(withoutHistory)
 })
 
 route('GET', '/v1/tasks/:n', async ({ params, query }) => {

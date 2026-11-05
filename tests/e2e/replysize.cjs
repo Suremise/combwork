@@ -263,8 +263,31 @@ const prose = (seed, n) => {
   const todoList = measure('cw_list_tasks (todo)', tool('cw_list_tasks', { column: 'todo' }), 50 * 200)
   check('Todo is listed top first', todoList.startsWith('Todo (50, top first):\n') && isCardLine(todoList.split('\n')[1]), todoList.slice(0, 80))
   measure('cw_list_tasks (alpha)', tool('cw_list_tasks', { project: 'alpha' }), 25 * 200)
-  const full = tool('cw_list_tasks', { column: 'review', details: true }).text
-  check('details=true still lists cards in full', JSON.parse(full).length === 10 && JSON.parse(full)[0].description.length > 1000)
+  // HI-2568: the full listing leaves every card's history out (historyEntries counts it), so it doesn't grow with the
+  // board's changes. The Review cards get 30 history entries each first, so a listing that gave them back would show.
+  const reviewCards = numbers.slice(56, 66)
+  for (let i = 0; i < 15; i++) {
+    await api('POST', '/v1/tasks/batch', { numbers: reviewCards, addLabels: ['churn'] })
+    await api('POST', '/v1/tasks/batch', { numbers: reviewCards, removeLabels: ['churn'] })
+  }
+  const oneByOne = new Map()
+  for (const n of reviewCards) oneByOne.set(n, (await api('GET', `/v1/tasks/${n}`)).body)
+  check('each Review card has a long history now', [...oneByOne.values()].every((c) => c.history.length >= 31), JSON.stringify([...oneByOne.values()].map((c) => c.history.length)))
+  const full = measure('cw_list_tasks (details, review)', tool('cw_list_tasks', { column: 'review', details: true }), 10 * 5000)
+  const fullCards = JSON.parse(full)
+  const sameAsRead = (c) => {
+    const one = oneByOne.get(c.number)
+    return one && c.historyEntries === one.history.length && c.description === one.description && JSON.stringify(c.comments) === JSON.stringify(one.comments) && JSON.stringify(c.decisions) === JSON.stringify(one.decisions) && JSON.stringify(c.forYou) === JSON.stringify(one.forYou)
+  }
+  check('details=true lists cards in full, without their history', fullCards.length === 10 && fullCards.every((c) => !('history' in c) && c.description.length > 1000 && c.comments.length === 3 && sameAsRead(c)), JSON.stringify(fullCards.map((c) => [c.number, Object.keys(c).includes('history'), c.historyEntries])))
+  const apiLean = await api('GET', '/v1/tasks?column=review')
+  const apiWhole = await api('GET', '/v1/tasks?column=review&history=true')
+  check('API: GET /v1/tasks gives whole cards without history, historyEntries counting it', apiLean.body.length === 10 && apiLean.body.every((c) => !('history' in c) && sameAsRead(c)), JSON.stringify(apiLean.body.map((c) => c.historyEntries)))
+  check('API: ?history=true gives every history back', apiWhole.body.length === 10 && apiWhole.body.every((c) => JSON.stringify(c.history) === JSON.stringify(oneByOne.get(c.number)?.history) && !('historyEntries' in c)), JSON.stringify(apiWhole.body.map((c) => c.history?.length)))
+  sizes['GET /v1/tasks?column=review'] = apiLean.text.length
+  sizes['GET /v1/tasks?column=review&history=true'] = apiWhole.text.length
+  console.log(`${String(apiLean.text.length).padStart(8)}  GET /v1/tasks?column=review\n${String(apiWhole.text.length).padStart(8)}  GET /v1/tasks?column=review&history=true`)
+  check('…and the lean listing is smaller by at least its histories (10 cards × 30 entries)', apiLean.text.length + 10 * 30 * 40 <= apiWhole.text.length, `${apiLean.text.length} vs ${apiWhole.text.length}`)
   const read = JSON.parse(measure('cw_read_task', tool('cw_read_task', { number: target })))
   check('a read has the description and comments, not the history', read.description.length > 1000 && read.comments.length === 3 && !('history' in read) && read.historyEntries >= 1, Object.keys(read).join(','))
   check('history=true adds it', JSON.parse(tool('cw_read_task', { number: target, history: true }).text).history.length >= 1)
@@ -687,7 +710,7 @@ const prose = (seed, n) => {
 
   // The Agent API's own replies are unchanged unless a caller asks for the short ones.
   const apiList = (await api('GET', '/v1/tasks?column=todo')).body
-  check('API: GET /v1/tasks still gives whole cards', apiList.length === 50 && typeof apiList[0].description === 'string' && Array.isArray(apiList[0].history))
+  check('API: GET /v1/tasks still gives whole cards, their history counted (HI-2568)', apiList.length === 50 && typeof apiList[0].description === 'string' && !('history' in apiList[0]) && apiList[0].historyEntries >= 1)
   const apiCard = (await api('PATCH', `/v1/tasks/${todo[41]}`, { comment: 'API' })).body
   check('API: PATCH still answers with the card', apiCard.number === todo[41] && Array.isArray(apiCard.comments) && Array.isArray(apiCard.history))
   const apiProjects = (await api('GET', '/v1/projects')).body

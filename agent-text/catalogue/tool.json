@@ -342,7 +342,7 @@
     "text": "The skills here, a line each: the workspace's Combwork skills with who gets them, and each provider's user and plugin skills; with project, what its agents get. A listing, not of what a running session loaded."
   },
   "tool.listTasks.arg.details": {
-    "text": "Every card in full."
+    "text": "Every card in full, without its history."
   },
   "tool.listTasks.arg.offset": {
     "text": "Skip this many cards."
