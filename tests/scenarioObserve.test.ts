@@ -59,6 +59,9 @@ describe('skills read', () => {
     const crlf = (s: string) => s.replace(/\n/g, '\r\n')
     const read = observeTranscript([sol('Get-Content .agents/skills/hive-work-on-card/SKILL.md', crlf(SKILL_TEXT('work-on-card')))], SKILLS)
     expect(read.skillsRead).toEqual(['work-on-card'])
+    // Combwork's copies since HI-2463 are cw-<name> (HI-2560: a fake Codex's Get-Content of cw-card-loop wasn't counted).
+    const cw = observeTranscript([tool('Shell', "Get-Content -Raw 'C:\\w\\alpha\\.agents\\skills\\cw-card-loop\\SKILL.md'", crlf(SKILL_TEXT('card-loop')))], ['card-loop', ...SKILLS])
+    expect(cw.skillsRead).toEqual(['card-loop'])
     // Escaped twice (a result nested in another JSON string), and a quoted name, count too.
     const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/hive-handover/SKILL.md"}))', JSON.stringify({ result: JSON.stringify({ output: crlf(SKILL_TEXT('"handover"')) }) }))
     expect(observeTranscript([nested], SKILLS).skillsRead).toEqual(['handover'])
