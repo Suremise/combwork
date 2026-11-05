@@ -207,7 +207,7 @@ describe('the board area', () => {
     setLanguage(PSEUDO_LANGUAGE, {})
     for (const label of names) expect(pseudo(archiveBatchText(label, tr)), archiveBatchText(label, tr)).toBe(true)
     expect(archiveBatchLabel('done', null)).toBe('All in Done')
-    // Any other name (one Hive didn't make, or a column it doesn't know) is shown as it is.
+    // Any other name (one Combwork didn't make, or a column it doesn't know) is shown as it is.
     expect(archiveBatchText('Spring clean', tr)).toBe('Spring clean')
     expect(archiveBatchText('All in Somewhere', tr)).toBe('All in Somewhere')
   })
@@ -223,7 +223,7 @@ describe('the board area', () => {
 })
 
 describe("a run's name in the Progress panel (#872)", () => {
-  it("shows Hive's stored names for a script and a nameless agent in the window's language, and other names as given", () => {
+  it("shows Combwork's stored names for a script and a nameless agent in the window's language, and other names as given", () => {
     const script = run({ source: 'api', agentName: 'Script', defaultName: 'script', agentId: null, projectPath: null })
     const nameless = run({ source: 'agent', agentName: 'Agent', defaultName: 'agent', agentId: 'a-1', projectPath: 'C:\\ws\\alpha' })
     const named = run({ source: 'agent', agentName: 'Script', agentId: 'a-2', projectPath: 'C:\\ws\\alpha' })
@@ -232,7 +232,7 @@ describe("a run's name in the Progress panel (#872)", () => {
     const all = [script, nameless, named, namedAgent, assistant]
     expect(all.map((r) => runAgentName(r, tr))).toEqual(['Script', 'Agent', 'Script', 'Agent', 'Agent'])
     setLanguage('de', { 'board.progress.script': 'Skript', 'board.progress.anAgent': 'Ein Agent' })
-    // Only the names Hive gave (defaultName) are translated: agents called "Script" or "Agent", and the Assistant's own name, stay as they are.
+    // Only the names Combwork gave (defaultName) are translated: agents called "Script" or "Agent", and the Assistant's own name, stay as they are.
     expect(all.map((r) => runAgentName(r, tr))).toEqual(['Skript', 'Ein Agent', 'Script', 'Agent', 'Agent'])
     expect(runDetails(script, null, script.startedAt, tr).find((d) => d.text.startsWith('Skript'))).toBeTruthy()
     expect(agentChoices([nameless, named, namedAgent], 'c:\\ws\\alpha', tr).map((c) => c.label)).toEqual(['Agent', 'Ein Agent', 'Script'])

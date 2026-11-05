@@ -548,7 +548,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
 })
 
 describe('stages in a lane (#1421): names over the categories, the divider, the legend, Solo, old rules', () => {
-  // A Pair project where Hive merges: Review, Approved and Merging (Merging inside Approved).
+  // A Pair project where Combwork merges: Review, Approved and Merging (Merging inside Approved).
   const pairStages = { stages: mustCompile(preset('git', 'pair')).stages, names: {} }
   const solo = { stages: mustCompile(preset('git', 'solo')).stages, names: {} }
   const withBadge = (stage: WorkBadge['stage']) => ({ stage })
@@ -651,7 +651,7 @@ describe('stages in a lane (#1421): names over the categories, the divider, the 
 })
 
 describe("old rules keep their stages (HR4's #1421 round 1): the options now produce others", () => {
-  // The project switched to Solo (no review, nothing merging); a lane and its cards still under Pair (Hive merges).
+  // The project switched to Solo (no review, nothing merging); a lane and its cards still under Pair (Combwork merges).
   const pair = mustCompile(preset('git', 'pair')).stages.map((s) => s.id)
   const soloNow = { stages: mustCompile(preset('git', 'solo')).stages, names: { approved: 'Ready' } }
 
@@ -742,7 +742,7 @@ describe("a lane's wait and its cards' times (HI-1926)", () => {
     // No longer waiting: none; a wait with no card (a slot) is stamped too.
     expect(stampWait(a, null, T + MIN, true)).toBeUndefined()
     expect(stampWait(undefined, { reason: 'slot', card: null }, T, true)).toMatchObject({ since: T, observed: true })
-    // The first listing (Hive just started, or the workspace opened): not seen to begin, so at least that long.
+    // The first listing (Combwork just started, or the workspace opened): not seen to begin, so at least that long.
     expect(stampWait(undefined, reviewer, T, false)).toMatchObject({ since: T, observed: false })
   })
 

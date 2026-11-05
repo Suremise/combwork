@@ -149,7 +149,7 @@ describe('Clean Up while sessions change', () => {
     expect(await totalTokens(id)).toBe(before)
   })
 
-  it('a session whose only copy is Hive’s is not deleted when its usage read throws', async () => {
+  it('a session whose only copy is Combwork’s is not deleted when its usage read throws', async () => {
     const id = await oldSession(false)
     const usage = failUsage(id, async () => {
       throw new Error('EBUSY')

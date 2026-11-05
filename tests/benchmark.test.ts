@@ -1,4 +1,4 @@
-// Comparing Hive's costs (#117): scenario benchmarks and Performance exports read as untrusted input
+// Comparing Combwork's costs (#117): scenario benchmarks and Performance exports read as untrusted input
 // (src/shared/benchmark.ts), compared like with like (correctness first: a smaller result that fails, skips checks or
 // fails more calls isn't better; what wasn't measured stays unknown), and kept per scope in the workspace
 // (src/main/benchmarks.ts: bounded, committed before anything is evicted, bound to the workspace each operation started
@@ -251,7 +251,7 @@ function exportFile(opts: { scope?: any; sanitized?: boolean; own?: boolean; obs
     dropped: opts.dropped ?? 0,
     ...(opts.unattributed ? { lossesUnattributed: true } : {})
   }
-  return JSON.stringify({ schema: 'hive-metrics/1', app: { name: 'Hive', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
+  return JSON.stringify({ schema: 'hive-metrics/1', app: { name: 'Combwork', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
 }
 
 describe('what Compare says about its measures', () => {
@@ -314,7 +314,7 @@ describe('Performance exports', () => {
     expect(shownText(keptAbout(trial))).toBe('Model trial Claude Code opus (high, auto), fixtures v3, 2 scenarios × 1, source abc1234, spent $1.23')
     setLanguage('pl', polish(), 'pl-PL')
     try {
-      // Hive's name, its description and the reason two can't be compared: Polish, the roles as the Who filter names them.
+      // Combwork's name, its description and the reason two can't be compared: Polish, the roles as the Who filter names them.
       expect(shownText(keptLabel(e))).not.toMatch(/Export/)
       expect(shownText(keptAbout(e))).not.toMatch(/agent|all providers/)
       const reason = compareArtifacts(agents, scripts).reasonsText.map((t) => shownText(t)).join()
@@ -1149,7 +1149,7 @@ describe('kept comparisons: bounds that hold under failing removals; quarantine 
       // Remove the newest at the bound (its unlink fails too: recorded, off the list), then try to import again.
       await expect(kept.removeBenchmark(ctx(), WS, lastAdded.at(-1)!)).rejects.toThrow(/couldn’t be removed yet/)
       await expect(kept.importBenchmark(ctx(), WS, { path: f })).rejects.toThrow(/couldn’t be deleted yet/)
-      // Every index Hive wrote, the reader accepts: never more than the bound, never more than 20 kept.
+      // Every index Combwork wrote, the reader accepts: never more than the bound, never more than 20 kept.
       for (const ix of written) {
         expect(ix.entries.length).toBeLessThanOrEqual(BENCHMARK_LIMITS.kept * 2)
         expect(ix.entries.filter((e: any) => !e.state).length).toBeLessThanOrEqual(BENCHMARK_LIMITS.kept)
@@ -1180,7 +1180,7 @@ describe('kept comparisons: bounds that hold under failing removals; quarantine 
     entryOf(await kept.importBenchmark(ctx(), WS, { path: f }))
     const q = join(dir, 'quarantine')
     mkdirSync(q, { recursive: true })
-    // 100 older quarantined files, with high ids; and one not in Hive's naming (never pruned).
+    // 100 older quarantined files, with high ids; and one not in Combwork's naming (never pruned).
     for (let i = 0; i < 100; i++) writeFileSync(join(q, `2026-01-01T00-${String(Math.floor(i / 60)).padStart(2, '0')}-${String(i % 60).padStart(2, '0')}-000Z-0000-${(0xf00000000000 + i).toString(16)}.json`), '{}')
     writeFileSync(join(q, 'notes.txt'), 'mine')
     // Two new strays in one move, one with the lowest id there is: both kept (in order), the two oldest go.

@@ -107,8 +107,8 @@ const report = req('./e2e/layoutReport.cjs') as {
 
 describe("the i18nshots route's text report (#899)", () => {
   it('looks for English left only where the language translates it into other words', () => {
-    const english = { a: 'Not running', b: 'To do', c: 'OK', d: 'Cancel', e: 'Cancel', f: 'Hive', g: '{agent} (removed)', h: '{n, plural, one {# card} other {# cards}}', i: '<b>{name}</b> is ready', j: '{name}', k: 'Hive {version}' }
-    const pl = { a: 'Nie działa', c: 'OK', d: 'Anuluj', e: 'Cancel', f: 'Pszczoła', g: '{agent} (usunięty)', h: '{n, plural, one {# karta} other {# kart}}', i: '<b>{name}</b> jest gotowy', j: '{name}', k: 'Hive {version}', z: 'Hive' }
+    const english = { a: 'Not running', b: 'To do', c: 'OK', d: 'Cancel', e: 'Cancel', f: 'Combwork', g: '{agent} (removed)', h: '{n, plural, one {# card} other {# cards}}', i: '<b>{name}</b> is ready', j: '{name}', k: 'Combwork {version}' }
+    const pl = { a: 'Nie działa', c: 'OK', d: 'Anuluj', e: 'Cancel', f: 'Pszczoła', g: '{agent} (usunięty)', h: '{n, plural, one {# karta} other {# kart}}', i: '<b>{name}</b> jest gotowy', j: '{name}', k: 'Combwork {version}', z: 'Combwork' }
     const left = report.englishLeft(english, pl)
     // b isn't translated (shown in English on purpose), c translates to itself, d's English is also e's translation,
     // and f's English is another message's translation (z): seeing any of them is no sign of a miss.

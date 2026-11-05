@@ -108,7 +108,7 @@ describe('mergeWorktree (#1347)', () => {
   })
 
   // HI-2422: a tag of the branch's name, at a commit the target already has, made git say "Already up to date" (a
-  // warning, exit 0) and Hive report the merge done, with the branch's work never merged.
+  // warning, exit 0) and Combwork report the merge done, with the branch's work never merged.
   for (const squash of [false, true]) {
     it(`merges the branch, not a same-named tag, into the checked-out target (${squash ? 'squash' : 'merge commit'})`, async () => {
       const { project, a } = await twoBranches()

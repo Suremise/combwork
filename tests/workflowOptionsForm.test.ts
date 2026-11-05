@@ -39,7 +39,7 @@ const { writeWorkflow } = await import('../src/shared/workflow/projectWorkflow')
 const { resolveOptions } = await import('../src/main/workflow/rulesets')
 const { FactStore } = await import('../src/main/workflow/factStore')
 const { MERGE_CHOICE_KEY } = await import('../src/shared/workflow/facts')
-/** A Git project's own options as a pre-1.0 build's preset left them: Pair whole, G19 Hive's. */
+/** A Git project's own options as a pre-1.0 build's preset left them: Pair whole, G19 Combwork's. */
 
 /** The bound for a hung run: a start's facts are recorded within it. */
 const HUNG_MS = 15_000
@@ -88,7 +88,7 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     expect(PRESETS.none.map((p) => p.id)).toEqual(['solo', 'pair', 'team'])
   })
 
-  it("Pair is §16.6.3's at its full values (P7, #1445): Hive merges with the quick checks on the merged result, in slots brought up to date, one reviewer per lane", () => {
+  it("Pair is §16.6.3's at its full values (P7, #1445): Combwork merges with the quick checks on the merged result, in slots brought up to date, one reviewer per lane", () => {
     const inputs = { quick: ['typecheck', 'lint'], tests: ['test'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }, identity: { name: 'Pat', email: 'p@e' } }
     const p = preset('git', 'pair', inputs)
     expect(p).toMatchObject({ review: 'agent', reviewers: 1, noSelfReview: true, preChecks: ['typecheck', 'lint'], sameness: 'change', finish: 'hiveMerges', style: 'merge', target: 'main', strict: false, mergeChecks: ['typecheck', 'lint'], mergeInstall: 'onManifestChange', okBefore: { mode: 'never' }, folder: 'slots', identity: { name: 'Pat', email: 'p@e' }, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane' })
@@ -126,13 +126,13 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     expect(checkOptions('git', { project: { ...t, review: 'agentThenYou' } }).problems).toEqual([{ kind: 'contradiction', id: 'okWithReview' }])
   })
 
-  it('Hive merges still needs Git and its own folder per card (§16.7.2)', () => {
+  it('Combwork merges still needs Git and its own folder per card (§16.7.2)', () => {
     expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'project' } }).problems).toEqual([{ kind: 'contradiction', id: 'mergeNeedsSlots' }])
     expect(checkOptions('none', { project: { finish: 'hiveMerges' } }).problems).toContainEqual({ kind: 'contradiction', id: 'hiveMergesNeedsGit' })
     expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', mergeChecks: ['lint'], mergeInstall: 'always', commands: { lint: 'npm run lint' } } }).problems).toEqual([])
   })
 
-  it("shows G9's checks only when Hive merges, and its install only with merge checks", () => {
+  it("shows G9's checks only when Combwork merges, and its install only with merge checks", () => {
     const o = { ...allOff('git'), folder: 'slots' as const }
     expect([formShows('mergeChecks', o), formShows('mergeInstall', o)]).toEqual([false, false])
     expect([formShows('mergeChecks', { ...o, finish: 'hiveMerges' }), formShows('mergeInstall', { ...o, finish: 'hiveMerges' })]).toEqual([true, false])
@@ -184,7 +184,7 @@ describe('checking options for a save (#1278)', () => {
     expect(checkOptions('git', { project: { colour: 'red' } as never }).problems).toEqual([{ kind: 'bad', why: 'project options: unknown option colour' }])
   })
 
-  it('gives each option its origin: the project over the workspace over Hive’s, the rest the platform’s', () => {
+  it('gives each option its origin: the project over the workspace over Combwork’s, the rest the platform’s', () => {
     const r = checkOptions('git', { global: { git: { style: 'squash' } }, workspace: { git: { target: 'develop', style: 'merge' } }, project: { target: 'release' } })
     expect(r.resolved.options).toMatchObject({ style: 'merge', target: 'release', review: 'none' })
     expect(r.resolved.origins).toMatchObject({ style: 'workspace', target: 'project', review: 'platform' })
@@ -208,7 +208,7 @@ describe('the Workflow section (#1278)', () => {
     const { platform: _tp, ...teamOptions } = team.options
     expect((await form.setWorkflowOptions(w, repo, { preset: 'team', options: teamOptions })).preset).toBe('team')
     expect((await w.projectConfig(repo)).workflow).toMatchObject({ preset: 'team', options: { finish: 'hiveMerges', mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] } } })
-    // Pair (Hive merges) suggests the same scripts as its merge checks (OP-24).
+    // Pair (Combwork merges) suggests the same scripts as its merge checks (OP-24).
     expect(f.presets.find((p) => p.id === 'pair')!.options).toMatchObject({ finish: 'hiveMerges', target: 'main', mergeChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' } })
   })
 
@@ -227,7 +227,7 @@ describe('the Workflow section (#1278)', () => {
     expect((await form.workflowForm(bare.w, bare.repo)).presets.find((p) => p.id === 'team')!.options.focusedTests).toBe(false)
   })
 
-  it("writes a Git project's options holding its repository's lock first, so a branch clean-up in this Hive or another never sees its target move (#1642)", async () => {
+  it("writes a Git project's options holding its repository's lock first, so a branch clean-up in this Combwork or another never sees its target move (#1642)", async () => {
     const { w, repo } = await workspace()
     git(repo, 'branch', 'release')
     const { withRepoLock } = await import('../src/main/repoLock')
@@ -484,7 +484,7 @@ describe("the upgrade's merge question (HI-1697)", () => {
       store.boardWrite(w, async () =>
         wf.write(rec, wf.rulesetOf(rec), 'hive', (x) => {
           if (entry && !x.state().entries.some((e) => e.id === entry)) x.fact('IntegrationRequested', { entry, revision: git(repo, 'rev-parse', 'HEAD'), key: null, target: 'main', style: 'merge' })
-          return wf.askUser(x, 'decide', gate, 'How should Hive merge?', { unbound: true, ...(entry ? { entry } : {}) })
+          return wf.askUser(x, 'decide', gate, 'How should Combwork merge?', { unbound: true, ...(entry ? { entry } : {}) })
         })
       )
     const choose = (request: string, style: string, commitMessage: string, number = card.number, on = w) => inWorkspace(on, () => form.chooseMerge(on, repo, { card: number, request, style, commitMessage }))
@@ -509,7 +509,7 @@ describe("the upgrade's merge question (HI-1697)", () => {
     const { commitMessage: _m, style: _s, ...inheriting } = pair
     await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...inheriting, strict: true } })
     expect(recorded(w)).toBeNull()
-    // Hive's, against Pair's branch's own (HI-1997): a change, so the choice.
+    // Combwork's, against Pair's branch's own (HI-1997): a change, so the choice.
     await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'hive' } })
     expect(recorded(w)).toMatchObject({ style: 'merge', commitMessage: 'hive', pending: false })
     expect((await w.projectConfig(repo)).workflow).toMatchObject({ mergeAsk: true, commitMessageChosen: true, options: { commitMessage: 'hive', strict: true } })
@@ -565,7 +565,7 @@ describe("the upgrade's merge question (HI-1697)", () => {
     expect(recorded(w)).toBeNull()
   })
 
-  /** The workspace closed and opened again (a restart of Hive): its board and files as they were left. */
+  /** The workspace closed and opened again (a restart of Combwork): its board and files as they were left. */
   async function restart(w: WS, ws: string): Promise<WS> {
     opened.splice(opened.indexOf(w), 1)
     await disposeWorkspaceService(w)
@@ -629,7 +629,7 @@ describe("the upgrade's merge question (HI-1697)", () => {
       throw new Error('stopped before the commit')
     }
     await expect(choose(request, 'squash', 'branch')).rejects.toThrow(/before the commit/)
-    // Another Hive on the same files (a restart): it settles what the board says, which is nothing.
+    // Another Combwork on the same files (a restart): it settles what the board says, which is nothing.
     const w2 = await restart(w, ws)
     await form.settleMergeChoices(w2)
     expect(await options(w2)).toEqual(before)
@@ -705,7 +705,7 @@ describe("the Assistant's settings tool (#1278)", () => {
       expect(await settingsTools.applySetting(folder, 'slots', repo)).toEqual({ old: 'project', new: 'slots' })
       expect(await settingsTools.applySetting(folder, null, repo)).toEqual({ old: 'slots', new: 'inherit' })
     })
-    // Hive merges with merge checks and the install, one at a time (#1355), read back as agents read them.
+    // Combwork merges with merge checks and the install, one at a time (#1355), read back as agents read them.
     await inWorkspace(w, async () => {
       await expect(settingsTools.applySetting(e, 'hiveMerges', repo)).rejects.toThrow(/each card needs its own folder/)
       await settingsTools.applySetting(settingEntry('project.workflow.folder')!, 'slots', repo)
@@ -713,7 +713,7 @@ describe("the Assistant's settings tool (#1278)", () => {
       expect(await settingsTools.applySetting(settingEntry('project.workflow.commands')!, { lint: 'npm run lint' }, repo)).toMatchObject({ new: expect.anything() })
       expect(await settingsTools.applySetting(settingEntry('project.workflow.mergeChecks')!, ['lint'], repo)).toMatchObject({ new: expect.anything() })
       expect(await settingsTools.applySetting(settingEntry('project.workflow.mergeInstall')!, 'always', repo)).toEqual({ old: 'inherit', new: 'always' })
-      // The folder can't go back to the project folder while Hive merges.
+      // The folder can't go back to the project folder while Combwork merges.
       await expect(settingsTools.applySetting(settingEntry('project.workflow.folder')!, 'project', repo)).rejects.toThrow(/each card needs its own folder/)
     })
     expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ finish: 'hiveMerges', folder: 'slots', mergeChecks: ['lint'], mergeInstall: 'always', commands: { lint: 'npm run lint' } })
@@ -741,7 +741,7 @@ describe('the one-time presets notice (#1278, §16.17)', () => {
   })
 })
 
-describe("workflow defaults at Hive's and the workspace's level (#1422)", () => {
+describe("workflow defaults at Combwork's and the workspace's level (#1422)", () => {
   const read = (file: string): Record<string, unknown> => JSON.parse(readFileSync(file, 'utf8'))
 
   it("saves the workspace's defaults: its projects inherit them, with the workspace as their origin; Inherit takes one back", async () => {
@@ -760,7 +760,7 @@ describe("workflow defaults at Hive's and the workspace's level (#1422)", () => 
     expect((await form.workflowForm(w, repo)).options.style).toBe('merge')
   })
 
-  it("saves Hive's defaults, under the workspace's: each level inherits the one below it", async () => {
+  it("saves Combwork's defaults, under the workspace's: each level inherits the one below it", async () => {
     const { w } = await workspace()
     const g = await levels.setLevelOptions(w, 'global', 'none', { preset: null, options: { dependenciesDone: true } })
     expect(config.settings.workflow?.none).toEqual({ dependenciesDone: true })
@@ -768,7 +768,7 @@ describe("workflow defaults at Hive's and the workspace's level (#1422)", () => 
     const wsForm = levels.levelForm(w, 'workspace', 'none')
     expect(wsForm.inherited.dependenciesDone).toBe(true)
     expect(wsForm.inheritedOrigins.dependenciesDone).toBe('global')
-    // The workspace's own value wins over Hive's.
+    // The workspace's own value wins over Combwork's.
     expect((await levels.setLevelOptions(w, 'workspace', 'none', { preset: null, options: { dependenciesDone: false } })).origins.dependenciesDone).toBe('workspace')
   })
 
@@ -898,7 +898,7 @@ describe("workflow writes take turns: a level's check and write, and a project's
   })
 })
 
-describe("Hive's level reaches every open workspace: its warning names each project's workspace and each card by its own key (#1422, HR5's round 2)", () => {
+describe("Combwork's level reaches every open workspace: its warning names each project's workspace and each card by its own key (#1422, HR5's round 2)", () => {
   it('two workspaces, a card #1 in flight in each: each listed under its own project and workspace, with its own key', async () => {
     const a = await workspace({ project: { review: 'none' }, name: 'alpha' })
     const b = await workspace({ project: { review: 'none' }, name: 'beta' })
@@ -1068,7 +1068,7 @@ describe("G15 saved before P7: the one-time step (#1445)", () => {
       const onDisk = JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8'))
       expect([onDisk.workflow.options.slotsUpToDate, onDisk.stepsDone], how).toEqual([true, [SLOTS_UP_TO_DATE_STEP]])
       expect(boardValue(w, SLOTS_UP_TO_DATE_STEP), how).toBeNull()
-      // The user saves G15 Off, and another run (a second Hive, or the next open) goes over the workspace.
+      // The user saves G15 Off, and another run (a second Combwork, or the next open) goes over the workspace.
       await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
       expect(await settleSlotsUpToDate(w), how).toBe(0)
       release()
@@ -1117,19 +1117,19 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     expect(resolveOptions('git', {}).options.commitMessage).toBe('branch')
   })
 
-  it("a write that makes it Hive's marks the choice; one that only keeps a preset's Hive's doesn't; the mark goes with Hive's", () => {
+  it("a write that makes it Combwork's marks the choice; one that only keeps a preset's Combwork's doesn't; the mark goes with Combwork's", () => {
     const wf = (o: Partial<WorkflowOptions>, mark?: true) => ({ platform: 'git' as const, preset: 'pair' as const, options: o, ...(mark ? { commitMessageChosen: mark } : {}) })
     expect(writeWorkflow(wf({}), { platform: 'git', preset: null, options: { commitMessage: 'hive' } }).commitMessageChosen).toBe(true)
     expect(writeWorkflow(wf({ commitMessage: 'branch' }), { platform: 'git', preset: null, options: { commitMessage: 'hive' } }).commitMessageChosen).toBe(true)
     // A preset's fill saved again unchanged: not a choice.
     expect(writeWorkflow(wf(filled()), { platform: 'git', preset: 'pair', options: { ...filled(), style: 'squash' } }).commitMessageChosen).toBeUndefined()
-    // Marked, it stays while Hive's, and goes with it.
+    // Marked, it stays while Combwork's, and goes with it.
     expect(writeWorkflow(wf({ commitMessage: 'hive' }, true), { platform: 'git', preset: null, options: { commitMessage: 'hive', strict: true } }).commitMessageChosen).toBe(true)
     expect(writeWorkflow(wf({ commitMessage: 'hive' }, true), { platform: 'git', preset: null, options: { commitMessage: 'branch' } }).commitMessageChosen).toBeUndefined()
     expect(writeWorkflow(wf({ commitMessage: 'hive' }, true), { platform: 'git', preset: null, options: {} }).commitMessageChosen).toBeUndefined()
   })
 
-  it("the step's choices: an ambiguous Hive's switched (in force and kept), a proven one and the branch's own kept", () => {
+  it("the step's choices: an ambiguous Combwork's switched (in force and kept), a proven one and the branch's own kept", () => {
     const wf = { platform: 'git' as const, preset: 'pair' as const, options: filled() }
     expect(settledCommitMessage(wf, false)?.options).not.toHaveProperty('commitMessage')
     expect(settledCommitMessage(wf, true)).toBeNull()
@@ -1152,13 +1152,13 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     expect(wsFile.stepsDone).toContain(COMMIT_MESSAGE_STEP)
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
     expect((await form.workflowForm(w, repo)).options.commitMessage).toBe('branch')
-    // Hive's chosen afterwards: kept by a second run.
+    // Combwork's chosen afterwards: kept by a second run.
     await w.mutateProjectConfig(repo, (c) => ({ workflow: writeWorkflow(c.workflow, { platform: 'git', preset: c.workflow!.preset, options: { ...c.workflow!.options, commitMessage: 'hive' } }) }))
     expect(await settleCommitMessageDefault(w)).toBe(0)
     expect((await w.projectConfig(repo)).workflow!.options.commitMessage).toBe('hive')
   })
 
-  it("Hive's proven by the mark or by the board's merge choice (HI-1697) is kept", async () => {
+  it("Combwork's proven by the mark or by the board's merge choice (HI-1697) is kept", async () => {
     const marked = await workspace({ project: { commitMessage: 'hive' }, preset: null })
     await marked.w.mutateProjectConfig(marked.repo, (c) => ({ workflow: { ...c.workflow!, commitMessageChosen: true } }))
     expect(await settleCommitMessageDefault(marked.w)).toBe(0)
@@ -1170,7 +1170,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     expect((await answered.w.projectConfig(answered.repo)).workflow!.options.commitMessage).toBe('hive')
   })
 
-  it("answered Hive's while inheriting it from the workspace: written into its own options before the workspace's goes, through a failed save and its retry (HR3's note on s26)", async () => {
+  it("answered Combwork's while inheriting it from the workspace: written into its own options before the workspace's goes, through a failed save and its retry (HR3's note on s26)", async () => {
     const { commitMessage: _m, ...inheriting } = filled()
     const { w, repo, ws } = await workspace({ project: inheriting, preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
     const name = basename(repo)
@@ -1178,7 +1178,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
     try {
       await settleCommitMessageDefault(w)
-      // The project's own Hive's is written first; the workspace's stays, as the save failed, and nothing is marked.
+      // The project's own Combwork's is written first; the workspace's stays, as the save failed, and nothing is marked.
       expect((await w.projectConfig(repo)).workflow).toMatchObject({ commitMessageChosen: true, options: { commitMessage: 'hive' } })
       expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
       expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
@@ -1191,11 +1191,11 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
   })
 
-  it("answered Hive's inherited in the Git options a None project keeps: written there too, so switching back to Git is still Hive's (HR3's round 1)", async () => {
+  it("answered Combwork's inherited in the Git options a None project keeps: written there too, so switching back to Git is still Combwork's (HR3's round 1)", async () => {
     const { setKept } = await import('../src/shared/workflow/projectWorkflow')
     const { commitMessage: _m, ...inheriting } = filled()
     const { w, repo, ws } = await workspace({ project: inheriting, preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
-    // On None now, its Git options kept (#1419), inheriting Hive's from the workspace.
+    // On None now, its Git options kept (#1419), inheriting Combwork's from the workspace.
     await w.mutateProjectConfig(repo, (c) => ({ workflow: setKept(c.workflow!, 'none') }))
     expect((await w.projectConfig(repo)).workflow).toMatchObject({ platform: 'none', kept: { git: { preset: 'pair' } } })
     const name = basename(repo)
@@ -1212,7 +1212,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     const wsFile = JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8'))
     expect(wsFile.workflow.git).not.toHaveProperty('commitMessage')
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
-    // Back on Git: its own Hive's, over the workspace's defaults as they are now.
+    // Back on Git: its own Combwork's, over the workspace's defaults as they are now.
     const back = setKept((await w.projectConfig(repo)).workflow!, 'git')
     expect(back.commitMessageChosen).toBe(true)
     expect(resolveOptions('git', { workspace: wsFile.workflow, project: back.options }).options.commitMessage).toBe('hive')
@@ -1226,7 +1226,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
       expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
       expect((await w.projectConfig(repo)).stepsDone).toContain(COMMIT_MESSAGE_STEP)
       expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
-      // Hive's chosen on the project before the retry: the project's record keeps the retry off it.
+      // Combwork's chosen on the project before the retry: the project's record keeps the retry off it.
       await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, commitMessage: 'hive' } } }))
     } finally {
       save.mockRestore()
@@ -1237,7 +1237,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
   })
 
-  it("Hive's own defaults: switched with their record only once the save reaches the disk", async () => {
+  it("Combwork's own defaults: switched with their record only once the save reaches the disk", async () => {
     const was = { workflow: config.settings.workflow, stepsDone: config.settings.stepsDone }
     const save = vi.spyOn(config, 'saveNow').mockResolvedValueOnce(false)
     try {
@@ -1251,7 +1251,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
       await settleGlobalCommitMessage()
       expect(config.settings.workflow).toEqual({ git: { review: 'agent' } })
       expect(config.settings.stepsDone).toContain(COMMIT_MESSAGE_STEP)
-      // Done: Hive's chosen since is kept.
+      // Done: Combwork's chosen since is kept.
       config.settings.workflow = { git: { commitMessage: 'hive' } }
       await settleGlobalCommitMessage()
       expect(config.settings.workflow).toEqual({ git: { commitMessage: 'hive' } })
@@ -1293,7 +1293,7 @@ describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)",
     expect((await w.projectConfig(repo)).copies).toEqual({})
   })
 
-  it("Hive's and the workspace's copied files (HI-1765): set, none or inherit at each level, the project's own winning, each with its origin", async () => {
+  it("Combwork's and the workspace's copied files (HI-1765): set, none or inherit at each level, the project's own winning, each with its origin", async () => {
     const { setSlotDefault, slotLevelForm, projectSlotCopy, setSlotSetting } = await import('../src/main/slotSettings')
     const saved = config.settings.slotDefaults
     try {
@@ -1304,7 +1304,7 @@ describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)",
       await setSlotDefault(w, 'global', 'copy', 'hive.env')
       expect(await projectSlotCopy(w, repo)).toEqual({ value: 'hive.env', origin: 'global' })
       expect(slotLevelForm(w, 'workspace')).toEqual({ own: {}, inherited: { copy: { value: 'hive.env', origin: 'global' } } })
-      // The workspace's none (an empty value) is kept over Hive's, in workspace.json.
+      // The workspace's none (an empty value) is kept over Combwork's, in workspace.json.
       await setSlotDefault(w, 'workspace', 'copy', '')
       expect(await projectSlotCopy(w, repo)).toEqual({ value: '', origin: 'workspace' })
       expect(JSON.parse(readFileSync(join(w.path!, '.combwork', 'workspace.json'), 'utf8')).slotDefaults).toEqual({ copy: '' })

@@ -1,7 +1,7 @@
 // Unit tests run in Node, whose libuv asserts (and kills the worker: "Assertion failed: !_wcsnicmp(filename, dir, dirlen),
 // file src\win\fs-event.c") when fs.watch watches a folder by its 8.3 short name and a file in it is reported by its short
 // name too. GitHub's runner has its temp folder at C:\Users\RUNNER~1\…, so any test watching a workspace in tmpdir() can
-// hit it. Electron's libuv doesn't assert (checked, #389), so Hive itself is unaffected. Here every watch watches the
+// hit it. Electron's libuv doesn't assert (checked, #389), so Combwork itself is unaffected. Here every watch watches the
 // folder's real path instead: the same folder, and the same file names relative to it. Tests make their folders by their
 // real paths (tests/tempDir.ts, #448); this keeps a test that watches a short name on purpose (tests/pathAliases.ts) safe.
 import fs from 'fs'

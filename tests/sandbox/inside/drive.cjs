@@ -1,15 +1,15 @@
 /**
- * Runs inside the Sandbox, as the user, with the host's Node, Hive's own playwright-core and Hive's tests folder (this
+ * Runs inside the Sandbox, as the user, with the host's Node, Combwork's own playwright-core and Combwork's tests folder (this
  * file's, tests\sandbox\inside, is in it) mapped read-only by the Sandbox checks (tests\sandbox\checks.cjs):
  *   C:\tools\node\node.exe C:\tools\hive-tests\sandbox\inside\drive.cjs <step> <prefix>
- * Drives the installed Hive (%LOCALAPPDATA%\Programs\Hive\Hive.exe, its real profile %APPDATA%\Hive) with Playwright's
- * _electron, as Hive's e2e suites do, and writes C:\out\<prefix>.json ({ step, checks: [{ id, scenario, name, ok, detail }],
+ * Drives the installed app (Combwork, or Hive Desktop before an upgrade, and its real profile: see HIVE_EXE and PROFILE below) with Playwright's
+ * _electron, as Combwork's e2e suites do, and writes C:\out\<prefix>.json ({ step, checks: [{ id, scenario, name, ok, detail }],
  * facts, shots, completed }) and window PNGs C:\out\<prefix>-<name>.png. completed is true only once the whole step ran
  * (the file is saved as it goes, so an interrupted step leaves a record without it). Network off, fake CLIs only.
  * Steps:
  *   first-run     scenarios 1 and 2: the first screen, no-CLI banners, Provider Setup's three providers, both themes
  *   cli-appears   scenario 3: Claude Code turned on, a stand-in installer puts the e2e fake on the user PATH, and
- *                 Provider Setup's "Check again" finds it without restarting Hive
+ *                 Provider Setup's "Check again" finds it without restarting Combwork
  *   workspace     scenario 6: a new workspace in the fresh install (its .combwork, views and status), for the fresh-install comparison
  *   mark          scenario 4, before the upgrade: change two settings (user name, theme), and two Advanced
  *                 overrides under the old hive.* ids (Combwork's own and a workspace's own, HI-2518)
@@ -46,7 +46,7 @@ const res = { step, prefix, at: new Date().toISOString(), checks: [], facts: {},
 const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.stringify(res, null, 2))
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
-// When what it reads is ready: conditions Hive says are met, each bounded (ready.cjs, unit-tested in hive's npm test).
+// When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in hive's npm test).
 const { until, workspaceSetUp, VIEWS, viewReady } = require(path.join(__dirname, 'ready.cjs'))
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
 const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PROFILE, 'config.json'), 'utf8')) } catch { return null } }
@@ -55,7 +55,7 @@ let app
 let page
 const inv = (channel, ...args) => page.evaluate(([c, a]) => window.hive.invoke(c, ...a), [channel, args])
 
-/** Hive instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
+/** Combwork instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
 function closeRunningHive() {
   const out = ps(`$p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(HIVE_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${HIVE_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } }; Start-Sleep -Seconds 3; $p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(HIVE_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${HIVE_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }; @($p).Count`)
   return Number(out) || 0
@@ -68,7 +68,7 @@ async function launch() {
   page.on('pageerror', e => { (res.facts.pageErrors ||= []).push(String(e.message).slice(0, 300)) })
   await page.waitForSelector('.app .workbench', { timeout: 90_000 })
   res.facts.launchMs = Date.now() - t0
-  // Ready once every provider check has finished (as Hive's e2e lib does).
+  // Ready once every provider check has finished (as Combwork's e2e lib does).
   await until(async () => Object.values(await inv('provider:info')).every(i => !i.checking), 60_000)
   res.facts.readyMs = Date.now() - t0
 }
@@ -84,7 +84,7 @@ async function shot(name) {
   save()
 }
 
-/** Sets the theme, and waits until the window shows it and Hive has saved it (it saves 300 ms after a change). */
+/** Sets the theme, and waits until the window shows it and Combwork has saved it (it saves 300 ms after a change). */
 async function theme(t) {
   await inv('settings:update', { appearance: { theme: t } })
   await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === t && readConfig()?.settings?.appearance?.theme === t, 5000)
@@ -115,7 +115,7 @@ async function providerSetup() {
 /** HKCU's Run values that start Hive.exe or Combwork.exe (Launch at login): [{ name, command }]. */
 function runValues() {
   try {
-    const out = ps("$k = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'; if (Test-Path $k) { $i = Get-Item $k; @($i.Property | ForEach-Object { [ordered]@{ name = $_; command = [string]$i.GetValue($_) } } | Where-Object { $_.command -match 'Hive\\.exe|Combwork\\.exe' }) | ConvertTo-Json -Compress }")
+    const out = ps("$k = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'; if (Test-Path $k) { $i = Get-Item $k; @($i.Property | ForEach-Object { [ordered]@{ name = $_; command = [string]$i.GetValue($_) } } | Where-Object { $_.command -match 'Combwork\\.exe|Combwork\\.exe' }) | ConvertTo-Json -Compress }")
     if (!out) return []
     const v = JSON.parse(out)
     return Array.isArray(v) ? v : [v]
@@ -189,11 +189,11 @@ const steps = {
     // The stand-in installer: the e2e fake Claude Code copied into the user's programs, on the user PATH (registry).
     res.facts.install = ps('& C:\\tools\\hive-tests\\sandbox\\inside\\fake-claude-install.ps1')
     const hivePath = await app.evaluate(() => process.env.PATH || process.env.Path || '')
-    check('3.user-path', 'The new folder is on the user PATH, not on Hive\'s own PATH yet', !hivePath.toLowerCase().includes('fakeclaude'), hivePath.slice(0, 300))
+    check('3.user-path', 'The new folder is on the user PATH, not on Combwork\'s own PATH yet', !hivePath.toLowerCase().includes('fakeclaude'), hivePath.slice(0, 300))
     if (dialog) await dialog.locator('button', { hasText: 'Check again' }).click()
     const found = dialog && await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)
     res.facts.after = found || (await inv('provider:info'))['claude-code']
-    check('3.check-again-finds', '"Check again" finds it, without restarting Hive', found && found.source === 'PATH' && found.version === '2.1.999' && /claude\.cmd$/i.test(found.path || '') && app.process().pid === pid, dialog ? JSON.stringify(res.facts.after) : `${NO_DIALOG}, so "Check again" was never pressed; ${JSON.stringify(res.facts.after)}`)
+    check('3.check-again-finds', '"Check again" finds it, without restarting Combwork', found && found.source === 'PATH' && found.version === '2.1.999' && /claude\.cmd$/i.test(found.path || '') && app.process().pid === pid, dialog ? JSON.stringify(res.facts.after) : `${NO_DIALOG}, so "Check again" was never pressed; ${JSON.stringify(res.facts.after)}`)
     check('3.setup-found', 'Provider Setup shows "Claude Code 2.1.999 — found via …"', dialog && /Claude Code 2\.1\.999 — found via/.test(await dialogText()), await dialogText())
     await shot('found-dark')
     await theme('light')
@@ -208,7 +208,7 @@ const steps = {
     await shot('ready-dark')
   },
 
-  // Scenario 6 (for the fresh-install comparison, no model): what a fresh Hive makes of a new workspace.
+  // Scenario 6 (for the fresh-install comparison, no model): what a fresh Combwork makes of a new workspace.
   async workspace() {
     await launch()
     const ws = path.join(process.env.USERPROFILE, 'Workspaces', 'Fresh')
@@ -221,7 +221,7 @@ const steps = {
       if (!fs.existsSync(dir)) return null
       return fs.readdirSync(dir, { withFileTypes: true }).map(e => (e.isDirectory() ? { [e.name]: depth > 1 ? tree(path.join(dir, e.name), depth - 1) : '(folder)' } : e.name))
     }
-    // Recorded once Hive has set the workspace up: its status names it with its Hive skills, which it replies with only
+    // Recorded once Combwork has set the workspace up: its status names it with its Combwork skills, which it replies with only
     // once the open has brought the bundled skills and modes up to date. Not set up within the bound: the check fails,
     // and what is there is kept apart (hiveNotSetUp), never recorded as the workspace's.
     const status = await workspaceSetUp(() => api('/v1/status'), ws)
@@ -230,7 +230,7 @@ const steps = {
     else res.facts.hiveNotSetUp = now
     res.facts.projectHive = tree(path.join(ws, 'demo', '.combwork'), 1)
     try { res.facts.workspaceJson = JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'workspace.json'), 'utf8')) } catch { /* recorded as missing */ }
-    check('6.hive-folder', 'Hive creates the workspace\'s .combwork folder and sets it up (its status lists its Hive skills)', status && Array.isArray(res.facts.hive), status ? 'no .combwork folder' : `Hive didn't say the workspace was set up within 60 s (GET /v1/status): ${JSON.stringify(now).slice(0, 300)}`)
+    check('6.hive-folder', 'Combwork creates the workspace\'s .combwork folder and sets it up (its status lists its Combwork skills)', status && Array.isArray(res.facts.hive), status ? 'no .combwork folder' : `Combwork didn't say the workspace was set up within 60 s (GET /v1/status): ${JSON.stringify(now).slice(0, 300)}`)
     res.facts.status = status && { workspace: status.workspace, workspaces: status.workspaces, providers: status.providers && Object.keys(status.providers) }
     res.facts.projects = await api('/v1/projects').catch(e => ({ error: String(e) }))
     res.facts.views = {}
@@ -334,7 +334,7 @@ const steps = {
     res.facts.runAfter = runs || runValues()
     check('4.login-moved', 'Launch at login starts Combwork.exe, and nothing starts Hive.exe', !!runs && !runs.some((x) => /\\Hive\.exe/i.test(x.command)), JSON.stringify(res.facts.runAfter))
     const fallback = await page.locator('.toast', { hasText: "Hive Desktop's data folders" }).count()
-    check('4.no-fallback', 'No notice that Hive runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
+    check('4.no-fallback', 'No notice that Combwork runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
     // The workspace made before the upgrade, opened (again, or restored at start): its .hive folders moved to .combwork,
     // its board and the card's path with them (HI-2462, HI-2506).
     await inv('workspace:open', KEPT_WS).catch(() => undefined)
@@ -378,7 +378,7 @@ const steps = {
     process.exitCode = 1
   } finally {
     if (app) {
-      // Every settings change above waited for Hive to save it (mark, theme), so it can close now.
+      // Every settings change above waited for Combwork to save it (mark, theme), so it can close now.
       await app.close().catch(e => { res.closeError = String(e) })
     }
     save()

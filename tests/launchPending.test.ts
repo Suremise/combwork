@@ -57,9 +57,9 @@ describe("a launch's task until its CLI takes it (#712)", () => {
   })
 })
 
-// #721: nothing of Hive's is typed into it in that gap (the line writer's and the watch wakes' check), also when a watch
+// #721: nothing of Combwork's is typed into it in that gap (the line writer's and the watch wakes' check), also when a watch
 // of the agent's outlived its last launch and shows its ready as watching (round 1 finding 1), or ends meanwhile.
-describe("no line of Hive's before its CLI takes the launch's task (#721)", () => {
+describe("no line of Combwork's before its CLI takes the launch's task (#721)", () => {
   const watched = { current: false }
   let spy: ReturnType<typeof vi.spyOn>
   beforeEach(() => {

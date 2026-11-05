@@ -50,7 +50,7 @@ describe('which slots are listed (#1450)', () => {
     const agents = new Set(['r1'])
     expect(homeListed('C:\\h', [], agents, same)).toBe(true)
     expect(homeListed('C:\\h', [{ cwd: 'c:\\H', agentId: 'r1' }], agents, same)).toBe(false)
-    // The agent is gone: its conversations can't be resumed from Hive any more.
+    // The agent is gone: its conversations can't be resumed from Combwork any more.
     expect(homeListed('C:\\h', [{ cwd: 'C:\\h', agentId: 'r9' }], agents, same)).toBe(true)
   })
 })

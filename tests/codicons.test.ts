@@ -1,5 +1,5 @@
-// Two copies of the Codicons font: @vscode/codicons (Hive's icons) and Monaco's, both named "codicon"; whichever the
-// page settles on draws every icon. That is only safe while they agree: each of Hive's icons at the same codepoint
+// Two copies of the Codicons font: @vscode/codicons (Combwork's icons) and Monaco's, both named "codicon"; whichever the
+// page settles on draws every icon. That is only safe while they agree: each of Combwork's icons at the same codepoint
 // in Monaco's font. An upgrade of either that breaks this would draw wrong icons once an editor has loaded.
 import { readFileSync } from 'fs'
 import { describe, expect, it } from 'vitest'
@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 const read = (rel: string): string => readFileSync(new URL(`../node_modules/${rel}`, import.meta.url), 'utf8')
 
 describe('the two Codicons fonts', () => {
-  it("Monaco's has each of Hive's icons at the same codepoint", () => {
+  it("Monaco's has each of Combwork's icons at the same codepoint", () => {
     const hive = new Map<string, number>()
     for (const m of read('@vscode/codicons/dist/codicon.css').matchAll(/\.codicon-([\w-]+):before\s*\{\s*content:\s*"\\([0-9a-f]+)"/g)) hive.set(m[1], parseInt(m[2], 16))
     const monaco = new Map<string, number>()

@@ -217,7 +217,7 @@ describe('removeCheckedWorktree', () => {
   })
 })
 
-// Paths Hive was given by another name than git's (#389): GitHub's runner has its temp folder at C:\Users\RUNNER~1\…, and
+// Paths Combwork was given by another name than git's (#389): GitHub's runner has its temp folder at C:\Users\RUNNER~1\…, and
 // git lists worktrees by their real, long names. Compared by real paths, they are the same worktree; anything else still
 // isn't one.
 describe('paths by another name: an 8.3 short name or a junction (#389)', () => {

@@ -1,4 +1,4 @@
-// HI-1693: a lane agent left with no card watch (a notice ended it, or its limit) isn't stalled while Hive's loop wakes
+// HI-1693: a lane agent left with no card watch (a notice ended it, or its limit) isn't stalled while Combwork's loop wakes
 // will bring it the other side's move: a builder waiting for its verdict or for its design's answer, a reviewer waiting
 // for the next submission. Once the move is its own again (a verdict sends the card back, a step waits for its
 // reviewer's answer), or nothing can wake it (loop wakes off, no inbox), it is flagged after the grace, as before (#376).

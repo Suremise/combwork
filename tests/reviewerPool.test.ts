@@ -151,7 +151,7 @@ function lane(e: Env, id: string, cards: number[], builder: string, reviewer: st
   state.lanes.push({ id, project: 'project', name: null, builder: { id: builder, name: builder }, reviewer: reviewer ? { id: reviewer, name: reviewer } : null, cards, rounds: 10, waitMinutes: 360, state: 'active', startedBy: 'the user', startedAt: t, updatedAt: t, endedAt: null, mergeCommit: null, ...(reviewer ? {} : { pool: true as const }) })
 }
 
-/** Runs SQL on the workspace's hive.db on a connection of its own, as another Hive (or the slots' own writes) would. */
+/** Runs SQL on the workspace's hive.db on a connection of its own, as another Combwork (or the slots' own writes) would. */
 function onDb<T>(e: Env, fn: (db: DatabaseSync) => T): T {
   const db = new DatabaseSync(boardFile(e.home))
   try {
@@ -211,7 +211,7 @@ const pass = (e: Env, agents?: AgentDef[]): Promise<void> => settleReviewerPool(
 /** The wakes and pool asks a submission left to run (the harness doesn't run them: autoRun off). */
 const pending = (e: Env): { kind: string; agent?: unknown }[] => e.store.pendingActions().map((a) => ({ kind: a.kind, agent: a.payload.agent }))
 
-/** Pair's options with these, made to hold together: Hive merges in slots, Committed is done in the project folder. */
+/** Pair's options with these, made to hold together: Combwork merges in slots, Committed is done in the project folder. */
 const optionsFor = (reviewers: 1 | 2, reviewerMode: 'lane' | 'pool', folder: 'slots' | 'project'): WorkflowOptions => ({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: 'main', reviewers, reviewerMode, folder, slotsUpToDate: folder === 'slots', finish: folder === 'slots' ? 'hiveMerges' : 'committed', identity: null, stopOwnRuns: false })
 
 describe('the option G17 (#1443)', () => {

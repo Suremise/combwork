@@ -39,7 +39,7 @@ afterEach(() => {
 describe('choosing the language', () => {
   const all = LANGUAGES.map((l) => l.code)
 
-  it('matches Windows tags to Hive languages', () => {
+  it('matches Windows tags to Combwork languages', () => {
     expect(matchLanguage('de-AT')).toBe('de')
     expect(matchLanguage('pt-PT')).toBe('pt-BR')
     expect(matchLanguage('pl_PL')).toBe('pl')
@@ -281,7 +281,7 @@ describe("main's language", () => {
 })
 
 describe('agent-facing scripts never load the translations', () => {
-  // hive-mcp.js and hive-progress.js run outside the asar with Node built-ins and Hive's own chunks only (AGENTS.md):
+  // hive-mcp.js and hive-progress.js run outside the asar with Node built-ins and Combwork's own chunks only (AGENTS.md):
   // a shared module they import that imports a package the build leaves in node_modules would break them, and
   // agent-facing text stays English. The one package they reach is agent text's formatter, intl-messageformat, which the
   // build bundles into the chunks (electron.vite.config.ts, HI-2433); never the window's translations. msg.ts and
@@ -346,7 +346,7 @@ describe('the e2e build follows the translations', () => {
 })
 
 describe('tests run in English', () => {
-  it('a test Hive is pinned to English unless a suite says otherwise', () => {
+  it('a test Combwork is pinned to English unless a suite says otherwise', () => {
     const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { hiveEnv: (vars?: Record<string, string>, parent?: Record<string, string>) => Record<string, string> }
     expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, { HIVE_LANG: 'pl' }).HIVE_LANG).toBe('en')
     expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p', HIVE_LANG: 'en-XA' }, {}).HIVE_LANG).toBe('en-XA')

@@ -1,5 +1,5 @@
 // HI-2186: a scenario's measures for its subject (the Assistant, or the agent under test) apart from the other agents
-// (a lane's builder and reviewer, agents it or Hive started). The harness (tests/scenarios/benchmark.cjs) measures each
+// (a lane's builder and reviewer, agents it or Combwork started). The harness (tests/scenarios/benchmark.cjs) measures each
 // part from its own series or log lines, never one as the total less the other, and leaves unknown what it can't say;
 // Compare (src/shared/benchmark.ts) shows them only when both sides have them, and says when it shows totals instead.
 import { readFileSync } from 'fs'
@@ -43,7 +43,7 @@ const lanes = [
 ]
 /** The two metrics snapshots' requests: the measured window is between them. */
 const snapshots = { before: { start: '2026-10-31T01:00:00.050Z', end: '2026-10-31T01:00:00.100Z' }, after: { start: '2026-10-31T01:01:00.000Z', end: '2026-10-31T01:01:00.050Z' } }
-/** When a report reached Hive: between the snapshots (the default), before the first, or after the last. */
+/** When a report reached Combwork: between the snapshots (the default), before the first, or after the last. */
 const IN = { sentAt: '2026-10-31T01:00:10.000Z', doneAt: '2026-10-31T01:00:10.010Z' }
 const EARLY = { sentAt: '2026-10-31T00:59:59.500Z', doneAt: '2026-10-31T00:59:59.510Z' }
 let seq = 0
@@ -59,7 +59,7 @@ const log = (calls: any[], lists: any[] = [], reports?: object[]) => ({ hiveCall
 const logOf = (...who: Who[]) => log(who.map((w) => call(w)), who.map((w) => list(w)))
 const assistantSubject = (extra: object = {}) => ({ kind: 'assistant', agentId: 'assistant', snapshots, complete: true, roster, lanes, ...extra })
 const coderSubject = (extra: object = {}) => ({ kind: 'agent', agentId: 'a-coder', snapshots, complete: true, roster, lanes, ...extra })
-/** A report with Hive's own start-view record of the Assistant (a tool call in the metrics, in no server's log). */
+/** A report with Combwork's own start-view record of the Assistant (a tool call in the metrics, in no server's log). */
 const withStartView = (r: any) => ({ ...r, workspace: { ...r.workspace, mcp: [...r.workspace.mcp, { role: 'assistant', tool: 'session start view', mode: 'compact', outcome: 'ok', count: 1, chars: 900, bytes: 900, totalMs: 1 }] } })
 /** Project agents' report with `n` calls of `chars` in all, and `lists` tool lists. */
 const agentsReport = (n: number, chars: number, lists = 0) => {
@@ -76,7 +76,7 @@ describe('the harness measures the subject apart from the other agents (benchmar
   it('the Assistant as subject: every measure by caller role, and the parts add up to the total where coverage is whole', () => {
     const observed = logOf(A, A, CODER, IMPL, IMPL)
     const m = measuresOf(report(0, 0), withStartView(report(2, 3)), observed, null, assistantSubject())
-    // Hive's start view is the Assistant's tool call in the metrics (and its reply its context), in no server's log.
+    // Combwork's start view is the Assistant's tool call in the metrics (and its reply its context), in no server's log.
     expect(m.subject).toMatchObject({ apiRequests: 2, toolCalls: 3, toolChars: 910, launches: 1, coreBytes: 200, toolListStarts: 2, toolListBytes: 100, toolListChars: 98 })
     expect(m.others).toMatchObject({ apiRequests: 3, toolCalls: 3, toolChars: 15, launches: 1, toolListStarts: 3 })
     expect(m).not.toHaveProperty('split')
@@ -147,9 +147,9 @@ describe('the harness measures the subject apart from the other agents (benchmar
   })
 
   describe('the window holds the very calls the metrics counted between the snapshots, by each one’s report (HR3 rounds 1 and 2)', () => {
-    it('crossings that cancel out: the call Hive took between the snapshots is the one counted, whatever was logged when', () => {
+    it('crossings that cancel out: the call Combwork took between the snapshots is the one counted, whatever was logged when', () => {
       // HR3's probe: Implementer's 100-character call was logged before the first snapshot but reported after it; Coder's
-      // 10-character call was logged after the first snapshot was asked for, yet Hive already had it then. One call each
+      // 10-character call was logged after the first snapshot was asked for, yet Combwork already had it then. One call each
       // side, but not the same call: the window is Implementer's.
       const other = call(IMPL, '2026-10-31T00:59:59.000Z', true, { chars: 100, bytes: 100 })
       const subj = call(CODER, '2026-10-31T01:00:00.001Z')
@@ -175,7 +175,7 @@ describe('the harness measures the subject apart from the other agents (benchmar
       const unreported = measuresOf(report(0, 0), report(0, 1), log([call(CODER)], [], []), null, coderSubject())
       expect(unreported).not.toHaveProperty('subject')
       expect(unreported.split).toBe('partial')
-      // Two calls alike but for whose they are, one without an id (a log from before HI-2186): which one Hive counted
+      // Two calls alike but for whose they are, one without an id (a log from before HI-2186): which one Combwork counted
       // can't be proved, so neither part is said.
       const a = call(CODER)
       const b = { ...call(IMPL), id: undefined }
@@ -189,7 +189,7 @@ describe('the harness measures the subject apart from the other agents (benchmar
       expect(asst.split).toBe('partial')
     })
 
-    it('calls Hive took before the first snapshot or after the last are no part of the window', () => {
+    it('calls Combwork took before the first snapshot or after the last are no part of the window', () => {
       const setup = call(IMPL, '2026-10-31T00:59:00.000Z')
       const own = call(CODER)
       const late = call(CODER, '2026-10-31T01:01:00.060Z')

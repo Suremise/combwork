@@ -10,7 +10,7 @@ import { settingText } from '../../src/shared/toolReplies'
 import { settingDetail } from '../../src/main/settingsTools'
 
 // #793: the `settings` area. Settings shows the catalogue's rows, its sections and Advanced's list in the user's
-// language, while the Hive Assistant's tools keep their English (#767: the catalogue is also the Assistant's).
+// language, while the Combwork Assistant's tools keep their English (#767: the catalogue is also the Assistant's).
 
 const ROOT = resolve(__dirname, '../..')
 const EN = JSON.parse(readFileSync(join(ROOT, 'locales/en/settings.json'), 'utf8')) as Record<string, { defaultMessage: string; description: string }>

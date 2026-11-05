@@ -1,6 +1,6 @@
-// Hive's skill copies per folder (#1431, SPEC §16.15 C row 15): Codex and Copilot read Hive's skills from copies in the
-// folder's .agents/skills, which Hive records (skill_copies) and removes only when its record and the copy's marker both
-// say Hive made it, the copy is unchanged since and no session of Hive's works there; Settings → Advanced says where
+// Combwork's skill copies per folder (#1431, SPEC §16.15 C row 15): Codex and Copilot read Combwork's skills from copies in the
+// folder's .agents/skills, which Combwork records (skill_copies) and removes only when its record and the copy's marker both
+// say Combwork made it, the copy is unchanged since and no session of Combwork's works there; Settings → Advanced says where
 // (Slots only, Everywhere, Never). The skills delivered are a choice (Skills → Delivered to agents), which the launch,
 // the copies and the guidance follow.
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
@@ -67,7 +67,7 @@ describe('delivery records (#1431)', () => {
     expect(existsSync(join(w.project, '.agents'))).toBe(false)
   })
 
-  it('an edited copy keeps its old record, and is never taken for Hive\'s own', async () => {
+  it('an edited copy keeps its old record, and is never taken for Combwork\'s own', async () => {
     const w = world('deploy')
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
@@ -82,22 +82,22 @@ describe('delivery records (#1431)', () => {
 })
 
 describe('safe clean-up (#1431)', () => {
-  it("removes Hive's own unchanged copies, never a user's skill, an edited copy or a folder with a running session", async () => {
+  it("removes Combwork's own unchanged copies, never a user's skill, an edited copy or a folder with a running session", async () => {
     const w = world('deploy', 'notes', 'review')
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
-    // The user's own skills: one of their own name, one using Hive's prefix.
+    // The user's own skills: one of their own name, one using Combwork's prefix.
     for (const mine of ['mine', 'hive-theirs']) {
       mkdirSync(join(w.slot, '.agents', 'skills', mine), { recursive: true })
       writeFileSync(join(w.slot, '.agents', 'skills', mine, 'SKILL.md'), `# ${mine}`)
     }
     writeFileSync(join(w.copy(w.slot, 'review'), 'SKILL.md'), '# review, edited')
 
-    // A session of Hive's works there: nothing goes.
+    // A session of Combwork's works there: nothing goes.
     expect(await removeHiveCopies(w.slot, w.project, book, () => true)).toEqual([])
     for (const s of ['deploy', 'notes', 'review']) expect(existsSync(w.copy(w.slot, s)), s).toBe(true)
 
-    // None now: Hive's two unchanged copies go, with their records; the edited one and the user's stay.
+    // None now: Combwork's two unchanged copies go, with their records; the edited one and the user's stay.
     expect((await removeHiveCopies(w.slot, w.project, book, () => false)).sort()).toEqual(['deploy', 'notes'])
     expect(existsSync(w.copy(w.slot, 'deploy'))).toBe(false)
     expect(existsSync(w.copy(w.slot, 'notes'))).toBe(false)
@@ -109,7 +109,7 @@ describe('safe clean-up (#1431)', () => {
     expect(readdirSync(join(w.slot, '.agents', 'skills')).filter((f) => f.startsWith('.')).length).toBe(0)
   })
 
-  it("a marked copy from before records is Hive's when unchanged (recorded, then removed); one with an old marker isn't", async () => {
+  it("a marked copy from before records is Combwork's when unchanged (recorded, then removed); one with an old marker isn't", async () => {
     const w = world('deploy', 'legacy')
     // Made without a book (before records): marked, unrecorded.
     await sync(w.slot, w.project, w.sources)
@@ -204,14 +204,14 @@ describe('safe clean-up (#1431)', () => {
       const removed = via === 'clean-up' ? await removeHiveCopies(w.slot, w.project, editing, () => false) : (await sync(w.slot, w.project, [], editing), [])
       expect(removed, via).toEqual([])
       expect(readFileSync(file, 'utf8'), via).toBe('# deploy, my edit')
-      // Its record is at the revision before the edit: never taken for Hive's own again.
+      // Its record is at the revision before the edit: never taken for Combwork's own again.
       expect(await removeHiveCopies(w.slot, w.project, book, () => false), via).toEqual([])
       expect(readFileSync(file, 'utf8'), via).toBe('# deploy, my edit')
       expect(readdirSync(join(w.slot, '.agents', 'skills')).filter((f) => f.startsWith('.')), via).toEqual([])
     }
   })
 
-  it('a skill switched off keeps its copy while another session of Hive\'s works in the folder, and loses it once none does', async () => {
+  it('a skill switched off keeps its copy while another session of Combwork\'s works in the folder, and loses it once none does', async () => {
     const w = world('deploy', 'notes')
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
@@ -340,7 +340,7 @@ describe('choosing the skills delivered (#1431)', () => {
       expect(await names()).toEqual([])
       expect(await names(ws.assistantHome)).toEqual(['helper'])
 
-      // The copies follow the launch's skills: the one switched off goes from Hive's copies at the next launch.
+      // The copies follow the launch's skills: the one switched off goes from Combwork's copies at the next launch.
       const book = memBook()
       const all = ['deploy', 'notes'].map((name) => ({ name, sourcePath: join(w.root, '.combwork', 'skills', name) }))
       await sync(w.slot, w.project, all, book)

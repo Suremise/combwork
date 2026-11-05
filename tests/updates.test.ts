@@ -1,4 +1,4 @@
-// Which update Hive takes, and when it installs one (#1647, src/shared/updates.ts, src/main/buildIdentity.ts): versions
+// Which update Combwork takes, and when it installs one (#1647, src/shared/updates.ts, src/main/buildIdentity.ts): versions
 // by semver with prereleases, a local build offered (never given) a release of its own version, and a downloaded update
 // installed only over an older copy read from disk, never one that can't be read.
 import { mkdirSync, writeFileSync } from 'fs'

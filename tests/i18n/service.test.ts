@@ -103,7 +103,7 @@ describe('refusals: English for agents and the log as before, the window in its 
       [await caught(() => files.move(proj, ['sub/a.txt'], '')), '"a.txt" already exists in the project root', 500, '„a.txt“ gibt es im Projektordner schon'],
       [await caught(() => gitDiff(proj, '../x')), 'Path is outside the project', 500, 'Der Pfad liegt außerhalb des Projekts'],
       [await caught(() => gitRepo.createTag(proj, 'a..b', '')), "a..b isn't a valid tag name.", 500, 'a..b ist kein gültiger Tag-Name.'],
-      // The Git view's checks shared with its dialogs (#871): English in the message, whatever language Hive shows.
+      // The Git view's checks shared with its dialogs (#871): English in the message, whatever language Combwork shows.
       [await caught(() => gitRepo.addRemote(proj, '', 'https://example.com/r.git')), 'Enter a name', 500, 'Gib einen Namen ein'],
       [await caught(() => gitRepo.setRemoteUrl(proj, 'origin', ' ')), 'Enter a URL', 500, 'Gib eine URL ein'],
       [await caught(() => gitRepo.setIdentity(proj, 'A', 'nope')), "That isn't an email address", 500, 'Das ist keine E-Mail-Adresse'],
@@ -121,7 +121,7 @@ describe('refusals: English for agents and the log as before, the window in its 
     }
   })
 
-  it("keeps a lane's refusals to agents English, with their status, whatever language Hive shows", () => {
+  it("keeps a lane's refusals to agents English, with their status, whatever language Combwork shows", () => {
     setLanguage('de', GERMAN)
     const e = new lanes.LaneError(400, "A lane's builder can't be its reviewer")
     expect(e).toBeInstanceOf(HiveError)

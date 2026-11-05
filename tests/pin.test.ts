@@ -1,4 +1,4 @@
-// Always on Top (src/main/pin.ts): per window, remembered by workspace in Hive's own config, following the workspace
+// Always on Top (src/main/pin.ts): per window, remembered by workspace in Combwork's own config, following the workspace
 // the window shows.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppConfig } from '../src/shared/types'

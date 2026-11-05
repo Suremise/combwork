@@ -35,7 +35,7 @@ async function workspace(): Promise<{ ws: string; w: WS }> {
 }
 
 const at = (i: number): string => new Date(Date.UTC(2026, 9, 1, 0, 0, i)).toISOString()
-/** A large card (in the form Hive saves one): hundreds of comments and history lines, labels, links, holds, a decision. */
+/** A large card (in the form Combwork saves one): hundreds of comments and history lines, labels, links, holds, a decision. */
 const bigCard = (num: number): Record<string, unknown> => ({
   number: num,
   title: 'A big card',
@@ -90,7 +90,7 @@ describe("a card's save writes what changed (#1210)", () => {
   it('a comment through the board (commentTask) writes a few rows, not the card again', async () => {
     const { ws, w } = await workspace()
     // Its links to cards the board has (a link to a card that isn't there is dropped as the card is saved).
-    // With its project's id, as Hive saves a card (one saved without would take it, and its number there, #1219, now).
+    // With its project's id, as Combwork saves a card (one saved without would take it, and its number there, #1219, now).
     const projectId = [...(await w.projectIds()).byId.keys()][0]
     await inWorkspace(w, () => writeCard(w, 1, { ...bigCard(1), blockedBy: [], links: [], projectId }))
     // Its comment and the card's own row (its time): never its 600 other entries.
@@ -115,7 +115,7 @@ describe("a card's save writes what changed (#1210)", () => {
         case 5: d.links = rnd(2) ? [...d.links, 10 + step] : d.links.slice(0, -1); d.blockedBy = rnd(2) ? [] : [5, 6]; break
         case 6: d.held = [...d.held, { agent: 'a1', name: 'Agent 1', role: 'review', from: at(step), to: null }]; break
         case 7: d.title = `Title ${step}`; d.updatedAt = at(4000 + step); break
-        // An entry not of Hive's form (kept as its raw JSON) and a field Hive doesn't know.
+        // An entry not of Combwork's form (kept as its raw JSON) and a field Combwork doesn't know.
         default: d.comments.push({ odd: true, step } as Record<string, unknown>); (d as Record<string, unknown>).custom = { step }; break
       }
       doc = d
@@ -139,7 +139,7 @@ describe('costs read what they need of the cards (#1210)', () => {
     expect(await inWorkspace(w, () => tasks.costCards(w, []))).toEqual([])
   })
 
-  /** Cards from before Hive kept holds (no `held`): their holds come from their history and their agent and reviewer now. */
+  /** Cards from before Combwork kept holds (no `held`): their holds come from their history and their agent and reviewer now. */
   const unheld = (num: number): Record<string, unknown> => {
     const { held: _held, ...card } = bigCard(num)
     return {

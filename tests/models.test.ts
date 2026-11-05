@@ -67,7 +67,7 @@ describe("Claude Code's initialize reply (2.1.289)", () => {
   })
 
   it('reads an older or odd reply defensively: unknown fields ignored, missing ones left out, garbage is null', () => {
-    // An older CLI without the per-model flags says nothing about effort or Auto: Hive falls back for them.
+    // An older CLI without the per-model flags says nothing about effort or Auto: Combwork falls back for them.
     const old = parseClaudeInitialize({ models: [{ value: 'opus', displayName: 'Opus' }, { value: 'haiku', resolvedModel: 'haiku', weird: 1 }] })!
     expect(old.models).toEqual([{ value: 'opus', label: 'Opus' }, { value: 'haiku', label: 'haiku' }])
     // Odd entries are skipped; levels that aren't strings are dropped.
@@ -141,7 +141,7 @@ describe("an alias and the model it stands for (#248), from Claude Code 2.1.289'
   it('footers: the Assistant on "Opus" and an agent on the default both run Opus 5.5', () => {
     expect(agentModelShown('claude-code', 'opus', '', info)).toEqual({ label: 'Opus 5.5', chosenAs: 'Opus' })
     expect(agentModelShown('claude-code', 'inherit', '', info)).toEqual({ label: 'Opus 5.5 (default)', chosenAs: null })
-    // Inherited from Hive's default, an alias.
+    // Inherited from Combwork's default, an alias.
     expect(agentModelShown('claude-code', 'inherit', 'sonnet', info)).toEqual({ label: 'Sonnet 5.5 (default)', chosenAs: 'Sonnet' })
     expect(agentModelShown('claude-code', 'claude-opus-4-8', '', info)).toEqual({ label: 'Opus 4.8', chosenAs: null })
     expect(effectiveModelLabel('claude-code', 'fable', '', info)).toBe('Fable 5.1')
@@ -191,7 +191,7 @@ describe("an alias and the model it stands for (#248), from Claude Code 2.1.289'
 
   it('a running session shows the model it reports, whatever was chosen', () => {
     expect(agentModelShown('claude-code', 'opus', '', info, 'claude-opus-5-5')).toEqual({ label: 'Opus 5.5', chosenAs: 'Opus' })
-    // The CLI picked another model than the alias resolved to when Hive last asked: the session says what runs.
+    // The CLI picked another model than the alias resolved to when Combwork last asked: the session says what runs.
     expect(agentModelShown('claude-code', 'opus', '', info, 'claude-opus-5-6')).toEqual({ label: 'Opus 5.6', chosenAs: 'Opus' })
     expect(agentModelShown('claude-code', 'inherit', '', info, 'claude-sonnet-5-5')).toEqual({ label: 'Sonnet 5.5 (default)', chosenAs: null })
   })
@@ -305,7 +305,7 @@ describe('the pickers: the CLI is the source, the editable fallback otherwise', 
     expect(effortLabel('codex', undefined, 'inherit', '', 'medium')).toBe('Medium (default)')
     expect(effortLabel('codex', 'high', 'inherit', '', 'medium')).toBe('High')
     expect(effortLabel('codex', undefined, 'inherit', '', null)).toBeNull()
-    // The user's names for the levels, as in the pickers: chosen, live, global and the default alike (#230); reset, Hive's.
+    // The user's names for the levels, as in the pickers: chosen, live, global and the default alike (#230); reset, Combwork's.
     const named = settingsWith('codex', { effortFallback: [{ value: 'medium', label: 'Mid' }, { value: 'high', label: 'Deep' }] })
     expect(effortLabel('codex', undefined, 'inherit', '', 'medium', named)).toBe('Mid (default)')
     expect(effortLabel('codex', 'high', 'inherit', '', 'medium', named)).toBe('Deep')
@@ -347,7 +347,7 @@ describe("price tables follow the CLI's model list (#436)", () => {
     expect(listedPriceModels('codex', null)).toBeNull()
   })
 
-  // A CLI update adds a model Hive has no price for.
+  // A CLI update adds a model Combwork has no price for.
   const newer = { ...codex, models: [...codex.models, { value: 'gpt-reserve', label: 'GPT Reserve' }] }
 
   it('a listed model with no price is a row to enter one; a priced one the CLI no longer lists stays, marked', () => {

@@ -42,7 +42,7 @@ const tasksDir = join(wsPath, '.combwork', 'tasks')
 const BOARD = 200
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
-/** A card as Hive saves one. */
+/** A card as Combwork saves one. */
 const card = (n: number, fields: Partial<TaskCard> = {}): Record<string, unknown> => ({ number: n, title: `Card ${n}`, description: 'x'.repeat(500), project: 'p', agent: null, column: 'todo', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '', createdBy: '', updatedAt: '', ...fields })
 /** The card documents `fn` reads. */
 async function readsOf(fn: () => Promise<unknown>): Promise<number> {
@@ -101,7 +101,7 @@ describe('placing a card on a big board (#458, #1017)', () => {
   })
 
   it("a column's live cards (a change's short reply, HI-1887): as the whole board read lists them, a card with no known column in To Do's, reading no card", async () => {
-    // Saved with a column Hive doesn't know (a later version's, or by hand): read as To Do.
+    // Saved with a column Combwork doesn't know (a later version's, or by hand): read as To Do.
     writeCardOutside(wsPath, 11, card(11, { column: 'later' as TaskCard['column'], order: 2 }))
     for (const column of ['todo', 'review', 'passed', 'hold', 'doing'] as const) {
       const listed = (await run(() => tasks.listTasks({ column }))).map((c) => c.number)

@@ -149,9 +149,9 @@ describe('an unused worktree not reused: English for the Agent API, data for the
     expect((await wt.worktreeCheck(proj, { ...t, base: 'main' })).reason).toBe('1 commit not merged into main and 1 uncommitted file')
   })
 
-  it("a recreate git's prune refuses carries the worktrees git named, not those Hive thinks missing (#1313)", async () => {
-    // Third's folder is gone (to recreate); Second, missing to Hive, has no git registration left; an unmanaged worktree
-    // made outside Hive lost its folder: only that one is what git's prune would forget.
+  it("a recreate git's prune refuses carries the worktrees git named, not those Combwork thinks missing (#1313)", async () => {
+    // Third's folder is gone (to recreate); Second, missing to Combwork, has no git registration left; an unmanaged worktree
+    // made outside Combwork lost its folder: only that one is what git's prune would forget.
     const third = join(treesRoot, 'third')
     const ext = join(base, 'external-blocker')
     await wt.createWorktree(proj, third, 'hive/third', 'main')

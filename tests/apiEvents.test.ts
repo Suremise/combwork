@@ -3,7 +3,7 @@ import { join } from 'path'
 import { API_EVENTS, COMMAND_TITLE, apiEventFor, publicRun, publicSessionState } from '../src/main/apiEvents'
 import type { HiveEvent, LiveSessionState, MergeSlotInfo, ProgressRun } from '../src/shared/types'
 
-// What the Agent API's event stream sends of Hive's events, and to whom (#620): every listed event to the workspace
+// What the Agent API's event stream sends of Combwork's events, and to whom (#620): every listed event to the workspace
 // token and viewers, a project agent its own project's, and nothing private (no notice body, no prompt the Assistant
 // quoted). The paths are only compared, never touched.
 const ws = join('C:\\', 'work')
@@ -52,7 +52,7 @@ describe('apiEventFor', () => {
     expect(sent).toEqual({ type: 'notice', notice: { id: 'n1', kind: 'finished', title: 'B1 finished', projectPath: alpha, agentId: 'a1' } })
     expect(JSON.stringify(sent)).not.toContain('secret')
     expect(apiEventFor({ type: 'notice', notice }, { workspace: ws, projectPath: beta })).toBeNull()
-    // An app-wide notice (plan usage, Hive closing) is the workspace's, not an agent's.
+    // An app-wide notice (plan usage, Combwork closing) is the workspace's, not an agent's.
     expect(apiEventFor({ type: 'notice', notice: { ...notice, projectPath: null } }, null)).not.toBeNull()
     expect(apiEventFor({ type: 'notice', notice: { ...notice, projectPath: null } }, agent)).toBeNull()
   })
@@ -63,7 +63,7 @@ describe('apiEventFor', () => {
     const sent = apiEventFor({ type: 'assistant-activity', projectPath: home, action }, null)
     expect(sent).toEqual({ type: 'assistant-activity', workspacePath: ws, action: { id: 'x', at: action.at, text: 'Gave B1 in alpha a task', ok: true } })
     expect(JSON.stringify(sent)).not.toContain('secret')
-    // A line that quotes nothing is sent as it is, with why it was refused in Hive's own words (#763).
+    // A line that quotes nothing is sent as it is, with why it was refused in Combwork's own words (#763).
     expect((apiEventFor({ type: 'assistant-activity', projectPath: home, action: { id: 'y', at: '', text: 'Stop B1 in alpha', ok: false, error: 'not allowed', reason: 'Not allowed' } }, null) as { action: unknown }).action).toEqual({ id: 'y', at: '', text: 'Stop B1 in alpha', ok: false, error: 'Not allowed' })
     expect(apiEventFor({ type: 'assistant-activity', projectPath: home, action }, agent)).toBeNull()
   })
@@ -117,7 +117,7 @@ describe('apiEventFor', () => {
     const sent = publicRun(r)
     expect(JSON.stringify(sent)).not.toContain('SECRET')
     expect(sent).toMatchObject({ id: 'r1', title: 'e2e: full set', titleFromCommand: false, waiting: true, waitingSince: 5, state: 'running' })
-    // No title of its own: the command line was its title, so none of it leaves Hive (Darren's rule): "a command".
+    // No title of its own: the command line was its title, so none of it leaves Combwork (Darren's rule): "a command".
     for (const command of [r.command!, '"C:\\Program Files\\nodejs\\npm.cmd" test --token SECRET', 'SECRET-tool']) {
       expect(publicRun({ ...r, command, title: command })).toMatchObject({ title: COMMAND_TITLE, titleFromCommand: true })
     }
@@ -137,7 +137,7 @@ describe('apiEventFor', () => {
       expect(sent).toMatchObject({ title: COMMAND_TITLE, titleFromCommand: true })
       expect(JSON.stringify(sent)).not.toContain('SECRET')
     }
-    // The reporter says so: whatever the title is, it stays in Hive.
+    // The reporter says so: whatever the title is, it stays in Combwork.
     expect(publicRun({ ...base, title: 'anything', titleFromCommand: true }).title).toBe(COMMAND_TITLE)
     // An explicit title of its own stays, long or not.
     expect(publicRun({ ...base, title: 'e2e: the full set before merging' }).title).toBe('e2e: the full set before merging')

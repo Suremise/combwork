@@ -1,4 +1,4 @@
-// Git's worker (HI-1783): Hive's git commands start their processes in a thread of their own, so a process start (about
+// Git's worker (HI-1783): Combwork's git commands start their processes in a thread of their own, so a process start (about
 // 4 ms of the calling thread on Windows) never holds main's thread. Here: git() through the built worker gives exactly
 // what it gives in-process (as it ran before), for an answer, git's own failure, input, output small and large, an
 // environment, a time limit, a folder that isn't there and output over its bound; and many commands at once each get

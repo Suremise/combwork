@@ -107,7 +107,7 @@ describe('a group of finishes, when it is shown', () => {
       return fake as unknown as BrowserWindow
     }
     sessions.setWindowProvider((p) => (p ? windowFor(p.toLowerCase()) : null))
-    // The Hive window in use: the one the test says is focused, showing its project (one window per project here); with
+    // The Combwork window in use: the one the test says is focused, showing its project (one window per project here); with
     // none, an entry's own project's window owns it.
     const { setNotifyHost } = await import('../src/main/notify')
     setNotifyHost({
@@ -153,7 +153,7 @@ describe('a group of finishes, when it is shown', () => {
     }
   })
 
-  it('a Hive window focused meanwhile: the group pops up in it, never a Windows notification too (HI-2320: once, in one place)', async () => {
+  it('a Combwork window focused meanwhile: the group pops up in it, never a Windows notification too (HI-2320: once, in one place)', async () => {
     await finished(alpha, 'One')
     focused.add(alpha.toLowerCase())
     await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
@@ -162,7 +162,7 @@ describe('a group of finishes, when it is shown', () => {
     expect(bellOnly).toEqual([])
   })
 
-  it('Hive in the background: a Windows notification, and its row in its window\'s bell, never a pop-up', async () => {
+  it('Combwork in the background: a Windows notification, and its row in its window\'s bell, never a pop-up', async () => {
     await finished(alpha, 'One')
     await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
     expect(titles()).toEqual(['alpha · One finished'])
@@ -170,7 +170,7 @@ describe('a group of finishes, when it is shown', () => {
     expect(bellOnly).toEqual([[alpha.toLowerCase(), 'alpha · One finished']])
   })
 
-  it("finishes in two windows, one focused meanwhile: one grouped banner in the focused window, counted from both; Hive in the background: a Windows notification opened from the first", async () => {
+  it("finishes in two windows, one focused meanwhile: one grouped banner in the focused window, counted from both; Combwork in the background: a Windows notification opened from the first", async () => {
     await finished(alpha, 'One')
     await finished(beta, 'Two')
     await finished(beta, 'Three')
@@ -205,7 +205,7 @@ describe('a group of finishes, when it is shown', () => {
     expect(titles()).toEqual(['beta · Two needs your input'])
     await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
     expect(titles()).toEqual(['beta · Two needs your input', 'alpha · One finished'])
-    // The same settings apply: a Hive window focused, it pops up there, not a Windows notification; waiting
+    // The same settings apply: a Combwork window focused, it pops up there, not a Windows notification; waiting
     // notifications off, it isn't told at all.
     focused.add(beta.toLowerCase())
     ;(sessions as unknown as { notify: (...a: unknown[]) => void }).notify(beta, 'beta · Two needs your input', 'Allow Bash?', 'waiting')

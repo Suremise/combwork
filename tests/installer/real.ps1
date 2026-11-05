@@ -1,4 +1,4 @@
-# The installer handoff with Hive's real installers (#1647), in Windows Sandbox only (never on the host): a local build's
+# The installer handoff with Combwork's real installers (#1647), in Windows Sandbox only (never on the host): a local build's
 # installer (npm run dist, local-setup.exe) and a release-style one of the same code (local: false, release-setup.exe) in
 # the mapped build folder. Which ends up installed is read from the installed copy's resources\build-identity.json.
 # Results in C:\out\real-results.txt, a line each (PASS/FAIL); exit 1 on any FAIL. -Timeout adds the 10-minute wait's
@@ -49,7 +49,7 @@ $id = Identity
 Say ($rc -eq 0 -and $lc -eq 0 -and $id.local -eq $true -and $locEnd -gt $relEnd) 'pending update first: the local installer waits and its build is the one installed' "exits release $rc, local $lc; installed local=$($id.local); release done $([int]($relEnd - $t0).TotalSeconds) s, local $([int]($locEnd - $t0).TotalSeconds) s after the local one started"
 Say (-not (Test-Path (Join-Path $env:LOCALAPPDATA 'hive-updater\pending'))) "…and the local install dropped the updater's pending download" ''
 
-# 2. The local installer first, then the pending update's (Hive quit while it ran): the release's quits, the local stays.
+# 2. The local installer first, then the pending update's (Combwork quit while it ran): the release's quits, the local stays.
 Baseline
 $loc = Run 'local-setup.exe' @('/S')
 Wait-Held

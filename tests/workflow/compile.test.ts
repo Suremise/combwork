@@ -54,7 +54,7 @@ describe('compilation', () => {
     expect(canonical({ b: 1, a: [2, { d: 3, c: 4 }] })).toBe('{"a":[2,{"c":4,"d":3}],"b":1}')
   })
 
-  it('refuses to load a ruleset with an unknown piece; one from a newer Hive is read-only', () => {
+  it('refuses to load a ruleset with an unknown piece; one from a newer Combwork is read-only', () => {
     const r = mustCompile(preset('git', 'team'))
     expect(loadRuleset(JSON.parse(JSON.stringify(r)))).toMatchObject({ ok: true, readOnly: false })
     expect(loadRuleset({ ...r, guards: { ...r.guards, submit: ['submit.runAnything'] } })).toMatchObject({ ok: false, error: 'unknownPiece', piece: 'submit.runAnything' })

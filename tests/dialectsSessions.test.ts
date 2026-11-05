@@ -82,7 +82,7 @@ describe('the API chain', () => {
     write(join(hive, 'dialects'), 'api/cli.json', file({ 'a.plain': 'api' }))
     write(join(hive, 'dialects'), 'workspace.json', file({ 'a.plain': 'ws', 'a.named': 'ws {project}' }))
     await apiChainReady(hive)
-    // Ids of a real catalogue only: these test ids aren't in this Hive's schema, so nothing applies.
+    // Ids of a real catalogue only: these test ids aren't in this Combwork's schema, so nothing applies.
     expect(apiChain(hive)).toBeNull()
     forgetApiChain(hive)
   })

@@ -28,8 +28,8 @@ export type CheckAnswer = { ok: true; result: any } | { ok: false; error: string
 
 /** How long a launcher gets to close once its job has ended (or Hive gave it up). */
 const END_MS = 10_000
-const QUITTING: CheckAnswer = { ok: false, error: 'Hive is quitting' } // i18n-ignore: for the log
-const ESCAPED: CheckAnswer = { ok: false, error: "a process Codex started left Hive's job: its end can't be confirmed" } // i18n-ignore: for the log
+const QUITTING: CheckAnswer = { ok: false, error: 'Combwork is quitting' } // i18n-ignore: for the log
+const ESCAPED: CheckAnswer = { ok: false, error: "a process Codex started left Combwork's job: its end can't be confirmed" } // i18n-ignore: for the log
 
 /** Tests only: another supervisor, and steps to hold a check at (before it starts, after its launcher joins, before its end's confirmation, each end). */
 export const codexCheckSeams: { host?: JobHost; beforeStart?: () => Promise<void>; afterAssign?: (job: LeaseJob) => Promise<void>; beforeConfirm?: () => Promise<void>; onEnd?: (phase: 'in' | 'out') => void } = {}
@@ -111,13 +111,13 @@ async function runCheck(c: Check, o: Request): Promise<CheckAnswer> {
     await codexCheckSeams.beforeStart?.()
     if (stopped) return QUITTING
     const h = host()
-    if (!(await h.ensure())) return { ok: false, error: "Hive can't own Codex's check here (its process tracking is off)" } // i18n-ignore: for the log
+    if (!(await h.ensure())) return { ok: false, error: "Combwork can't own Codex's check here (its process tracking is off)" } // i18n-ignore: for the log
     if (stopped) return QUITTING
     // A process of the check found outside its job: ended by the supervisor, unconfirmed (no journal to follow it by).
     unwatch = h.onUnowned((job, pid) => {
       if (job !== c.name) return
       c.escaped ??= pid
-      log.warn(`Codex's check of ${userText(c.key)}: process ${pid} left its job and was ended unconfirmed: the connection is held until Hive restarts`)
+      log.warn(`Codex's check of ${userText(c.key)}: process ${pid} left its job and was ended unconfirmed: the connection is held until Combwork restarts`)
     })
     const job = await LeaseJob.open(h, c.name, '')
     if ('problem' in job) return { ok: false, error: `its job couldn't be made: ${job.problem}` } // i18n-ignore: for the log

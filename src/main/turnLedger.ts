@@ -223,7 +223,7 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { h
         return { verdict: 'apply', event: { ...ev, resumes: true }, note: "a turn the CLI began by itself: its background task's wake (no prompt hook)" } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
       }
     }
-    return { verdict: 'stale', why: `${what(ev)} ${earlier ? 'of an earlier turn' : 'of a turn Hive saw no prompt for'}` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+    return { verdict: 'stale', why: `${what(ev)} ${earlier ? 'of an earlier turn' : 'of a turn Combwork saw no prompt for'}` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
   }
   // Launch-wide hooks (naming the latest turn, or none); the CLI's session ending is the launch's.
   if (launchWide) {

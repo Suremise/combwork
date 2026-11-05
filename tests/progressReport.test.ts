@@ -1,6 +1,6 @@
 // Progress reporters (#137): the hive-progress wrapper (main/progressReporters/wrapper.ts) and the reporting it shares with the
 // test runners (main/progressReporters/report.mts), against a stand-in for #136's Agent API: output and exit codes pass
-// through; Hive reachable, unreachable or absent; step lines; estimates after one run; updates coalesced.
+// through; Combwork reachable, unreachable or absent; step lines; estimates after one run; updates coalesced.
 import { spawnSync } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createServer, type Server } from 'http'
@@ -41,18 +41,18 @@ afterAll(() => {
 const calls: { method: string; path: string; auth: string; body: Record<string, unknown> }[] = []
 /**
  * What a run is for, asked before its command starts (#1220: POST /v1/progress/resolve), kept apart from `calls`; the
- * stand-in answers as `resolveReply` says: by default 404, as a Hive from before it does (the run isn't linked).
+ * stand-in answers as `resolveReply` says: by default 404, as a Combwork from before it does (the run isn't linked).
  */
 const resolves: Record<string, unknown>[] = []
 let resolveReply: { status: number; body: Record<string, unknown> } | 'hang' = { status: 404, body: { error: 'No such route' } }
-/** How long the stand-in holds a resolve before answering it (HI-1892: a slow Hive). */
+/** How long the stand-in holds a resolve before answering it (HI-1892: a slow Combwork). */
 let resolveDelayMs = 0
 /**
  * How the stand-in takes a run's start and finish (HI-1892): `hangStart`, its start never answered; `hangFinish`, no
- * finish answered; `hangFinishOnce`, the first finish taken but not answered, a second refused as Hive does (409).
+ * finish answered; `hangFinishOnce`, the first finish taken but not answered, a second refused as Combwork does (409).
  */
 let lose: 'none' | 'hangStart' | 'hangFinish' | 'hangFinishOnce' = 'none'
-/** How long the stand-in holds a run's start before taking it (HR2's round 1: a start Hive takes late, in time). */
+/** How long the stand-in holds a run's start before taking it (HR2's round 1: a start Combwork takes late, in time). */
 let startDelayMs = 0
 /** What the stand-in answers a run's finish (#1654: how a check's run counted). */
 let finishReply: Record<string, unknown> = {}
@@ -291,17 +291,17 @@ describe.runIf(process.platform === 'win32')('starting a command on Windows', ()
 describe('what a run is for (#1220): its card, revision and check, asked before the command starts', () => {
   const id = 'c'.repeat(40)
 
-  it("starts the run with what Hive resolved, asking with the folder and what was named", async () => {
+  it("starts the run with what Combwork resolved, asking with the folder and what was named", async () => {
     resolveReply = { status: 200, body: { link: 'L1', card: '#12', revision: id, testedCheckout: id, check: null, folder: dir } }
     expect(await wrap(['--card', '#12', '--', node, '-e', "console.log('ran')"], env(), 0)).toEqual({ code: 0, out: 'ran\n', err: '' })
     expect(resolves).toEqual([{ folder: dir, card: '#12' }])
-    // The link Hive gave is passed back (Hive keeps what it read then); no checkout is sent as if it were proof.
+    // The link Combwork gave is passed back (Combwork keeps what it read then); no checkout is sent as if it were proof.
     expect(calls[0].body).toMatchObject({ link: 'L1', card: '#12', revision: id, folder: dir })
     expect(calls[0].body).not.toHaveProperty('testedCheckout')
     expect(calls[0].body).not.toHaveProperty('check')
   })
 
-  it('a run Hive gives no card says so (card: null), so none is defaulted at the start', async () => {
+  it('a run Combwork gives no card says so (card: null), so none is defaulted at the start', async () => {
     resolveReply = { status: 200, body: { card: null, revision: null, testedCheckout: null, check: null, folder: dir } }
     await wrap(['--', node, '-e', '0'], env(), 0)
     expect(resolves).toEqual([{ folder: dir }])
@@ -335,17 +335,17 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect((await wrap(['--check', 'test'], env(), 0)).code).toBe(4)
   })
 
-  it('--check with no command configured, Hive unreachable or outside Hive runs nothing and says why', async () => {
+  it('--check with no command configured, Combwork unreachable or outside Combwork runs nothing and says why', async () => {
     resolveReply = { status: 400, body: { error: 'hive has no command configured for the check "lint", so nothing was run.' } }
     expect(await wrap(['--check', 'lint'], env(), 0)).toEqual({ code: 2, out: '', err: 'cw-progress: hive has no command configured for the check "lint", so nothing was run.\n' })
-    // A Hive from before (no resolve call: 404) doesn't know the command either.
+    // A Combwork from before (no resolve call: 404) doesn't know the command either.
     resolveReply = { status: 404, body: { error: 'No such route' } }
     expect(await wrap(['--check', 'lint'], env(), 0)).toMatchObject({ code: 2, err: expect.stringContaining("Combwork couldn't be reached to look up the command for lint") })
     expect(await wrap(['--check', 'lint'], env({ CW_API_URL: undefined }), 0)).toMatchObject({ code: 2, err: expect.stringContaining('only Combwork knows') })
     expect(calls).toEqual([])
   })
 
-  it("a --revision is checked with git when Hive can't check it: reporting off, outside Hive, an older Hive, an error, no answer (round 1's finding 2)", async () => {
+  it("a --revision is checked with git when Combwork can't check it: reporting off, outside Combwork, an older Combwork, an error, no answer (round 1's finding 2)", async () => {
     const repoDir = join(dir, 'revision-repo')
     const g = (...a: string[]) => spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: repoDir, encoding: 'utf8' }).stdout.trim()
     spawnSync('git', ['init', '-q', '-b', 'main', repoDir])
@@ -359,8 +359,8 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     const ran = ['--', node, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`]
     const ways: [string, () => Record<string, string | undefined>][] = [
       ['reporting off', () => env({ CW_PROGRESS: '0' })],
-      ['outside Hive', () => env({ CW_API_URL: undefined })],
-      ['an older Hive (404)', () => ((resolveReply = { status: 404, body: { error: 'No such route' } }), env())],
+      ['outside Combwork', () => env({ CW_API_URL: undefined })],
+      ['an older Combwork (404)', () => ((resolveReply = { status: 404, body: { error: 'No such route' } }), env())],
       ['an error (500)', () => ((resolveReply = { status: 500, body: { error: 'boom' } }), env())],
       ['no answer', () => ((resolveReply = 'hang'), env())],
       ['nothing listening', () => env({ CW_API_URL: 'http://127.0.0.1:9' })]
@@ -385,22 +385,22 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     resolveReply = { status: 200, body: { card: 'HI-12', revision: id, testedCheckout: id, check: { name: 'typecheck', command: `"${node}" -e "0"` }, folder: dir } }
     finishReply = { ok: true, check: { name: 'typecheck', counted: false, whyNot: 'changed', changes: ['src/a.ts', ':reflog'], platform: 'git' } }
     expect(await wrap(['--check', 'typecheck'], env(), 0)).toEqual({ code: 0, out: '', err: 'cw-progress: not counted as check typecheck: files changed in the folder while it ran (src/a.ts, a commit or checkout). Run it again with nothing else writing in the folder, or with --isolated (a check copy of its own).\n' })
-    // Counted, or a Hive that doesn't say: nothing more is printed.
+    // Counted, or a Combwork that doesn't say: nothing more is printed.
     finishReply = { ok: true, check: { name: 'typecheck', counted: true, platform: 'git' } }
     expect((await wrap(['--check', 'typecheck'], env(), 0)).err).toBe('')
     finishReply = { ok: true }
     expect((await wrap(['--check', 'typecheck'], env(), 0)).err).toBe('')
-    // A run that wasn't started as a check says nothing either, whatever Hive answers.
+    // A run that wasn't started as a check says nothing either, whatever Combwork answers.
     resolveReply = { status: 200, body: { card: 'HI-12', revision: id, testedCheckout: id, check: null, folder: dir } }
     finishReply = { ok: true, check: { name: 'node', counted: false, whyNot: 'notCheck', platform: 'git' } }
     expect(await wrap(['--', node, '-e', 'process.exit(3)'], env(), 0)).toEqual({ code: 3, out: '', err: '' })
   })
 
-  it("waits for Hive's reply as its setting says (HI-1892): a resolve held past 5 s, answered within it, runs the check and records it", async () => {
+  it("waits for Combwork's reply as its setting says (HI-1892): a resolve held past 5 s, answered within it, runs the check and records it", async () => {
     resolveReply = { status: 200, body: { card: 'HI-12', revision: null, testedCheckout: null, check: { name: 'typecheck', command: `"${node}" -e "0"` }, folder: dir } }
     resolveDelayMs = 5500
     finishReply = { ok: true, check: { name: 'typecheck', counted: true, platform: 'git' } }
-    // No timeout of the test's own: the one Hive hands the session (8 s here), as a session gets it.
+    // No timeout of the test's own: the one Combwork hands the session (8 s here), as a session gets it.
     const r = await wrap(['--check', 'typecheck'], env({ CW_PROGRESS_REPLY_SECONDS: '8' }), 0, dir, {})
     expect(r).toEqual({ code: 0, out: '', err: '' })
     expect(resolves).toHaveLength(1)
@@ -418,7 +418,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: 'soon' })).toBe(15_000)
   })
 
-  it('a check with no reply asks once more, then runs nothing and says Hive is slow; a refused connection says it couldn\'t be reached at once, asking once (HI-1892)', async () => {
+  it('a check with no reply asks once more, then runs nothing and says Combwork is slow; a refused connection says it couldn\'t be reached at once, asking once (HI-1892)', async () => {
     resolveReply = 'hang'
     const slow = await wrap(['--check', 'lint'], env(), 0, dir, { resolveTimeoutMs: 1000, retryMs: 50 })
     expect(slow).toEqual({ code: 2, out: '', err: 'cw-progress: Combwork is slow to answer: no reply to look up the command for lint in 1 s, asked 2 times, so nothing was run. Try again; Settings → Advanced → "cw-progress: Combwork\'s reply time" gives it longer.\n' })
@@ -436,7 +436,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect(calls).toEqual([])
   })
 
-  it("a check's result Hive didn't confirm is sent once more, and hive-progress says when it may not be recorded (HI-1889's lost report); its exit code is the command's", async () => {
+  it("a check's result Combwork didn't confirm is sent once more, and hive-progress says when it may not be recorded (HI-1889's lost report); its exit code is the command's", async () => {
     resolveReply = { status: 200, body: { card: 'HI-12', revision: null, testedCheckout: null, check: { name: 'typecheck', command: `"${node}" -e "0"` }, folder: dir } }
     const quick = { resolveTimeoutMs: 1000, retryMs: 50, checkFinishWaitMs: 500 }
     const finishes = () => calls.filter((c) => c.path.endsWith('/finish')).length
@@ -462,7 +462,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect(finishes()).toBe(1)
   }, 30_000)
 
-  it("a quick check's start Hive takes late but within its time is followed by its finish, never given up first (HR2's round 1)", async () => {
+  it("a quick check's start Combwork takes late but within its time is followed by its finish, never given up first (HR2's round 1)", async () => {
     // Its finish's own budget (twice 300 ms and a 50 ms pause) is shorter than the start's wait: the start's time comes first.
     startDelayMs = 1500
     const run = new ProgressRun({ url, token: 'agent-token', workspace: '' }, { title: 'quick', check: 'typecheck' }, { startTimeoutMs: 5000 })
@@ -507,7 +507,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect(isolatedPollDelay(120_000, 50, 50)).toBe(75)
   })
 
-  it('a Hive from before (no resolve call) still gets the run, as before, unlinked', async () => {
+  it('a Combwork from before (no resolve call) still gets the run, as before, unlinked', async () => {
     expect(await wrap(['--card', '#12', '--', node, '-e', '0'], env(), 0)).toMatchObject({ code: 0 })
     for (const k of ['card', 'revision', 'testedCheckout', 'check', 'folder']) expect(calls[0].body).not.toHaveProperty(k)
   })
@@ -520,7 +520,7 @@ describe('reporting a run', () => {
     expect(r).toEqual({ code: 3, out: 'one\n', err: 'warn\n' })
     // The first step line gives the total, so the run starts with it: step 1 of 2 starting is 0 finished.
     expect(calls[0]).toMatchObject({ method: 'POST', path: '/v1/progress', auth: 'Bearer agent-token' })
-    // With its process (#549: once it is gone without a finish, Hive says the run ended without a report).
+    // With its process (#549: once it is gone without a finish, Combwork says the run ended without a report).
     // Its own title: not the command line, so nothing says it is (#620).
     expect(calls[0].body).toEqual({ title: 'Build', total: 2, step: 0, stepName: 'first', command: expect.stringContaining('-e'), pid: process.pid })
     const patches = calls.filter((c) => c.method === 'PATCH')
@@ -551,8 +551,8 @@ describe('reporting a run', () => {
     expect(commandLabel(ok).startsWith(String(calls[0].body.title).replace(/…$/, ''))).toBe(true)
   })
 
-  it("a command's output tells Hive its run still goes, at most every keep-alive; a silent one sends nothing (HI-1993)", async () => {
-    // A stress loop with no step lines, printing as it goes: it ends once Hive has had a keep-alive (an empty update).
+  it("a command's output tells Combwork its run still goes, at most every keep-alive; a silent one sends nothing (HI-1993)", async () => {
+    // A stress loop with no step lines, printing as it goes: it ends once Combwork has had a keep-alive (an empty update).
     const loud = `const t = setInterval(() => console.log('run'), 20); seen((c) => c.some((x) => x.method === 'PATCH')).then(() => { clearInterval(t) })`
     const r = await wrap(['--', ...seenNode, '-e', loud], env(), 0, dir, { resolveTimeoutMs: 1000, keepAliveMs: 50 })
     expect(r.code).toBe(0)
@@ -594,7 +594,7 @@ describe('reporting a run', () => {
     ])
   })
 
-  it('with Hive unreachable, refusing, absent or turned off: the command runs as usual and nothing fails', async () => {
+  it('with Combwork unreachable, refusing, absent or turned off: the command runs as usual and nothing fails', async () => {
     const cmd = ['--', node, '-e', "console.log('out'); process.exit(4)"]
     const t0 = Date.now()
     expect(await wrap(cmd, env({ CW_API_URL: 'http://127.0.0.1:9' }))).toEqual({ code: 4, out: 'out\n', err: '' })
@@ -678,7 +678,7 @@ describe('reporting a run', () => {
 })
 
 describe('the shared reporter and timings', () => {
-  it('finds its target: the agent token from the file Hive keeps it in, never HIVE_API_TOKEN (HI-2262); CW_PROGRESS=0 turns it off', () => {
+  it('finds its target: the agent token from the file Combwork keeps it in, never HIVE_API_TOKEN (HI-2262); CW_PROGRESS=0 turns it off', () => {
     const file = join(dir, 'token.json')
     writeFileSync(file, JSON.stringify({ token: 'from-file' }))
     expect(progressTarget({ CW_API_URL: 'http://h/', CW_API_TOKEN_FILE: file, CW_WORKSPACE: 'W' })).toEqual({ url: 'http://h', token: 'from-file', workspace: 'W' })
@@ -828,12 +828,12 @@ describe('the shared reporter and timings', () => {
 
 describe("the hive-progress command on a session's PATH (main/progressReporters/shims.ts)", () => {
   it('puts the bin folder first on PATH, once, whatever the variable is called', () => {
-    expect(withBinOnPath({ Path: 'C:\\a;C:\\Hive\\bin;C:\\b' }, 'C:\\Hive\\bin')).toEqual({ Path: 'C:\\Hive\\bin;C:\\a;C:\\b' })
+    expect(withBinOnPath({ Path: 'C:\\a;C:\\Combwork\\bin;C:\\b' }, 'C:\\Combwork\\bin')).toEqual({ Path: 'C:\\Combwork\\bin;C:\\a;C:\\b' })
     expect(withBinOnPath({ PATH: '/usr/bin' }, '/h/bin', ':')).toEqual({ PATH: '/h/bin:/usr/bin' })
     expect(withBinOnPath({ X: '1' }, null)).toEqual({ X: '1' })
   })
 
-  it('the .cmd and sh shims start the script with Hive as Node, passing every argument through and the exit code back', async () => {
+  it('the .cmd and sh shims start the script with Combwork as Node, passing every argument through and the exit code back', async () => {
     const bin = join(dir, 'bin dir')
     // A stand-in for hive-progress.js: shows what it was given, and ends with the code it was asked for.
     const script = join(dir, 'echo args.js')
@@ -872,7 +872,7 @@ describe("the hive-progress command on a session's PATH (main/progressReporters/
     )
   })
 
-  it("the command doesn't get what started hive-progress: in Hive's executable, ELECTRON_RUN_AS_NODE is the caller's own again", async () => {
+  it("the command doesn't get what started hive-progress: in Combwork's executable, ELECTRON_RUN_AS_NODE is the caller's own again", async () => {
     const shimmed = { PATH: 'p', ELECTRON_RUN_AS_NODE: '1', CW_PROGRESS_DATA: 'd', CW_PROGRESS_RUN_AS_NODE: undefined, CW_API_URL: 'u' }
     expect(commandEnv(shimmed, true)).toEqual({ PATH: 'p', CW_API_URL: 'u' })
     expect(commandEnv({ ...shimmed, CW_PROGRESS_RUN_AS_NODE: '1' }, true)).toEqual({ PATH: 'p', CW_API_URL: 'u', ELECTRON_RUN_AS_NODE: '1' })
@@ -912,7 +912,7 @@ describe('a reporter inside a command hive-progress runs: one row, the wrapper\'
 
   it('a reporter run under hive-progress shows in its run: one row with the total and steps', async () => {
     const report = pathToFileURL(join(__dirname, '..', 'src', 'main', 'progressReporters', 'report.mts')).href
-    // The way Hive's runners report (tests/progressReport.mts): a run of their own, or step lines when wrapped.
+    // The way Combwork's runners report (tests/progressReport.mts): a run of their own, or step lines when wrapped.
     const script = `import(${JSON.stringify(report)}).then(async (m) => { const r = new m.ProgressRun(m.progressTarget(), { title: 'inner', total: 3, step: 0, stepName: 'a' }, { lines: m.wrappedLines() }); r.update({ step: 1, stepName: 'b' }); await seen((c) => c.some((x) => x.body.stepName === 'b')); await r.finish(true) })`
     const r = await wrap(['--title', 'outer', '--', ...seenNode, '-e', script], env())
     expect(r).toMatchObject({ code: 0, out: '' })
@@ -943,7 +943,7 @@ describe("agents told to run long commands through hive-progress (Settings → G
   })
 })
 
-describe("Hive's own test runners (tests/progressReport.mts)", () => {
+describe("Combwork's own test runners (tests/progressReport.mts)", () => {
   const saved = { ...process.env }
   beforeEach(() => {
     Object.assign(process.env, { CW_API_URL: url, CW_API_TOKEN_FILE: agentTokenFile, HIVE_TEST_PROGRESS_TIMINGS: join(dir, 'runner-timings.json') })

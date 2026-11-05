@@ -38,7 +38,7 @@ describe('which servers are added to a project (HI-2059)', () => {
     expect(mcpAdded(null, ['godot'])).toEqual([])
   })
 
-  it("adds nothing from a list Hive can't read, its own or the workspace's", () => {
+  it("adds nothing from a list Combwork can't read, its own or the workspace's", () => {
     expect(mcpAdded({ enabled: 'godot' as never, model: MCP_ADDED_MODEL }, ['godot'])).toEqual([])
     expect(mcpAdded({ enabled: ['godot'] }, 'godot')).toEqual([])
     expect(mcpAdded({ enabled: ['godot'] }, { godot: true })).toEqual([])
@@ -64,7 +64,7 @@ describe('which servers are added to a project (HI-2059)', () => {
     expect(mcpServerShown(godot, '', 'errors')).toBe(false)
   })
 
-  it("strips Hive's own fields from what a CLI is given", () => {
+  it("strips Combwork's own fields from what a CLI is given", () => {
     expect(mcp.toLaunchDef({ description: 'd', tags: ['x'], command: 'node', args: ['a.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['a.js'] })
   })
 })
@@ -107,7 +107,7 @@ describe('MCP servers per project (HI-2059)', () => {
   const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
   const projectMcp = (p: string) => json(join(p, '.combwork', 'project.json')).mcp
 
-  /** The servers a launch in a project gets (its agent's), but Hive's own: the launch's own reader. */
+  /** The servers a launch in a project gets (its agent's), but Combwork's own: the launch's own reader. */
   const gets = async (p: string): Promise<string[]> => run(async () => Object.keys((await sessions.effective(p, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers).filter((n) => n !== 'hive').sort())
   /** Which projects a server runs in, as a launch decides it. */
   const onIn = async (name: string): Promise<string[]> => {

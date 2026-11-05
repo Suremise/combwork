@@ -51,7 +51,7 @@ describe("gh off a test Copilot's PATH, whatever its folder is called", () => {
     expect(() => pathWithoutGh([sys, linked].join(';'), { pathext: PATHEXT, realpath: () => join(both, 'node.exe') })).toThrow(/losing node/)
   })
 
-  it("a test Hive's environment: no gh where Windows looks, the login and token variables hidden, the profile faked", () => {
+  it("a test Combwork's environment: no gh where Windows looks, the login and token variables hidden, the profile faked", () => {
     const { copilotTestEnv } = require('./e2e/fake-copilot-api.cjs')
     const portable = folder('portable-tools-2', ['gh.cmd'])
     const was = process.env.PATH

@@ -1,5 +1,5 @@
-// When an agent can take a line of Hive's (#649, main/readiness.ts): read from the turn ledger's facts (#648), with a
-// watch as Hive's policy on top; a state from before the facts reads its status word.
+// When an agent can take a line of Combwork's (#649, main/readiness.ts): read from the turn ledger's facts (#648), with a
+// watch as Combwork's policy on top; a state from before the facts reads its status word.
 import { describe, expect, it } from 'vitest'
 import { readyFor } from '../src/main/readiness'
 import type { LiveSessionState, RuntimeFacts } from '../src/shared/types'
@@ -42,7 +42,7 @@ describe('readyFor (#649)', () => {
     expect(readyFor(st({ status: 'background', backgroundTasks: 1, turn: { state: 'running' } }))).toBe(false)
   })
 
-  it("a watch is Hive's policy: a watching agent takes a message or a wake (idle), not new work (free)", () => {
+  it("a watch is Combwork's policy: a watching agent takes a message or a wake (idle), not new work (free)", () => {
     expect(readyFor(st({ status: 'watching', watch }))).toBe(true)
     expect(readyFor(st({ status: 'watching', watch }), 'free')).toBe(false)
   })

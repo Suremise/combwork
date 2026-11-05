@@ -38,22 +38,22 @@ describe('the full form', () => {
   })
 })
 
-describe("a branch Hive made for an agent", () => {
+describe("a branch Combwork made for an agent", () => {
   const home = { workspace: 'HIVE', project: 'ambrosia' }
 
-  it('is recognised in either form: hive/<slug> from before as Hive made it, and the full form here, case aside', () => {
+  it('is recognised in either form: hive/<slug> from before as Combwork made it, and the full form here, case aside', () => {
     expect(hiveBranchNumber('hive/amb1', home, 'AMB1')).toBe(0)
     expect(hiveBranchNumber('hive/amb1-2', home, 'AMB1')).toBe(2)
     expect(hiveBranchNumber('hive/HIVE/ambrosia/amb1', home, 'AMB1')).toBe(0)
     expect(hiveBranchNumber('hive/hive/Ambrosia/amb1-3', home, 'amb1')).toBe(3)
-    // In a workspace part Hive gave this project (recorded): this project's; one that only looks numbered isn't (round 3:
+    // In a workspace part Combwork gave this project (recorded): this project's; one that only looks numbered isn't (round 3:
     // another workspace may be called HIVE-2).
     expect(hiveBranchNumber('hive/HIVE-2/ambrosia/amb1', { ...home, spaces: ['HIVE-2'] }, 'AMB1')).toBe(0)
     expect(hiveBranchNumber('hive/HIVE-2/ambrosia/amb1', home, 'AMB1')).toBeNull()
     expect(hiveBranchNumber('hive/My-Work/web-app/b1', { workspace: 'My Work', project: 'web app' }, 'B1')).toBe(0)
   })
 
-  it("from before, by its slug exactly as Hive made it then: B--1 had hive/b--1 (round 2: not the new rules' b-1)", () => {
+  it("from before, by its slug exactly as Combwork made it then: B--1 had hive/b--1 (round 2: not the new rules' b-1)", () => {
     expect(oldHiveBranch('B--1')).toBe('hive/b--1')
     expect(hiveBranchNumber('hive/b--1', home, 'B--1')).toBe(0)
     expect(hiveBranchNumber('hive/b--1-2', home, 'B--1')).toBe(2)
@@ -63,11 +63,11 @@ describe("a branch Hive made for an agent", () => {
     expect(hiveBranchNumber('hive/HIVE/ambrosia/b-1', home, 'B--1')).toBe(0)
   })
 
-  it("isn't another agent's, another workspace's or project's (two workspaces in one repository), or a branch not Hive's", () => {
+  it("isn't another agent's, another workspace's or project's (two workspaces in one repository), or a branch not Combwork's", () => {
     for (const b of ['hive/OTHER/ambrosia/amb1', 'hive/HIVE/other/amb1', 'hive/HIVEX/ambrosia/amb1', 'feature/amb1', 'hive/HIVE/amb1', 'hive/a/b/c/d', 'main', 'hive', 'hive/amb10', 'hive/HIVE/ambrosia/amb1-x']) expect(hiveBranchNumber(b, home, 'AMB1')).toBeNull()
   })
 
-  it("Add Agent's new worktree on an agent's full-form branch may find the branch Hive made for that name before; any other only itself", () => {
+  it("Add Agent's new worktree on an agent's full-form branch may find the branch Combwork made for that name before; any other only itself", () => {
     expect(reusableBranches('hive/HIVE/ambrosia/amb1', home, 'AMB1')).toEqual(['hive/HIVE/ambrosia/amb1', 'hive/amb1'])
     expect(reusableBranches('hive/HIVE/ambrosia/b-1', home, 'B--1')).toEqual(['hive/HIVE/ambrosia/b-1', 'hive/b--1'])
     // Without the name, or for another agent's or workspace's branch: only itself.
@@ -125,12 +125,12 @@ describe('a branch named after where its project was (branchHere, #1305)', () =>
     expect(branchHere('hive/tools/DIALECT/db1', tools)).toBeNull()
     expect(branchHere('hive/Tools-2/dialect/db1', { ...tools, spaces: ['Tools-2'] })).toBeNull()
   })
-  it("not Hive's full form: kept (hive/<agent> from before #703, a branch of the user's)", () => {
+  it("not Combwork's full form: kept (hive/<agent> from before #703, a branch of the user's)", () => {
     expect(branchHere('hive/db1', tools)).toBeNull()
     expect(branchHere('feature/login', tools)).toBeNull()
     expect(branchHere('hive/a/b/c/d', tools)).toBeNull()
   })
-  it("a folder name git refuses is made a ref part, as Hive's branches are", () => {
+  it("a folder name git refuses is made a ref part, as Combwork's branches are", () => {
     expect(branchHere('hive/Scratch/juniper/jb1', { workspace: 'My Tools', project: 'dialect' })).toBe('hive/My-Tools/dialect/jb1')
   })
 })

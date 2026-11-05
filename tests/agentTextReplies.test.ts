@@ -1,4 +1,4 @@
-// Agent text (dialects, HI-2065; HI-2435): the canary dialect over Hive's tool replies (src/shared/toolReplies.ts, the
+// Agent text (dialects, HI-2065; HI-2435): the canary dialect over Combwork's tool replies (src/shared/toolReplies.ts, the
 // `reply` area). Every word a reply builder says comes through the catalogue: run with every id's text wrapped in
 // markers, no letter is left outside them but the values the test passed in, and every `reply.*` id shows in some
 // reply. With no dialect, the replies read as they always did.
@@ -23,7 +23,7 @@ const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: 
 
 afterEach(() => setProcessChain(null))
 
-/** Values the samples pass: names, keys, paths and the like, which are the caller's words, not Hive's. */
+/** Values the samples pass: names, keys, paths and the like, which are the caller's words, not Combwork's. */
 const VALUES = ['alpha', 'Coder', 'Codex', 'Lean replies', 'HI-12', 'main', 'feature/x', 'claude-code', 'builder', 'reviewer', 'lane-3f2a', 'notes/plan.md', 'm41', 'work-on-card', 'Carry a card', 'broken header', 'Commented', 'Moved to Review', 'cw_start_card', 'cw_submit', 'folder', 'files', 'base', 'greet.js', 'column', 'comment', 'Waiting for HI-12 → Review', 'waiting for HI-12 → Review', 'decision', 'sessions.compactAbove', 'Suggest compacting above', 'Settings → Sessions → Suggest compacting above', 'Einstellungen', 'on or off', 'Suggests compacting.', 'A tip.', 'when long', 'at the next launch', 'the user decides', 'User guide section', 'summary text', 'why text', 'detail text', 'abc1234', 'it was taken', 'B1', 'a-1', 'log', 'hello', 'conflict', 'paused for a conflict', 'src/a.ts', 'ours', 'merge', 'git merge --abort', 'git status', 'abort', 'check', 'checks', 'a step', 'timeout', 'Opus', 'opus', 'high', 'plan', 'acc', 'Work', 'Codex work', 'weekly', 'fiveHour', 'any', 'Sonnet', 'tpl', 'workspace', 'team.json', 'mergeMethod', 'squash', 'rebase', 'Review checks', 'pnpm build', 'Coder2', 'HB4', 'working', 'refused text', 'move.needsOverride', 'Do this next.', 'Change it there.', 'a warning', 'Watching HI-12', '5h', 'e2e', 'Watching lanes', 'HI-12 has a new decision', 'Coder: finished', 'pending reason', 'active', 'review', 'start', 'submit', 'beta', 'HI-13', 'HI-60', 'Other', 'Git', 'None', 'title', 'labels', 'Plan', 'lane line', 'failed', 'passed', 'Waiting for agents', 'ttl', 'slot-a', 'r1', 'h1', 'x', 'y']
 
 /** Text other modules give the replies as values (shared/tasks.ts's column names, mergeSlot.ts, idleWatch.ts, unsubmitted.ts, progress.ts): not this area's. */

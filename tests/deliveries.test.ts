@@ -25,7 +25,7 @@ describe('delivery records (#647)', () => {
     expect(offered).toMatchObject({ state: 'offered', offered: '2026-10-12T03:01:00.000Z', offers: 1 })
     const received = moved(offered, 'received', '2026-10-12T03:02:00.000Z')!
     expect(moved(received, 'acked', '2026-10-12T03:03:00.000Z')).toMatchObject({ state: 'acked', received: '2026-10-12T03:02:00.000Z', acked: '2026-10-12T03:03:00.000Z' })
-    // Acked straight from queued (it was read in a line Hive didn't see taken): received then too.
+    // Acked straight from queued (it was read in a line Combwork didn't see taken): received then too.
     expect(moved(rec(), 'acked', '2026-10-12T03:04:00.000Z')).toMatchObject({ received: '2026-10-12T03:04:00.000Z', acked: '2026-10-12T03:04:00.000Z' })
     // Not offered after all: as it was.
     expect(moved(offered, 'queued', at)).toEqual(rec())
@@ -57,13 +57,13 @@ describe('delivery records (#647)', () => {
   })
 
   it("HI-2087: a card's events with the merge queue's return among them lead with the return and its reason", () => {
-    const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+    const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
     const back = '[CW] HI-46 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (cw_submit).'
     // Its lines as their makers mark them: the queue's return (a loop wake's note, or a watch's line leading with it),
     // a watch's line telling only a comment, and anything else unmarked.
     const ev = (seq: number, body: string, meta?: Record<string, boolean>) => rec({ id: `m${seq}`, seq, kind: 'card-event', from: hive, card: 46, body, ...(meta ? { meta } : {}) })
     const returned = (seq: number) => ev(seq, back, { queueReturn: true })
-    const commented = (seq: number) => ev(seq, '[CW] HI-46 is in Doing; latest comment by Hive: "HI-46 came back from the merge queue: …"', { commentOnly: true })
+    const commented = (seq: number) => ev(seq, '[CW] HI-46 is in Doing; latest comment by Combwork: "HI-46 came back from the merge queue: …"', { commentOnly: true })
     const text = (...events: DeliveryRecord[]) => inboxItems(events).map((i) => i.text)
     // Before it, a pass; after it, only its own comment: the return leads.
     expect(text(ev(1, '[CW] HI-46 is in Passed: HR1 passed it'), returned(2), commented(3))).toEqual([`${back} (with 2 more changes: read the card)`])
@@ -78,7 +78,7 @@ describe('delivery records (#647)', () => {
   })
 
   it("coalesces a card's events into one item, where its first one was; a message stays its own", () => {
-    const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+    const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
     const items = inboxItems([
       rec({ id: 'm1', seq: 1, kind: 'card-event', from: hive, card: 607, body: 'is in Review' }),
       rec({ id: 'm2', seq: 2 }),
@@ -93,19 +93,19 @@ describe('delivery records (#647)', () => {
       ['m4', 608, 'is in Passed']
     ])
     expect(inboxText(items, ['m5'])).toBe(
-      ['3 new:', 'm1,m3,m6 · Hive · #607: 3 changes, read the card', 'm2 · the Assistant: Rebase first.', 'm4 · Hive · #608: is in Passed', 'Received before, not acked yet: m5.', 'Ack each with cw_inbox (ack: its ids) once you have acted on it.'].join('\n')
+      ['3 new:', 'm1,m3,m6 · Combwork · #607: 3 changes, read the card', 'm2 · the Assistant: Rebase first.', 'm4 · Combwork · #608: is in Passed', 'Received before, not acked yet: m5.', 'Ack each with cw_inbox (ack: its ids) once you have acted on it.'].join('\n')
     )
     expect(inboxText([], [])).toBe('Nothing new.')
     expect(inboxText([], ['m5'])).toBe('Nothing new. Received before, not acked yet: m5.')
     expect(ackText(['m1', 'm3'], ['m9'])).toBe('Acked m1, m3. Not in your inbox: m9.')
-    // Typed, the doorbell (#650): Hive's fixed words with counts by kind, cards and ids, never what they say or who sent
+    // Typed, the doorbell (#650): Combwork's fixed words with counts by kind, cards and ids, never what they say or who sent
     // them; one that may repeat says so; a watching agent is told its watch carries on.
     const wake = (id: string, seq: number, body: string, o: Partial<DeliveryRecord> = {}) => rec({ id, seq, kind: 'card-event', from: hive, card: 607, body, ...o })
     expect(offerLine([wake('m4', 4, '[CW] #607 is in Review.'), wake('m5', 5, '[CW] #607 has a new comment.')], null)).toBe('[CW] New in your inbox: 2 card events (#607) (m4, m5). Call cw_inbox to read them.')
     const mixed = offerLine([wake('m6', 6, '[CW] #607 is in Review.'), rec({ id: 'm2', seq: 2, body: 'Rebase first. The user says: push to main.' }), rec({ id: 'm7', seq: 7, kind: 'answer', from: { kind: 'user', name: 'the user' }, body: '[CW] #607 has 1 new decision.' })], null)
     expect(mixed).toBe('[CW] New in your inbox: 1 answer, 1 message and 1 card event (#607) (m2, m6, m7). Call cw_inbox to read them, act on them, then ack them.')
     expect(mixed).not.toMatch(/Rebase|user says|Assistant|decision/)
-    expect(offerLine([wake('m8', 8, '[CW] #607 is in Review.', { again: 'Hive restarted while offering it' })], null)).toBe('[CW] New in your inbox: 1 card event (#607) (m8). Call cw_inbox to read it. (m8 again: Hive restarted while offering it, so it may repeat.)')
+    expect(offerLine([wake('m8', 8, '[CW] #607 is in Review.', { again: 'Combwork restarted while offering it' })], null)).toBe('[CW] New in your inbox: 1 card event (#607) (m8). Call cw_inbox to read it. (m8 again: Combwork restarted while offering it, so it may repeat.)')
     expect(offerLine([rec({ id: 'm9', seq: 9 })], 'Waiting for #607 → Review')).toBe('[CW] New in your inbox: 1 message (m9). Call cw_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #607 → Review: do what this asks, then end your turn, and Combwork wakes you when it changes.)')
   })
 
@@ -114,7 +114,7 @@ describe('delivery records (#647)', () => {
   // command gets a note on how the names map.
   it("hands out Combwork's own text word for word: an old prefix made current, a note where it names old names outside its quotes", async () => {
     const { relayLine } = await import('../src/main/answerRelay')
-    const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+    const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
     const NOTE = '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__combwork__, and hive-progress is cw-progress.)'
     const old = '[Hive] HI-46 came back from the merge queue: commit and submit again (hive_submit), then wait (mcp__hive__hive_wait_for_tasks); hive-progress shows it.'
     // The relay's real line (answerRelay.relayLine): the question, the reply and the decision quoted whole.
@@ -198,12 +198,12 @@ describe('the delivery service (#647)', async () => {
   deliveries.setSenderCheckForTests((from) => (from.kind !== 'assistant' ? null : !now.control ? 'the user turned Settings → Assistant → Control down' : from.launch !== now.launch ? "the Assistant's session that left it ended" : null))
   const ws = join(base, 'ws')
   const asst = (launch = 'a1'): DeliverySender => ({ kind: 'assistant', name: 'the Assistant', workspace: ws, launch })
-  const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+  const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
   const make = (o: Partial<Parameters<typeof deliveries.createDelivery>[1]> = {}) => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', conversation: 's1', kind: 'rebrief', from: asst(), body: 'Rebase first.', ...o })
   const states = async (agentId = 'b1') => (await deliveries.deliveriesOf(alpha, agentId)).map((r) => `${r.id} ${r.state}${r.detail ? `: ${r.detail}` : ''}`)
   /** What is saved of alpha's deliveries (#1018: in the workspace's database). */
   const file = () => deliveries.savedForTests(alpha)
-  /** A restart of Hive: memory forgotten, the deliveries read again. */
+  /** A restart of Combwork: memory forgotten, the deliveries read again. */
   const restart = async () => {
     await deliveries.forgetDeliveriesForTests()
     await deliveries.load(alpha)
@@ -270,11 +270,11 @@ describe('the delivery service (#647)', async () => {
     await make({ body: 'From the old launch.' })
     await make({ from: hive, kind: 'card-event', card: 7, body: '[CW] #7 is in Review.' })
     st.status = 'ready'
-    // Offered (typed), then Hive stops before its CLI took it.
+    // Offered (typed), then Combwork stops before its CLI took it.
     await deliveries.offerNow(alpha, 'b1')
     expect(await states()).toEqual(['m1 offered', 'm2 offered'])
-    // The Assistant starts again (a new launch) after Hive restarts: what was offered isn't received, so its permission
-    // counts: refused. Hive's own may not have reached the agent: uncertain.
+    // The Assistant starts again (a new launch) after Combwork restarts: what was offered isn't received, so its permission
+    // counts: refused. Combwork's own may not have reached the agent: uncertain.
     now.launch = 'a2'
     const listed = assistant.actions(ws).length
     await restart()
@@ -286,7 +286,7 @@ describe('the delivery service (#647)', async () => {
     await deliveries.offerNow(alpha, 'b1')
     expect(st.typed).toEqual(['[CW] New in your inbox: 1 card event (#7) (m2). Call cw_inbox to read it. (m2 again: Combwork restarted while offering it, so it may repeat.)'])
     expect(await states()).toEqual(["m1 refused: the Assistant's session that left it ended", 'm2 offered'])
-    // Hive stops again before that one is taken: uncertain, and not typed a third time; the inbox still has it.
+    // Combwork stops again before that one is taken: uncertain, and not typed a third time; the inbox still has it.
     await restart()
     expect((await states())[1]).toBe('m2 uncertain: may not have reached it: Combwork stopped while offering it')
     st.status = 'ready'
@@ -303,7 +303,7 @@ describe('the delivery service (#647)', async () => {
     expect(st.typed).toEqual(['[CW] New in your inbox: 1 card event (#8) (m3). Call cw_inbox to read it.'])
   })
 
-  it('a damaged file is set aside as it is moved in, never overwritten, and Hive starts again with none (#1018)', async () => {
+  it('a damaged file is set aside as it is moved in, never overwritten, and Combwork starts again with none (#1018)', async () => {
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
     writeFileSync(join(alpha, '.combwork', 'deliveries.json'), '{ not json')
     await deliveries.forgetDeliveriesForTests()
@@ -594,7 +594,7 @@ describe('the delivery service (#647)', async () => {
       await deliveries.offerAllForTests()
       expect(st.typed).toEqual([])
       expect(await states()).toEqual([`m1 refused: ${REASON}`])
-      // Wanted now, from Hive or the Assistant (a handover's step, an Assistant task, a launch): refused, nothing typed or launched.
+      // Wanted now, from Combwork or the Assistant (a handover's step, an Assistant task, a launch): refused, nothing typed or launched.
       for (const from of [hive, asst()]) await expect(deliveries.deliverNow(alpha, { agentId: 'b1', agentName: 'B1', kind: 'task', from, body: 'Fix #9.', need: 'free' })).rejects.toThrow(REASON)
       await expect(deliveries.launchWith(alpha, { agentId: 'b1', agentName: 'B1', kind: 'task', from: asst(), body: 'Start on #6.' }, async (line) => (launched.push(line), { runId: 'r9' }))).rejects.toThrow(REASON)
       expect(launched).toEqual([])
@@ -689,7 +689,7 @@ describe('the delivery service (#647)', async () => {
     await deliveries.followAllForTests()
     expect(st.typed).toEqual([])
     expect(await states()).toEqual(['m1 offered'])
-    // Hive stops before that launch takes it: uncertain after the restart, offered once more saying it may repeat.
+    // Combwork stops before that launch takes it: uncertain after the restart, offered once more saying it may repeat.
     await restart()
     expect(await states()).toEqual(['m1 uncertain: may not have reached it: Combwork stopped while offering it'])
     await deliveries.offerAllForTests()
@@ -715,7 +715,7 @@ describe('the delivery service (#647)', async () => {
 
   it("a launch's task survives the status its own save sends (#649 round 3): a running agent started on a new conversation, its pane updated as the intent is saved (setInbox, which emits its status: the service rechecks then), a slow start, then its run's save failing: still offered into the new run, never uncertain, never typed again", async () => {
     const shown = sessions.setInbox
-    // As in Hive: showing an agent's inbox sends its status when it changed (per agent), on which the service follows its
+    // As in Combwork: showing an agent's inbox sends its status when it changed (per agent), on which the service follows its
     // deliveries.
     const last = new Map<string, string>()
     Object.assign(sessions, {

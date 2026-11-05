@@ -2,7 +2,7 @@
 // worktree's entry as it adds one and fails on one another add has made but not yet written ("fatal: failed to read
 // .git/worktrees/copy-1/commondir"), so two review copies made at once failed now and then (reviewCopies.test.ts, "two
 // reviews at once"). The queue's rules with changes held open by the test, then git() putting real worktree changes
-// in it; conditions, never time. HI-2349: a git this process can't queue (another Hive, an agent's or the user's own)
+// in it; conditions, never time. HI-2349: a git this process can't queue (another Combwork, an agent's or the user's own)
 // leaves such an entry for a moment: git() runs the change again once it's written.
 import { existsSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'

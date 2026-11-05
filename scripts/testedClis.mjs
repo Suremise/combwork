@@ -43,8 +43,8 @@ function cliInRecord(record, suites, need) {
   if (!ran) return { ran, versions, problem: `${name}: none of its real suites ran` }
   if (missing.length) return { ran, versions, problem: `${name}: not all of its real suites ran (${missing.join(', ')} didn't)` }
   if (notPassed.length) return { ran, versions, problem: `${name}: not all of its real suites passed (${notPassed.join(', ')})` }
-  if (unsaid.length) return { ran, versions, problem: `${name}: the record doesn't say which version Hive used in ${unsaid.join(', ')}` }
-  if (!versions.length) return { ran, versions, problem: `${name}: none of its real suites says which version Hive used` }
+  if (unsaid.length) return { ran, versions, problem: `${name}: the record doesn't say which version Combwork used in ${unsaid.join(', ')}` }
+  if (!versions.length) return { ran, versions, problem: `${name}: none of its real suites says which version Combwork used` }
   if (versions.length > 1) return { ran, versions, problem: `${name}: its real suites ran different versions (${versions.join(', ')})` }
   return { ran, versions, version: versions[0] }
 }

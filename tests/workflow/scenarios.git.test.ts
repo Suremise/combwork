@@ -78,7 +78,7 @@ describe('the agent merges with no review and no OK before merging (no Approved 
     moved(await e.wf.submit(c2.key, B1, { summary: 'x' }))
   })
 
-  it('a submit retrying a failed Hive merge also refuses an unread decision, before it or during it, and queues nothing (HI-2275)', async () => {
+  it('a submit retrying a failed Combwork merge also refuses an unread decision, before it or during it, and queues nothing (HI-2275)', async () => {
     const e = pair({}, { review: 'none', noSelfReview: false, mergeChecks: ['quick'] })
     let fail = true
     const q = e.queue({ runCheck: async () => (fail ? { ok: false, transient: true, output: 'network' } : { ok: true, output: '' }) })
@@ -106,7 +106,7 @@ describe('the agent merges with no review and no OK before merging (no Approved 
     fail = false
   })
 
-  it('a merge outside Hive while it waits in Active is found and makes it Done', async () => {
+  it('a merge outside Combwork while it waits in Active is found and makes it Done', async () => {
     const e = noReview()
     const { card } = await started(e)
     moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
@@ -197,7 +197,7 @@ describe('workflow scenarios, Git', () => {
       commit(folder, { 'src/fix.txt': 'a follow-up\n' }, 'follow-up')
       await reconcile(e.wf, card)
       expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: { approved: rev, why: 'change' } })
-      // Stale in Approved under Hive merges: Retry merge is refused, naming submit (not report merge) as the way on.
+      // Stale in Approved under Combwork merges: Retry merge is refused, naming submit (not report merge) as the way on.
       const r = refusedBy(await e.wf.retryMerge(card.key, 'just merge it'), 'move.notFromHere')
       expect(r.next).toBe('From Approved, use: submit.')
       expect(e.wf.movesFrom('approved', e.wf.rulesetOf(e.wf.store.card(card.id)), e.wf.state(card))).toEqual(['submit'])
@@ -523,7 +523,7 @@ describe('workflow scenarios, Git', () => {
   it('S16: an agent moving a card to Done is refused with the intent; the user drags it with no merge → asked, override recorded', async () => {
     const e = pair()
     const { card } = await started(e)
-    // Pair: Hive merges it, so the refusal names the queue (#1354) rather than an intent the agent can't use.
+    // Pair: Combwork merges it, so the refusal names the queue (#1354) rather than an intent the agent can't use.
     const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'merge.hiveMerges')
     expect(r.next).toBe('Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.')
     const ask = await e.wf.move(card.key, 'done', 'user')
@@ -545,7 +545,7 @@ describe('workflow scenarios, Git', () => {
     moved(await e.wf.startReview(other.key, R1))
   })
 
-  it('S17: the agent merges, Hive checks: a reported merge not in the target is refused', async () => {
+  it('S17: the agent merges, Combwork checks: a reported merge not in the target is refused', async () => {
     const e = agentMerges()
     const { card, folder } = await approved(e)
     const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'done.contained')

@@ -1,6 +1,6 @@
-// Hive's quit waits for the slot writers of the runs it stopped to be released (HI-1801, sessions.writersSettled): a
+// Combwork's quit waits for the slot writers of the runs it stopped to be released (HI-1801, sessions.writersSettled): a
 // release is written once its run's outcome is known, after the leftovers' look, and a quit that closed the workspaces
-// first left the slot held by a Hive that had gone, so the next start in that slot was refused. Sessions' own set of
+// first left the slot held by a Combwork that had gone, so the next start in that slot was refused. Sessions' own set of
 // releases under way stands in for runs being settled; the wait is bounded for one that never ends.
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
@@ -23,7 +23,7 @@ function release(): { written: () => void } {
   return { written }
 }
 
-describe("Hive's quit and the slot writers of the runs it stopped (HI-1801)", () => {
+describe("Combwork's quit and the slot writers of the runs it stopped (HI-1801)", () => {
   it('waits until each release under way is written, those begun while it waits too', async () => {
     const a = release()
     let done = false

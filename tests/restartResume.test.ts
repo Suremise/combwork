@@ -1,5 +1,5 @@
 // Restarts announced and resumed (HI-1707): the installer's request checked (for this process and copy, fresh, whole,
-// once), the restart record's merge and what a start makes of it, the line a resumed agent is given, and Hive's side of
+// once), the restart record's merge and what a start makes of it, the line a resumed agent is given, and Combwork's side of
 // the request: taken once, acknowledged, never acted on when it is someone else's.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -36,7 +36,7 @@ describe("the installer's request to close (checkRequest)", () => {
     ['another reason', request({ reason: 'update' }), /malformed/],
     ['for another process', request({ pid: 999 }), /another process/],
     ['for an earlier process with the same id', request({ pidCreated: new Date(NOW - 9_000_000).toISOString() }), /earlier process/],
-    ['for another copy of Hive', request({ exe: 'C:\\Other\\Hive.exe' }), /another copy/],
+    ['for another copy of Combwork', request({ exe: 'C:\\Other\\Hive.exe' }), /another copy/],
     ['stale', request({ at: new Date(NOW - 120_000).toISOString() }), /stale/]
   ])('is refused when %s', (_what, text, why) => {
     const r = checkRequest(text, target(), same)
@@ -53,7 +53,7 @@ describe("the installer's request to close (checkRequest)", () => {
 const entry = (o: Partial<RestartEntry>): RestartEntry => ({ workspace: 'C:\\ws', projectPath: 'C:\\ws\\alpha', project: 'alpha', agentId: 'a1', agentName: 'Coder', provider: 'claude-code', sessionId: 's1', status: 'working', from: '1.0.0-rc.4', at: new Date(NOW).toISOString(), state: 'pending', changedAt: new Date(NOW).toISOString(), ...o })
 
 describe('the restart record', () => {
-  it("keeps an earlier offer the user hasn't answered when Hive closes again, replaces an agent's entry with its newer one, and takes the latest close's reason", () => {
+  it("keeps an earlier offer the user hasn't answered when Combwork closes again, replaces an agent's entry with its newer one, and takes the latest close's reason", () => {
     const before: RestartRecord = { version: 1, reason: 'quit', entries: [entry({ agentId: 'offered', state: 'offered' }), entry({ agentId: 'a1', sessionId: 'old', state: 'offered' }), entry({ agentId: 'done', state: 'resumed' })] }
     const after = mergeSnapshot(before, [entry({ agentId: 'a1', sessionId: 'new' }), entry({ agentId: 'a2' })], 'update')
     expect(after.reason).toBe('update')
@@ -92,7 +92,7 @@ describe('the line a resumed agent is given (resumeNote)', () => {
   })
 })
 
-describe("Hive's side of the request (watchRestartRequests)", () => {
+describe("Combwork's side of the request (watchRestartRequests)", () => {
   const exe = (app as unknown as { getPath: (k: string) => string }).getPath('exe')
   const started = (): string => new Date(Date.now() - process.uptime() * 1000).toISOString()
   const write = (dir: string, o: Record<string, unknown> = {}): void => writeFileSync(join(dir, REQUEST_FILE), JSON.stringify({ v: 1, nonce: NONCE, pid: process.pid, pidCreated: started(), exe, reason: 'install', at: new Date().toISOString(), ...o }))

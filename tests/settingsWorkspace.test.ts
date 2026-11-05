@@ -140,7 +140,7 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         // A plain listing: the advanced ones at their defaults are one line.
         const plain = settingRows({})
         expect(plain.filter((r) => r.id.startsWith('advanced.') && r.id !== 'advanced.showDeveloperFeatures')).toEqual([expect.objectContaining({ id: 'advanced.*', value: expect.stringMatching(/^\d+ more$/), title: 'query "advanced" lists them' })])
-        // Every trust-related advanced setting: each CLI's trust prompt, Claude Code's accounts field (HI-1870), Codex's per-launch trust (HI-1871), Codex's hook listing (HI-982: Hive trusts its hooks by its own hashes without it).
+        // Every trust-related advanced setting: each CLI's trust prompt, Claude Code's accounts field (HI-1870), Codex's per-launch trust (HI-1871), Codex's hook listing (HI-982: Combwork trusts its hooks by its own hashes without it).
         expect(settingRows({ query: 'advanced trust' }).map((r) => r.id)).toEqual(['advanced.claude-code.trust.prompt', 'advanced.claude-code.accounts.trustField', 'advanced.codex.trust.perLaunch', 'advanced.codex.trust.prompt', 'advanced.codex.hooks.listMethod', 'advanced.copilot.trust.prompt'])
         const changed = await applySetting(entryOf('advanced.cw.mcp.replySeconds'), 600, null)
         expect([changed.old, changed.new]).toEqual([300, 600])

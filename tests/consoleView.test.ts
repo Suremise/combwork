@@ -60,7 +60,7 @@ describe('sourceGroups', () => {
       src({ label: 'alpha · B1', project: 'alpha', agent: 'B1' }),
       src({ label: 'Combwork', kind: 'hive' })
     ])
-    // The app's own group says its name (HI-2511), never Hive's.
+    // The app's own group says its name (HI-2511), never Combwork's.
     expect(groups.map((g) => [g.label, g.sources.map((s) => s.label)])).toEqual([
       ['Combwork', ['Combwork', 'Assistant']],
       ['alpha', ['alpha · B1']],

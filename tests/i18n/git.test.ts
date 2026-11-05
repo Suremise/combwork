@@ -107,7 +107,7 @@ describe('git missing or too old', () => {
 
   it("stays English for the main process's errors, whatever the window's language", () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    expect(gitProblemText({ state: 'missing' })).not.toBe("Git isn't installed (or isn't on Hive's PATH)")
+    expect(gitProblemText({ state: 'missing' })).not.toBe("Git isn't installed (or isn't on Combwork's PATH)")
     expect(gitProblemEnglish({ state: 'missing' })).toBe("Git isn't installed (or isn't on Combwork's PATH)")
     expect(gitProblemEnglish({ state: 'old', version: '2.16.0' })).toBe('Git 2.16.0 is too old for Combwork (it needs 2.38 or later)')
     expect(gitProblemEnglish({ state: 'old', version: '2.30.0' })).toBeNull()

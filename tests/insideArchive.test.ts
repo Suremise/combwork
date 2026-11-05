@@ -1,4 +1,4 @@
-// A path is inside an .asar archive only when a folder of it named *.asar is a file on disk (#246, #261): Hive's file
+// A path is inside an .asar archive only when a folder of it named *.asar is a file on disk (#246, #261): Combwork's file
 // routes and image previews refuse those, and leave alone a real folder that happens to end in .asar.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'

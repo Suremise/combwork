@@ -141,7 +141,7 @@ describe('the sentences once built by hand read as before, in English', () => {
   })
 })
 
-describe("what Hive works out follows the window's language; what agents read doesn't", () => {
+describe("what Combwork works out follows the window's language; what agents read doesn't", () => {
   it('worked out under the pseudo-locale', () => {
     setLanguage(PSEUDO_LANGUAGE, {})
     expect(keepAwakeText(2)).toMatch(/^\[/)

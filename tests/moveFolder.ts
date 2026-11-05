@@ -1,7 +1,7 @@
 // A test's own rename of a folder or file (a project renamed, a workspace moved), tried again while Windows refuses it
 // (#555). Windows refuses a rename with EPERM, EBUSY or EACCES for a moment while anything has a file in the folder open:
-// Hive's own readers and watchers in the test, git, the indexer or a virus scanner, which under a full run's load can
-// hold it for seconds. Hive's own renames retry the same way (renameRetrying in src/main/fsutil.ts).
+// Combwork's own readers and watchers in the test, git, the indexer or a virus scanner, which under a full run's load can
+// hold it for seconds. Combwork's own renames retry the same way (renameRetrying in src/main/fsutil.ts).
 import { renameSync } from 'fs'
 
 /** How long a rename is tried before the test fails: only a folder held for good (a hang) takes this long. */

@@ -2,7 +2,7 @@
 ; (never on the host). Its .onInit is the template's order: preInit (installer.nsh's wait, local builds only), then the
 ; app's mutex taken as ALLOW_ONLY_ONE_INSTALLER_INSTANCE takes it (one found held quits, exit 4 here), held until it
 ; exits. Its "install" writes when it started and ended to C:\out\<name>.log, five seconds apart. A test mutex name, so
-; it can't meet a real Hive installer.
+; it can't meet a real Combwork installer.
 Unicode true
 !define /ifndef APP_GUID "hive-test-1647-installer-mutex"
 !addincludedir "${__FILEDIR__}\..\..\node_modules\app-builder-lib\templates\nsis\include"
@@ -31,8 +31,8 @@ Function .onInit
   !ifmacrodef preInit
     !insertmacro preInit
   !endif
-  ; installer.nsh's request to a running Hive to close (HI-1707), as the template inserts it after initMultiUser: here
-  ; the stand-in install folder (C:\stand\Hive), where run.ps1 starts a stand-in Hive for its cases, or none.
+  ; installer.nsh's request to a running Combwork to close (HI-1707), as the template inserts it after initMultiUser: here
+  ; the stand-in install folder (C:\stand\Combwork), where run.ps1 starts a stand-in Combwork for its cases, or none.
   StrCpy $INSTDIR "C:\stand\Hive"
   !ifmacrodef customInit
     !insertmacro customInit

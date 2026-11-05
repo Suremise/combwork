@@ -1,6 +1,6 @@
 // The window's messages agents also read (dialects, HI-2065; card 5b, HI-2440): one descriptor for both audiences. With
 // no dialect chain, everything agents get is byte for byte what it was (the error reply, refusals, card history and
-// Hive's comments, fields kept beside their text as data); with one, agents read its override and the window never does.
+// Combwork's comments, fields kept beside their text as data); with one, agents read its override and the window never does.
 // Also: the agent branch of `forAgents` as agent messages, and the catalogue's `audience: "both"` entries round-tripping
 // through the dialect service's schema check into agentText.
 import { join } from 'path'
@@ -187,7 +187,7 @@ describe('refusalBody: the three sentences in the reader’s chain', () => {
   })
 })
 
-describe('card history and Hive’s comments, said when read', () => {
+describe('card history and Combwork’s comments, said when read', () => {
   const said = (s: ReturnType<typeof storedText>): string => storedLineText(s, agentEnglish, (id) => providerMessage(id))!
 
   it('every history line reads as stored with no chain, and the entry keeps its fields in order', () => {
@@ -222,10 +222,10 @@ describe('card history and Hive’s comments, said when read', () => {
     expect(asAgent(() => entryForAgents({ at: 'x', by: 'HB1', what: 'Moved into Review', whatText: moved, id: 'e' }))).toEqual({ at: 'x', by: 'HB1', what: 'DIALECT ARRIVAL Review' })
   })
 
-  it('keeps as stored: a line with no message (before #845), and an id this Hive does not know', () => {
+  it('keeps as stored: a line with no message (before #845), and an id this Combwork does not know', () => {
     using({ 'tasks.history.moved': 'Now in {column}' })
     expect(asAgent(() => entryForAgents({ at: 'x', by: 'HB1', what: 'Moved to Review' }))).toEqual({ at: 'x', by: 'HB1', what: 'Moved to Review' })
-    expect(asAgent(() => storedForAgents('From a newer Hive', { id: 'tasks.history.fromTheFuture', values: { column: 'review' } }))).toBe('From a newer Hive')
+    expect(asAgent(() => storedForAgents('From a newer Combwork', { id: 'tasks.history.fromTheFuture', values: { column: 'review' } }))).toBe('From a newer Combwork')
   })
 
   it("the queue's return comment (HI-2087), as written and stored: its agents' English said again in the reader's chain, through a card read and a wake", async () => {
@@ -234,8 +234,8 @@ describe('card history and Hive’s comments, said when read', () => {
     const failure = { entry: 'q-1', revision: 'abc1234', target: 'main', reason: 'conflict' as const, transient: false, files: ['a.ts'], log: Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n') }
     const written = returnedComment('HI-1', failure)
     // What commentAsHive keeps: the English and the window's message as they are, through the card file's JSON.
-    const comment = { at: '2026-11-03T10:00:01.000Z', by: 'Hive', text: written.text, hiveText: JSON.parse(JSON.stringify(written.shown)), id: 'c1' }
-    const card = { number: 1, column: 'doing', history: [{ at: '2026-11-03T10:00:00.000Z', by: 'Hive', what: 'Moved to Doing' }], comments: [comment] }
+    const comment = { at: '2026-11-03T10:00:01.000Z', by: 'Combwork', text: written.text, hiveText: JSON.parse(JSON.stringify(written.shown)), id: 'c1' }
+    const card = { number: 1, column: 'doing', history: [{ at: '2026-11-03T10:00:00.000Z', by: 'Combwork', what: 'Moved to Doing' }], comments: [comment] }
     expect(written.text).toMatch(/^HI-1 came back from the merge queue: a conflict with main in a\.ts\./)
     expect(written.text).toContain('line 39')
     // Its data keeps only the log lines the comment quotes.
@@ -260,11 +260,11 @@ describe('card history and Hive’s comments, said when read', () => {
     expect(asAgent(() => storedForAgents(written.text, legacy))).toBe(written.text)
   })
 
-  it("says a nested id's override through entryForAgents, and a wake quotes Hive's comment in the reader's chain", async () => {
+  it("says a nested id's override through entryForAgents, and a wake quotes Combwork's comment in the reader's chain", async () => {
     const { cardChange } = await import('../src/shared/watch')
     const stop = { id: HISTORY.safeguardStop.id, values: { agent: 'HB1', stops: 0, model: 'none', time: '', to: 'opus', from: 'sonnet', since: '15:00', state: 'none', hasTools: 'no', tools: '', hasHelp: 'yes', help: { id: 'agents.claude.safeguardHelp' } } }
     const english = said(stop)
-    const card = { number: 7, column: 'doing', history: [{ at: '2026-11-03T10:00:00.000Z', by: 'Hive', what: 'Moved to Doing' }], comments: [{ at: '2026-11-03T10:00:01.000Z', by: 'Hive', text: english, hiveText: stop, id: 'c1' }] }
+    const card = { number: 7, column: 'doing', history: [{ at: '2026-11-03T10:00:00.000Z', by: 'Combwork', what: 'Moved to Doing' }], comments: [{ at: '2026-11-03T10:00:01.000Z', by: 'Combwork', text: english, hiveText: stop, id: 'c1' }] }
     const before = JSON.stringify(asAgent(() => cardChange(7, card as never, ['comment'])))
     using({ 'agents.claude.safeguardHelp': 'Use /model to switch back.' })
     expect(asAgent(() => entryForAgents(card.comments[0])).text).toBe(english.replace(/In its terminal:.*$/, 'Use /model to switch back.'))

@@ -1,7 +1,7 @@
-// The Hive Assistant's actions say what they were with fields (#763): a kind from a fixed set and its targets, so a
+// The Combwork Assistant's actions say what they were with fields (#763): a kind from a fixed set and its targets, so a
 // viewer such as Apiary follows the Assistant without reading its English line. Every change the Assistant makes names
 // a kind where it is recorded, every kind is made somewhere and documented with an example in AGENT_API.md, and the
-// fields that leave Hive are an allow-list: never a prompt, a message or a setting's value.
+// fields that leave Combwork are an allow-list: never a prompt, a message or a setting's value.
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'

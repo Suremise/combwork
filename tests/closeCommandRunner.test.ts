@@ -1,7 +1,7 @@
 // HI-1368's close command runner and runs: the output kept is bounded (the last 64 KB, however much the command writes),
 // written whole and at most every 250 ms; the command never blocks on its output; a real command writing megabytes is
-// followed to its end with the tail never over its bound; Hive reads only the end of the tail; what runs, with its
-// placeholders filled, and what doesn't (none, a test copy of Hive, an update restart without the tick); the runs kept,
+// followed to its end with the tail never over its bound; Combwork reads only the end of the tail; what runs, with its
+// placeholders filled, and what doesn't (none, a test copy of Combwork, an update restart without the tick); the runs kept,
 // never one still running.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { EventEmitter } from 'events'
@@ -124,7 +124,7 @@ describe('the runner, with a real command', () => {
   }, 60_000)
 })
 
-describe('what Hive reads of a run', () => {
+describe('what Combwork reads of a run', () => {
   it('the last lines, from the end of the tail only, each cut short', async () => {
     const dir = folder()
     const file = join(dir, 'tail.txt')

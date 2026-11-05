@@ -12,7 +12,7 @@ import { checkDelay, connectionDropped, OutageResume, reachable, resumeNote, typ
 
 const ROOT = join(__dirname, '..')
 const fixture = (name: string): string => readFileSync(join(ROOT, 'tests/fixtures/advanced', name), 'utf8')
-/** The defaults, as Hive reads them with no override. */
+/** The defaults, as Combwork reads them with no override. */
 const pattern = (id: string): RegExp => {
   const d = advancedDef(id)!
   return new RegExp(d.default as string, d.flags ?? '')
@@ -48,7 +48,7 @@ describe('a dropped connection, by what the CLI said (connectionDropped)', () =>
     for (const line of fixture('rate-limit-copilot-1.0.105.jsonl').split('\n').filter(Boolean)) expect(dropped('copilot', JSON.parse(line).data.message)).toBe(false)
   })
 
-  it("keeps each CLI's words to its own pattern, and Hive's exclusions win", () => {
+  it("keeps each CLI's words to its own pattern, and Combwork's exclusions win", () => {
     // Codex's dropped stream isn't how Claude Code says it, nor Copilot's.
     expect(dropped('claude-code', 'stream disconnected before completion: Transport error')).toBe(false)
     expect(dropped('copilot', 'stream disconnected before completion: Transport error')).toBe(false)

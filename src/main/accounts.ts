@@ -289,7 +289,7 @@ async function makeFolder(a: Account): Promise<void> {
       if (tst.isSymbolicLink() || !tst.isDirectory()) throw new Unsafe(`${target} isn't a folder`) // i18n-ignore: for the log
       const link = join(dir, name)
       await symlink(target, link, 'junction')
-      if ((await linkState(link, target)) !== 'ours') throw new Unsafe(`${link} isn't the junction Hive made`) // i18n-ignore: for the log
+      if ((await linkState(link, target)) !== 'ours') throw new Unsafe(`${link} isn't the junction Combwork made`) // i18n-ignore: for the log
     }
   } catch (e) {
     await removeFolder(a).catch((r) => log.warn(`couldn't take back the half-made folder of account ${a.id}: ${userText(String(r))}`))
@@ -365,13 +365,13 @@ async function removeFolder(a: Account): Promise<void> {
     const target = sharedTarget(a.provider, name)
     const state = await linkState(link, target)
     if (state === 'absent') continue
-    if (state !== 'ours') throw new Unsafe(`${link} is ${state}, not the junction Hive made`) // i18n-ignore: for the log
+    if (state !== 'ours') throw new Unsafe(`${link} is ${state}, not the junction Combwork made`) // i18n-ignore: for the log
     // The link alone (unlink removes a junction, never what it points at: tests/accounts.test.ts).
     await unlink(link)
     if ((await linkState(link, target)) !== 'absent') throw new Unsafe(`${link} is still there after it was removed`) // i18n-ignore: for the log
   }
   const links = await linksUnder(dir)
-  if (links.length) throw new Unsafe(`links Hive didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
+  if (links.length) throw new Unsafe(`links Combwork didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
   // Renamed aside, one rename that follows nothing, so no account is ever at its own path half deleted; then deleted
   // there by the walk. The threat model (the Assistant's call on HI-980, 26 Oct): Hive's own junction, the CLI's
   // writes and the user's changes before removal began, not another process racing the walk (SPEC §11.2).
@@ -399,7 +399,7 @@ async function finishRemoving(aside: string): Promise<void> {
   if (!(await exists(aside))) return
   await assertRealFolder(aside)
   const links = await linksUnder(aside)
-  if (links.length) throw new Unsafe(`links Hive didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
+  if (links.length) throw new Unsafe(`links Combwork didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
   await deleteTree(aside)
 }
 

@@ -1,4 +1,4 @@
-// Hive's queue commits (#1350, SPEC §16.9.1 step 4, S47): the project's identity (else a pause naming the folder), the
+// Combwork's queue commits (#1350, SPEC §16.9.1 step 4, S47): the project's identity (else a pause naming the folder), the
 // repository's hooks (one that fails returns the card with its output), signing that never waits on a prompt (a signer
 // waiting is ended within the bound and the queue pauses, the worktree clean), any other git failure a pause with git's
 // message, and the trailers in a squash's commit. Pauses are never failures: only a hook returns the card.
@@ -53,7 +53,7 @@ const running = (pid: number): boolean => {
   }
 }
 
-describe("Hive's queue commits (#1350)", () => {
+describe("Combwork's queue commits (#1350)", () => {
   it('no commit identity for the repository: paused identity, naming the folder; not returned, nothing merged', async () => {
     const e = team()
     const card = await queued(e)
@@ -67,7 +67,7 @@ describe("Hive's queue commits (#1350)", () => {
     expect(e.wf.state(card).stage).toBe('merging')
   })
 
-  it("HI-2266: G12 on, git config changed after it was turned on: Hive's merge is authored and committed as git's identity now, never G12's saved copy", async () => {
+  it("HI-2266: G12 on, git config changed after it was turned on: Combwork's merge is authored and committed as git's identity now, never G12's saved copy", async () => {
     const e = team()
     await queued(e)
     // Turned on once the card is approved (its own commits are checked against G12 at submit: not this test's), saving

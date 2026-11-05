@@ -5,8 +5,8 @@ import { join } from 'path'
 import type { MoveOwner, PathDataCopy } from '../../src/shared/types'
 import { tempDir, tempRoot } from '../tempDir'
 
-// #796, the `main` area's services, in the language Hive shows while what agents read stays English: the Agent API's
-// notice titles (grouped finishes, plan usage, Hive closing), before and after a language change; Repair's report of a
+// #796, the `main` area's services, in the language Combwork shows while what agents read stays English: the Agent API's
+// notice titles (grouped finishes, plan usage, Combwork closing), before and after a language change; Repair's report of a
 // copy recorded in one language and shown in another; Initialise Git Repository's reply.
 
 vi.mock('electron', () => ({
@@ -71,7 +71,7 @@ describe('notices: in the language shown, their Agent API title in English', () 
     off = onHiveEvent((e) => void seen.push(e as never))
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
     config.get().planWarnings = {}
-    // Hive in the background: a Windows notification, told to the Agent API's stream.
+    // Combwork in the background: a Windows notification, told to the Agent API's stream.
     setNotifyHost({ focused: () => null, fallback: () => null, workspaceOf: () => null })
   })
   afterEach(() => {
@@ -103,7 +103,7 @@ describe('notices: in the language shown, their Agent API title in English', () 
     expect(titles.map((t) => t.title)).toEqual(['81 % Ihres 2-Stunden-Limits für Codex verbraucht', '81 % Ihres Wochenlimits für Codex verbraucht', '81 % Ihres 2-hour-Limits für Codex verbraucht', '81 % Ihres primary-Limits für Codex verbraucht'])
   })
 
-  it('Hive closing', () => {
+  it('Combwork closing', () => {
     setLanguage('de', GERMAN, 'de-DE')
     const c = closedNotice(2)
     tell({ kind: 'quit', title: c.title, message: c.body, apiTitle: c.apiTitle })
@@ -159,7 +159,7 @@ describe("Repair's report of a copy: whose it is, kept as data", () => {
 })
 
 describe("Repair's report of a recreate git's prune refused (#1313)", () => {
-  it('names the worktrees git would forget: an agent’s by its name, one Hive has no agent for by its folder', () => {
+  it('names the worktrees git would forget: an agent’s by its name, one Combwork has no agent for by its folder', () => {
     const trees = [
       { agentName: 'Second', from: 'D:\\old\\ws.worktrees\\alpha\\second', to: null },
       { agentName: 'Third', from: 'D:\\old\\ws.worktrees\\alpha\\third', to: 'D:\\new\\ws.worktrees\\alpha\\third' }

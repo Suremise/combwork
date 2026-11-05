@@ -1,7 +1,7 @@
-// Carrying on (#1432, #966 row 16, shared/inboxSwitches.ts): Hive's three ways of getting an agent to read its inbox,
+// Carrying on (#1432, #966 row 16, shared/inboxSwitches.ts): Combwork's three ways of getting an agent to read its inbox,
 // each with its own switch: told at the end of a tool (a checkpoint, inboxNotices.ts), kept going at its Stop (the
 // drain), woken while idle (the doorbell, deliveries.ts offerOnce). Every combination of the switches, for an agent at
-// each point, says what Hive does, and none loses an item: it stays in the inbox, unread, until the agent reads it.
+// each point, says what Combwork does, and none loses an item: it stays in the inbox, unread, until the agent reads it.
 // Deliver Now types the doorbell once with idle wakes off; a task given now isn't a wake. The sessions are stand-ins
 // here, as in agentMessages.test.ts (the e2e carryingon suite runs fake Claude Code and Codex agents).
 import { rmSync } from 'fs'
@@ -31,7 +31,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
 
   let n = 0
   let alpha = ''
-  /** A stand-in agent b1 of alpha: its status and launch, and what Hive typed into it. */
+  /** A stand-in agent b1 of alpha: its status and launch, and what Combwork typed into it. */
   const st = { status: 'ready' as string, runId: 'r1', sessionId: 's1', typed: [] as string[], during: null as null | (() => unknown) }
   const live = (): LiveSessionState => ({ projectPath: alpha, agentId: 'b1', status: st.status, runId: st.runId, sessionId: st.sessionId }) as never
   Object.assign(sessions, {
@@ -49,7 +49,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     }
   })
   deliveries.setReadsInboxForTests(() => true)
-  const hive = { kind: 'hive' as const, name: 'Hive' }
+  const hive = { kind: 'hive' as const, name: 'Combwork' }
   /** What b1 has unread (queued, offered or uncertain: not received, not ended). */
   const unread = async (): Promise<string[]> => (await deliveries.deliveriesOf(alpha, 'b1')).filter((r) => ['queued', 'offered', 'uncertain'].includes(r.state)).map((r) => r.id)
   const setSwitches = async (on: Record<InboxSwitch, boolean>): Promise<void> => {
@@ -196,9 +196,9 @@ describe('carrying on: the inbox switches (#1432)', async () => {
       expect(st.typed).toEqual([])
       expect(await unread()).toEqual([m.id])
     })
-    it("the project's own turned off while its line is typed (Hive writes project.json): its last key isn't pressed (round 2 finding)", async () => {
+    it("the project's own turned off while its line is typed (Combwork writes project.json): its last key isn't pressed (round 2 finding)", async () => {
       await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
-      // project.json as Hive writes it: its own value, and a count of the writes since it was read.
+      // project.json as Combwork writes it: its own value, and a count of the writes since it was read.
       const project = { own: 'inherit' as 'inherit' | 'off', writes: 0 }
       deliveries.setInboxProjectForTests(async () => {
         const at = project.writes

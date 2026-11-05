@@ -22,8 +22,8 @@ const FOLDERS: FolderMode[] = ['slots', 'project']
 
 /**
  * §16.5.2's table (decided on #1417): On Hold, Todo, Active and Done always; Review with any review; Approved when a review
- * or your OK before merging (G10) approves the work and something follows: a merge in Git (Hive's, the agent's, or Not
- * checked), your OK after the reviewer agent in None (N1); Merging when Hive merges. Committed is done has nothing after.
+ * or your OK before merging (G10) approves the work and something follows: a merge in Git (Combwork's, the agent's, or Not
+ * checked), your OK after the reviewer agent in None (N1); Merging when Combwork merges. Committed is done has nothing after.
  */
 function expected(o: WorkflowOptions): StageId[] {
   const review = o.review !== 'none'
@@ -136,7 +136,7 @@ describe('stage names (N5, OP-30)', () => {
     expect(englishText(stageNameProblemText({ stage: 'merging', why: 'duplicate' }))).toBe('The name of Merging is already another stage’s name.')
   })
 
-  it('checks a name against the names the window shows: a default name in the language Hive shows counts too (HR2, round 1)', async () => {
+  it('checks a name against the names the window shows: a default name in the language Combwork shows counts too (HR2, round 1)', async () => {
     setLanguage('de', await loadCatalogue('de'), 'de')
     // Done is Erledigt in German: Active can't be called that, nor Done (English's name for it).
     expect(stageNameProblems({ active: 'Erledigt' }, tr)).toEqual([{ stage: 'active', why: 'duplicate' }])

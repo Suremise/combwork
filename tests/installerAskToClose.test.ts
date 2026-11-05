@@ -1,6 +1,6 @@
-// The installer's request to a running Hive to close for the install (HI-1707, build/hiveAskToClose.ps1, run by
+// The installer's request to a running Combwork to close for the install (HI-1707, build/hiveAskToClose.ps1, run by
 // installer.nsh's customInit), against a stand-in Hive: a copy of Node named Hive.exe in its own install folder, running
-// a script that answers as Hive does (or doesn't). Only this test's own processes are found, asked and ended.
+// a script that answers as Combwork does (or doesn't). Only this test's own processes are found, asked and ended.
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -15,7 +15,7 @@ const ps = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 /** PowerShell's environment: what it has on any machine (its module-analysis cache too, HI-2401), nothing else of the test's shell. */
 const psEnv = powershellEnv()
 
-/** The stand-in Hive: watches the profile for a request, records it, and acknowledges and exits, acknowledges and stays, or neither. */
+/** The stand-in Combwork: watches the profile for a request, records it, and acknowledges and exits, acknowledges and stays, or neither. */
 const STAND_IN = `
 const fs = require('fs'), path = require('path')
 const [profile, mode, seen] = process.argv.slice(2)
@@ -37,7 +37,7 @@ process.stdout.write('watching\\n')
 let dir = ''
 const started: ChildProcess[] = []
 
-/** A stand-in Hive installed in `folder`, answering as `mode` says; resolves once it watches. */
+/** A stand-in Combwork installed in `folder`, answering as `mode` says; resolves once it watches. */
 async function standIn(folder: string, profile: string, mode: 'ack-exit' | 'ack-stay' | 'none', seen: string): Promise<ChildProcess> {
   mkdirSync(folder, { recursive: true })
   const exe = join(folder, 'Hive.exe')
@@ -45,7 +45,7 @@ async function standIn(folder: string, profile: string, mode: 'ack-exit' | 'ack-
   const child = spawn(exe, [join(dir, 'stand-in.cjs'), profile, mode, seen], { env: { SystemRoot: root }, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
   started.push(child)
   await new Promise<void>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('the stand-in Hive did not start')), HUNG_MS)
+    const t = setTimeout(() => reject(new Error('the stand-in Combwork did not start')), HUNG_MS)
     child.stdout!.once('data', () => {
       clearTimeout(t)
       resolve()
@@ -58,7 +58,7 @@ async function standIn(folder: string, profile: string, mode: 'ack-exit' | 'ack-
 const ask = (install: string, profile: string, waits = { ack: 3000, exit: 3000 }): number | null =>
   spawnSync(ps, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', SCRIPT, '-InstallDir', install, '-Profile', profile, '-AckMs', String(waits.ack), '-ExitMs', String(waits.exit)], { env: psEnv, windowsHide: true, timeout: HUNG_MS }).status
 
-describe("the installer asks a running Hive to close (hiveAskToClose.ps1, HI-1707)", () => {
+describe("the installer asks a running Combwork to close (hiveAskToClose.ps1, HI-1707)", () => {
   beforeAll(() => {
     dir = tempDir('hive-ask-to-close-')
     writeFileSync(join(dir, 'stand-in.cjs'), STAND_IN)
@@ -67,14 +67,14 @@ describe("the installer asks a running Hive to close (hiveAskToClose.ps1, HI-170
     for (const c of started) if (c.exitCode === null) c.kill()
   })
 
-  it('with no Hive of its install folder running: nothing to ask (0)', () => {
+  it('with no Combwork of its install folder running: nothing to ask (0)', () => {
     const profile = join(dir, 'profile-none')
     mkdirSync(profile)
     expect(ask(join(dir, 'nothing-installed'), profile)).toBe(0)
     expect(existsSync(join(profile, 'restart-request.json'))).toBe(false)
   })
 
-  it("asks that Hive (its id, its executable, a GUID nonce), and once it acknowledges and exits, it's done (0)", async () => {
+  it("asks that Combwork (its id, its executable, a GUID nonce), and once it acknowledges and exits, it's done (0)", async () => {
     const install = join(dir, 'install-a')
     const profile = join(dir, 'profile-a')
     mkdirSync(profile)
@@ -88,7 +88,7 @@ describe("the installer asks a running Hive to close (hiveAskToClose.ps1, HI-170
     expect(Math.abs(Date.parse(request.at) - Date.now())).toBeLessThan(HUNG_MS)
   })
 
-  it("takes its request back when Hive doesn't acknowledge it (3): the template's check ends Hive as before", async () => {
+  it("takes its request back when Combwork doesn't acknowledge it (3): the template's check ends Combwork as before", async () => {
     const install = join(dir, 'install-b')
     const profile = join(dir, 'profile-b')
     mkdirSync(profile)
@@ -97,7 +97,7 @@ describe("the installer asks a running Hive to close (hiveAskToClose.ps1, HI-170
     expect(existsSync(join(profile, 'restart-request.json'))).toBe(false)
   })
 
-  it('says so when Hive acknowledged but is still running when the wait ends (4)', async () => {
+  it('says so when Combwork acknowledged but is still running when the wait ends (4)', async () => {
     const install = join(dir, 'install-c')
     const profile = join(dir, 'profile-c')
     mkdirSync(profile)
@@ -106,7 +106,7 @@ describe("the installer asks a running Hive to close (hiveAskToClose.ps1, HI-170
     expect(hive.exitCode).toBe(null)
   })
 
-  it("never asks a Hive of another install folder (0, and that one sees no request)", async () => {
+  it("never asks a Combwork of another install folder (0, and that one sees no request)", async () => {
     const profile = join(dir, 'profile-d')
     mkdirSync(profile)
     const seen = join(dir, 'seen-d.json')

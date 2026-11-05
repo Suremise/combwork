@@ -218,7 +218,7 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
       const away = linkAway(at)
       running()
       await expect(run(() => sessions.attach(proj, [write(join(outside, `ext-${n}.log`))], 'a1'))).rejects.toThrow(/link or not a folder/)
-      // HI-2085: through a linked .combwork folder, Hive's own setup of the new project (its sessions and archive folders, its
+      // HI-2085: through a linked .combwork folder, Combwork's own setup of the new project (its sessions and archive folders, its
       // project.json and its .bak) can land there too: a refresh the watcher scheduled late may run after the link. Only
       // that is let be; an attachment, or anything else, fails it. Listed once that refresh has finished (HI-2430): one
       // still writing has temp files there (project.json.bak's, project.json.bak.<pid>-<n>.tmp, matched nothing here).

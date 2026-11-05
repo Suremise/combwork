@@ -21,7 +21,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 
-/** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+/** Workflow rules off for one test (#1270: Combwork owns the lane while they are on), on again after it. */
 const { advanced } = await import('../src/main/advanced')
 const { ENFORCE } = await import('../src/main/workflow/service')
 const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
@@ -291,7 +291,7 @@ describe('which lanes are listed and kept', () => {
 })
 
 describe("a card loop's rounds and wait when the request doesn't say (#412, HI-1766: workflow options)", () => {
-  it("the project's, else the workspace's, else Hive's, else 10 rounds and 6 hours; values out of range are passed over", () => {
+  it("the project's, else the workspace's, else Combwork's, else 10 rounds and 6 hours; values out of range are passed over", () => {
     const of = (levels: Parameters<typeof preferencesOf>[1]) => {
       const v = preferencesOf('git', levels).values
       return { rounds: v.loopRounds, waitHours: v.loopWaitHours }

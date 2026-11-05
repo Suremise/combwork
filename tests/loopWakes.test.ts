@@ -27,7 +27,7 @@ describe('loop wake lines (#405)', () => {
 
 describe("a lane's next card, after a Done one (HI-1990)", () => {
   const lc = (number: number, column: LaneCard['column'], more: Partial<LaneCard> = {}): LaneCard => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...more })
-  it('is due for Hive to start as the first open card, in Todo, not blocked, in an active lane (its first card too, HI-2029)', () => {
+  it('is due for Combwork to start as the first open card, in Todo, not blocked, in an active lane (its first card too, HI-2029)', () => {
     expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'todo')] })?.number).toBe(2)
     // Another lane's card before it doesn't hold it up; one Done before that does count.
     expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(3, 'doing', { elsewhere: 'x' }), lc(2, 'todo')] })?.number).toBe(2)
@@ -61,7 +61,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   watches.testHooks.settleMs = 0
   const lanes = await import('../src/main/lanes')
 
-  /** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+  /** Workflow rules off for one test (#1270: Combwork owns the lane while they are on), on again after it. */
   const { advanced } = await import('../src/main/advanced')
   const { ENFORCE } = await import('../src/main/workflow/service')
   const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
@@ -83,7 +83,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     return { w, alpha }
   }
   /**
-   * Stand-in sessions: every agent of alpha running, its status, and what each was told: #650, it follows Hive's doorbell
+   * Stand-in sessions: every agent of alpha running, its status, and what each was told: #650, it follows Combwork's doorbell
    * with cw_inbox, as a model does, and `text` is what it read.
    */
   const fake = (alpha: string) => {
@@ -224,8 +224,8 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
     st.status.set('r1', 'watching')
     await watches.registerWatch(w, alpha, 'r1', { cards: [c], changes: ['column'], column: 'review' })
-    // A fired watch covers the card until its line is typed after Hive's settle, which this file sets to 0: a handoff
-    // later than that found no watch and queued a second line (#560, under load). Here the settle is Hive's own, as when
+    // A fired watch covers the card until its line is typed after Combwork's settle, which this file sets to 0: a handoff
+    // later than that found no watch and queued a second line (#560, under load). Here the settle is Combwork's own, as when
     // it runs, so the handoff meets the fired watch.
     watches.testHooks.settleMs = undefined
     try {
@@ -444,14 +444,14 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     expect(st.typed.map((t) => t.agent)).toEqual(['r1'])
     st.status.set('b1', 'watching')
     await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], column: 'passed' }) as WatchCondition)
-    // Failed: the watch doesn't fire (still in Review), so Hive wakes the builder, once.
+    // Failed: the watch doesn't fire (still in Review), so Combwork wakes the builder, once.
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'Round 1: FAILED.' }))
     await watches.evaluateWatches(w)
     await typedUntil(st, 2)
     expect(st.typed.map((t) => t.agent)).toEqual(['r1', 'b1'])
     expect(st.typed[1].text).toMatch(/failed it; .*This is your card in its loop/)
-    // Its watch still waits for Passed. Returned and passed: the watch tells it, and Hive doesn't too.
+    // Its watch still waits for Passed. Returned and passed: the watch tells it, and Combwork doesn't too.
     st.status.set('b1', 'watching')
     st.status.set('r1', 'working')
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
@@ -895,7 +895,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     const queueReturnWake = async (w: Awaited<ReturnType<typeof open>>['w'], alpha: string, c: number, text: string) => {
       const card = await inWorkspace(w, () => tasks.getTask(c, w))
       const since = card.history.at(-1)!
-      await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1 (alpha)', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: c, body: `[CW] #${c}: ${text}`, source: 'loop', ref: `#${c}`, replace: true, meta: { n: c, kind: 'note', agentName: 'B1 (alpha)', sinceAt: since.at, sinceId: since.id ?? '', text } })
+      await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1 (alpha)', kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, card: c, body: `[CW] #${c}: ${text}`, source: 'loop', ref: `#${c}`, replace: true, meta: { n: c, kind: 'note', agentName: 'B1 (alpha)', sinceAt: since.at, sinceId: since.id ?? '', text } })
     }
 
     it("HI-1694's sequence: the builder's watch told it the pass; the return comes, and a watch for Done begins before it reads it: the return is still given, and the builder told of the conflict", async () => {
@@ -1299,7 +1299,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it("a builder's Done wake in its lane names the lane's next card: Hive starts it with the rules on, the builder with them off (HI-1990)", async () => {
+  it("a builder's Done wake in its lane names the lane's next card: Combwork starts it with the rules on, the builder with them off (HI-1990)", async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open()
     const st = fake(alpha)

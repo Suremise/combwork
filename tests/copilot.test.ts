@@ -23,7 +23,7 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
   return {
     projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\copilot.exe', cwd, workspacePath: base, runId: 'r1', sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
     resume: false, name: 'Agent 1', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'], env: { CW_PROJECT: 'proj' } } }, model: null, effort: null, permissionMode: 'ask', extraArgs: [],
-    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
     env: { PATH: 'C:\\Windows', GH_TOKEN: 'gho_stray', GITHUB_TOKEN: 'ghp_other', COPILOT_GITHUB_TOKEN: 'github_pat_x', CW_HOOK_TOKEN: 'tok123' },
     ...over
   }
@@ -59,7 +59,7 @@ describe('Copilot footer and modes', () => {
     expect(copilotFooterMode(' ← open sidebar · Plan · Manual Approval · / commands · ? help · tab next tab')).toBe('plan')
     expect(copilotFooterMode(' ← open sidebar · Autopilot · Manual Approval · / commands · tab next tab')).toBe('autopilot')
     expect(copilotFooterMode(' ← open sidebar · Interactive · Allow All · / commands · ? help · tab next tab')).toBe('allow-all')
-    // A pane too narrow for one line (seen in Hive's agent terminal with two panes).
+    // A pane too narrow for one line (seen in Combwork's agent terminal with two panes).
     expect(copilotFooterMode('← open ·Interactive · Manual · / commands · ? help · tab\nsidebar Approval next tab gpt-4.1')).toBe('ask')
     expect(copilotFooterMode('← open ·Plan · Manual · / commands\nsidebar Approval')).toBe('plan')
     // While typing, the footer lists other items; the last footer drawn wins.
@@ -94,7 +94,7 @@ describe('Copilot footer and modes', () => {
 })
 
 describe('Copilot launch', () => {
-  it('starts a new session under the id Hive chose, with its hooks, MCP servers and modes', () => {
+  it('starts a new session under the id Combwork chose, with its hooks, MCP servers and modes', () => {
     const ctx = context({ model: 'claude-sonnet-5.5', effort: 'high', trustedHiveTools: ['cw_list_tasks', 'cw_read_task'], initialPrompt: 'Fix the bug' })
     const { file, args, env } = copilot.buildCommand(ctx.executable, ctx)
     expect(file).toBe('C:\\bin\\copilot.exe')
@@ -121,7 +121,7 @@ describe('Copilot launch', () => {
     expect(args.join(' ')).not.toContain('tok123')
   })
 
-  it("pre-approves Hive's tools: a project agent's all of them, the Assistant's only its trusted ones (#468)", () => {
+  it("pre-approves Combwork's tools: a project agent's all of them, the Assistant's only its trusted ones (#468)", () => {
     const allow = (over: Partial<LaunchContext>) => copilot.buildCommand('x.exe', context(over)).args.filter((a) => a.startsWith('--allow-tool='))
     expect(allow({})).toEqual(['--allow-tool=combwork'])
     expect(allow({ permissionMode: 'plan' })).toEqual(['--allow-tool=combwork'])
@@ -174,7 +174,7 @@ describe('Copilot launch', () => {
     expect(r.args).toContain('--plan')
     expect(copilot.buildCommand('x.exe', context({ permissionMode: 'allow-all' })).args).toContain('--allow-all')
     expect(copilot.buildCommand('x.exe', context({ permissionMode: 'autopilot' })).args).toContain('--autopilot')
-    const ctx = context({ instructions: 'You are the Hive Assistant.', env: { COPILOT_CUSTOM_INSTRUCTIONS_DIRS: 'D:\\mine' } })
+    const ctx = context({ instructions: 'You are the Combwork Assistant.', env: { COPILOT_CUSTOM_INSTRUCTIONS_DIRS: 'D:\\mine' } })
     expect(copilot.buildCommand('x.exe', ctx).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(`D:\\mine,${join(ctx.privateDir, 'instructions')}`)
   })
 
@@ -209,7 +209,7 @@ describe('Copilot launch', () => {
     // Stop types them on conditions (HI-2272): the key that exits once its screen shows the exit armed.
     expect(exit.armed.test(readFileSync(join(__dirname, 'fixtures', 'advanced', 'exit-armed-copilot-1.0.105.txt'), 'utf8'))).toBe(true)
     expect(exit.armed.test(readFileSync(join(__dirname, 'fixtures', 'advanced', 'ready-copilot-1.0.95.txt'), 'utf8'))).toBe(false)
-    // Quitting Hive or closing a workspace (stopWhereAndWait, 3 s) waits past the grace, for the kill and its exit.
+    // Quitting Combwork or closing a workspace (stopWhereAndWait, 3 s) waits past the grace, for the kill and its exit.
     const { stopWaitMs } = await import('../src/main/sessions')
     expect(stopWaitMs(3000, [exit.graceMs])).toBeGreaterThan(exit.graceMs)
     expect(stopWaitMs(3000, [undefined, undefined])).toBe(3000)
@@ -244,7 +244,7 @@ describe('Copilot launch', () => {
     }
   })
 
-  it('gives every event to Hive’s hook server over HTTP, by the PascalCase names', () => {
+  it('gives every event to Combwork’s hook server over HTTP, by the PascalCase names', () => {
     const h = copilotHooks('http://127.0.0.1:5000/hook?run=r1', 'tok') as { version: number; hooks: Record<string, { type: string; url: string; headers: Record<string, string>; timeoutSec: number }[]> }
     expect(h.version).toBe(1)
     expect(Object.keys(h.hooks)).toEqual(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'])
@@ -267,7 +267,7 @@ describe('Copilot launch', () => {
 describe('Copilot hooks', () => {
   const h = (body: Record<string, unknown>) => copilot.normalizeHook(body)
 
-  it('turns its hook calls into Hive events', () => {
+  it('turns its hook calls into Combwork events', () => {
     expect(h({ hook_event_name: 'SessionStart', session_id: 's1', source: 'new', initial_prompt: 'do it' })).toMatchObject({ event: { kind: 'start', source: 'new' }, sessionId: 's1', mode: null })
     expect(h({ hook_event_name: 'UserPromptSubmit', session_id: 's1', prompt: 'hello there' }).event).toEqual({ kind: 'prompt', text: 'hello there' })
     expect(h({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { path: 'C:\\w\\a.ts', old_str: 'x', new_str: 'y' } })).toMatchObject({ event: { kind: 'toolStart' }, editedPaths: ['C:\\w\\a.ts'] })
@@ -368,7 +368,7 @@ describe('Copilot models', () => {
 })
 
 describe('Copilot files', () => {
-  it('reads skills from its own folders and three project folders, sharing Hive’s copies with Codex', () => {
+  it('reads skills from its own folders and three project folders, sharing Combwork’s copies with Codex', () => {
     const roots = copilot.skillRoots()
     expect(roots.local).toEqual([join('.github', 'skills'), join('.agents', 'skills'), join('.claude', 'skills')])
     expect(copilot.skillCopyPath(context(), 'deploy')).toBe(join(context().cwd, '.agents', 'skills', 'cw-deploy'))

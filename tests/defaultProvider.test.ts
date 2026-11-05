@@ -16,7 +16,7 @@ function settings(on: string[], defaultProvider: string = AUTO_PROVIDER): AppSet
   return s
 }
 
-/** These CLIs are installed, as Hive found them. */
+/** These CLIs are installed, as Combwork found them. */
 function installed(ids: string[]): (id: ProviderId) => { found: boolean; checking?: boolean } {
   setInstalledCheck((id) => ids.includes(id))
   return (id) => ({ found: ids.includes(id) })
@@ -49,7 +49,7 @@ describe('Automatic', () => {
   })
 
   it('never resolves from partial detection: Codex found before Claude Code has answered (#506)', () => {
-    // Detection as Hive hears it: found, missing, or null while still looking.
+    // Detection as Combwork hears it: found, missing, or null while still looking.
     const heard: Partial<Record<ProviderId, boolean | null>> = { 'claude-code': null, codex: true, copilot: null }
     setInstalledCheck((id) => heard[id] ?? null)
     expect(autoProviderPending(settings(ALL))).toBe(true)
@@ -104,7 +104,7 @@ describe('decision A: no default provider is read (HI-2132)', () => {
   })
 })
 
-describe('which providers Hive warns about (the banner, the status bar, Provider Setup opening)', () => {
+describe('which providers Combwork warns about (the banner, the status bar, Provider Setup opening)', () => {
   const ids = (w: ReturnType<typeof providerWarnings>) => w.providers.map((p) => p.id)
 
   it('not a provider only turned on: agents on Codex leave a missing Claude Code alone', () => {
@@ -137,7 +137,7 @@ describe('which providers Hive warns about (the banner, the status bar, Provider
   })
 })
 
-describe("Hive's order (HI-2139: no order of the user's)", () => {
+describe("Combwork's order (HI-2139: no order of the user's)", () => {
   it('Claude Code, Codex, GitHub Copilot: Automatic picks the first turned on and installed in it', () => {
     expect(PROVIDERS.map((p) => p.id)).toEqual(ALL)
     installed(ALL)
@@ -175,7 +175,7 @@ describe('migration (config version 8)', () => {
     expect(load({ version: 8, settings: { defaultProvider: 'claude-code' } }).settings.defaultProvider).toBe('claude-code')
   })
 
-  it('makes an unknown provider (a newer Hive wrote it) Automatic', () => {
+  it('makes an unknown provider (a newer Combwork wrote it) Automatic', () => {
     expect(load({ version: 8, settings: { defaultProvider: 'gemini' } }).settings.defaultProvider).toBe(AUTO_PROVIDER)
   })
 })

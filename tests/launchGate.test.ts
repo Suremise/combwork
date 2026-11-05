@@ -1,4 +1,4 @@
-// A launch's command runs only once Hive has put its terminal's process in the launch's job (#507), and only on Hive's
+// A launch's command runs only once Combwork has put its terminal's process in the launch's job (#507), and only on Combwork's
 // explicit word: a CLI that starts a detached server the moment it runs, with the job host not even started (cold), or
 // with tracking slower than any timeout, still leaves it in the job; tracking refused, or the pipe closing without a
 // word, never runs it. The gate passes the command line node-pty itself would have built.
@@ -116,7 +116,7 @@ if (process.argv[4] === '--stay') {
     expect(refused.ranAt).toBe(0)
     expect(refused.serverPid).toBe(0)
     expect(refused.code).toBe(1)
-    expect(refused.output.replace(/\s+/g, ' ')).toContain(`Error: Hive didn't start ${program}: its processes couldn't be tracked (test)`)
+    expect(refused.output.replace(/\s+/g, ' ')).toContain(`Error: Combwork didn't start ${program}: its processes couldn't be tracked (test)`)
     const failed = await launch('failed', () => Promise.reject(new Error('the tracker broke')))
     expect(failed.ranAt).toBe(0)
     expect(failed.output.replace(/\s+/g, ' ')).toContain('the tracker broke')
@@ -125,7 +125,7 @@ if (process.argv[4] === '--stay') {
   it('ends a CLI that outlives its gate, rather than leaving it in the job (HI-1819)', async () => {
     const { trackLaunch, launchEnded } = await import('../src/main/agentProcesses')
     const { spawnPty } = await import('../src/main/ptyHost')
-    // Hive quitting just after a launch: its CLI, started as the console closed, missed the close and ran on with no
+    // Combwork quitting just after a launch: its CLI, started as the console closed, missed the close and ran on with no
     // terminal, kept as a leftover that held its slot. Here the gate is ended under its running CLI the same way.
     const ran = join(dir, 'orphan-ran.txt')
     const cliPid = join(dir, 'orphan-pid.txt')
@@ -162,7 +162,7 @@ if (process.argv[4] === '--stay') {
   it('ends a CLI started through a .cmd wrapper that outlives its gate, the wrapper and the CLI both (HI-1819)', async () => {
     const { trackLaunch, launchEnded } = await import('../src/main/agentProcesses')
     const { spawnPty } = await import('../src/main/ptyHost')
-    // A CLI Hive starts through cmd.exe (toSpawnable: a .cmd launcher it can't start directly): the gate's child is
+    // A CLI Combwork starts through cmd.exe (toSpawnable: a .cmd launcher it can't start directly): the gate's child is
     // cmd.exe, and the CLI is cmd.exe's.
     const cliPid = join(dir, 'wrapped-pid.txt')
     const wrapper = join(dir, 'wrapper.cmd')
@@ -209,7 +209,7 @@ if (process.argv[4] === '--stay') {
     gate.close()
     expect(existsSync(ran)).toBe(false)
     expect(code).toBe(1)
-    expect(plain(output).replace(/\s+/g, ' ')).toContain(`Error: Hive didn't start ${program}: its terminal was closed before it started`)
+    expect(plain(output).replace(/\s+/g, ' ')).toContain(`Error: Combwork didn't start ${program}: its terminal was closed before it started`)
   }, 60000)
 
   it('never runs the CLI when the pipe closes without a word', async () => {
@@ -218,12 +218,12 @@ if (process.argv[4] === '--stay') {
     let output = ''
     const proc = pty.spawn(gate.file, gate.args, { cols: 120, rows: 30, cwd: dir, env: gate.env, useConptyDll: false })
     proc.onData((d) => (output += d))
-    // Hive goes away before it has said anything: the pipe closes under the waiting gate.
+    // Combwork goes away before it has said anything: the pipe closes under the waiting gate.
     setTimeout(() => gate.close(), 3000)
     const code = await new Promise<number>((resolve) => proc.onExit(({ exitCode }) => resolve(exitCode)))
     expect(existsSync(ran)).toBe(false)
     expect(code).toBe(1)
-    expect(plain(output).replace(/\s+/g, ' ')).toContain(`Error: Hive didn't start ${program}`)
+    expect(plain(output).replace(/\s+/g, ' ')).toContain(`Error: Combwork didn't start ${program}`)
   }, 60000)
 
   it("doesn't track a process that has exited, and lets go of a launch stopped while it was being tracked", async () => {

@@ -99,12 +99,12 @@ describe('sweeping the leftovers (#1016)', () => {
       put(join(hive, 'tasks', '3.json.before-ids.bak'), now, HOUR), // made an hour ago: kept for its week
       put(join(hive, 'metrics', 'metrics.json.4242-9.tmp'), now, HOUR), // a write that may still be under way
       put(join(hive, 'workspace.json.bak'), now), // a kept file's last good copy
-      put(join(hive, 'shared', 'notes.tmp'), now), // not a name Hive's writes use
+      put(join(hive, 'shared', 'notes.tmp'), now), // not a name Combwork's writes use
       // A temp file's or a backup's suffix on anything but a store's own files is never taken for a failed save (round 1):
       put(join(hive, 'shared', 'research.123-abc.tmp'), now), // the user's notes
       put(join(hive, 'shared', 'handovers', 'x.md.123-4.tmp'), now),
       put(join(hive, 'attachments', 'session', 'report.123-abc.tmp'), now), // attachments
-      put(join(hive, 'unknown', 'user.json.before-ids.bak'), now), // a folder Hive doesn't know
+      put(join(hive, 'unknown', 'user.json.before-ids.bak'), now), // a folder Combwork doesn't know
       put(join(hive, 'unknown', 'metrics.json.1-2.tmp'), now),
       put(join(hive, 'tasks', 'notes.json.1-2.tmp'), now), // in a store, but not one of its files
       put(join(hive, 'tasks', 'board.json.before-ids.bak'), now), // a store file the migration never backed up
@@ -197,7 +197,7 @@ describe('sweeping the leftovers (#1016)', () => {
   it("a project's stores are only its settings, sessions, deliveries and transcript backups", async () => {
     const hive = join(tempDir('hive-leftovers-project-'), '.combwork')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
-    // A backup compressed, or decompressed to archive it, part way when Hive stopped (#1110).
+    // A backup compressed, or decompressed to archive it, part way when Combwork stopped (#1110).
     const gone = [put(join(hive, 'project.json.1-1.tmp'), now), put(join(hive, 'sessions.json.bak.1-2.tmp'), now), put(join(hive, 'sessions', 'abc-123.jsonl.1-3.tmp'), now), put(join(hive, 'sessions', 'abc-123.jsonl.gz.1-7.tmp'), now), put(join(hive, 'archive', 'abc-123.jsonl.1-8.tmp'), now)]
     const kept = [put(join(hive, 'attachments', 'a.png.1-4.tmp'), now), put(join(hive, 'archive', 'x.json.1-5.tmp'), now), put(join(hive, 'workspace.json.1-6.tmp'), now), put(join(hive, 'project.json.before-ids.bak'), now)]
     expect((await sweepLeftovers([{ hive, stores: PROJECT_STORES }], { now })).temp).toBe(5)

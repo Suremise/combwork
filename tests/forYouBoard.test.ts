@@ -153,7 +153,7 @@ describe('For you on the board (#1269)', () => {
     expect(req).toMatchObject({ gate: 'okBefore', kind: 'approve', shown: { id: FOR_YOU.okBefore.id } })
     const approved = await answer(w, card, req.request, { outcome: 'approved', reply: 'Go ahead' })
     expect(forYou(w).count).toBe(0)
-    // HI-2286: a note on Hive's own gate is the user's comment only, never a decision.
+    // HI-2286: a note on Combwork's own gate is the user's comment only, never a decision.
     expect(approved.comments.at(-1)).toMatchObject({ by: 'You', text: 'Go ahead' })
     expect(approved.decisions ?? []).toEqual([])
     const told = await deliveredTo(w, 'a1')
@@ -300,7 +300,7 @@ describe('For you on the board (#1269)', () => {
       underWay()
       return real.apply(this, args)
     })
-    // What another connection (another window's Hive) sees of the card once the action has written its kind.
+    // What another connection (another window's Combwork) sees of the card once the action has written its kind.
     let seenOutside: string | null = null
     const written = FactStore.prototype.updateCard
     const kindSpy = vi.spyOn(FactStore.prototype, 'updateCard').mockImplementation(function (this: unknown, ...args: Parameters<typeof written>) {

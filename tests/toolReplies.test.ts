@@ -149,7 +149,7 @@ describe("an agent's model, effort and retry waits (HI-1996)", () => {
     expect(retryWaitsView({})).toBeUndefined()
   })
 
-  it('a wait ends at its retry time when Hive notices later, never before it began; the waits add up', () => {
+  it('a wait ends at its retry time when Combwork notices later, never before it began; the waits add up', () => {
     expect(retryWaitEnd(wait, at('2026-10-29T10:06:45.000Z'))).toBe(at(wait.retryAt))
     expect(retryWaitEnd(wait, at('2026-10-29T10:02:00.000Z'))).toBe(at('2026-10-29T10:02:00.000Z'))
     expect(retryWaitEnd({ ...wait, retryAt: null }, at('2026-10-29T09:59:00.000Z'))).toBe(at(wait.since))
@@ -176,7 +176,7 @@ describe("a card's open requests (HI-1992)", () => {
     expect(cardRequests([], true)).toBeUndefined()
   })
 
-  it('each with its id, who asked, its words and when; Hive asked: no asker', () => {
+  it('each with its id, who asked, its words and when; Combwork asked: no asker', () => {
     expect(cardRequests([asked, gate])).toEqual([
       { request: 'HI-7/r15', kind: 'decide', gate: 'ask', text: asked.text, asker: 'Coder', since: asked.since },
       { request: 'HI-7/r16', kind: 'approve', gate: 'okBefore', text: 'Approve the merge.', since: gate.since }
@@ -219,7 +219,7 @@ describe('projects and notes', () => {
     expect(projectListText([{ name: 'a', workspace: 'one', active: true, branch: null, agents: [] }, { name: 'b', workspace: 'two', active: true, branch: null, agents: [] }])).toMatch(/^one\/a \(on\): no agents\ntwo\/b/)
   })
 
-  it("a project's status leaves out what its settings only repeat or keep for Hive (HI-1712)", () => {
+  it("a project's status leaves out what its settings only repeat or keep for Combwork (HI-1712)", () => {
     const status = { name: 'alpha', path: 'C:\\ws\\alpha', settings: { version: 2, chime: 'inherit', id: 'p-1', lastPath: 'C:\\ws\\alpha', stepsDone: ['a step'] } }
     expect(projectStatusReply(status)).toEqual({ name: 'alpha', path: 'C:\\ws\\alpha', settings: { chime: 'inherit', id: 'p-1' } })
     expect(projectStatusReply({ name: 'alpha' })).toEqual({ name: 'alpha' })

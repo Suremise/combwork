@@ -1,4 +1,4 @@
-// HI-1368's drain: a closed workspace's close command runs only once Hive has finished writing it. A store's last save,
+// HI-1368's drain: a closed workspace's close command runs only once Combwork has finished writing it. A store's last save,
 // asked for before the close and waiting meanwhile, keeps the drain waiting until it has committed (its row in the file
 // when the drain ends); a lease held past the bound, or a quit's outer bound, ends it undrained (no command runs); the
 // checkpoints are waited for before it ends. Real stores on a workspace folder; the rest with stand-ins.

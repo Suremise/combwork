@@ -39,7 +39,7 @@ async function fresh() {
     }
     throw new Error('not refused')
   }
-  /** A token for each of 20 apps, the most Hive keeps; the first is Apiary. */
+  /** A token for each of 20 apps, the most Combwork keeps; the first is Apiary. */
   const fill = async (): Promise<void> => {
     for (let i = 0; i < 20; i++) await createViewerToken(i ? `app ${i}` : 'Apiary')
   }
@@ -59,7 +59,7 @@ describe('a viewer token refused', () => {
     expect((await told(createViewerToken('one more'))).english).toBe('Combwork keeps at most 20 viewer tokens: revoke one first')
   })
 
-  it("and in the language Hive shows, with the log's English kept", async () => {
+  it("and in the language Combwork shows, with the log's English kept", async () => {
     const { createViewerToken, told, fill, setLanguage } = await fresh()
     setLanguage('de', locale('de'))
     const r = await told(createViewerToken(''))

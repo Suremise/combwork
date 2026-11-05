@@ -58,7 +58,7 @@ describe('Copilot sign-in detection', () => {
     expect(parseGhStatus('not json')).toBeNull()
   })
 
-  it('checks with the environment agents get: no GH_TOKEN or GITHUB_TOKEN, no auto-update, nothing of Hive’s', () => {
+  it('checks with the environment agents get: no GH_TOKEN or GITHUB_TOKEN, no auto-update, nothing of Combwork’s', () => {
     const env = copilotCheckEnv({ PATH: 'C:\\bin', GH_TOKEN: 'a', GITHUB_TOKEN: 'b', HIVE_SESSION: 'x', ELECTRON_RUN_AS_NODE: '1', CHROME_CRASHPAD_PIPE_NAME: 'p', GH_CONFIG_DIR: 'D:\\gh' })
     expect(env).toEqual({ PATH: 'C:\\bin', GH_CONFIG_DIR: 'D:\\gh', COPILOT_AUTO_UPDATE: 'false' })
     expect(copilotSignIn(env, null, null).loggedIn).toBe(false)
@@ -125,7 +125,7 @@ describe('Copilot readiness', () => {
     expect(issue.detail!.join('\n')).not.toContain('GH_TOKEN')
   })
 
-  it('says when a token in Hive’s environment isn’t passed to agents', () => {
+  it('says when a token in Combwork’s environment isn’t passed to agents', () => {
     const [issue] = copilotReadiness({ ...base, loggedIn: false }, { GH_TOKEN: 'secret-not-read', PATH: 'x' })
     expect(issue.detail!.at(-1)).toContain('`GH_TOKEN`')
     expect(issue.detail!.join('\n')).not.toContain('secret-not-read')

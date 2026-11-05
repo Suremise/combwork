@@ -42,7 +42,7 @@ describe('rebase', () => {
 describe('worktreeCandidates', () => {
   const ws = { from: 'D:\\Dev\\HIVE', to: 'E:\\HIVE' }
   const project = { from: 'D:\\Dev\\HIVE\\hive', to: 'E:\\HIVE\\hive' }
-  it("in Hive's worktrees folder beside the workspace: moved along with it, else where it was", () => {
+  it("in Combwork's worktrees folder beside the workspace: moved along with it, else where it was", () => {
     expect(worktreeCandidates('D:\\Dev\\HIVE.worktrees\\hive\\claudio', ws, project)).toEqual(['E:\\HIVE.worktrees\\hive\\claudio', 'D:\\Dev\\HIVE.worktrees\\hive\\claudio'])
   })
   it('inside the project or the workspace: moved along with it first', () => {

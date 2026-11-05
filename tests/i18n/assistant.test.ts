@@ -15,7 +15,7 @@ import { installSourceText } from '../../src/shared/providers'
 import type { AppSettings } from '../../src/shared/types'
 
 // #806: the `assistant` area (the Assistant's panel and view, its modes, the Skills, Templates, Shared Notes, MCP and
-// Projects sidebars, the template dialogs, and the template and MCP secret texts Hive works out). Its messages are read
+// Projects sidebars, the template dialogs, and the template and MCP secret texts Combwork works out). Its messages are read
 // from the English catalogue (tests/i18nCatalogues.test.ts checks it is current); the sentences once built by hand read
 // as before in English; the Load template plan marks the defaults from the values, never from a label's words (labels
 // are in the window's language); and what the Assistant itself reads stays English.
@@ -93,7 +93,7 @@ describe('the assistant area', () => {
   })
 })
 
-describe('what Hive works out in shared code is in the language when it is worked out', () => {
+describe('what Combwork works out in shared code is in the language when it is worked out', () => {
   it("a template file's problems: text, in the language shown when shown, English for the log (#870)", () => {
     const problem = (raw: unknown): Text => {
       const t = readTemplate(raw)

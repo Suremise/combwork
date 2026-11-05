@@ -225,7 +225,7 @@ export function compareContract(fixture: ConsoleFixture, live: ConsoleFixture): 
     const kind = was[0].kind
     const is = now.get(event)
     if (!is) {
-      if (required(was[0])) findings.push({ level: 'change', event, what: kind === 'terminal' ? 'Hive no longer recognises it on the screen' : 'no longer arrives' })
+      if (required(was[0])) findings.push({ level: 'change', event, what: kind === 'terminal' ? 'Combwork no longer recognises it on the screen' : 'no longer arrives' })
       continue
     }
     if (SHAPE_KINDS.includes(kind)) {
@@ -251,8 +251,8 @@ export function compareContract(fixture: ConsoleFixture, live: ConsoleFixture): 
       const rb = new Set(is.map((e) => readingOf(e.made)).filter(Boolean))
       const lost = [...ra].filter((x) => !rb.has(x))
       const gained = [...rb].filter((x) => !ra.has(x))
-      if (lost.length) findings.push({ level: 'change', event, what: `Hive's reading changed: it was ${lost.join(' | ')}; now ${[...rb].join(' | ') || 'none'}` })
-      else if (gained.length) findings.push({ level: 'new', event, what: `Hive also reads it as ${gained.join(' | ')}` })
+      if (lost.length) findings.push({ level: 'change', event, what: `Combwork's reading changed: it was ${lost.join(' | ')}; now ${[...rb].join(' | ') || 'none'}` })
+      else if (gained.length) findings.push({ level: 'new', event, what: `Combwork also reads it as ${gained.join(' | ')}` })
     }
   }
   for (const [event] of now) if (!before.has(event)) findings.push({ level: 'new', event, what: 'arrives now, and is not in the fixture' })

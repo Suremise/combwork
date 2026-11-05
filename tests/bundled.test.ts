@@ -1,4 +1,4 @@
-// Hive's bundled skills and modes in a workspace (src/main/bundled.ts): new ones are added, untouched copies of
+// Combwork's bundled skills and modes in a workspace (src/main/bundled.ts): new ones are added, untouched copies of
 // older versions updated, edited copies and same-name folders of the user's kept, deleted ones left deleted; a swap
 // never leaves a half-copied folder; the recorded versions cover what ships (scripts/bundled-history.mjs).
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'fs'
@@ -37,7 +37,7 @@ describe('what to do with a bundled item', () => {
     expect(act({ copy: 'v2', given: undefined, manifest: false })).toBe('update')
     // A version reverted to (v1 → v2 → v1): the copy of v2 is older than this v1.
     expect(act({ shipped: 'v1', copy: 'v2', versions: ['v1', 'v2', 'v1'] })).toBe('update')
-    // A copy of a version this Hive doesn't know (a newer Hive's, sharing the workspace) stays.
+    // A copy of a version this Combwork doesn't know (a newer Combwork's, sharing the workspace) stays.
     expect(act({ copy: 'v4' })).toBe('keep')
     expect(act({ copy: 'v3' })).toBe('keep')
   })
@@ -58,7 +58,7 @@ describe('recorded versions', () => {
       const id = f.replace(/\.md$/, '')
       expect(history.modes[id]?.at(-1), `${id}: run npm run bundled-history`).toBe(await contentHash(join(RES, 'modes', f)))
     }
-    // Dialect files (HI-2439), each `<folder>/<label>`, once Hive ships them.
+    // Dialect files (HI-2439), each `<folder>/<label>`, once Combwork ships them.
     const dialects = join(RES, 'dialects')
     for (const folder of existsSync(dialects) ? readdirSync(dialects) : []) {
       for (const f of readdirSync(join(dialects, folder)).filter((n) => n.endsWith('.json'))) {
@@ -96,7 +96,7 @@ describe('recorded versions', () => {
     writeFileSync(join(dir, 'b', 'SKILL.md'), 'one\r\ntwo\r\n')
     writeFileSync(join(dir, 'a', 'ref', 'x.md'), 'x')
     writeFileSync(join(dir, 'b', 'ref', 'x.md'), 'x')
-    // Hive's copy marker isn't content.
+    // Combwork's copy marker isn't content.
     writeFileSync(join(dir, 'b', '.hive-copy'), '{}')
     expect(await contentHash(join(dir, 'a'))).toBe(await contentHash(join(dir, 'b')))
     writeFileSync(join(dir, 'b', 'ref', 'x.md'), 'y')
@@ -155,7 +155,7 @@ describe('swapping a folder in', () => {
 describe('a workspace', () => {
   const base = tempDir('hive-bundled-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-  // Trash is the Recycle Bin in Hive; here it deletes.
+  // Trash is the Recycle Bin in Combwork; here it deletes.
   ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })
   const skillsDir = (ws: string) => join(ws, '.combwork', 'skills')
   const OLD_HANDOVER = '---\nname: handover\ndescription: An older handover skill.\n---\n\nOld text.\n'
@@ -170,14 +170,14 @@ describe('a workspace', () => {
   let oldCoordinator = ''
 
   beforeAll(async () => {
-    // The history this Hive "shipped": an older handover, then today's of each.
+    // The history this Combwork "shipped": an older handover, then today's of each.
     const old = join(base, 'old-handover')
     mkdirSync(old, { recursive: true })
     writeFileSync(join(old, 'SKILL.md'), OLD_HANDOVER)
     const history = structuredClone(HISTORY) as Record<'skills' | 'modes', Record<string, string[]>>
     oldHash = await contentHash(old)
     history.skills.handover = [oldHash, ...history.skills.handover]
-    // An Overseer persona this Hive "shipped" before working modes replaced it (#259).
+    // An Overseer persona this Combwork "shipped" before working modes replaced it (#259).
     writeFileSync(join(base, 'old-overseer.md'), OLD_OVERSEER)
     history.modes.overseer = [...(history.modes.overseer ?? []), await contentHash(join(base, 'old-overseer.md'))]
     // An older Coordinator, so a copy of it is an untouched one to update.
@@ -260,7 +260,7 @@ describe('a workspace', () => {
       expect(existsSync(join(skillsDir(ws), 'work-on-card', 'SKILL.md'))).toBe(true)
       expect(readdirSync(join(ws, '.combwork', 'modes')).length).toBe(readdirSync(join(RES, 'modes')).length)
 
-      // The views: the edited copy is "changed", the deleted one "missing" (Restore), the rest Hive's.
+      // The views: the edited copy is "changed", the deleted one "missing" (Restore), the rest Combwork's.
       const listed = await wsMod.inWorkspace(w, () => skills.hiveSkills(true))
       const state = Object.fromEntries(listed.map((s) => [s.name, s.bundled]))
       expect(state).toMatchObject({ handover: 'same', 'merge-ready': 'changed', 'pick-up': 'missing', 'work-on-card': 'same' })
@@ -272,7 +272,7 @@ describe('a workspace', () => {
       expect(existsSync(join(skillsDir(ws), 'pick-up'))).toBe(false)
       expect(text('merge-ready')).toContain('My own steps.')
 
-      // Restore puts one back as Hive's, and later updates follow it again.
+      // Restore puts one back as Combwork's, and later updates follow it again.
       await wsMod.inWorkspace(w, () => skills.restoreBundledSkill('pick-up'))
       expect((await wsMod.inWorkspace(w, () => skills.hiveSkills(true))).find((s) => s.name === 'pick-up')?.bundled).toBe('same')
     } finally {
@@ -347,7 +347,7 @@ describe('a workspace', () => {
     // Its Assistant chose the user's mode, in the agent's `persona` of then.
     mkdirSync(join(ws, '.combwork', 'assistant', '.combwork'), { recursive: true })
     writeFileSync(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'assistant', name: 'Assistant', persona: 'my-own' }] }))
-    // As Hive opens it: the bundled copies are brought up to date before its folders are watched (ipc.ts).
+    // As Combwork opens it: the bundled copies are brought up to date before its folders are watched (ipc.ts).
     let before: { dir: string; mode: string | undefined } | null = null
     wsMod.WorkspaceService.onOpened = async () => {
       // Before the move (or while it can't be made), the modes are read where they are.
@@ -374,7 +374,7 @@ describe('a workspace', () => {
       expect(cfg.agents.find((a) => a.id === 'assistant')).toMatchObject({ mode: 'my-own' })
       expect(cfg.agents.find((a) => a.id === 'assistant')).not.toHaveProperty('persona')
 
-      // An older Hive opening it again makes .combwork/personas once more: it is left alone, and .combwork/modes is used.
+      // An older Combwork opening it again makes .combwork/personas once more: it is left alone, and .combwork/modes is used.
       mkdirSync(legacy, { recursive: true })
       writeFileSync(join(legacy, 'coordinator.md'), OLD_COORDINATOR)
       await wsMod.inWorkspace(w, () => mod.syncBundled())
@@ -392,7 +392,7 @@ describe('a workspace', () => {
     writeFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), OLD_HANDOVER)
     const w = await opened(ws)
     try {
-      // A copy made from the old version, which the user then edited: this Hive's version can't go in over the edit.
+      // A copy made from the old version, which the user then edited: this Combwork's version can't go in over the edit.
       await wsMod.inWorkspace(w, () => mod.syncBundled())
       writeFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), OLD_HANDOVER + 'My addition.\n')
       const m = JSON.parse(readFileSync(join(ws, '.combwork', 'bundled.json'), 'utf8'))
@@ -427,13 +427,13 @@ describe('a workspace', () => {
     }
   })
 
-  it('offers an update only from an older version: not to a copy from a newer or unknown Hive', async () => {
+  it('offers an update only from an older version: not to a copy from a newer or unknown Combwork', async () => {
     const ws = join(base, 'newer')
     mkdirSync(ws, { recursive: true })
     const w = await opened(ws)
     try {
       await wsMod.inWorkspace(w, () => mod.syncBundled({ fresh: true }))
-      // Another Hive (newer, sharing the workspace) gave its own versions, which this one doesn't know.
+      // Another Combwork (newer, sharing the workspace) gave its own versions, which this one doesn't know.
       writeFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), 'A newer handover.\n')
       writeFileSync(join(ws, '.combwork', 'modes', 'planner.md'), '---\nname: Planner\n---\nA newer planner.\n')
       const m = JSON.parse(readFileSync(join(ws, '.combwork', 'bundled.json'), 'utf8'))
@@ -446,7 +446,7 @@ describe('a workspace', () => {
       expect([h.bundled, h.updateAvailable]).toEqual(['changed', undefined])
       const status = await wsMod.inWorkspace(w, () => mod.bundledStatus('modes', 'planner', join(ws, '.combwork', 'modes', 'planner.md')))
       expect(status).toEqual({ bundled: 'changed' })
-      // From a version this Hive knows to be older, an update is offered (modes too).
+      // From a version this Combwork knows to be older, an update is offered (modes too).
       m.modes.planner.from = (HISTORY as { modes: Record<string, string[]> }).modes.planner[0]
       writeFileSync(join(ws, '.combwork', 'bundled.json'), JSON.stringify(m))
       expect(await wsMod.inWorkspace(w, () => mod.bundledStatus('modes', 'planner', join(ws, '.combwork', 'modes', 'planner.md')))).toEqual({ bundled: 'changed', updateAvailable: true })
@@ -501,8 +501,8 @@ describe("Codex's copies of a session's skills", () => {
     writeFileSync(join(dir, '.cw-example.hive-old-1-1', 'SKILL.md'), 'v1')
     writeFileSync(join(dir, '.cw-example.hive-old-1-1', '.hive-copy'), JSON.stringify({ hash: 'old' }))
     mkdirSync(join(dir, '.cw-example.hive-new-1-1'), { recursive: true })
-    // And one for a skill the session no longer gets: it comes back as Hive's copy, then goes like any such copy (its
-    // content still its marker's hash: unchanged since Hive made it, #1431).
+    // And one for a skill the session no longer gets: it comes back as Combwork's copy, then goes like any such copy (its
+    // content still its marker's hash: unchanged since Combwork made it, #1431).
     mkdirSync(join(dir, '.cw-gone.hive-old-1-2'), { recursive: true })
     writeFileSync(join(dir, '.cw-gone.hive-old-1-2', '.hive-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.cw-gone.hive-old-1-2')) }))
     const out = await sync(cwd, [{ name: 'example', sourcePath: example }])
@@ -515,7 +515,7 @@ describe("Codex's copies of a session's skills", () => {
   it("says when a skill isn't delivered: a folder of the user's has its name, or the old copy is in use", async () => {
     const cwd = join(base, 'deliver')
     const dir = join(cwd, '.agents', 'skills')
-    const handover = source('handover', 'Hive handover')
+    const handover = source('handover', 'Combwork handover')
     const held = source('held', 'held v1')
     mkdirSync(join(dir, 'cw-handover'), { recursive: true })
     writeFileSync(join(dir, 'cw-handover', 'SKILL.md'), 'MY OWN')
@@ -541,7 +541,7 @@ describe("Codex's copies of a session's skills", () => {
   })
 })
 
-describe('links in skills Hive copies', () => {
+describe('links in skills Combwork copies', () => {
   const base = tempDir('hive-skill-links-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const target = join(base, 'my-references')
@@ -580,7 +580,7 @@ describe('links in skills Hive copies', () => {
     expect(again.example).toEqual({ revision: await contentHash(src) })
   })
 
-  it("Codex: a user's same-name folder with a linked reference is never taken for Hive's, nor replaced later", async () => {
+  it("Codex: a user's same-name folder with a linked reference is never taken for Combwork's, nor replaced later", async () => {
     const cwd = join(base, 'users')
     const src = join(base, 'users-src')
     mkdirSync(src, { recursive: true })

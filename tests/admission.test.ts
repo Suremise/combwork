@@ -43,7 +43,7 @@ function nothingOpen(ws: string): boolean {
 }
 const settings = journalSettings({ enabled: true })
 const fact = (summary: string) => ({ kind: 'event', summary })
-const delivery = (body: string) => ({ agentId: 'b1', agentName: 'B1', conversation: null, kind: 'control' as const, from: { kind: 'hive' as const, name: 'Hive' }, body })
+const delivery = (body: string) => ({ agentId: 'b1', agentName: 'B1', conversation: null, kind: 'control' as const, from: { kind: 'hive' as const, name: 'Combwork' }, body })
 
 let w: ReturnType<typeof createWorkspaceService>
 const elsewhere = join(base, 'elsewhere')
@@ -126,7 +126,7 @@ describe("the journal (#1395)", () => {
     const ws = workspace()
     const home = join(ws, '.combwork', 'assistant')
     mkdirSync(home, { recursive: true })
-    const id = journal.leaveEntry(home, settings, fact('Hive closed unexpectedly'), 'hive')
+    const id = journal.leaveEntry(home, settings, fact('Combwork closed unexpectedly'), 'hive')
     expect(id).toBeGreaterThan(0)
     expect(nothingOpen(ws)).toBe(true)
     expect(() => journal.recall(home, {})).toThrow('The workspace was closed')
@@ -149,7 +149,7 @@ describe('deliveries (#1395)', () => {
     const ws = workspace()
     const host = join(ws, 'proj')
     const before = fence.admittedCount()
-    const r = (await deliveries.leaveDelivery(host, delivery('Hive closed unexpectedly')))!
+    const r = (await deliveries.leaveDelivery(host, delivery('Combwork closed unexpectedly')))!
     expect(r.state).toBe('queued')
     expect(fence.admittedCount()).toBe(before)
     expect(deliveries.deliveryNow(host, r.id)).toBeNull()
@@ -162,7 +162,7 @@ describe('deliveries (#1395)', () => {
     await w.open(ws)
     await deliveries.loadsForTests()
     expect((await deliveries.deliveriesOf(host, 'b1')).map((x) => [x.id, x.body])).toEqual([
-      [r.id, 'Hive closed unexpectedly'],
+      [r.id, 'Combwork closed unexpectedly'],
       [r2.id, 'again']
     ])
     await w.close()

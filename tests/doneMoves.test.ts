@@ -64,7 +64,7 @@ async function workspace(): Promise<WS> {
 }
 const facts = (w: WS, card: number) => FactStore.forBoard(w, { project: 'p', key: 'p' }).facts(card)
 const row = (w: WS, card: number) => store.workspaceDb(w.path!).reader.prepare('SELECT col, stage, pre_workflow FROM cards WHERE number = ?').get(card) as { col: string; stage: string; pre_workflow: number }
-/** Sets the card's row as a test's stand-in for what an older Hive left (rc.1's), under the board's lock. */
+/** Sets the card's row as a test's stand-in for what an older Combwork left (rc.1's), under the board's lock. */
 const setRow = (w: WS, card: number, sql: string) => inWorkspace(w, () => store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare(`UPDATE cards SET ${sql} WHERE number = ?`).run(card))))
 
 /**

@@ -57,7 +57,7 @@ describe('Start New (All) and Archive and Start New (All)', () => {
     const agents = [
       agent('w', { live: { sessionId: 's1', status: 'working' } }),
       agent('i', { resume: { id: 's2' } }),
-      // Archived meanwhile, or gone from Hive's list: nothing to archive.
+      // Archived meanwhile, or gone from Combwork's list: nothing to archive.
       agent('a', { resume: { id: 's3' } }),
       agent('g', { resume: { id: 'gone' } }),
       agent('n')
@@ -81,7 +81,7 @@ describe('Start New (All) and Archive and Start New (All)', () => {
       agent('m')
     ]
     expect(batchCounts(agents)).toEqual({ stop: 2, resume: 2, startNew: 6, archive: 4 })
-    // Archive's count is the agents its confirmation lists (when Hive keeps their sessions).
+    // Archive's count is the agents its confirmation lists (when Combwork keeps their sessions).
     const sessions = ['s1', 's2', 's3', 's4'].map((id) => ({ id }))
     expect(sessionsToArchive(agents, sessions)).toHaveLength(batchCounts(agents).archive)
     expect(batchCounts([])).toEqual({ stop: 0, resume: 0, startNew: 0, archive: 0 })

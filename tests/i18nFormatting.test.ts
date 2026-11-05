@@ -1,6 +1,6 @@
 // No bare locale call outside fmt (#851): `toLocaleString()` and its kin format in the machine's or Chromium's locale,
-// not the language Hive shows (main's Intl stays the OS locale whatever the language), so numbers and dates would
-// follow Windows instead of the setting. Hive formats through `fmt` and the helpers on it (shared/i18n, shared/units,
+// not the language Combwork shows (main's Intl stays the OS locale whatever the language), so numbers and dates would
+// follow Windows instead of the setting. Combwork formats through `fmt` and the helpers on it (shared/i18n, shared/units,
 // shared/dates). A call elsewhere names English (what agents, the log and the English developer views read) or says why
 // on its line (`// i18n-ignore: <reason>`).
 import { describe, expect, it } from 'vitest'
@@ -37,7 +37,7 @@ function sources(dir = 'src'): string[] {
   })
 }
 
-describe('numbers and dates are formatted in the language Hive shows', () => {
+describe('numbers and dates are formatted in the language Combwork shows', () => {
   it('no bare toLocaleString(), toLocaleDateString(), toLocaleTimeString() or Intl formatter outside fmt', () => {
     const found = sources().flatMap((rel) => bareLocaleCalls(rel, readFileSync(join(ROOT, rel), 'utf8')))
     expect(found, 'format through fmt (shared/i18n), formatTokens/formatBytes/formatSize (shared/units) or shared/dates; name English for what agents read, or say why with // i18n-ignore: <reason>').toEqual([])

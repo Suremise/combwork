@@ -72,11 +72,11 @@ test('the comparison lists what only this workspace has, by name, and reads no n
   const c = compare(r, inv)
   const md = markdown(c, r)
   assert.ok(!/SECRET/.test(md + JSON.stringify(c)))
-  assert.match(md, /\| Hive skills \| 2: handover, my-own \| 2 \(its own: my-own\) \| same set \|/)
+  assert.match(md, /\| Combwork skills \| 2: handover, my-own \| 2 \(its own: my-own\) \| same set \|/)
   assert.match(md, /\| Shared notes \| handovers \(0\) \| conventions \(1\), handovers \(0\) \| differs: 0 only in the fresh install, 1 only here \|/)
   assert.match(md, /\| Task board \| 0 cards .* \| 3 cards \|/)
   assert.match(md, /\| Project conventions \| .* \| app: CLAUDE.md, skill release-app \|/)
-  assert.match(md, /\| Git \| missing: Hive shows its Git warning/)
+  assert.match(md, /\| Git \| missing: Combwork shows its Git warning/)
   assert.match(md, /\| Node \| missing/)
   assert.match(md, /Provider Setup tabs: Claude Code \(off\), Codex \(off\), GitHub Copilot \(off\)/)
 })
@@ -88,7 +88,7 @@ test('sets are compared by name: same size with different names differs, a missi
   // Same number of skills (2) but a different one, and no Assistant modes at all.
   const inv = inventory(workspace(path.join(s.dir, 'ws'), { skills: ['handover', 'totally-different'], personas: [] }))
   const md = markdown(compare(report(), inv), report())
-  assert.match(md, /\| Hive skills \| .* \| differs: only in the fresh install: my-own; only here: totally-different \|/)
+  assert.match(md, /\| Combwork skills \| .* \| differs: only in the fresh install: my-own; only here: totally-different \|/)
   assert.match(md, /\| Assistant modes \(personas\) \| 1: planner \| 0: none, all bundled \| differs: only in the fresh install: planner \|/)
 })
 
@@ -120,7 +120,7 @@ test('incomplete evidence is refused, never turned into claims (CLI exits 1, wri
   assert.strictEqual(cli(s, r, ws).code, 0)
 })
 
-test('a workspace that is missing, not a folder, not a Hive workspace or unreadable is an error, never "none"', () => {
+test('a workspace that is missing, not a folder, not a Combwork workspace or unreadable is an error, never "none"', () => {
   const s = scratch('compare-workspace')
   const file = path.join(s.dir, 'a-file')
   fs.writeFileSync(file, '')
@@ -131,7 +131,7 @@ test('a workspace that is missing, not a folder, not a Hive workspace or unreada
   fs.writeFileSync(path.join(broken, '.combwork', 'skills'), '') // a file where a folder must be: readdir fails (ENOTDIR)
   const badJson = workspace(path.join(s.dir, 'badjson'))
   fs.writeFileSync(path.join(badJson, '.combwork', 'workspace.json'), '{not json')
-  for (const [ws, re] of <[string, RegExp][]>[[path.join(s.dir, 'nope'), /can't be read: ENOENT/], [file, /is not a folder/], [noHive, /not a Hive workspace/], [broken, /can't read .*skills: ENOTDIR/], [badJson, /isn't valid JSON/]]) {
+  for (const [ws, re] of <[string, RegExp][]>[[path.join(s.dir, 'nope'), /can't be read: ENOENT/], [file, /is not a folder/], [noHive, /not a Combwork workspace/], [broken, /can't read .*skills: ENOTDIR/], [badJson, /isn't valid JSON/]]) {
     assert.throws(() => inventory(ws), re, ws)
     const out = cli(s, report(), ws)
     assert.strictEqual(out.code, 1, ws)

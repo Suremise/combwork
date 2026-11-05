@@ -23,7 +23,7 @@ afterEach(() => {
 })
 
 /**
- * Pair (Hive merges), with the target `main` checked out nowhere, and a bare remote `origin` that main tracks. No review:
+ * Pair (Combwork merges), with the target `main` checked out nowhere, and a bare remote `origin` that main tracks. No review:
  * a submitted card goes straight into the queue, as the push is all these tests are about (HI-1930: a reviewer's start,
  * review copy and verdict per card made them slow enough to reach the time limit on a loaded machine).
  */
@@ -64,7 +64,7 @@ const withPush = (around: (run: () => Promise<QueueGitResult>) => Promise<QueueG
   return args[0] === 'push' ? around(run) : run()
 }
 
-/** Another Hive (a restart): its own store connection, Workflow and queue on the same files. */
+/** Another Combwork (a restart): its own store connection, Workflow and queue on the same files. */
 function restarted(e: Env): MergeQueue {
   const store = e.reopen()
   extra.push(store)
@@ -94,7 +94,7 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(remoteMain(bare)).toBe(before)
     for (const p of ['solo', 'pairAgent', 'pair', 'team'] as const) expect(preset('git', p).pushTarget, p).toBe(false)
     expect('pushTarget' in ruleOptions({ ...preset('git', 'pair'), pushTarget: true })).toBe(false)
-    // Its row shows only where Hive merges.
+    // Its row shows only where Combwork merges.
     expect(formShows('pushTarget', preset('git', 'pair'))).toBe(true)
     expect(formShows('pushTarget', preset('git', 'pairAgent'))).toBe(false)
   })
@@ -184,7 +184,7 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(owed(e)).toBeNull()
   })
 
-  it('a crash after Integrated was written by recovery owes the push too (the advance done, Hive stopped before Integrated)', async () => {
+  it('a crash after Integrated was written by recovery owes the push too (the advance done, Combwork stopped before Integrated)', async () => {
     const { e, bare } = pushing()
     const a = await queued(e, 'A', 'a.txt')
     await expect(e.queue({ hooks: { afterAdvance: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
@@ -256,7 +256,7 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
       }
       expect(e.wf.state(b).stage).toBe('merging')
       expect(owed(e)).not.toBeNull()
-      // Said in Hive's own words, a message the window translates (HR2's round 2): no English stored with it.
+      // Said in Combwork's own words, a message the window translates (HR2's round 2): no English stored with it.
       expect(e.store.queuePause('main')).toMatchObject({ reason: 'pushUnreadable' })
       expect(e.store.queuePause('main')?.message).toBeFalsy()
       e.queue().resume('main')
@@ -268,7 +268,7 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
 
   // HI-2054: where to push, read by git, is taken only from git's own answer (a value, or exit 1: not set). A git that
   // couldn't answer (never started, ended by a signal, ended at a bound whatever its code and partial output, or git's
-  // own error) is unreadable: paused in Hive's own words, still owed, nothing pushed; never "no remote", nor a guessed ref.
+  // own error) is unreadable: paused in Combwork's own words, still owed, nothing pushed; never "no remote", nor a guessed ref.
   // One card each (HI-2077: twelve cases of two cards each reached the time limit on a loaded machine): that the next card
   // waits behind a pushUnreadable pause is the lineHead and isAncestor reads' tests above.
   const notAnswers: [string, Partial<QueueGitResult>][] = [
@@ -310,7 +310,7 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
         expect(e.wf.state(a).stage).toBe('done')
         expect(owed(e)).not.toBeNull()
         expect(pending(e).map((p) => p.entry)).toEqual([entryOf(e, a)])
-        // In Hive's own words, as the other unreadable reads: no English stored with it.
+        // In Combwork's own words, as the other unreadable reads: no English stored with it.
         expect(e.store.queuePause('main')).toMatchObject({ reason: 'pushUnreadable', card: a.key })
         expect(e.store.queuePause('main')?.message).toBeFalsy()
         e.queue().resume('main')

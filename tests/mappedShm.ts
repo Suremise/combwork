@@ -1,4 +1,4 @@
-// HI-2199, HI-2200: a Hive that ended without quitting leaves a WAL database's -shm, which another process can still have
+// HI-2199, HI-2200: a Combwork that ended without quitting leaves a WAL database's -shm, which another process can still have
 // mapped. SQLite 3.53's first connection truncates it, which Windows refuses while it is mapped: every open fails with
 // SQLITE_IOERR_TRUNCATE (1546) until it is let go. These make that state for a test, and let it go whatever happens.
 import { existsSync, mkdirSync, writeFileSync } from 'fs'

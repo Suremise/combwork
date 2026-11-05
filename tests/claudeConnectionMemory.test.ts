@@ -1,5 +1,5 @@
 // Auto memory on a connection (HI-1899): a connection's home links `projects` to the CLI's own by a junction, so Claude
-// Code saw each memory file's resolved path outside its memory folder and asked before every memory write. Hive gives
+// Code saw each memory file's resolved path outside its memory folder and asked before every memory write. Combwork gives
 // the launch that folder by its resolved path (autoMemoryDirectory), only on such a home and only where nothing else
 // names the folder.
 import { execFileSync } from 'child_process'
@@ -164,7 +164,7 @@ describe("a Claude Code launch's settings on a connection (HI-1899)", () => {
     writeFileSync(join(own.home, 'settings.json'), JSON.stringify({ env: { CLAUDE_CODE_PROJECT_DIR_NAME: 'user-chosen-memory' } }))
     expect((await launch('userenv', { env: { CLAUDE_CONFIG_DIR: own.home } })).settings.autoMemoryDirectory).toBeUndefined()
     expect((await launch('otherhome', { env: { CLAUDE_CONFIG_DIR: home }, extraArgs: ['--settings', JSON.stringify({ env: { CLAUDE_CONFIG_DIR: 'C:\\elsewhere' } })] })).settings.autoMemoryDirectory).toBeUndefined()
-    // Settings Hive can't be sure of (--bare may stop Claude Code reading some): none.
+    // Settings Combwork can't be sure of (--bare may stop Claude Code reading some): none.
     expect((await launch('bare', { env: { CLAUDE_CONFIG_DIR: home }, extraArgs: ['--bare'] })).settings.autoMemoryDirectory).toBeUndefined()
     // The project's own settings.
     const project = join(base, 'project-project')

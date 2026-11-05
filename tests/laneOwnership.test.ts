@@ -1,4 +1,4 @@
-// Hive owns the lane (#1270, SPEC §16.11): a list change made while a card is in flight is queued and applied at the
+// Combwork owns the lane (#1270, SPEC §16.11): a list change made while a card is in flight is queued and applied at the
 // next card boundary (the builder told, none dropped: S3); a lane's cards start under the ruleset it started with (S19);
 // one card at a time (a lane's card starts only once the ones before it are Done: S43's P4 form); a lane ends by itself
 // once its cards are Done, its merge commit from their facts (an agent's ignored) and a verified lane-end event fired
@@ -87,7 +87,7 @@ describe('why a lane waits (laneStatus)', () => {
 
 // --- The service.
 
-describe('Hive owns the lane (lanes.ts, #1270)', () => {
+describe('Combwork owns the lane (lanes.ts, #1270)', () => {
   type WS = ReturnType<typeof createWorkspaceService>
   let w: WS
   const wsPath = join(base, 'ws')

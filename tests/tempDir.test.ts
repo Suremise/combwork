@@ -45,7 +45,7 @@ const ALLOWED: Record<string, string[]> = {
   'e2e/evidence.cjs': ['function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContext.TEST_ROOT, homes = [runContext.CODEX_HOME, runContext.CLAUDE_TEST_HOME] } = {}) {']
 }
 const OWN = ['tempDir.ts', 'runTemp.mts', 'tempDir.test.ts']
-// Files whose subject is the temp variables Hive gives agents (HI-2496: Agents' temp folder): TEMP, TMP and TMPDIR are
+// Files whose subject is the temp variables Combwork gives agents (HI-2496: Agents' temp folder): TEMP, TMP and TMPDIR are
 // the data they check, never where they put files (those come from tempDir() and lib.WORK).
 const DATA = ['agentTemp.test.ts', 'e2e/agenttemp.cjs']
 
@@ -102,13 +102,13 @@ describe('temp folders for tests (#448)', () => {
     expect(readdirSync(a)).toEqual([])
     expect(realpathSync.native(a)).toBe(a)
     expect(a.startsWith(tempRoot() + sep)).toBe(true)
-    // In the test area, which Hive's Antivirus scanning setting covers, not in %TEMP%; the temp folder only off Windows.
+    // In the test area, which Combwork's Antivirus scanning setting covers, not in %TEMP%; the temp folder only off Windows.
     const area = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'tmp')
     expect(tempArea).toBe(area)
     expect(dirname(tempRoot())).toBe(realpathSync.native(area))
     expect(basename(tempRoot())).toMatch(/^run-/)
     expect(realpathSync.native(tempRoot())).toBe(tempRoot())
-    // vitest.config.ts makes it the run's temp folder too, so what Vitest, Hive's code and git put in %TEMP% goes there.
+    // vitest.config.ts makes it the run's temp folder too, so what Vitest, Combwork's code and git put in %TEMP% goes there.
     if (process.env.LOCALAPPDATA) expect(tmpdir()).toBe(tempRoot())
   })
 })

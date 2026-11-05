@@ -1,6 +1,6 @@
-// The keeper outlives a Hive killed from outside (HI-2314). Node (libuv) puts each child it starts in one job that ends
-// them all once their parent ends, so a helper that was Hive's own child died with it, quit or crash, and never kept
-// anything (HI-2055). Here a "Hive" (tests/keeperHost.ts: the real JobHost, started as Hive starts it) holds a launch
+// The keeper outlives a Combwork killed from outside (HI-2314). Node (libuv) puts each child it starts in one job that ends
+// them all once their parent ends, so a helper that was Combwork's own child died with it, quit or crash, and never kept
+// anything (HI-2055). Here a "Combwork" (tests/keeperHost.ts: the real JobHost, started as Combwork starts it) holds a launch
 // job with a process of the test's own in it, and its main process is ended from outside, nothing else: its helper
 // stays, writes "live" with that process, then "ended" once the test ends it, and exits.
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
@@ -40,9 +40,9 @@ afterEach(() => {
 const exited = (c: ChildProcess) => (c.exitCode !== null || c.signalCode !== null ? Promise.resolve() : new Promise<void>((r) => c.once('exit', () => r())))
 const waitFor = <T>(fn: () => T) => vi.waitFor(fn, { timeout: HUNG_MS, interval: 100 })
 
-describe.runIf(process.platform === 'win32')('the keeper, its Hive killed from outside (HI-2314)', () => {
-  it('hands the helper only its pipes to its Hive, never what the Hive itself could hand down (a test’s pipes to it)', async () => {
-    // A Hive (Electron's main process, no window) whose own output is the test's pipe: Electron, unlike Node, leaves its
+describe.runIf(process.platform === 'win32')('the keeper, its Combwork killed from outside (HI-2314)', () => {
+  it('hands the helper only its pipes to its Combwork, never what the Combwork itself could hand down (a test’s pipes to it)', async () => {
+    // A Combwork (Electron's main process, no window) whose own output is the test's pipe: Electron, unlike Node, leaves its
     // standard handles inheritable. It starts the helper's launcher, with a script that stays a minute after its input
     // ends, and quits once it is ready. The test's pipe closes as Electron exits: the helper, still running, holds none
     // of it (started through cmd, which hands down all it can, the pipe stayed open while the helper ran).
@@ -78,11 +78,11 @@ app.on('window-all-closed', () => undefined)
     helpers.push(...helper)
     await exited(hive)
     // Its pipe closed while the helper (outside the parent's job) still runs.
-    await waitFor(() => expect(closed, 'the test’s pipe to the Hive still open: the helper holds it').toBe(true))
+    await waitFor(() => expect(closed, 'the test’s pipe to the Combwork still open: the helper holds it').toBe(true))
     expect(stillSame(helper)).toEqual([pid])
   }, 60_000)
 
-  it('outlives its Hive’s main process ended from outside: "live" with the launch’s process, then "ended" once it ends', async () => {
+  it('outlives its Combwork’s main process ended from outside: "live" with the launch’s process, then "ended" once it ends', async () => {
     const keepDir = join(dir, 'keeper')
     const member = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
     started.push(member)
@@ -119,7 +119,7 @@ app.on('window-all-closed', () => undefined)
     await waitFor(() => expect(stillSame(helper)).toEqual([]))
   }, 60_000)
 
-  /** A launcher started as Hive starts it, on a script of the test's own: the launcher and its helper's identity. */
+  /** A launcher started as Combwork starts it, on a script of the test's own: the launcher and its helper's identity. */
   async function launched(script: string): Promise<{ launcher: ChildProcessWithoutNullStreams; helper: Identity[]; out: () => string }> {
     const { file, args, stdio } = helperLaunch(script)
     const launcher = spawn(file, args, { windowsHide: true, stdio, env: baseEnv(), cwd: dir }) as ChildProcessWithoutNullStreams
@@ -137,7 +137,7 @@ app.on('window-all-closed', () => undefined)
   }
   const code = (c: ChildProcess) => exited(c).then(() => c.exitCode)
 
-  it('a stuck helper is ended by its Hive only through its launcher, which holds its handle: never by an id (#603)', async () => {
+  it('a stuck helper is ended by its Combwork only through its launcher, which holds its handle: never by an id (#603)', async () => {
     // Ready, then answers nothing and ignores its input's end: only its launcher's handle can end it.
     const stuck = "[Console]::Out.WriteLine('pid ' + $PID); $null = [Console]::In.ReadLine(); [Console]::Out.WriteLine('ready'); while ($true) { Start-Sleep -Milliseconds 200 }"
     let proc: ChildProcessWithoutNullStreams | null = null
@@ -169,7 +169,7 @@ app.on('window-all-closed', () => undefined)
     // Exits with 7 at its input's end.
     const own = "[Console]::Out.WriteLine('pid ' + $PID); while ($null -ne [Console]::In.ReadLine()) {}; exit 7"
     const a = await launched(own)
-    // The control pipe ends (as Hive gone): the helper runs on, then exits at its input's end with its own code.
+    // The control pipe ends (as Combwork gone): the helper runs on, then exits at its input's end with its own code.
     ;(a.launcher.stdio[3] as Writable).end()
     a.launcher.stdin.end()
     expect(await code(a.launcher)).toBe(7)

@@ -153,7 +153,7 @@ describe('places by real path (#455)', () => {
       process.env.HIVE_TEST_TRASH_DIR = trashDir
       try {
         const agents = [agent('z', alias(q, 'q-delete')), agent('y', alias(outer, 'outer-delete')), agent('x', alias(q2, 'q2-delete')), agent('s', alias(spare, 'spare-delete'))]
-        // Under project.json's lock, as Hive writes it (#1238): written beside it, a write the opened workspace began
+        // Under project.json's lock, as Combwork writes it (#1238): written beside it, a write the opened workspace began
         // before (its project ids, 250 ms on) put back the config from before, and Delete found no agents.
         await w2.mutateProjectConfig(q, () => ({ agents }))
         const { warnings } = await inWorkspace(w2, () => removeProject(q, 'delete'))
@@ -221,7 +221,7 @@ describe('places by real path (#455)', () => {
     }
     const edit = (st: Record<string, unknown>) =>
       inWorkspace(w, async () => sessions.preToolUse(st.runId as string, { hook_event_name: 'PreToolUse', session_id: st.sessionId, cwd: proj, tool_name: 'apply_patch', tool_input: { command: '*** Begin Patch\n*** Update File: a.txt\n@@\n+x\n*** End Patch' } }))
-    // File locks as Hive's workflow default (HI-1766), for either platform the project is detected as.
+    // File locks as Combwork's workflow default (HI-1766), for either platform the project is detected as.
     const was = config.settings.workflow
     config.settings.workflow = { none: { fileLocks: 'warn' }, git: { fileLocks: 'warn' } }
     try {

@@ -15,7 +15,7 @@ afterEach(() => {
   env = null
 })
 
-/** Pair (Hive merges) with one merge check, no review: a submitted card goes straight into the queue. */
+/** Pair (Combwork merges) with one merge check, no review: a submitted card goes straight into the queue. */
 function pairWithCheck(): Env {
   const e = (env = setup({ ...preset('git', 'pair'), review: 'none', noSelfReview: false, preChecks: [], mergeChecks: ['quick'], commands: { quick: 'npm run quick' } }))
   sh(e.project, 'checkout', '-q', '--detach')
@@ -156,10 +156,10 @@ describe("a queue's pause log (HI-1924)", () => {
     expect(log[0].at).toBe(at(QUEUE_LOG_MAX + 4))
   })
 
-  it("is written in the store's pause writes: Pause queue, Hive's own pause kept in its place, a clear by reason, Resume", () => {
+  it("is written in the store's pause writes: Pause queue, Combwork's own pause kept in its place, a clear by reason, Resume", () => {
     const e = pairWithCheck()
     expect(e.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' })).toBe(true)
-    // Hive's own pause never replaces one saved meanwhile, and logs nothing.
+    // Combwork's own pause never replaces one saved meanwhile, and logs nothing.
     expect(e.store.setQueuePause('main', { reason: 'pushFailed', card: 'HI-1' }, true)).toBe(false)
     expect(e.store.queuePauseLog('main').map((p) => [p.reason, !!p.ended])).toEqual([['user', false]])
     e.store.setQueuePause('main', null)

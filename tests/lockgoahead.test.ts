@@ -1,6 +1,6 @@
 // "Ask me" file locks for a CLI without its own approval (Codex): the user's Allow reaches the agent whenever it is
 // clicked. Clicked while the blocked agent is still in its turn (the toast shows as the hook denies the edit), the
-// go-ahead is typed when that turn ends and the edit is allowed in the next one (#201). Like every prompt Hive types on
+// go-ahead is typed when that turn ends and the edit is allowed in the next one (#201). Like every prompt Combwork types on
 // its own, it waits while the user may be writing in the agent's terminal, and never adds to or sends their input. An
 // edit that went ahead meanwhile needs none, and an interrupt drops it.
 import { mkdirSync, writeFileSync } from 'fs'
@@ -12,8 +12,8 @@ import { tempDir } from './tempDir'
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 
-// What Hive types into agents' terminals, recorded instead (no process runs), with when each piece went in (Date.now(),
-// the clock Hive's pause after typing is measured by); onWrite acts as each piece goes in.
+// What Combwork types into agents' terminals, recorded instead (no process runs), with when each piece went in (Date.now(),
+// the clock Combwork's pause after typing is measured by); onWrite acts as each piece goes in.
 const pty = vi.hoisted(() => ({ typed: [] as { key: string; data: string; at: number }[], onWrite: (_data: string): void => undefined }))
 vi.mock('../src/main/ptyHost', async (original) => ({
   ...(await original<object>()),
@@ -93,7 +93,7 @@ function agents() {
   const hookOf = (st: typeof holder, event: string) => run(() => sessions.handleHook(st.runId, { hook_event_name: event, session_id: st.sessionId, cwd: p }))
   const typed = () => pty.typed.filter((t) => t.key === s.key(p, editor.agentId)).map((t) => t.data)
   /**
-   * The go-ahead for the file given: its doorbell typed (in pieces, as Hive types) and sent (#650: it names the notice by
+   * The go-ahead for the file given: its doorbell typed (in pieces, as Combwork types) and sent (#650: it names the notice by
    * id; the agent reads what it says with cw_inbox).
    */
   const goAhead = async () => typed().join('').includes('New in your inbox: 1 notice') && typed().at(-1) === '\r' && (await deliveries.deliveriesOf(p, editor.agentId)).some((r) => r.state === 'offered' && r.body.includes(`allowed you to edit ${file}`))
@@ -125,7 +125,7 @@ function agents() {
     /** The user typing in editor's terminal. */
     userTypes: (text: string) => sessions.noteUserInput(s.key(p, editor.agentId), text),
     /**
-     * Once the user's pause has passed (Hive's own check of it), what the delivery service's retry then does, awaited: a
+     * Once the user's pause has passed (Combwork's own check of it), what the delivery service's retry then does, awaited: a
      * check reads its outcome, not how soon the retry's timer ran (#1029: late on a loaded machine).
      */
     afterPause: async () => {
@@ -378,7 +378,7 @@ describe('Allow on an "Ask me" lock', () => {
     await a.claim()
     expect(await a.edit()).not.toBeNull()
     await a.allow()
-    // A wake (or the user's prompt, sent with Enter) went first: the agent is working as Hive clears the input.
+    // A wake (or the user's prompt, sent with Enter) went first: the agent is working as Combwork clears the input.
     pty.onWrite = (d) => {
       if (d === '\x15') a.editor.status = 'working'
     }

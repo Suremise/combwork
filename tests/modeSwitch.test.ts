@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-// What Hive types into agents' terminals, recorded instead (no process runs); onWrite acts as each piece goes in.
+// What Combwork types into agents' terminals, recorded instead (no process runs); onWrite acts as each piece goes in.
 const pty = vi.hoisted(() => ({ typed: [] as { key: string; data: string }[], onWrite: (_data: string, _key: string): void => undefined }))
 vi.mock('../src/main/ptyHost', async (original) => ({
   ...(await original<object>()),

@@ -47,7 +47,7 @@ describe('sessionOrigin', () => {
     expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: P }, folders)?.location).toBe('Project folder')
   })
 
-  it('a session started outside Hive claims no agent', () => {
+  it('a session started outside Combwork claims no agent', () => {
     expect(sessionOrigin(P, [{ id: 'a-1', name: 'Coder' }], { source: 'external', agentId: 'a-1' })).toBeNull()
   })
 })

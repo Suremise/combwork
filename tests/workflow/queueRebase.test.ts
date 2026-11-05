@@ -15,7 +15,7 @@ afterEach(() => {
   env = null
 })
 
-/** Pair (Hive merges), merge style Rebase and fast-forward; `main` checked out nowhere unless `checkedOut`. */
+/** Pair (Combwork merges), merge style Rebase and fast-forward; `main` checked out nowhere unless `checkedOut`. */
 function rebasing(over: Partial<ReturnType<typeof preset>> = {}, checkedOut = false): Env {
   const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], style: 'rebase', ...over }))
   if (!checkedOut) sh(e.project, 'checkout', '-q', '--detach')

@@ -34,7 +34,7 @@ describe('commands', () => {
       expect(EN[msgId], msgId).toBeTruthy()
     }
     expect(COMMANDS).not.toMatch(/\blabel: ['"`]/)
-    // The three named by values: a layout, an agent's number, Hive's name.
+    // The three named by values: a layout, an agent's number, Combwork's name.
     for (const id of ['shell.command.layout', 'shell.command.agent.focusN', 'shell.command.help.about']) expect(EN[id], id).toBeTruthy()
   })
 

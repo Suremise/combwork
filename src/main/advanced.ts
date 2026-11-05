@@ -369,7 +369,7 @@ export class AdvancedStore {
       `- Advanced settings: ${ids.length ? `${ids.length} override${ids.length === 1 ? '' : 's'} (${ids.join(', ')})` : 'no overrides'}${own ? `; ${own} workspace value${own === 1 ? '' : 's'}` : ''}`, // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(invalid.length ? [`  - not valid, so the default is used: ${invalid.join(', ')}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(other.length ? [`  - made for another CLI version than the installed one: ${other.join(', ')}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
-      ...(this.unknown.length ? [`  - unknown to this Hive: ${this.unknown.length}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
+      ...(this.unknown.length ? [`  - unknown to this Combwork: ${this.unknown.length}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(this.fileError ? ["  - advanced.json can't be read as it is now"] : []) // i18n-ignore: Help → Copy Diagnostics, a report in English
     ]
   }

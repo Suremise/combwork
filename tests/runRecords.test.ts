@@ -1,6 +1,6 @@
-// What Hive keeps of its runs for their slot writers (HI-1886), in leftovers.json beside what agents left running: the
+// What Combwork keeps of its runs for their slot writers (HI-1886), in leftovers.json beside what agents left running: the
 // runs whose processes it saw end (their jobs seen empty), also those whose releases couldn't be written. Read back by
-// the next start (a new module, as a restarted Hive), kept forward until settled, and never offered as leftovers. No job
+// the next start (a new module, as a restarted Combwork), kept forward until settled, and never offered as leftovers. No job
 // host: no launch is running, so nothing is listed (the quit's look at running launches is agentProcesses.test.ts's).
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -26,7 +26,7 @@ const jobs = vi.hoisted(() => ({
   onEnsure: () => undefined as void,
   /** Told as a launch's job is made (`add`), before it answers (HI-2055: a loss then). */
   onAdd: () => undefined as void,
-  /** Processes still running, "pid:created" (HI-2303: an earlier Hive's helper, keeping). */
+  /** Processes still running, "pid:created" (HI-2303: an earlier Combwork's helper, keeping). */
   alive: new Set<string>(),
   /** The host can't say which still run. */
   identifyFails: false
@@ -92,14 +92,14 @@ const HUNG_MS = 10_000
 const file = join(profile.dir, 'leftovers.json')
 const saved = () => JSON.parse(readFileSync(file, 'utf8')) as { launches: unknown[]; ended?: string[] }
 
-/** The module as a Hive started now finds it. */
+/** The module as a Combwork started now finds it. */
 async function restarted(): Promise<typeof import('../src/main/agentProcesses')> {
   vi.resetModules()
   return import('../src/main/agentProcesses')
 }
 
 describe("a run's record for its slot writer (HI-1886)", () => {
-  it('kept as Hive quits, read by the next start, kept forward until its writer is settled, and never listed as left running', async () => {
+  it('kept as Combwork quits, read by the next start, kept forward until its writer is settled, and never listed as left running', async () => {
     writeFileSync(file, JSON.stringify({ version: 1, launches: [], ended: ['r-before'] }))
     let m = await restarted()
     expect(await m.endedEarlier('r-before')).toBe(true)
@@ -131,7 +131,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
   })
 
   it("a busy day's ended runs never push out those a later start needs (HI-2299)", async () => {
-    // An earlier Hive's record not settled yet (its workspace not reopened since).
+    // An earlier Combwork's record not settled yet (its workspace not reopened since).
     writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
     let m = await restarted()
     m.runTookWriter('w-earlier')
@@ -200,17 +200,17 @@ describe("a run's record for its slot writer (HI-1886)", () => {
   })
 
   /**
-   * HI-2055: a launch whose CLI exited leaving processes, which Hive quitting then ends (Settings → Agents): asked to end,
+   * HI-2055: a launch whose CLI exited leaving processes, which Combwork quitting then ends (Settings → Agents): asked to end,
    * its job is looked at until seen empty (`confirming`). The quit's look waits for it as for a running launch, by the same
    * rules: kept as ended only once the helper that held its job sees it empty.
    */
-  describe('leftovers Hive ended as it quits (HI-2055)', () => {
+  describe('leftovers Combwork ended as it quits (HI-2055)', () => {
     const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => {
       // A slot's writer's run (HI-2299: only those are kept).
       m.runTookWriter(runId)
       expect(await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).toEqual({ tracked: true })
     }
-    /** A launch that left a process running, ended by Hive quitting: asked, not yet seen gone. */
+    /** A launch that left a process running, ended by Combwork quitting: asked, not yet seen gone. */
     async function endedAtQuit(runId: string): Promise<typeof import('../src/main/agentProcesses')> {
       writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
       jobs.instance = 1
@@ -263,7 +263,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
 
   /**
    * HI-2055: a run bound to the helper that holds its job, kept in the profile, so the next start takes that helper's
-   * keeper's state (keeper-<run>.json) for it, and nothing else: whole, its own run and Hive, a helper bound and not
+   * keeper's state (keeper-<run>.json) for it, and nothing else: whole, its own run and Combwork, a helper bound and not
    * revoked. A lost helper is revoked before its replacement is given a launch, kept before it is.
    */
   describe("a keeper's state (HI-2055)", () => {
@@ -274,7 +274,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       mkdirSync(join(profile.dir, 'keeper'), { recursive: true })
       writeFileSync(keeperFile(run), typeof data === 'string' ? data : JSON.stringify(data))
     }
-    /** A Hive started now, tracking with the first helper (4001:1). */
+    /** A Combwork started now, tracking with the first helper (4001:1). */
     async function tracking(): Promise<typeof import('../src/main/agentProcesses')> {
       writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
       jobs.instance = 1
@@ -297,7 +297,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       const m = await tracking()
       expect(await track(m, 'k-run')).toBe(true)
       await m.leftoversSaved()
-      // Hive gone without quitting: a new start reads the binding back.
+      // Combwork gone without quitting: a new start reads the binding back.
       const next = await restarted()
       plantState('k-run', state('k-run'))
       expect(await next.keeperState('k-run', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
@@ -309,7 +309,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', members: [{ pid: 7001 }], more: 0 })
     })
 
-    it.runIf(process.platform === 'win32')("none taken unless whole and its own: another helper, Hive or run, a version, an incomplete or non-empty \"ended\", a bad member, malformed or too large", async () => {
+    it.runIf(process.platform === 'win32')("none taken unless whole and its own: another helper, Combwork or run, a version, an incomplete or non-empty \"ended\", a bad member, malformed or too large", async () => {
       const m = await tracking()
       expect(await track(m, 'k-bad')).toBe(true)
       const bad: unknown[] = [
@@ -464,7 +464,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       for (const run of held) expect(m.keeperStillBound(run, '4001:1')).toBe(true)
       expect(m.keeperStillBound('s-0', '4001:1')).toBe(false)
       expect(m.keeperStillBound('s-159', '4001:1')).toBe(false)
-      // Hive quits.
+      // Combwork quits.
       await m.recordEndedLaunches()
       await m.leftoversSaved()
       expect(Object.keys((JSON.parse(readFileSync(file, 'utf8')) as { helpers?: Record<string, string> }).helpers ?? {}).sort()).toEqual(held)
@@ -479,7 +479,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       expect(await next.keeperState('u-2', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
     })
 
-    it.runIf(process.platform === 'win32')("an earlier Hive's binding goes at the start only when its helper has gone and left no state: one keeping, or with a state, stays", async () => {
+    it.runIf(process.platform === 'win32')("an earlier Combwork's binding goes at the start only when its helper has gone and left no state: one keeping, or with a state, stays", async () => {
       writeFileSync(file, JSON.stringify({ version: 1, launches: [], helpers: { 'o-gone': '4007:1', 'o-state': '4007:1', 'o-keeping': '4008:1' } }))
       jobs.instance = 1
       jobs.alive = new Set(['4008:1'])

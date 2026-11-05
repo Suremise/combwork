@@ -18,7 +18,7 @@ const ctx: RedactContext = {
 describe('diagnostics redaction', () => {
   it('folders: the home folder becomes ~, the workspace and worktrees a placeholder, either slash', () => {
     expect(redact('cli at C:\\Users\\Jo Smith\\.local\\bin\\claude.exe', ctx)).toBe('cli at ~\\.local\\bin\\claude.exe')
-    expect(redact('c:/users/jo smith/AppData/Roaming/Hive/logs', ctx)).toBe('~/AppData/Roaming/Hive/logs')
+    expect(redact('c:/users/jo smith/AppData/Roaming/Combwork/logs', ctx)).toBe('~/AppData/Roaming/Combwork/logs')
     expect(redact('opened D:\\Work\\acme\\billing and D:/work/acme.worktrees/billing/two/src', ctx)).toBe('opened <workspace>\\<project> and <workspace>/src')
   })
 
@@ -214,7 +214,7 @@ describe('diagnostics redaction of the log', () => {
     expect(out).toContain('Removed worktree <path>')
   })
 
-  it("keeps Hive's and the CLIs' own paths, and each line's [scope]", () => {
+  it("keeps Combwork's and the CLIs' own paths, and each line's [scope]", () => {
     const keep = [
       `${T} [main] at f (C:\\Users\\Jo Smith\\AppData\\Local\\Programs\\Hive\\resources\\app.asar\\out\\main\\index.js:12:3)`,
       `${T} [claude] Candidate C:\\Users\\Jo Smith\\.local\\bin\\claude.exe did not report a version`,
@@ -230,7 +230,7 @@ describe('diagnostics redaction of the log', () => {
     expect(redactLog(`${T} [main] D:\\dev\\hive\\out\\main\\index.js:5`, { ...ctx, app: 'D:\\dev\\hive' })).toBe(`${T} [main] <hive>\\out\\main\\index.js:5`)
   })
 
-  it("lines logged before Hive marked the user's text keep only their time, level and scope", () => {
+  it("lines logged before Combwork marked the user's text keep only their time, level and scope", () => {
     const lines = [
       `${T} [tasks] #7 created by You: Earlier run, unknown version`,
       `${T} [main] Hive 0.3.1 starting (Electron 44.5.1)`,
@@ -247,7 +247,7 @@ describe('diagnostics redaction of the log', () => {
       `${T} [tasks] #2 created by <text>: <text>`,
       `${T} [updates] Update settings: check on`
     ])
-    // No start line in view: every line is from the running Hive, which marks.
+    // No start line in view: every line is from the running Combwork, which marks.
     expect(redactLog(`${T} [tasks] #3 created by ${userText('You')}: ${userText('x')}`, ctx)).toBe(`${T} [tasks] #3 created by <text>: <text>`)
   })
 

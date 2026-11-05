@@ -59,7 +59,7 @@ describe('messages left for agents (#530, #647)', async () => {
   deliveries.setSenderCheckForTests((from) => (from.kind === 'assistant' ? why : null))
   const asst: DeliverySender = { kind: 'assistant', name: 'the Assistant', workspace: 'C:/ws', launch: 'a1' }
   const leave = (text: string) => messages.leaveMessage(alpha, 'b1', 'HR2', asst, text)
-  const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+  const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
   /** A wake for b1 (#649: a card event, as a watch or a loop wake hands it over), offered now: whether a line was typed. */
   const wake = async (body: string): Promise<boolean> => {
     await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body })
@@ -67,7 +67,7 @@ describe('messages left for agents (#530, #647)', async () => {
   }
   const states = async (agentId = 'b1') => (await deliveries.deliveriesOf(alpha, agentId)).map((r) => `${r.id} ${r.state}${r.detail ? `: ${r.detail}` : ''}`)
   const tryAll = () => deliveries.offerAllForTests()
-  /** The doorbell (#650) naming these deliveries: Hive's fixed words with counts and ids. */
+  /** The doorbell (#650) naming these deliveries: Combwork's fixed words with counts and ids. */
   const bell = (what: string, ids: string, tail = '') => {
     const them = ids.includes(',') ? 'them' : 'it'
     // Anything to ack (not only card events): act on it, then ack (#1530).
@@ -334,7 +334,7 @@ describe('messages left for agents (#530, #647)', async () => {
   })
 
   it('its CLI drops the first Enter and its permission goes before the Enter again: the doorbell is never cleared (#652), the Enter again gives the agent nothing of it, and it is refused', async () => {
-    // A CLI that takes nothing typed (as Codex dropped an Enter on 7 Oct), until Hive presses Enter again.
+    // A CLI that takes nothing typed (as Codex dropped an Enter on 7 Oct), until Combwork presses Enter again.
     const cli = { count: 0, enters: 0 }
     const before = { ...sessions } as Record<string, unknown>
     Object.assign(sessions, {

@@ -21,7 +21,7 @@ const empty = (over: Partial<StartViewInput> = {}): StartViewInput => ({ now: ne
 const card = (n: number, over: Partial<ViewCard> = {}): ViewCard => ({ number: n, title: `Title${n}`, column: 'doing', project: 'alpha', agent: 'B1', reviewer: null, blocked: null, ...over })
 const entry = (id: number, over: Partial<ViewEntry> = {}): ViewEntry => ({ id, at: '2026-10-15T09:00:00Z', kind: 'decision', project: 'alpha', summary: `Summary${id}`, importance: 1, ...over })
 
-/** The view over its variants, with the values the test put in it (names, titles, kinds, states: not Hive's words). */
+/** The view over its variants, with the values the test put in it (names, titles, kinds, states: not Combwork's words). */
 function views(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []
   for (const source of ['startup', 'resume', 'compact', null]) out.push({ name: `empty ${source}`, text: startView(empty({ source })) })

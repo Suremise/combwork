@@ -1,5 +1,5 @@
 // The team pause's admission gate in the delivery service (HI-2081; HR1's s10 and s12 checks): apart from a delivery's
-// own validity, one of Hive's own wakes (a loop card event, a watch wake) for a project agent of a paused workspace is
+// own validity, one of Combwork's own wakes (a loop card event, a watch wake) for a project agent of a paused workspace is
 // held as it is, unread: not offered, not typed (a pause landing between the offer and its Enter stops it before Enter,
 // and it is put back), not read by cw_inbox, not counted for a notice, and not expired while held; a message or the
 // user's answer still goes. Once the team resumes its time is moved on by how long it was held and it is offered once.
@@ -46,7 +46,7 @@ describe("the team pause's hold on deliveries (HI-2081)", async () => {
     }
   })
   deliveries.setSenderCheckForTests(() => null)
-  const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+  const hive: DeliverySender = { kind: 'hive', name: 'Combwork' }
   const wake = (o: Record<string, unknown> = {}) => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'card-event', from: hive, card: 7, body: 'is in Review', source: 'loop', ref: '#7', ...o })
   const states = async () => (await deliveries.deliveriesOf(alpha, 'b1')).map((r) => `${r.id} ${r.state}`)
   beforeEach(() => {

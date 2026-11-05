@@ -1,4 +1,4 @@
-// Server connections' keys masked wherever Hive writes text (HI-1772, main/keyMatcher.ts): by each saved key's
+// Server connections' keys masked wherever Combwork writes text (HI-1772, main/keyMatcher.ts): by each saved key's
 // fingerprint, any run of FRAGMENT or more of its characters, as it is or JSON-escaped (once, twice) or URL-encoded,
 // whatever the key's shape (dummy keys no other rule masks, quotes and backslashes included), alone, inside other text,
 // split anywhere, through the sinks that write (hive.log's line with serialised data, the developer console's events).

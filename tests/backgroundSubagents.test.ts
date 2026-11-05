@@ -1,6 +1,6 @@
 // #1584: HB6 showed "Finished" while nine background subagents it had launched ran #1126's reviews (24 Oct). Claude
-// Code's Agent tool runs a subagent in the background with an `async_launched` result, which Hive didn't count, so
-// the turn's Stop left the agent finished. Here the transcript is read as Hive reads it, the status settled after each
+// Code's Agent tool runs a subagent in the background with an `async_launched` result, which Combwork didn't count, so
+// the turn's Stop left the agent finished. Here the transcript is read as Combwork reads it, the status settled after each
 // read: subagents keep the agent in the background until the last ends, each end that Claude Code tells it of may
 // open a turn (`woke`), a resumed one counts again, and one it stopped itself wakes nothing (#640). Codex's subagents
 // are counted, and leave the agent finished, as its commands do (Codex starts no turn when one ends).

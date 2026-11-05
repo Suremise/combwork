@@ -1,4 +1,4 @@
-// Reading a card's attachment through Hive (HI-1751: the document tools refuse `.combwork`, so HR2 couldn't read HI-1702's
+// Reading a card's attachment through Combwork (HI-1751: the document tools refuse `.combwork`, so HR2 couldn't read HI-1702's
 // evidence), on the real board with two projects: a page of its text by byte offset, the pages joined giving its text
 // exactly (a character of any UTF-8 length at a page's end, a byte-order mark, the end of the file); an image, a PDF, a
 // file with a NUL or bytes that aren't UTF-8 by its kind and path; offsets that aren't a byte of it refused, for text and
@@ -78,7 +78,7 @@ async function allPages(w: WS, c: { number: number; project: string | null }, na
 }
 const folderOf = (root: string, c: number): string => join(root, 'p', '.combwork', 'attachments', 'cards', String(c))
 
-describe("a card's attachment read through Hive (HI-1751)", () => {
+describe("a card's attachment read through Combwork (HI-1751)", () => {
   it('a small text file whole; a long one in pages whose contents joined are its text, a character of each UTF-8 length at a page end', async () => {
     const { w } = await workspace()
     const PAGE = att.ATTACHMENT_PAGE

@@ -1,4 +1,4 @@
-// Agents under Hive merges (#1354, SPEC §16.9.3): a builder never merges a card Hive merges, and is told at each queue
+// Agents under Combwork merges (#1354, SPEC §16.9.3): a builder never merges a card Combwork merges, and is told at each queue
 // outcome what to do. What decides is the card's own ruleset (the options it started under), never the project's
 // current options; with workflow rules off (Settings → Advanced) nothing here refuses: agents merge and report as before
 // 1.0, and the queue drops the entry. On real temporary repositories (harness.ts).
@@ -37,7 +37,7 @@ async function queued(e: Env, title = 'Change', files: Record<string, string> = 
   return { card, folder }
 }
 
-describe('refusals under Hive merges (the card says what to do)', () => {
+describe('refusals under Combwork merges (the card says what to do)', () => {
   it("report merge on a queued card: refused with its place in the queue and where the rule is set; the card untouched; Refused recorded", async () => {
     const e = team()
     const { card: first } = await queued(e, 'One')
@@ -78,7 +78,7 @@ describe('refusals under Hive merges (the card says what to do)', () => {
     expect(refusedBy(await e.wf.agentColumnMove(theirs.key, B1, 'done'), 'move.useIntent').next).toBe('Use the report merge intent instead.')
   })
 
-  it('the merge slot: refused for a card Hive merges (refuseHiveMerge), nothing for an unknown card', async () => {
+  it('the merge slot: refused for a card Combwork merges (refuseHiveMerge), nothing for an unknown card', async () => {
     const e = team()
     const { card } = await queued(e)
     const r = await e.wf.refuseHiveMerge(card.key, B1, 'merge slot')
@@ -113,7 +113,7 @@ describe('refusals under Hive merges (the card says what to do)', () => {
       ['staged', 'folder', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
       ['unstagedChanges', 'folder', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
       ['folderBusy', 'folder', 'it moves on once the user puts right the folder main is checked out in and resumes it.', 'which is paused until the user puts right the folder main is checked out in and resumes it'],
-      // Hive resumes it once the rules are enforced again (queueHost's startOpen); one left from before, Resume.
+      // Combwork resumes it once the rules are enforced again (queueHost's startOpen); one left from before, Resume.
       ['rulesOff', 'rules', 'it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it).', 'which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it)']
     ]
     for (const [reason, waits, line, next, st] of cases) {
@@ -128,7 +128,7 @@ describe('refusals under Hive merges (the card says what to do)', () => {
 })
 
 describe('old rules: the card keeps the ruleset it started under', () => {
-  it('started under Hive merges, the project switched to "The agent merges": still refused and still queued; a card started afterwards reports its merge', async () => {
+  it('started under Combwork merges, the project switched to "The agent merges": still refused and still queued; a card started afterwards reports its merge', async () => {
     const e = team()
     const { card: old } = await queued(e, 'Old')
     e.options.finish = 'agentMerges'
@@ -146,7 +146,7 @@ describe('old rules: the card keeps the ruleset it started under', () => {
 })
 
 describe('with workflow rules off (Settings → Advanced)', () => {
-  it('report merge of a queued Hive-merges card works as before 1.0: Done, and the queue drops its entry', async () => {
+  it('report merge of a queued Combwork-merges card works as before 1.0: Done, and the queue drops its entry', async () => {
     let enforced = true
     const e = team({ enforced: () => enforced })
     const { card, folder } = await queued(e)
@@ -242,7 +242,7 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     expect(t.length).toBeLessThanOrEqual(WAKE_NOTE_MAX)
     expect(t).toContain('line 49')
     expect(t.endsWith('Fix it in your worktree, commit and submit again (cw_submit).')).toBe(true)
-    // The wake line quotes Hive's note whole (up to 600), a reviewer's request still at 200.
+    // The wake line quotes Combwork's note whole (up to 600), a reviewer's request still at 200.
     const change = cardChange(5, { number: 5, title: 'T', column: 'doing', comments: [], history: [] } as unknown as TaskCard, ['column'])
     expect(loopWakeLine(change, 'note', t)).toContain(t.slice(-60))
     expect(loopWakeLine(change, 'request', t)).not.toContain(t.slice(-60))
@@ -353,7 +353,7 @@ describe('where a card is, for its readers (queueState.ts)', () => {
     const { card } = await queued(e, 'Two')
     expect(queueStateOf(e.wf, first)).toMatchObject({ state: 'queued', position: 1 })
     expect(queueStateOf(e.wf, card)).toMatchObject({ state: 'queued', position: 2 })
-    // This Hive's queue takes the first and runs its checks: it is testing (its entry still open), the second next.
+    // This Combwork's queue takes the first and runs its checks: it is testing (its entry still open), the second next.
     const entry = e.wf.state(first).entries.at(-1)!
     live = { running: true, run: null, now: { card: first.key, number: first.id, entry: entry.id, revision: entry.revision, expected: null, step: 'checks', started: new Date().toISOString() } }
     expect(e.wf.state(first).entries.at(-1)!.state).toBe('open')
@@ -364,9 +364,9 @@ describe('where a card is, for its readers (queueState.ts)', () => {
     expect(refusedBy(await e.wf.reportMerge(first.key, B1), 'merge.hiveMerges').next).toContain('is merging it into main now')
   })
 
-  it("cw_lane next: a passed card Hive merges is named with where it is, and the next card waits for it", () => {
+  it("cw_lane next: a passed card Combwork merges is named with where it is, and the next card waits for it", () => {
     const lane = { state: 'running' } as unknown as Parameters<typeof laneNextText>[0]['lane']
-    expect(laneNextText({ lane, next: { card: 9, title: 'Next one', carryOn: false }, waits: null, queue: [{ card: 8, line: 'Hive merges this card (its rules): queued.' }] })).toBe('#8: Hive merges this card (its rules): queued. Next: #9 Next one, once it is Done.')
+    expect(laneNextText({ lane, next: { card: 9, title: 'Next one', carryOn: false }, waits: null, queue: [{ card: 8, line: 'Combwork merges this card (its rules): queued.' }] })).toBe('#8: Combwork merges this card (its rules): queued. Next: #9 Next one, once it is Done.')
     expect(laneNextText({ lane, next: null, waits: null, queue: [{ card: 8, line: 'Queued.' }] })).toBe('#8: Queued. Nothing else to start: the lane ends by itself once all are Done.')
     expect(laneNextText({ lane, next: { card: 9, title: 'Next one', carryOn: false }, waits: null })).toBe('Next: #9 Next one. Start it.')
   })

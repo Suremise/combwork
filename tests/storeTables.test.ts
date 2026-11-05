@@ -137,7 +137,7 @@ describe('entries as rows, and back (#1212)', () => {
       expect(r.whole).toBe(true)
       expect(canonical(r.back)).toBe(canonical(JSON.parse(JSON.stringify(odd))))
     }
-    // A bucket with a family Hive doesn't know, or a project named '' (the workspace's own part).
+    // A bucket with a family Combwork doesn't know, or a project named '' (the workspace's own part).
     for (const odd of [{ ...bucket(0), workspace: { api: {}, mcp: {}, guidance: {}, catalog: {}, later: {} } }, { ...bucket(0), projects: { '': { api: {}, mcp: {}, guidance: {}, catalog: {} } } }]) {
       const plain = JSON.parse(JSON.stringify(odd))
       expect(roundTrip('metrics', plain)).toMatchObject({ whole: true })

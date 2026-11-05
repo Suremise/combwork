@@ -78,7 +78,7 @@ describe('period totals', () => {
   })
 
   it("never shows sessions without a price as $0: Unknown when none has one, a subtotal + ? when some don't", () => {
-    /** A session Hive had no price for (its model unknown): no cost, in total or on its days. */
+    /** A session Combwork had no price for (its model unknown): no cost, in total or on its days. */
     const unpriced = (days: Record<string, number>): SessionListItem => {
       const s = session(days, 'codex')
       for (const d of Object.values(s.usage!.days!)) Object.assign(d, { costUsd: null, costEstimated: false })
