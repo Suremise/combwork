@@ -39,7 +39,7 @@ async function runToEnd(args, ms = 30000) {
   // A child of a suite's that failed to start, in the suite's output (Playwright's words for Electron that didn't start):
   // under the failed suite's line, with its meaning.
   const out = `<process did exit: exitCode=${r.code}, signal=null>`
-  const lines = resultLines('failfast', { ok: false, code: 1, seconds: 1, failed: ['FAIL Hive did not start'], windows: windowsCodesIn(out) })
+  const lines = resultLines('failfast', { ok: false, code: 1, seconds: 1, failed: ['FAIL Combwork did not start'], windows: windowsCodesIn(out) })
   check('a startup failure in a suite’s output is said under its line', lines[2] === `    Windows: ${describeExit(0xc0000142)}`, JSON.stringify(lines))
 
   console.log(failed ? `FAIL ${failed} check(s) failed` : 'failfast: all checks passed')
