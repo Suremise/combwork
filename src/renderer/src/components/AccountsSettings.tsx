@@ -653,6 +653,9 @@ export function AccountsSettings() {
 /** Shows its element once, as it first appears (HI-2541: a Set Up terminal opened under a card further down). */
 function ScrollIntoView({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => ref.current?.scrollIntoView?.({ block: 'nearest' }), [])
+  // A block, never its value: Electron's Chromium returns a promise from scrollIntoView, which React would call as the clean-up.
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'nearest' })
+  }, [])
   return <div ref={ref}>{children}</div>
 }
