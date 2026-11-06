@@ -160,7 +160,12 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     check('4. the rules back on: the lane gets the slot, B4 starts there', !!inSlot, JSON.stringify(await live(b4.id)))
     check('4. …R1 starts too', !!(await until(async () => !!(await live(r1.id)), HUNG_MS)))
     const sessionsOf = async (id) => (await inv('session:list', alpha)).filter((s) => s.agentId === id)
-    check("4. …started once: one conversation of B4's, the lane waiting no more", (await sessionsOf(b4.id)).length === 1 && !!(await until(async () => (await lane(lane4.lane.id))?.status?.reason !== 'slot', HUNG_MS)), JSON.stringify((await sessionsOf(b4.id)).length))
+    // Its conversation is recorded after its launch shows as live (HI-2638: read at once under load, there was none yet).
+    const b4Convs = await until(async () => {
+      const list = await sessionsOf(b4.id)
+      return list.length ? list : null
+    }, HUNG_MS)
+    check("4. …started once: one conversation of B4's, the lane waiting no more", b4Convs?.length === 1 && (await sessionsOf(b4.id)).length === 1 && !!(await until(async () => (await lane(lane4.lane.id))?.status?.reason !== 'slot', HUNG_MS)), JSON.stringify((await sessionsOf(b4.id)).length))
 
     // --- 5. A placement owed at a restart, the builder's conversation bound to the card's lease (HI-1746). B2 builds card 5
     // in a slot (its conversation there, under card 5's lease); in its turn, it puts card 5 back and starts card 6, which

@@ -150,9 +150,12 @@ async function theForm(page, app, inv) {
     const running = page.locator('.project-row', { hasText: 'web' }).locator('.agent-count')
     for (const s of ['ready', 'working', 'waiting', 'working']) for (const a of ['b1', 'r1']) await status(a, s)
     // Main knows nothing of these made-up runs, so a workspace refresh meanwhile (a project.json write's) drops them: they
-    // go on reporting, as running agents do, until the row shows them (HI-1774: it raced that refresh).
+    // go on reporting, as running agents do, until the row shows them (HI-1774: it raced that refresh). The count is read
+    // without Playwright's wait (HI-2639): a refresh between count() and innerText() removed it, and innerText() then
+    // waited 30 s for it while nothing reported the runs again.
     const twoShown = !!(await lib.until(async () => {
-      if ((await running.count()) === 1 && (await running.innerText()).trim() === '2') return true
+      const shown = await running.allInnerTexts()
+      if (shown.length === 1 && shown[0].trim() === '2') return true
       for (const a of ['b1', 'r1']) await status(a, 'working')
       return false
     }, HUNG_MS))
@@ -303,6 +306,15 @@ async function theForm(page, app, inv) {
     const copied = await lib.until(() => page.evaluate(() => window.__copied), HUNG_MS)
     const parsed = copied ? JSON.parse(copied) : null
     check('Copy as JSON gives the version control, the preset and every option', parsed?.platform === 'git' && parsed?.preset === 'pairAgent' && parsed?.options.finish === 'agentMerges' && 'style' in parsed.options, String(copied))
+    // Pop-ups stay while the window isn't focused (a test window never is), stacked at the bottom right over Paste JSON…
+    // (HI-2639: under load its pop-up was there before the click): its own shown, then every one closed, as you would.
+    const popups = page.locator('.toast.popup')
+    await popups.filter({ hasText: 'Workflow options copied' }).waitFor({ timeout: HUNG_MS })
+    check('…saying so in a pop-up; the pop-ups closed, nothing covers Paste JSON…', !!(await lib.until(async () => {
+      if ((await popups.count()) === 0) return true
+      await popups.first().locator('.popup-close').click({ timeout: 2000 }).catch(() => undefined)
+      return false
+    }, HUNG_MS)), (await popups.allInnerTexts()).join(' | '))
     const pasteIn = async (json) => {
       await section.getByRole('button', { name: 'Paste JSON…' }).click()
       const d = page.locator('.dialog', { hasText: 'Paste Workflow Options' })
