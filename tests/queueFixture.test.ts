@@ -11,7 +11,7 @@ const fx = { alpha: 'C:\\ws\\alpha' }
 const refused = new Error('slot-a changed meanwhile: its writer is no longer the one shown. Look again.')
 
 /** A window whose slot-a is held by run r-1: its release refused; `after`, what reading its writer again gives. */
-function hive(after: () => Promise<unknown>) {
+function heldWindow(after: () => Promise<unknown>) {
   let reads = 0
   return {
     inv: async (channel: string): Promise<unknown> => {
@@ -25,12 +25,12 @@ function hive(after: () => Promise<unknown>) {
 
 describe("the queue fixture's Release Slot (HI-2177)", () => {
   it('refused, the writer then gone or another run: released (Combwork freed it itself)', async () => {
-    expect(await releaseHeld(fx, hive(async () => null))).toEqual(['slot-a'])
-    expect(await releaseHeld(fx, hive(async () => ({ run: 'r-2' })))).toEqual(['slot-a'])
+    expect(await releaseHeld(fx, heldWindow(async () => null))).toEqual(['slot-a'])
+    expect(await releaseHeld(fx, heldWindow(async () => ({ run: 'r-2' })))).toEqual(['slot-a'])
   })
 
   it('refused, the same run still holding it: the release’s own error', async () => {
-    await expect(releaseHeld(fx, hive(async () => ({ run: 'r-1' })))).rejects.toBe(refused)
+    await expect(releaseHeld(fx, heldWindow(async () => ({ run: 'r-1' })))).rejects.toBe(refused)
   })
 
   it('refused, its writer unreadable: that error, never taken as released', async () => {
@@ -38,7 +38,7 @@ describe("the queue fixture's Release Slot (HI-2177)", () => {
     await expect(
       releaseHeld(
         fx,
-        hive(async () => {
+        heldWindow(async () => {
           throw unreadable
         })
       )

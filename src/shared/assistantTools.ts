@@ -1,5 +1,5 @@
 /**
- * The Combwork tools the Combwork Assistant gets, by how far it may act (Settings → Assistant → Control). The hive MCP
+ * The Combwork tools the Combwork Assistant gets, by how far it may act (Settings → Assistant → Control). The combwork MCP
  * server offers these and Claude Code runs them without asking (they're Combwork's own, already limited by the
  * control level and checked again by the Agent API). No imports: cw-mcp.js runs outside the app bundle.
  */

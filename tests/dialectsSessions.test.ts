@@ -74,36 +74,36 @@ describe('a session’s chain and its key', () => {
 
 describe('the API chain', () => {
   it('is loaded once per workspace, then kept; the Default until loaded and where nothing overrides', async () => {
-    const hive = folder()
-    expect(apiChain(hive)).toBeNull()
-    await apiChainReady(hive)
-    expect(apiChain(hive)).toBeNull()
-    forgetApiChain(hive)
-    write(join(hive, 'dialects'), 'api/cli.json', file({ 'a.plain': 'api' }))
-    write(join(hive, 'dialects'), 'workspace.json', file({ 'a.plain': 'ws', 'a.named': 'ws {project}' }))
-    await apiChainReady(hive)
+    const home = folder()
+    expect(apiChain(home)).toBeNull()
+    await apiChainReady(home)
+    expect(apiChain(home)).toBeNull()
+    forgetApiChain(home)
+    write(join(home, 'dialects'), 'api/cli.json', file({ 'a.plain': 'api' }))
+    write(join(home, 'dialects'), 'workspace.json', file({ 'a.plain': 'ws', 'a.named': 'ws {project}' }))
+    await apiChainReady(home)
     // Ids of a real catalogue only: these test ids aren't in this Combwork's schema, so nothing applies.
-    expect(apiChain(hive)).toBeNull()
-    forgetApiChain(hive)
+    expect(apiChain(home)).toBeNull()
+    forgetApiChain(home)
   })
 
   it('follows its files: a change loads it again, and a load that started before it never lands', async () => {
-    const hive = folder()
-    const dir = join(hive, 'dialects')
+    const home = folder()
+    const dir = join(home, 'dialects')
     const id = 'api.http.noRoute'
     const say = (t: string) => ({ name: 'x', texts: { [id]: { text: `${t} {method} {path}`, why: 'a test' } } })
     mkdirSync(join(dir, 'api'), { recursive: true })
     writeFileSync(join(dir, 'workspace.json'), JSON.stringify(say('one')))
-    await apiChainReady(hive)
-    expect(apiChain(hive)?.texts[id]).toBe('one {method} {path}')
+    await apiChainReady(home)
+    expect(apiChain(home)?.texts[id]).toBe('one {method} {path}')
     writeFileSync(join(dir, 'api', 'cli.json'), JSON.stringify(say('two')))
-    apiChainChanged(hive)
+    apiChainChanged(home)
     writeFileSync(join(dir, 'api', 'cli.json'), JSON.stringify(say('three')))
-    apiChainChanged(hive)
-    await apiChainReady(hive)
-    expect(apiChain(hive)?.texts[id]).toBe('three {method} {path}')
-    expect(apiChain(hive)?.files).toEqual(['api/cli.json', 'workspace.json'])
-    forgetApiChain(hive)
+    apiChainChanged(home)
+    await apiChainReady(home)
+    expect(apiChain(home)?.texts[id]).toBe('three {method} {path}')
+    expect(apiChain(home)?.files).toEqual(['api/cli.json', 'workspace.json'])
+    forgetApiChain(home)
   })
 })
 
@@ -112,10 +112,10 @@ describe('the API chain of a request (HR1 on HI-2443)', () => {
     const id = 'api.http.noRoute'
     const a = folder()
     const b = folder()
-    for (const [hive, mark] of [[a, 'A'], [b, 'B']]) {
-      mkdirSync(join(hive, 'dialects'), { recursive: true })
-      writeFileSync(join(hive, 'dialects', 'workspace.json'), JSON.stringify({ name: 'x', texts: { [id]: { text: `${mark} {method} {path}`, why: 'a test' } } }))
-      await apiChainReady(hive)
+    for (const [home, mark] of [[a, 'A'], [b, 'B']]) {
+      mkdirSync(join(home, 'dialects'), { recursive: true })
+      writeFileSync(join(home, 'dialects', 'workspace.json'), JSON.stringify({ name: 'x', texts: { [id]: { text: `${mark} {method} {path}`, why: 'a test' } } }))
+      await apiChainReady(home)
     }
     const after = async (dir: string | null) =>
       inApiWorkspace(dir, async () => {

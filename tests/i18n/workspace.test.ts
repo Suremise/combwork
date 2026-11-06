@@ -123,7 +123,7 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(unusedSummary([tree({ removable: true }), tree({ ahead: 1 })])).toBe('2 unused worktrees (1 merged)')
     expect(unusedWorkNotice([tree({ ahead: 1 })])).toBe("1 unused worktree has work that isn't on main")
     expect(lostLines({ path: 'D:/x', branch: null, into: null, ahead: 1, dirty: 2 })).toEqual(['1 commit on no branch (only its detached HEAD has it)', '2 uncommitted files in D:/x', 'the files git ignores in its folder (build output, copied .env files)'])
-    expect(CHANGES_ABOUT.unused('hive')).toBe('Worktrees no agent of hive works in: open one to see its changes and merge them, or remove it.')
+    expect(CHANGES_ABOUT.unused('alpha')).toBe('Worktrees no agent of alpha works in: open one to see its changes and merge them, or remove it.')
     expect(CHANGES_ABOUT.unusedTip('main')).toMatch(/^Kept when their agent was removed \(by hand, or when a template's agents replaced it\), .*Loading a template gives none of them to its agents\. Those merged into main and clean can go with their branches; the others hold work that is nowhere else\.$/)
     expect(CHANGES_ABOUT.unusedTip(null)).not.toMatch(/merged into/)
     // #1562: 1.0's templates make agents without worktrees, so loading one gives no unused worktree back.

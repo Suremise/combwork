@@ -157,7 +157,7 @@ export const CONNECTION_COLUMN: AgentColumn = {
 export const PROJECT_COLUMN: AgentColumn = {
   label: msg({ id: 'panes.table.project', defaultMessage: 'Project', description: "An agents table's column heading: the agent's project." }),
   kind: 'short',
-  cell: msg({ id: 'panes.table.projectPrefix', defaultMessage: 'in {value}', description: "The agent's project in a line of text (screen readers, a dialog's copy): {value} is its name (\"in hive\"). Lower case." })
+  cell: msg({ id: 'panes.table.projectPrefix', defaultMessage: 'in {value}', description: "The agent's project in a line of text (screen readers, a dialog's copy): {value} is its name (\"in demo\"). Lower case." })
 }
 
 /**

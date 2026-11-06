@@ -82,7 +82,7 @@ export interface QueuePause {
   pid?: number
   /** What git (or a signer) said, for a pause it caused (#1350): its message, in its own words. */
   message?: string
-  /** Who paused it (#1353: Pause queue); left out, Hive (its reason says why). */
+  /** Who paused it (#1353: Pause queue); left out, Combwork (its reason says why). */
   by?: 'user' | 'assistant'
   /** When (ISO), as the store saved it; left out of a pause written, the store's time then. */
   at?: string

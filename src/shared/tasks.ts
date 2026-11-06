@@ -5,7 +5,7 @@ import { cardLabel, cardName, cardRef } from './projectKeys'
 import { agentMsg, say } from './agentText'
 
 /**
- * The window's tr() (#798), passed in: agent scripts (hive-mcp.js) import this module and must not load the
+ * The window's tr() (#798), passed in: agent scripts (cw-mcp.js) import this module and must not load the
  * translations, so it holds messages and the window formats them. Without it, a function words its text in English, for
  * agents and the Agent API.
  */

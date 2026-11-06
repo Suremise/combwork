@@ -27,9 +27,9 @@ import { folderWhat } from '../shared/projectFolders'
 const log = createLogger('projects')
 
 /**
- * A project leaving Hive (Project → Remove Project…), three ways:
+ * A project leaving Combwork (Project → Remove Project…), three ways:
  * - Hide: nothing moves; Combwork leaves the folder out until it's restored (Settings → Workspace).
- * - Remove from Hive: its workspace files (handovers, cards) are packed into its own .combwork/removed and leave the
+ * - Remove from Combwork: its workspace files (handovers, cards) are packed into its own .combwork/removed and leave the
  *   workspace, so the folder carries them wherever it goes; Combwork offers them back when it sees the folder again.
  * - Delete: the folder, its worktrees and its handovers go to the Recycle Bin, and its cards are deleted.
  * The CLIs' own transcripts (~/.claude, ~/.codex) are never touched.
@@ -377,7 +377,7 @@ export async function restoreProject(name: string): Promise<{ handovers: number;
   return result
 }
 
-/** A project folder holding a pack from Remove from Hive (moved here, or never unpacked): takes it in, or drops it. */
+/** A project folder holding a pack from Remove from Combwork (moved here, or never unpacked): takes it in, or drops it. */
 export async function takeRemovedData(projectPath: string, keep: boolean): Promise<{ handovers: number; cards: number }> {
   const ws = workspace
   const p = ws.assertProject(projectPath)

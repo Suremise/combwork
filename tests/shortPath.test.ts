@@ -5,19 +5,19 @@ import { pathParts, shortName, shortPath } from '../src/shared/shortPath'
 
 describe('pathParts', () => {
   it('a drive, a share, a POSIX root, or none', () => {
-    expect(pathParts('D:\\Development\\HIVE\\hive')).toEqual({ root: 'D:\\', names: ['Development', 'HIVE', 'hive'], sep: '\\' })
-    expect(pathParts('\\\\nas\\work\\hive\\api')).toEqual({ root: '\\\\nas\\work\\', names: ['hive', 'api'], sep: '\\' })
-    expect(pathParts('/home/d/hive/')).toEqual({ root: '/', names: ['home', 'd', 'hive'], sep: '/' })
-    expect(pathParts('hive/api')).toEqual({ root: '', names: ['hive', 'api'], sep: '/' })
+    expect(pathParts('D:\\Development\\ACME\\acme')).toEqual({ root: 'D:\\', names: ['Development', 'ACME', 'acme'], sep: '\\' })
+    expect(pathParts('\\\\nas\\work\\acme\\api')).toEqual({ root: '\\\\nas\\work\\', names: ['acme', 'api'], sep: '\\' })
+    expect(pathParts('/home/d/acme/')).toEqual({ root: '/', names: ['home', 'd', 'acme'], sep: '/' })
+    expect(pathParts('acme/api')).toEqual({ root: '', names: ['acme', 'api'], sep: '/' })
     expect(pathParts('C:')).toEqual({ root: 'C:\\', names: [], sep: '\\' })
   })
 })
 
 describe('shortPath', () => {
   it("alone: the folder's name", () => {
-    expect(shortPath('D:\\Development\\HIVE\\hive')).toBe('hive')
-    expect(shortPath('D:\\Development\\HIVE\\hive\\')).toBe('hive')
-    expect(shortPath('/home/d/hive')).toBe('hive')
+    expect(shortPath('D:\\Development\\ACME\\acme')).toBe('acme')
+    expect(shortPath('D:\\Development\\ACME\\acme\\')).toBe('acme')
+    expect(shortPath('/home/d/acme')).toBe('acme')
   })
 
   it('a drive root or a share alone stays whole', () => {
@@ -26,32 +26,32 @@ describe('shortPath', () => {
   })
 
   it('beside another: the common start dropped, after …\\', () => {
-    expect(shortPath('D:\\Dev\\HIVE.worktrees\\hive\\hb5\\api', 'D:\\Dev\\HIVE.worktrees\\hive\\hb6\\api')).toBe('…\\hb5\\api')
+    expect(shortPath('D:\\Dev\\ACME.worktrees\\acme\\hb5\\api', 'D:\\Dev\\ACME.worktrees\\acme\\hb6\\api')).toBe('…\\hb5\\api')
     expect(shortPath('D:\\Dev\\old\\x\\wt', 'D:\\Dev\\new\\y\\wt')).toBe('…\\old\\x\\wt')
     expect(shortPath('/srv/a/x/wt', '/srv/a/y/wt')).toBe('…/x/wt')
   })
 
   it('a path that differs only at the end shows its name', () => {
-    expect(shortPath('D:\\Dev\\HIVE.worktrees\\hive\\hb5', 'D:\\Dev\\HIVE.worktrees\\hive\\hb6')).toBe('hb5')
-    expect(shortPath('D:\\Dev\\hive', 'D:\\Dev\\hive-2')).toBe('hive')
+    expect(shortPath('D:\\Dev\\ACME.worktrees\\acme\\hb5', 'D:\\Dev\\ACME.worktrees\\acme\\hb6')).toBe('hb5')
+    expect(shortPath('D:\\Dev\\acme', 'D:\\Dev\\acme-2')).toBe('acme')
   })
 
   it('compares without case, as Windows does', () => {
-    expect(shortPath('d:\\dev\\HIVE\\a\\wt', 'D:\\Dev\\hive\\b\\wt')).toBe('…\\a\\wt')
+    expect(shortPath('d:\\dev\\ACME\\a\\wt', 'D:\\Dev\\acme\\b\\wt')).toBe('…\\a\\wt')
   })
 
   it('the same path, or the folder above the other, shows its name', () => {
-    expect(shortPath('D:\\Dev\\hive', 'D:\\Dev\\hive')).toBe('hive')
-    expect(shortPath('D:\\Dev\\hive', 'D:\\Dev\\hive\\api')).toBe('hive')
+    expect(shortPath('D:\\Dev\\acme', 'D:\\Dev\\acme')).toBe('acme')
+    expect(shortPath('D:\\Dev\\acme', 'D:\\Dev\\acme\\api')).toBe('acme')
   })
 
   it('on another drive or share: whole, since its root is what differs', () => {
-    expect(shortPath('E:\\Dev\\hive', 'D:\\Dev\\hive')).toBe('E:\\Dev\\hive')
-    expect(shortPath('\\\\nas\\work\\hive', '\\\\nas\\home\\hive')).toBe('\\\\nas\\work\\hive')
+    expect(shortPath('E:\\Dev\\acme', 'D:\\Dev\\acme')).toBe('E:\\Dev\\acme')
+    expect(shortPath('\\\\nas\\work\\acme', '\\\\nas\\home\\acme')).toBe('\\\\nas\\work\\acme')
   })
 
   it('a share beside a path on the same share: the part that differs', () => {
-    expect(shortPath('\\\\nas\\work\\hive\\old\\api', '\\\\nas\\work\\hive\\new\\api')).toBe('…\\old\\api')
+    expect(shortPath('\\\\nas\\work\\acme\\old\\api', '\\\\nas\\work\\acme\\new\\api')).toBe('…\\old\\api')
   })
 
   it('nothing in common but the root: the path from its root', () => {
@@ -69,7 +69,7 @@ describe('shortName', () => {
   })
   it('names that share little stay whole', () => {
     expect(shortName('hb5', 'hb6')).toBe('hb5')
-    expect(shortName('hive', 'hive-2')).toBe('hive')
+    expect(shortName('acme', 'acme-2')).toBe('acme')
     expect(shortName('short-a', 'short-b')).toBe('short-a')
   })
 })

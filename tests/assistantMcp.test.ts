@@ -57,7 +57,7 @@ async function opened(ws: string): Promise<Service> {
 }
 
 /** The servers a launch gets, but Combwork's own. */
-const gets = async (path: string, agent: object): Promise<string[]> => Object.keys((await sessions.effective(path, agent as never)).mcpServers).filter((n) => n !== 'hive').sort()
+const gets = async (path: string, agent: object): Promise<string[]> => Object.keys((await sessions.effective(path, agent as never)).mcpServers).filter((n) => n !== 'combwork').sort()
 const assistantGets = (w: Service) => gets(w.assistantHome, ASSISTANT)
 const saved = (ws: string): unknown => json(join(ws, '.combwork', 'workspace.json')).mcp.assistant
 

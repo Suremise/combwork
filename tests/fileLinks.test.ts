@@ -119,30 +119,30 @@ describe('file links: unquoted paths with spaces', () => {
 
 describe('file links: where a path leads', () => {
   const roots: LinkRoot[] = [
-    { path: 'C:\\ws\\hive', project: 'C:\\ws\\hive', agentId: null },
+    { path: 'C:\\ws\\demo', project: 'C:\\ws\\demo', agentId: null },
     { path: 'C:\\ws\\web', project: 'C:\\ws\\web', agentId: null },
-    { path: 'C:\\ws\\hive\\.combwork\\worktrees\\two', project: 'C:\\ws\\hive', agentId: 'two' }
+    { path: 'C:\\ws\\demo\\.combwork\\worktrees\\two', project: 'C:\\ws\\demo', agentId: 'two' }
   ]
 
   it('joins and normalises', () => {
-    expect(joinPath('C:\\ws\\hive', './src/../docs/x.md')).toBe('C:\\ws\\hive\\docs\\x.md')
-    expect(joinPath('C:\\ws\\hive', 'D:/other/x.md')).toBe('D:\\other\\x.md')
+    expect(joinPath('C:\\ws\\demo', './src/../docs/x.md')).toBe('C:\\ws\\demo\\docs\\x.md')
+    expect(joinPath('C:\\ws\\demo', 'D:/other/x.md')).toBe('D:\\other\\x.md')
   })
 
   it("an agent's relative path: its own folder", () => {
-    expect(resolveLink('src/a.ts', 'C:\\ws\\hive', roots)).toEqual({ project: 'C:\\ws\\hive', agentId: null, root: 'C:\\ws\\hive', rel: 'src/a.ts' })
-    expect(resolveLink('src\\a.ts', 'C:\\ws\\hive\\.combwork\\worktrees\\two', roots)).toEqual({ project: 'C:\\ws\\hive', agentId: 'two', root: 'C:\\ws\\hive\\.combwork\\worktrees\\two', rel: 'src/a.ts' })
+    expect(resolveLink('src/a.ts', 'C:\\ws\\demo', roots)).toEqual({ project: 'C:\\ws\\demo', agentId: null, root: 'C:\\ws\\demo', rel: 'src/a.ts' })
+    expect(resolveLink('src\\a.ts', 'C:\\ws\\demo\\.combwork\\worktrees\\two', roots)).toEqual({ project: 'C:\\ws\\demo', agentId: 'two', root: 'C:\\ws\\demo\\.combwork\\worktrees\\two', rel: 'src/a.ts' })
   })
 
   it('another workspace project, and the Assistant (from the workspace)', () => {
-    expect(resolveLink('..\\web\\index.html', 'C:\\ws\\hive', roots)?.project).toBe('C:\\ws\\web')
-    expect(resolveLink('c:\\WS\\web\\index.html', 'C:\\ws\\hive', roots)?.rel).toBe('index.html')
-    expect(resolveLink('hive/docs/SPEC.md', 'C:\\ws', roots)).toMatchObject({ project: 'C:\\ws\\hive', rel: 'docs/SPEC.md' })
+    expect(resolveLink('..\\web\\index.html', 'C:\\ws\\demo', roots)?.project).toBe('C:\\ws\\web')
+    expect(resolveLink('c:\\WS\\web\\index.html', 'C:\\ws\\demo', roots)?.rel).toBe('index.html')
+    expect(resolveLink('demo/docs/SPEC.md', 'C:\\ws', roots)).toMatchObject({ project: 'C:\\ws\\demo', rel: 'docs/SPEC.md' })
   })
 
   it('nothing outside the projects, or in .git', () => {
-    expect(resolveLink('C:\\Users\\me\\.claude\\settings.json', 'C:\\ws\\hive', roots)).toBeNull()
-    expect(resolveLink('../notes.md', 'C:\\ws\\hive', roots)).toBeNull()
-    expect(resolveLink('.git/config', 'C:\\ws\\hive', roots)).toBeNull()
+    expect(resolveLink('C:\\Users\\me\\.claude\\settings.json', 'C:\\ws\\demo', roots)).toBeNull()
+    expect(resolveLink('../notes.md', 'C:\\ws\\demo', roots)).toBeNull()
+    expect(resolveLink('.git/config', 'C:\\ws\\demo', roots)).toBeNull()
   })
 })

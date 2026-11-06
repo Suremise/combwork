@@ -535,7 +535,7 @@ export async function repoHistory(root: string, opts: { ref?: string | null; pag
     if (r.startsWith('refs/heads/')) branches.push(r.slice('refs/heads/'.length))
     else if (r.startsWith('refs/remotes/') && !r.endsWith('/HEAD')) remoteBranches.push(r.slice('refs/remotes/'.length))
   }
-  // By default the project's target (where its work goes: 1.0.0 for hive, not main), else the folder's branch.
+  // By default the project's target (where its work goes: an integration branch such as 1.0.0, not main), else the folder's branch.
   const target = opts.workTarget && branches.includes(opts.workTarget) ? opts.workTarget : null
   // Named whole (round 1): a local branch called origin/main never hides the remote's of that name.
   const defaultRef = target ? `refs/heads/${target}` : summary.branch ? `refs/heads/${summary.branch}` : null

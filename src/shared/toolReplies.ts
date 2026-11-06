@@ -1,5 +1,5 @@
 /**
- * The short forms of Combwork's replies to agents (the hive MCP tools) and the Agent API's opt-in short views. Every
+ * The short forms of Combwork's replies to agents (the combwork MCP server's tools) and the Agent API's opt-in short views. Every
  * character a tool returns goes into an agent's context and is paid for again on each later turn, so: a change
  * confirms what changed (and what the agent can't know: a new card's number, where a card is now), a listing
  * returns a short row per item, and full detail comes on request. No imports beyond shared code without side
@@ -172,7 +172,7 @@ const R = {
   markEssential: agentMsg({ id: 'reply.journal.mark.essential', text: 'essential', note: "A journal entry's mark: importance 3." }),
   markImportant: agentMsg({ id: 'reply.journal.mark.important', text: 'important', note: "A journal entry's mark: importance 2." }),
   markByCombwork: agentMsg({ id: 'reply.journal.mark.byCombwork', text: 'by Combwork', note: "A journal entry's mark: Combwork recorded it." }),
-  markDetail: agentMsg({ id: 'reply.journal.mark.detail', text: 'detail', note: "A journal entry's mark: it has detail (hive_journal_get reads it)." }),
+  markDetail: agentMsg({ id: 'reply.journal.mark.detail', text: 'detail', note: "A journal entry's mark: it has detail (cw_journal_entry reads it)." }),
   markSuperseded: agentMsg({ id: 'reply.journal.mark.superseded', text: 'superseded by #{id}', note: "A journal entry's mark: the entry that superseded it." }),
   journalHead: agentMsg({ id: 'reply.journal.head', text: '#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byCombwork, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}', note: "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed." }),
   journalWhy: agentMsg({ id: 'reply.journal.why', text: 'Why: {why}', note: "A journal entry's why." }),
@@ -553,7 +553,7 @@ function nextText(n: NextStep): string {
   }
 }
 
-/** The hive tool of each intent: an old move's reply says to call it next time (#1268), an intent's names what's next (#1530). */
+/** The cw_ tool of each intent: an old move's reply says to call it next time (#1268), an intent's names what's next (#1530). */
 /** A workflow refusal as the Agent API gives it (SPEC §16.8.3). */
 export interface Refused {
   refused: true
@@ -1136,7 +1136,7 @@ export interface JournalRow {
   hasDetail: boolean
 }
 
-/** cw_journal_recall: "#12 2026-10-18 decision · hive: summary [important, detail]", newest or best first. */
+/** cw_journal_recall: "#12 2026-10-18 decision · demo: summary [important, detail]", newest or best first. */
 export function journalRecallText(rows: JournalRow[], query?: string): string {
   if (!rows.length) return query ? say(R.journalNoMatch, { query }) : say(R.journalNone)
   return rows

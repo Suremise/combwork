@@ -49,14 +49,14 @@ export function setRetiredHomes(fn: ((projectPath: string) => readonly string[] 
 }
 
 /**
- * Who writes (#1434): this Hive (its pid and start, as slot operations' holders are known), its live tokens (the pools'
+ * Who writes (#1434): this Combwork (its pid and start, as slot operations' holders are known), its live tokens (the pools'
  * `holder.live`: a writer's run is live from before its claim can be seen until it is released), its pools (a claim is
  * a pool's tracked work, which `close` awaits), and what a pool does once a writer is released (the ended lease's last
  * revision, the slot looked at). The app gives its own (slotsApp.ts); unset (unit tests), stand-ins.
  */
 export interface WriterHost {
   self(): Promise<{ pid: number; started: number }>
-  /** Whether another Hive (a writer's holder) still runs; null when it can't be told (#1506: then it is taken to). */
+  /** Whether another Combwork (a writer's holder) still runs; null when it can't be told (#1506: then it is taken to). */
   alive(pid: number, started: number): Promise<boolean | null>
   live: Set<string>
   track(projectPath: string): Promise<{ done: () => void } | null>

@@ -1,4 +1,4 @@
-// The hive project's focused-test picker (HI-1367): `node tests/e2e/affected.mjs --pick`, which Combwork's merge queue runs
+// This repository's focused-test picker (HI-1367): `node tests/e2e/affected.mjs --pick`, which Combwork's merge queue runs
 // as the project's focused.pick. Which unit tests and e2e suites a change needs: the e2e suites are affectedSuites'
 // (tests/e2esuites.test.ts checks those), the unit tests a changed test, Vitest's import graph, and UNIT_SCANS for the
 // tests that read the repository rather than import it. These check the table can't drift from the tests, and replay

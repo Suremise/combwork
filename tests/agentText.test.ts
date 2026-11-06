@@ -142,7 +142,7 @@ describe('say', () => {
     expect(await inRequestScope(null, async () => say(M, { name: 'x', n: 1 }))).toBe('for the API')
     expect(inRequestScope({ projectPath: 'C:\\ws\\.combwork\\assistant', agentId: 'assistant' }, () => say(M, { name: 'x', n: 1 }))).toBe('for assistant')
     expect(asked).toEqual([{ kind: 'session', session: alpha }, { kind: 'api' }, { kind: 'session', session: { projectPath: 'C:\\ws\\.combwork\\assistant', agentId: 'assistant' } }])
-    // Outside a scope: the process's chain (hive-mcp.js), else the Default.
+    // Outside a scope: the process's chain (cw-mcp.js), else the Default.
     expect(say(M, { name: 'x', n: 1 })).toBe('process')
     expect(currentChain()?.texts['test.thing.case']).toBe('process')
   })
@@ -152,7 +152,7 @@ describe('say', () => {
   })
 })
 
-describe("hive-mcp.js and hive-progress.js's dialect file", () => {
+describe("cw-mcp.js and cw-progress.js's dialect file", () => {
   it('reads the overrides from CW_DIALECT_FILE, and speaks the Default without one or with one it cannot read', () => {
     const dir = tempDir('agent-text-dialect-')
     const file = join(dir, 'dialect.json')

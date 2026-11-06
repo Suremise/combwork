@@ -33,7 +33,7 @@ const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<strin
 describe("a scenario's leftover processes (#542, #402)", () => {
   const dir = 'C:\\combwork-test\\scenarios\\lanes\\1\\scenario'
   it('the folder itself or inside it, in any spelling: backslashes, slashes, case, quoted', () => {
-    expect(namesFolder(`cmd.exe /c "${dir}\\profile\\bin\\hive-progress.cmd" --title x`, dir)).toBe(true)
+    expect(namesFolder(`cmd.exe /c "${dir}\\profile\\bin\\cw-progress.cmd" --title x`, dir)).toBe(true)
     expect(namesFolder('node C:/COMBWORK-TEST/scenarios/lanes/1/scenario/run.js', dir)).toBe(true)
     expect(namesFolder(`node -e x "${dir}"`, dir)).toBe(true)
     expect(namesFolder(`node -e x ${dir}`, dir + '\\')).toBe(true)
@@ -469,7 +469,7 @@ describe('test tooling ends processes by identity, never by a remembered pid (#6
     readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) =>
       e.isDirectory() ? (['node_modules', 'fixtures'].includes(e.name) ? [] : files(join(dir, e.name))) : /\.(c|m)?[jt]s$/.test(e.name) ? [join(dir, e.name)] : []
     )
-  // And in Combwork itself: hive-progress ends its command's tree by identity too (wrapper.ts endTree, #655).
+  // And in Combwork itself: cw-progress ends its command's tree by identity too (wrapper.ts endTree, #655).
   it('no process.kill on a pid (other than signal 0) and no taskkill, in tests, scripts or src', () => {
     const found: string[] = []
     for (const f of [...files('tests'), ...files('scripts'), ...files('src')]) {

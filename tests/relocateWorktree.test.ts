@@ -3,7 +3,7 @@
 //   no failure (a copy failing at apply time: nothing moved); git's move refused onto anything already there and checked
 //   where git lists it; cards and sessions following; a step failing after the move put back whole;
 // - the pool's rename operation: its destination reserved in the write that takes the slot and honoured by every write
-//   that makes a slot, so two different slots renamed at once (in two Hives), or a lend meanwhile, never share it; each
+//   that makes a slot, so two different slots renamed at once (in two Combworks), or a lend meanwhile, never share it; each
 //   step acts only on the worktree with the rename's identity (another arriving at the destination is never followed or
 //   moved); a live rename's intent left alone by another Combwork's pass; one cut
 //   short after git's move finished by the Combwork that takes its operation over, one cut short before it given up, and one
@@ -292,7 +292,7 @@ describe('free adopted slots renamed by the pass (#1441)', () => {
 })
 
 describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)', () => {
-  it('two different slots renamed at once in two Hives: different destinations, each where git lists it', async () => {
+  it('two different slots renamed at once in two Combworks: different destinations, each where git lists it', async () => {
     const n4 = await free('b4')
     const n5 = await free('b5')
     const gA = gate()
@@ -423,13 +423,13 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     const name = await free('b9')
     const r = realRenamer()
     let backFails = true
-    const hive = combworkPool(94001, { ...r, follow: async () => Promise.reject(new Error('the sessions could not follow (test)')), back: async (a, b, t) => (backFails ? false : r.back(a, b, t)) })
-    expect(await hive.rename(name)).toBeNull()
+    const app = combworkPool(94001,{ ...r, follow: async () => Promise.reject(new Error('the sessions could not follow (test)')), back: async (a, b, t) => (backFails ? false : r.back(a, b, t)) })
+    expect(await app.rename(name)).toBeNull()
     expect(intentOf(name)).not.toBeNull()
     expect(store.slot(name)?.op).not.toBeNull()
     // The next look (its own operation no longer running: taken over again) puts it back once it can.
     backFails = false
-    await hive.refresh()
+    await app.refresh()
     expect(store.slot(name)).toMatchObject({ state: 'ready', op: null })
     expect(await listed()).toContain(wt('hb9').toLowerCase())
     expect(await cwdOf('s-b9')).toBe(wt('hb9').toLowerCase())

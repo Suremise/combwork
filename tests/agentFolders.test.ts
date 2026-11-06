@@ -289,7 +289,7 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     // b1's card lease on slot-b, its card not started there yet: no line.
     expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-b'), target: null, line: null, carried: false })
     db.prepare("INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (12, 'Fix', '', 'p1', 'doing', 1, ?, 'test', ?)").run(at, at)
-    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'hive', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix' }))
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'combwork', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix' }))
     expect(leasedLine(db, 'p1', 'b1')?.line).toBe('cw/P1/P1-12-fix')
     // A carried lease too (its 0.9 worktree, adopted): the dispatch lease's still wins; another agent's carried one is its own.
     db.prepare("UPDATE slots SET target = 'main' WHERE name = 'slot-c'").run()
@@ -306,9 +306,9 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     db.prepare("UPDATE slots SET target = 'main' WHERE name = 'slot-b'").run()
     db.prepare("INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (12, 'Fix', '', 'p1', 'doing', 1, ?, 'test', ?)").run(at, at)
     // Started before 1.0's facts named a target: the slot's.
-    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'hive', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix' }))
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'combwork', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix' }))
     expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ line: 'cw/P1/P1-12-fix', target: 'main' })
-    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 2, 'Started', ?, 'hive', 'recorded', ?)").run(new Date(Date.parse(at) + 1000).toISOString(), JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix', target: '1.0.0' }))
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 2, 'Started', ?, 'combwork', 'recorded', ?)").run(new Date(Date.parse(at) + 1000).toISOString(), JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix', target: '1.0.0' }))
     expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ line: 'cw/P1/P1-12-fix', target: '1.0.0' })
   })
   /** A claim as claimPlace makes it, its facts read before the write (as `before` has them). */

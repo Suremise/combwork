@@ -139,7 +139,7 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
 
   it("a read's failure and a worker's end are logged as the user's text: Copy Diagnostics leaves the file's name out (HR3's round 1)", () => {
     const T = '2026-11-02T12:00:00.000Z [WARN] [noneBaseline]'
-    const lines = [`${T} Hive 1.0.0 starting (${MARKED_LOG})`, `${T} ${failedLine('D:\\Work\\notes', "ENOENT: no such file or directory, open 'D:\\Work\\notes\\private-salary-review.txt'")}`, `${T} ${endedLine("EACCES: permission denied, scandir 'D:\\Work\\notes\\medical'")}`]
+    const lines = [`${T} Combwork 1.1.0 starting (${MARKED_LOG})`, `${T} ${failedLine('D:\\Work\\notes', "ENOENT: no such file or directory, open 'D:\\Work\\notes\\private-salary-review.txt'")}`, `${T} ${endedLine("EACCES: permission denied, scandir 'D:\\Work\\notes\\medical'")}`]
     const out = redactLog(lines.join('\n'), { home: 'C:\\Users\\someone', folders: [], names: [] } satisfies RedactContext)
     expect(out).not.toMatch(/private-salary-review|medical|Work\\notes/)
     expect(out).toContain("the None baseline's worker ended")

@@ -18,7 +18,7 @@ const log = createLogger('journal')
 /**
  * The Assistant's journal (#989, #1031): a database of its own beside its home (`.combwork/assistant/journal.db`), apart
  * from the board's. Entries are small and typed (a one-line summary, optional detail and why, a project, an importance,
- * links to cards, commits, notes and other entries, tags), written by the Assistant (its tools) and by Hive (facts:
+ * links to cards, commits, notes and other entries, tags), written by the Assistant (its tools) and by Combwork (facts:
  * lanes, merges, an unexpected close). Recall gives one-line rows, at most a few, ranked; an entry's detail is read one
  * at a time. Long details are kept compressed (Brotli); the full-text index (FTS5, contentless: the text is only in
  * `entries`; not `detail=column`, with which a contentless table's bm25 is always nought) is kept by triggers, which read a compressed detail through `journal_text()`, a function each connection gets. Everyday

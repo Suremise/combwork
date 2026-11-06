@@ -31,8 +31,8 @@ function fixture(n: number): string {
     const commits = Array.from({ length: n - 2 }, (_, k) => {
       const msg = `commit ${k + 2}`
       const file = `${k + 2}\n`
-      const when = `<test@hive.invalid> ${t + k} +0000`
-      return ['commit refs/heads/1.0.0', `author Hive Test ${when}`, `committer Hive Test ${when}`, `data ${Buffer.byteLength(msg)}`, msg, ...(k === 0 ? [`from ${sh(repo, 'rev-parse', '1.0.0')}`] : []), 'M 100644 inline count.txt', `data ${Buffer.byteLength(file)}`, file].join('\n')
+      const when = `<test@example.invalid> ${t + k} +0000`
+      return ['commit refs/heads/1.0.0', `author Combwork Test ${when}`, `committer Combwork Test ${when}`, `data ${Buffer.byteLength(msg)}`, msg, ...(k === 0 ? [`from ${sh(repo, 'rev-parse', '1.0.0')}`] : []), 'M 100644 inline count.txt', `data ${Buffer.byteLength(file)}`, file].join('\n')
     })
     execFileSync('git', ['fast-import', '--quiet'], { cwd: repo, input: `${commits.join('\n')}\n`, stdio: ['pipe', 'pipe', 'pipe'] })
   }

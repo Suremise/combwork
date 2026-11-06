@@ -49,7 +49,7 @@ export interface WatchCondition {
 
 /** At most this many cards in one wait. */
 export const WATCH_MAX_CARDS = 20
-/** A bounded wait's longest (seconds): under Codex's tool timeout for hive (900 s), with room for the reply. */
+/** A bounded wait's longest (seconds): under Codex's tool timeout for combwork (900 s), with room for the reply. */
 export const WAIT_MAX_SECONDS = 840
 /** The longest an Agent API agents wait (`POST /v1/agents/wait`, cw_wait_for_agents) holds a call. */
 export const AGENT_WAIT_MAX_SECONDS = 600

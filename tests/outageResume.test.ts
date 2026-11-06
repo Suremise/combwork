@@ -371,7 +371,7 @@ describe('the reachability check (reachable)', () => {
 
   it('is false for a refused port, a host that does not resolve, and an address that is not http(s)', async () => {
     expect(await reachable(`http://127.0.0.1:${await closedPort()}/`)).toBe(false)
-    expect(await reachable('http://hive-outage-test.invalid/')).toBe(false)
+    expect(await reachable('http://outage-test.invalid/')).toBe(false)
     expect(await reachable('ftp://example.com/')).toBe(false)
     expect(await reachable('not a url')).toBe(false)
   })

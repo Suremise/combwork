@@ -31,7 +31,7 @@ const M = {
   projects: msg({ id: 'workspace.move.projects', defaultMessage: '{count, plural, one {The project {name} was moved to another folder.} other {# projects were moved to another folder.}}', description: 'The banner when projects moved.' }),
   pending: msg({ id: 'workspace.move.pending', defaultMessage: 'A worktree of {projects} was made again at a new folder, and not everything has followed it yet.', description: 'The banner when a worktree was made again elsewhere.' }),
   stillPoint: msg({ id: 'workspace.move.stillPoint', defaultMessage: "Agents' worktrees, sessions and conversations still point to the old folder.", description: 'The banner over a moved workspace or project, after what moved.' }),
-  cardsBanner: msg({ id: 'workspace.move.cardsBanner', defaultMessage: '{lines}, which was renamed or moved: the board still lists them under the old name.', description: 'The banner when cards are listed under a project\'s old name ({lines}: "9 cards of hive-website belong to website", several separated by ;).' }),
+  cardsBanner: msg({ id: 'workspace.move.cardsBanner', defaultMessage: '{lines}, which was renamed or moved: the board still lists them under the old name.', description: 'The banner when cards are listed under a project\'s old name ({lines}: "9 cards of demo-website belong to website", several separated by ;).' }),
   branchesBanner: msg({ id: 'workspace.move.branchesBanner', defaultMessage: "{count, plural, one {An agent's branch is still named after an old folder; Repair renames it.} other {# agents' branches are still named after an old folder; Repair renames them.}}", description: "The banner when agents' git branches are named after where the workspace or project was (cw/<workspace>/<project>/<agent>)." }),
   profileBanner: msg({ id: 'workspace.move.profileBanner', defaultMessage: "Some of Combwork's records of this workspace couldn't follow it from its old folder yet.", description: "The banner when the output Combwork keeps of the workspace's close command couldn't all be moved from its old folder's records after a move (HI-2007); Repair… tries again." }),
   repair: msg({ id: 'workspace.move.repairButton', defaultMessage: 'Repair…', description: 'The banner over a moved workspace: opens Repair.' }),
@@ -73,7 +73,7 @@ const rich = (m: Msg, values: Record<string, string | number>): React.ReactNode[
 
 /** What was saved under a project's old name (#508): "9 cards", "9 cards and 1 lane". */
 const savedUnder = (m: MoveCards): string => fmt.list([m.cards.length ? tr(M.cards, { count: m.cards.length }) : '', m.lanes ? tr(M.lanes, { count: m.lanes }) : '', m.watches ? tr(M.watches, { count: m.watches }) : ''].filter(Boolean))
-/** "9 cards of hive-website belong to website": what was left under a project's old name (#508). */
+/** "9 cards of demo-website belong to website": what was left under a project's old name (#508). */
 const cardsLine = (m: MoveCards): string => tr(M.cardsLine, { what: savedUnder(m), from: m.from, to: m.to, total: m.cards.length + (m.lanes ?? 0) + (m.watches ?? 0) })
 
 export function MovedBanner() {

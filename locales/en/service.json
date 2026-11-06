@@ -205,7 +205,7 @@
   },
   "service.combworkMove.phaseFailed": {
     "defaultMessage": "Combwork moved this workspace's .hive folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.",
-    "description": "An error opening a workspace (HI-2462): its .hive folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.hiveMove.what.*); {error} says why, a sentence. Keep .hive and .combwork as they are."
+    "description": "An error opening a workspace (HI-2462): its .hive folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.combworkMove.what.*); {error} says why, a sentence. Keep .hive and .combwork as they are."
   },
   "service.combworkVcs.cantList": {
     "defaultMessage": "Git couldn't list the files it tracks in .combwork.",
@@ -661,11 +661,11 @@
   },
   "service.keys.notice": {
     "defaultMessage": "Cards are named by their project’s key: {keys}. Change a key in Project Settings; the old one keeps working.",
-    "description": "A quiet notice once after the upgrade to Hive 1.0. {keys}: the projects' keys, joined (HI, AM and WE)."
+    "description": "A quiet notice once after the upgrade to 1.0. {keys}: the projects' keys, joined (HI, AM and WE)."
   },
   "service.keys.noticeTitle": {
     "defaultMessage": "Projects have keys now",
-    "description": "A quiet notice's title, once after the upgrade to Hive 1.0: each project now has a short key (letters such as HI or AM) its cards are named by (HI-12)."
+    "description": "A quiet notice's title, once after the upgrade to 1.0: each project now has a short key (letters such as HI or AM) its cards are named by (HI-12)."
   },
   "service.keys.prefix": {
     "defaultMessage": "{key} and another project’s key {other} begin alike: no key can be the start of another.",
@@ -877,11 +877,11 @@
   },
   "service.templates.v09": {
     "defaultMessage": "1.0 templates don’t pin agents to worktrees, so the Combwork templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.",
-    "description": "A quiet notice once after the upgrade to Hive 1.0: the {n} agent templates saved in 0.9 aren't used; a copy of each was put in the folder of the board's 0.9 backup. \"The Combwork templates\" are Combwork's own templates (the Templates view's Combwork group)."
+    "description": "A quiet notice once after the upgrade to 1.0: the {n} agent templates saved in 0.9 aren't used; a copy of each was put in the folder of the board's 0.9 backup. \"The Combwork templates\" are Combwork's own templates (the Templates view's Combwork group)."
   },
   "service.templates.v09Title": {
     "defaultMessage": "Your 0.9 agent templates aren’t used in 1.0",
-    "description": "A quiet notice's title, once after the upgrade to Hive 1.0: the agent templates saved in 0.9 aren't listed or loaded any more (a copy is kept)."
+    "description": "A quiet notice's title, once after the upgrade to 1.0: the agent templates saved in 0.9 aren't listed or loaded any more (a copy is kept)."
   },
   "service.transcripts.busy": {
     "defaultMessage": "This session is being archived or deleted. Try again in a moment.",
@@ -1065,7 +1065,7 @@
   },
   "service.workspace.stillOpening": {
     "defaultMessage": "{name} is still opening: wait for it to finish, then try again.",
-    "description": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0)."
+    "description": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to 1.0)."
   },
   "service.workspace.twoCalled": {
     "defaultMessage": "Two agents are called {name}",

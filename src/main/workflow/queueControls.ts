@@ -353,8 +353,8 @@ export async function branchQueueCard(ws: WorkspaceService, projectPath: string,
 }
 
 /**
- * The user merged a Hive-merges card's branch from the Merge dialog anyway (#1357, OP-13): an override on the card, its
- * reason given. The merge itself is observed as one done outside Hive (§16.4.4), which cancels its queue entry.
+ * The user merged a Combwork-merges card's branch from the Merge dialog anyway (#1357, OP-13): an override on the card, its
+ * reason given. The merge itself is observed as one done outside Combwork (§16.4.4), which cancels its queue entry.
  */
 export async function mergedOutsideQueue(ws: WorkspaceService, projectPath: string, n: number, reason: string): Promise<void> {
   const wf = await needWorkflow(ws, projectPath)

@@ -17,12 +17,12 @@ describe('chimes', () => {
 
 describe('finished notifications', () => {
   it('one alone reads as before', () => {
-    expect(finishedNotice([finish('hive', 'Claude')])).toEqual({ title: 'hive · Claude finished', body: 'Claude is done.' })
+    expect(finishedNotice([finish('alpha', 'Claude')])).toEqual({ title: 'alpha · Claude finished', body: 'Claude is done.' })
   })
 
   it('several in one project are named; across projects, counted per project', () => {
-    expect(finishedNotice([finish('hive', 'Claude'), finish('hive', 'Codex'), finish('hive', 'Agent 3')])).toEqual({ title: '3 agents finished in hive', body: 'Claude, Codex, Agent 3' })
-    expect(finishedNotice([finish('hive', 'Claude'), finish('web', 'One'), finish('hive', 'Codex')])).toEqual({ title: '3 agents finished', body: 'hive (2), web (1)' })
+    expect(finishedNotice([finish('alpha', 'Claude'), finish('alpha', 'Codex'), finish('alpha', 'Agent 3')])).toEqual({ title: '3 agents finished in alpha', body: 'Claude, Codex, Agent 3' })
+    expect(finishedNotice([finish('alpha', 'Claude'), finish('web', 'One'), finish('alpha', 'Codex')])).toEqual({ title: '3 agents finished', body: 'alpha (2), web (1)' })
   })
 
   describe('grouping', () => {
@@ -32,9 +32,9 @@ describe('finished notifications', () => {
     it('finishes within a few seconds of each other go together, once they stop coming', () => {
       const sent: Finish[][] = []
       const b = new FinishBatcher((items) => sent.push(items))
-      b.add(finish('hive', 'A'))
+      b.add(finish('alpha', 'A'))
       vi.advanceTimersByTime(FINISH_GROUP_MS - 500)
-      b.add(finish('hive', 'B'))
+      b.add(finish('alpha', 'B'))
       vi.advanceTimersByTime(FINISH_GROUP_MS - 500)
       expect(sent).toEqual([])
       vi.advanceTimersByTime(500)
@@ -49,7 +49,7 @@ describe('finished notifications', () => {
       const sent: Finish[][] = []
       const b = new FinishBatcher((items) => sent.push(items))
       for (let i = 0; i < 8; i++) {
-        b.add(finish('hive', `Agent ${i}`))
+        b.add(finish('alpha', `Agent ${i}`))
         vi.advanceTimersByTime(2000)
       }
       expect(sent.length).toBeGreaterThanOrEqual(1)

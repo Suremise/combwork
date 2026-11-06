@@ -109,7 +109,7 @@ describe('the events and fields each CLI is known to send', () => {
 describe("the console's flight mode", async () => {
   const { DevConsole, FLIGHT_MAX_SOURCES, FLIGHT_RING_EVENTS } = await import('../src/main/devConsole')
   const a = sessionSourceId('C:\\ws\\alpha', 'a1')
-  const hive = combworkSourceId('C:\\ws')
+  const own = combworkSourceId('C:\\ws')
   const ev = (n: number) => () => ({ kind: 'hook' as const, name: `Hook ${n}`, summary: `hook ${n}`, raw: { prompt: 'secret words', token: SECRET } })
 
   it('keeps the sources it is given whether watched or not, redacted, bounded, and nothing once off', () => {
@@ -118,8 +118,8 @@ describe("the console's flight mode", async () => {
     expect([c.capturing(a), c.flightEvents(a)]).toEqual([false, []])
     const kept: string[] = []
     c.setFlight((s) => s.startsWith('session:'), (e) => kept.push(e.name))
-    expect([c.capturing(a), c.capturing(hive)]).toEqual([true, false])
-    for (let i = 1; i <= FLIGHT_RING_EVENTS + 5; i++) c.capture([a, hive], ev(i))
+    expect([c.capturing(a), c.capturing(own)]).toEqual([true, false])
+    for (let i = 1; i <= FLIGHT_RING_EVENTS + 5; i++) c.capture([a, own], ev(i))
     const events = c.flightEvents(a)
     expect(events.length).toBe(FLIGHT_RING_EVENTS)
     expect(events.at(-1)!.name).toBe(`Hook ${FLIGHT_RING_EVENTS + 5}`)
@@ -127,7 +127,7 @@ describe("the console's flight mode", async () => {
     // Redacted as capture is: no text, no secret.
     expect(JSON.stringify(events)).not.toMatch(/secret words|sk-abc/)
     // The console's own rings and readers aren't touched: nobody watches.
-    expect([c.events(a), c.flightEvents(hive), c.stats().sources]).toEqual([[], [], 0])
+    expect([c.events(a), c.flightEvents(own), c.stats().sources]).toEqual([[], [], 0])
     // The least recently written sources go past the bound.
     for (let i = 0; i <= FLIGHT_MAX_SOURCES; i++) c.capture([sessionSourceId('C:\\ws\\p', `x${i}`)], ev(i))
     expect(c.stats().flightSources).toBe(FLIGHT_MAX_SOURCES)

@@ -273,7 +273,7 @@ describe("a run's bracket in the app (#1222)", () => {
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Settled', project: 'p' }, { kind: 'user' }))).number
     const link = { card, revision: head, testedCheckout: head, check: { name: 'typecheck', command: 'npm run typecheck' }, folder: p }
     bracketStarted('run-s1', (await bracketFor(w, link))!)
-    // As the finish route does: the record started, not waited for (hive-progress has exited meanwhile).
+    // As the finish route does: the record started, not waited for (cw-progress has exited meanwhile).
     const recorded = bracketFinished({ id: 'run-s1', finishedAt: Date.now(), state: 'passed', source: 'agent', agentId: 'a1', agentName: 'Agent 1', title: 'typecheck', command: 'npm run typecheck' } as never)
     expect(cardWork(w, card)!.checks).toEqual([])
     await checksSettled(w, join(ws, 'other'))

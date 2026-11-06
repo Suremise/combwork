@@ -86,7 +86,7 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
     attention = needYou > 0
     tray.setImage(icon(attention ? 'tray-attention' : 'tray'))
     const working = live.filter((s) => s.status === 'working' || s.status === 'background').length
-    // Hive's name and its workspaces, then (each a line) what its agents do and whether it waits to quit.
+    // Combwork's name and its workspaces, then (each a line) what its agents do and whether it waits to quit.
     tray.setToolTip(
       [
         `${appName(app.isPackaged)}${open.length ? ` — ${open.map((w) => basename(w.path!)).join(', ')}` : ''}`,

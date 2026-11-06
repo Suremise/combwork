@@ -1644,7 +1644,7 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
 
 /**
  * Moves an account to `index` in the one order of accounts (HI-2107, decision A: every CLI's, the CLI's own homes too;
- * Hive-wide). It never turns one on or off: what a new agent gets, and what an agent whose connection can't be used
+ * Combwork-wide). It never turns one on or off: what a new agent gets, and what an agent whose connection can't be used
  * here falls back to, is the first in the order that's on there, for new launches only.
  */
 export function moveConnection(id: string, index: number): void {

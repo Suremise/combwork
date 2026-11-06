@@ -45,7 +45,7 @@ export interface Turn {
   /** The CLI's id for it; null when its hooks name none (Copilot): Combwork then knows only the latest turn. */
   id: string | null
   state: TurnState
-  /** When its first hook reached Hive (ms, as it arrived, not as it was handled): records from before it are earlier turns'. */
+  /** When its first hook reached Combwork (ms, as it arrived, not as it was handled): records from before it are earlier turns'. */
   startedAt: number
   /**
    * When it last went on after it had stopped (ms, as the hook arrived): Combwork continuing its Stop, or a new tool call
@@ -174,7 +174,7 @@ function what(ev: HookEvent): string {
 /**
  * Takes a hook in: what the status rules should make of it. `combworkContinued`: Combwork answered this Stop with a
  * continuation. `woke`: the CLI's transcript says a background task of it just ended, so it may begin a turn by itself.
- * `now`: when the hook reached Hive (before it waited its turn in the launch's queue). Counts it (seq) and that the CLI
+ * `now`: when the hook reached Combwork (before it waited its turn in the launch's queue). Counts it (seq) and that the CLI
  * was heard.
  */
 export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { combworkContinued?: boolean; woke?: boolean; now?: number } = {}): Admitted {
@@ -337,7 +337,7 @@ export function reconciles(ledger: TurnLedger, turn: string, at?: number): boole
 
 /**
  * Whether the CLI's own records show a Stop of the running turn that Combwork never received, for CLIs whose records don't
- * name turns (Copilot): more of its Stops answered since the turn's first hook reached Hive (`stopEnds`, ms, as the CLI
+ * name turns (Copilot): more of its Stops answered since the turn's first hook reached Combwork (`stopEnds`, ms, as the CLI
  * recorded them) than Stops of the turn Combwork got. One answered before the turn began is an earlier turn's; each Stop
  * Combwork carried the turn on with is one of those it got, so a missed final one after continuations still counts.
  */

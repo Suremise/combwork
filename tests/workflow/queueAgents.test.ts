@@ -251,7 +251,7 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
   it('long names: what came back and the next step always whole, in the note and the wake line; what is left out is said', () => {
     const nested = (i: number) => `packages/feature-${i}/src/components/deeply/nested/folder/structure/Component${i}.test.tsx`.padEnd(92, 'x')
     const files = Array.from({ length: 8 }, (_, i) => nested(i))
-    const longPath = `C:\\Users\\someone\\AppData\\Local\\hive\\queue-logs\\${'very-long-folder-name\\'.repeat(16)}check.log`
+    const longPath = `C:\\Users\\someone\\AppData\\Local\\demo\\queue-logs\\${'very-long-folder-name\\'.repeat(16)}check.log`
     const longName = 'release/' + 'a-very-long-branch-name-'.repeat(8)
     const longCheck = 'npm run ' + 'check:'.repeat(30)
     const base = { entry: 'AM-1/e1', revision: 'a', transient: false } as const

@@ -584,7 +584,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
   })
 
   it("HI-1449: a question with no actions on a card in Passed that its agent doesn't merge, answered with a reply: the Assistant is told its agent can't move it on", async () => {
-    const { w, wt } = await workspace({ ...REVIEWED, finish: 'hiveMerges', target: 'main', folder: 'slots' })
+    const { w, wt } = await workspace({ ...REVIEWED, finish: 'combworkMerges', target: 'main', folder: 'slots' })
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     commitIn(wt, 'checks.txt')

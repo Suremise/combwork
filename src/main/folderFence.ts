@@ -32,7 +32,7 @@ export const inFolder = (path: string, folder: string): boolean => {
 }
 
 /**
- * Runs `fn` with `folder` fenced: no Hive-sent line is typed and no agent starts in it until `fn` settles. The fence is
+ * Runs `fn` with `folder` fenced: no Combwork-sent line is typed and no agent starts in it until `fn` settles. The fence is
  * up before `fn` starts, so a check `fn` makes first (an agent there busy?) can't be overtaken by a turn Combwork starts.
  */
 export async function changingFolder<T>(folder: string, what: string, fn: () => Promise<T>): Promise<T> {

@@ -604,7 +604,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
         </div>
       </div>
 
-      {/* Its hooks aren't reaching Hive (#1336): its status may be wrong; a restart with working hooks clears it. */}
+      {/* Its hooks aren't reaching Combwork (#1336): its status may be wrong; a restart with working hooks clears it. */}
       {live?.hooksMissing && (
         <div className="banner warn hooks-missing">
           <Icon name="warning" /> {hooksMissingNote(live, tr)}

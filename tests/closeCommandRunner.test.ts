@@ -143,7 +143,7 @@ describe('what Combwork reads of a run', () => {
 
 describe('what runs', () => {
   it('fills the placeholders as written; an unknown one, or one with no value, stays', () => {
-    expect(fillCloseCommand('replica run hive --workspace "{workspace}" --name {name} --why {reason} {other}', { workspace: 'D:\\My Work', name: 'My Work', reason: 'switch' })).toBe('replica run hive --workspace "D:\\My Work" --name My Work --why switch {other}')
+    expect(fillCloseCommand('replica run demo --workspace "{workspace}" --name {name} --why {reason} {other}', { workspace: 'D:\\My Work', name: 'My Work', reason: 'switch' })).toBe('replica run demo --workspace "D:\\My Work" --name My Work --why switch {other}')
     expect(fillCloseCommand('backup {workspace} {reason}', { reason: 'quit' })).toBe('backup {workspace} quit')
   })
 
@@ -244,7 +244,7 @@ describe('the runs kept', () => {
     const root = folder()
     const at = new Date(Date.UTC(2026, 9, 28, 12, 0, 0))
     const spawn = vi.fn(() => Object.assign(new EventEmitter(), { pid: 0, unref: () => undefined }) as never)
-    const deps = { exec: 'hive.exe', script: 'runner.js', env: {}, spawn }
+    const deps = { exec: 'combwork.exe', script: 'runner.js', env: {}, spawn }
     const one = startRun(root, runFolderName(runPrefix('workspace', A), at), 'backup one', 'D:/one/work', deps)
     const two = startRun(root, runFolderName(runPrefix('workspace', A), at), 'backup two', 'D:/one/work', deps)
     expect(one).not.toBe(two)

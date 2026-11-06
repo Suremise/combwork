@@ -164,7 +164,7 @@ describe('Codex: a source changing while it is copied', () => {
 
 describe('Claude Code: a source changing while it is copied', () => {
   const launch = (project: string, skills: { name: string; sourcePath: string }[]) =>
-    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
+    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
 
   for (const kind of ['bytes', 'entries', 'depth', 'vanish', 'unreadable'] as const) {
     it(`${kind}: not copied for the session (no partial copy), and why; a later skill is still delivered`, async () => {
@@ -227,7 +227,7 @@ describe('writes that take less than they are given', () => {
     mkdirSync(project, { recursive: true })
     const s = rich(root, 'rich')
     hooks.writes = 'short'
-    const out = (await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'rich', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)) as Record<string, Delivery>
+    const out = (await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'rich', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never)) as Record<string, Delivery>
     const copy = join(project, '.combwork', 'launch-a1', 'plugin', 'skills', 'rich')
     for (const f of ['SKILL.md', 'refs/data.bin']) same(s, copy, f)
     expect(out.rich).toEqual({ revision: await contentHash(s) })
@@ -262,7 +262,7 @@ describe('writes that take less than they are given', () => {
 
     const project = join(root, 'claude')
     mkdirSync(project, { recursive: true })
-    const claude = (await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'stuck', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)) as Record<string, Delivery>
+    const claude = (await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'stuck', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never)) as Record<string, Delivery>
     expect(claude.stuck).toEqual({ revision: null, problem: 'it could not be copied (EIO)' })
     expect(existsSync(join(project, '.combwork', 'launch-a1', 'plugin', 'skills', 'stuck'))).toBe(false)
   })
@@ -278,7 +278,7 @@ describe('a skill at the entry limit', () => {
   const launchCodex = (cwd: string, skills: { name: string; sourcePath: string }[]) =>
     codex.prepareLaunch({ projectPath: cwd, agentId: 'a1', runId: `limit${++n}`, cwd, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, executable: 'codex' } as never) as Promise<Record<string, Delivery>>
   const launchClaude = (project: string, skills: { name: string; sourcePath: string }[]) =>
-    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
+    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
 
   // At the file's lowered limit (LIMITS, above), not Combwork's 2000: the same boundary over a tenth of the file work, which
   // at 2000 passed even a 180 s bound under a loaded full run (#356, HI-2423, HI-2453). The test hashes the source only

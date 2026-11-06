@@ -1,5 +1,5 @@
 // Markdown documents by section (#817): a document's headings with their sizes, and one section's text, so an agent reads
-// the part of a long plan or note it needs. Node built-ins only (hive-mcp.js and the Agent API share it).
+// the part of a long plan or note it needs. Node built-ins only (cw-mcp.js and the Agent API share it).
 //
 // Headings are ATX headings (`#` to `######` at the start of a line, up to three spaces in), outside fenced code (``` or
 // ~~~) and outside front matter (a `---` block at the very top). A section runs from its heading to the next heading of

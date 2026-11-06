@@ -931,7 +931,7 @@ describe('writers at once (#1266 round 3)', () => {
       const own2 = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
       const left = own2.tx((tx) => tx.action(c, 'probeNotice', {}, null))
       own2.close()
-      store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET lease_owner = 'a-hive-that-ended', lease_until = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), left)
+      store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET lease_owner = 'a-combwork-that-ended', lease_until = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), left)
       await second.runActions(w)
       expect(ran).toBe(2)
       expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(left) as object) }).toEqual({ state: 'done', attempts: 1 })

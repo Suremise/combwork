@@ -342,7 +342,7 @@ export function handoverProject(text: string): string | null {
 
 /**
  * A project's handovers, newest first. Files are named <date>-<project>-<title>.md, so the project is
- * matched on the name. One project's name can begin another's ("hive" and "hive-website"), and two names can
+ * matched on the name. One project's name can begin another's ("demo" and "demo-website"), and two names can
  * make the same slug ("foo_bar" and "foo-bar"): where another project could own the file, the file's
  * "- **Project:**" header decides (read with `read`), by the project's exact name when two share a slug.
  * `strict` (before moving or deleting them): a file only counts when its header names this project exactly, or it
@@ -352,7 +352,7 @@ export async function projectHandovers<T extends NoteLike>(tree: T[], project: s
   const files = ((tree.find((n) => n.isDir && n.name === 'handovers')?.children ?? []) as T[]).filter((f) => !f.isDir && f.name.endsWith('.md') && f.name !== 'README.md')
   const p = project ? slug(project) : ''
   const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
-  // Other projects whose names overlap this one's ("hive" / "hive-website"), or make the same slug ("foo_bar" / "foo-bar").
+  // Other projects whose names overlap this one's ("demo" / "demo-website"), or make the same slug ("foo_bar" / "foo-bar").
   const others = p ? allProjects.filter((n) => !same(n, project!)) : []
   const twins = others.filter((n) => slug(n) === p)
   const overlapping = others.map(slug).filter((s) => s === p || s.startsWith(p + '-') || p.startsWith(s + '-'))
@@ -368,7 +368,7 @@ export async function projectHandovers<T extends NoteLike>(tree: T[], project: s
       mine.push(f)
       continue
     }
-    // "hive-website-plan" could be hive-website's "Plan", or hive's "Website plan": the header says which.
+    // "demo-website-plan" could be demo-website's "Plan", or demo's "Website plan": the header says which.
     try {
       const owner = handoverProject(await read(f.relPath))
       // Strictly, a header names its project exactly: a project that has gone ("foo-bar") may share this one's slug.

@@ -67,7 +67,7 @@ export async function askAssistant(ws: WorkspaceService, n: number, actor: TaskA
     if (!assistantCanAct(ws)) throw new AskRefused(409, say(REFUSED.cantAct))
   }, ws)
   const key = card.key ?? cardRef(n)
-  // An agent actor's name says its project ("HB6 (hive)").
+  // An agent actor's name says its project ("HB6 (demo)").
   const askerName = actor.name
   try {
     const r = await createDelivery(ws.assistantHome, {

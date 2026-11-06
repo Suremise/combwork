@@ -15,7 +15,7 @@ const line = (o: unknown): string => JSON.stringify(o)
 
 describe('encodeProjectPath', () => {
   it('matches Claude Code folder naming', () => {
-    expect(encodeProjectPath('d:\\Code\\workspace\\hive')).toBe('d--Code-workspace-hive')
+    expect(encodeProjectPath('d:\\Code\\workspace\\demo')).toBe('d--Code-workspace-demo')
     expect(encodeProjectPath('/home/me/my.project')).toBe('-home-me-my-project')
   })
 })
@@ -177,7 +177,7 @@ describe('MCP definitions', () => {
 
   it('strips description and expands CW_MCP_DIR (only: HI-2594)', () => {
     expect(toLaunchDef({ description: 'd', command: 'node', args: ['${CW_MCP_DIR}/srv/index.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['C:/ws/.combwork/mcp/srv/index.js'] })
-    expect(toLaunchDef({ command: 'node', args: ['${HIVE_MCP_DIR}/srv/index.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['${HIVE_MCP_DIR}/srv/index.js'] })
+    expect(toLaunchDef({ command: 'node', args: ['${OTHER_MCP_DIR}/srv/index.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['${OTHER_MCP_DIR}/srv/index.js'] })
   })
 })
 
@@ -464,7 +464,7 @@ describe('Claude Code hooks', () => {
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const ctx = {
       projectPath: 'C:\\ws\\p', agentId: 'a-1', executable: 'C:\\bin\\claude.exe', cwd: 'C:\\ws\\p', workspacePath: 'C:\\ws', runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: false, name: '', skills: [], mcpServers: {}, model: 'opus[1m]', effort: null, permissionMode: null, extraArgs: [], hookUrl: '', hookAuthFile: '', privateDir: 'C:/hive/launches/r', guidance: '', env: { A: '1' }, allowBackgroundSessions: true, use200kContext: false
+      resume: false, name: '', skills: [], mcpServers: {}, model: 'opus[1m]', effort: null, permissionMode: null, extraArgs: [], hookUrl: '', hookAuthFile: '', privateDir: 'C:/demo/launches/r', guidance: '', env: { A: '1' }, allowBackgroundSessions: true, use200kContext: false
     }
     const full = claudeCode.buildCommand(ctx.executable, ctx)
     expect(full.args).toContain('opus[1m]')
@@ -478,7 +478,7 @@ describe('Claude Code hooks', () => {
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const ctx = {
       projectPath: 'C:\\ws\\.combwork\\assistant', agentId: 'assistant', executable: 'C:\\bin\\claude.exe', cliVersion: '2.1.292', cwd: 'C:\\ws', workspacePath: 'C:\\ws', runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: true, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [] as string[], hookUrl: '', hookAuthFile: '', privateDir: 'C:/hive/launches/r', guidance: '', instructions: 'You are in Planner mode.', env: {}, allowBackgroundSessions: true, use200kContext: false
+      resume: true, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [] as string[], hookUrl: '', hookAuthFile: '', privateDir: 'C:/demo/launches/r', guidance: '', instructions: 'You are in Planner mode.', env: {}, allowBackgroundSessions: true, use200kContext: false
     }
     const snapshot = (c: typeof ctx): string | null => {
       const args = claudeCode.buildCommand(c.executable, c).args
@@ -502,11 +502,11 @@ describe('Claude Code hooks', () => {
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const ctx = {
       projectPath: 'C:\\ws\\p', agentId: 'a-1', executable: 'C:\\bin\\claude.exe', cwd: 'C:\\ws\\p', workspacePath: 'C:\\ws', runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--allowedTools', 'mcp__hive', 'Bash'], hookUrl: '', hookAuthFile: '', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false,
+      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--allowedTools', 'mcp__demo', 'Bash'], hookUrl: '', hookAuthFile: '', privateDir: 'C:/demo/launches/r', guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false,
       initialPrompt: 'Work on card #12'
     }
     // Claude Code 2.1.296 reads a plain argument after "--allowedTools a b" as another tool rule; after "--" it is the task.
-    expect(claudeCode.buildCommand(ctx.executable, ctx).args.slice(-5)).toEqual(['--allowedTools', 'mcp__hive', 'Bash', '--', 'Work on card #12'])
+    expect(claudeCode.buildCommand(ctx.executable, ctx).args.slice(-5)).toEqual(['--allowedTools', 'mcp__demo', 'Bash', '--', 'Work on card #12'])
     expect(claudeCode.buildCommand(ctx.executable, { ...ctx, resume: true }).args.slice(-2)).toEqual(['--', 'Work on card #12'])
     // The user's "--settings" Combwork takes out is not where the task goes.
     expect(claudeCode.buildCommand(ctx.executable, { ...ctx, extraArgs: ['--settings', '{}'] }).args.slice(-2)).toEqual(['--', 'Work on card #12'])
@@ -711,7 +711,7 @@ describe('agents', () => {
 
   it('places the worktrees folder next to the workspace', async () => {
     const { worktreesRoot } = await import('../src/main/worktrees')
-    expect(worktreesRoot('D:\\Dev\\HIVE')).toBe(join('D:\\Dev', 'HIVE.worktrees'))
+    expect(worktreesRoot('D:\\Dev\\DEMO')).toBe(join('D:\\Dev', 'DEMO.worktrees'))
   })
 })
 
@@ -750,10 +750,10 @@ describe('resumeRecord', () => {
 describe('sessionLabel', () => {
   it("uses Claude Code's title while the name is still automatic", async () => {
     const { sessionLabel } = await import('../src/shared/defaults')
-    expect(sessionLabel({ id: 'abc12345x', name: 'hive · 29/09/2026, 10:00:00', title: 'Fix the tray' }, 'hive')).toBe('Fix the tray')
-    expect(sessionLabel({ id: 'abc12345x', name: 'hive · Agent 2 · 9/29/2026, 10:00 AM', title: 'Docs' }, 'hive')).toBe('Docs')
-    expect(sessionLabel({ id: 'abc12345x', name: 'My refactor', title: 'Fix the tray' }, 'hive')).toBe('My refactor')
-    expect(sessionLabel({ id: 'abc12345x' }, 'hive')).toBe('Session abc12345')
+    expect(sessionLabel({ id: 'abc12345x', name: 'demo · 29/09/2026, 10:00:00', title: 'Fix the tray' }, 'demo')).toBe('Fix the tray')
+    expect(sessionLabel({ id: 'abc12345x', name: 'demo · Agent 2 · 9/29/2026, 10:00 AM', title: 'Docs' }, 'demo')).toBe('Docs')
+    expect(sessionLabel({ id: 'abc12345x', name: 'My refactor', title: 'Fix the tray' }, 'demo')).toBe('My refactor')
+    expect(sessionLabel({ id: 'abc12345x' }, 'demo')).toBe('Session abc12345')
   })
 
   it('shows when it started, not the project and agent, until it has a name or title', async () => {
@@ -761,17 +761,17 @@ describe('sessionLabel', () => {
     const { setDateStyle } = await import('../src/shared/dates')
     const today = new Date(2026, 9, 2, 14, 5).toISOString()
     const earlier = new Date(2026, 8, 29, 9, 30).toISOString()
-    const auto = 'hive · Claudette · 02/10/2026, 14:05:00'
+    const auto = 'demo · Claudette · 02/10/2026, 14:05:00'
     // Combwork passes its automatic name to Claude Code (--name), which keeps it as the session's title.
-    expect(sessionLabel({ id: 'abc12345x', name: auto, title: auto, customTitle: auto, startedAt: today }, 'hive')).toBe('2026-10-02 14:05')
-    expect(sessionLabel({ id: 'abc12345x', name: auto, title: null, createdAt: earlier }, 'hive')).toBe('2026-09-29 09:30')
-    expect(sessionLabel({ id: 'abc12345x', name: auto, usage: { firstActivity: earlier } }, 'hive')).toBe('2026-09-29 09:30')
-    expect(sessionLabel({ id: 'abc12345x', name: auto, startedAt: 'not a date' }, 'hive')).toBe('Session abc12345')
+    expect(sessionLabel({ id: 'abc12345x', name: auto, title: auto, customTitle: auto, startedAt: today }, 'demo')).toBe('2026-10-02 14:05')
+    expect(sessionLabel({ id: 'abc12345x', name: auto, title: null, createdAt: earlier }, 'demo')).toBe('2026-09-29 09:30')
+    expect(sessionLabel({ id: 'abc12345x', name: auto, usage: { firstActivity: earlier } }, 'demo')).toBe('2026-09-29 09:30')
+    expect(sessionLabel({ id: 'abc12345x', name: auto, startedAt: 'not a date' }, 'demo')).toBe('Session abc12345')
     // In the user's format; a name they gave stays as it is.
     setDateStyle({ date: 'dmy', time: '12h' })
     try {
-      expect(sessionLabel({ id: 'abc12345x', name: auto, startedAt: today }, 'hive')).toBe('02/10/2026 2:05 PM')
-      expect(sessionLabel({ id: 'abc12345x', name: '2026-10-02 14:05', startedAt: today }, 'hive')).toBe('2026-10-02 14:05')
+      expect(sessionLabel({ id: 'abc12345x', name: auto, startedAt: today }, 'demo')).toBe('02/10/2026 2:05 PM')
+      expect(sessionLabel({ id: 'abc12345x', name: '2026-10-02 14:05', startedAt: today }, 'demo')).toBe('2026-10-02 14:05')
     } finally {
       setDateStyle(undefined)
     }
@@ -779,24 +779,24 @@ describe('sessionLabel', () => {
 
   it('the latest rename wins, in Combwork or with /rename', async () => {
     const { sessionLabel, cliRename } = await import('../src/shared/defaults')
-    const auto = 'hive · Claudette · 02/10/2026, 14:05:00'
+    const auto = 'demo · Claudette · 02/10/2026, 14:05:00'
     // /rename on a session Combwork named automatically.
-    expect(sessionLabel({ id: 'a', name: auto, title: 'Tray fix', customTitle: 'Tray fix' }, 'hive')).toBe('Tray fix')
+    expect(sessionLabel({ id: 'a', name: auto, title: 'Tray fix', customTitle: 'Tray fix' }, 'demo')).toBe('Tray fix')
     // Renamed in Combwork while running: Claude Code still has Combwork's automatic name, which is no rename.
-    expect(sessionLabel({ id: 'a', name: 'Docs pass', customTitle: auto, titleAtRename: auto }, 'hive')).toBe('Docs pass')
+    expect(sessionLabel({ id: 'a', name: 'Docs pass', customTitle: auto, titleAtRename: auto }, 'demo')).toBe('Docs pass')
     // Then /rename: Claude Code's name changed since Combwork's rename, so it is the newer one.
-    expect(sessionLabel({ id: 'a', name: 'Docs pass', customTitle: 'Guide only', titleAtRename: auto }, 'hive')).toBe('Guide only')
-    expect(cliRename({ id: 'a', name: 'Docs pass', customTitle: 'Guide only', titleAtRename: auto }, 'hive')).toBe('Guide only')
+    expect(sessionLabel({ id: 'a', name: 'Docs pass', customTitle: 'Guide only', titleAtRename: auto }, 'demo')).toBe('Guide only')
+    expect(cliRename({ id: 'a', name: 'Docs pass', customTitle: 'Guide only', titleAtRename: auto }, 'demo')).toBe('Guide only')
     // Renamed in Combwork again: Claude Code's name is the one it had then, so Combwork's wins.
-    expect(sessionLabel({ id: 'a', name: 'Final docs', customTitle: 'Guide only', titleAtRename: 'Guide only' }, 'hive')).toBe('Final docs')
+    expect(sessionLabel({ id: 'a', name: 'Final docs', customTitle: 'Guide only', titleAtRename: 'Guide only' }, 'demo')).toBe('Final docs')
     // Resumed with --name: Claude Code's name is Combwork's.
-    expect(sessionLabel({ id: 'a', name: 'Final docs', customTitle: 'Final docs', titleAtRename: 'Guide only' }, 'hive')).toBe('Final docs')
+    expect(sessionLabel({ id: 'a', name: 'Final docs', customTitle: 'Final docs', titleAtRename: 'Guide only' }, 'demo')).toBe('Final docs')
     // Claude Code's name from a list item's usage.
-    expect(sessionLabel({ id: 'a', name: 'Docs pass', titleAtRename: null, usage: { customTitle: 'Guide only' } }, 'hive')).toBe('Guide only')
+    expect(sessionLabel({ id: 'a', name: 'Docs pass', titleAtRename: null, usage: { customTitle: 'Guide only' } }, 'demo')).toBe('Guide only')
     // Renamed in Combwork by an earlier version (no titleAtRename), or Claude Code's name not known: Combwork's stands.
-    expect(sessionLabel({ id: 'a', name: 'Docs pass', customTitle: 'Guide only' }, 'hive')).toBe('Docs pass')
-    expect(sessionLabel({ id: 'a', name: 'Docs pass', titleAtRename: auto }, 'hive')).toBe('Docs pass')
-    expect(cliRename({ id: 'a', name: 'Docs pass', customTitle: auto, titleAtRename: null }, 'hive')).toBeNull()
+    expect(sessionLabel({ id: 'a', name: 'Docs pass', customTitle: 'Guide only' }, 'demo')).toBe('Docs pass')
+    expect(sessionLabel({ id: 'a', name: 'Docs pass', titleAtRename: auto }, 'demo')).toBe('Docs pass')
+    expect(cliRename({ id: 'a', name: 'Docs pass', customTitle: auto, titleAtRename: null }, 'demo')).toBeNull()
   })
 })
 
@@ -917,7 +917,7 @@ describe('writeJsonAtomic and withFileLock', () => {
   })
 
   it('carries on after a failed change', async () => {
-    const file = join(tempRoot(), 'hive-lock-fail.json')
+    const file = join(tempRoot(), 'demo-lock-fail.json')
     await expect(withFileLock(file, async () => Promise.reject(new Error('boom')))).rejects.toThrow('boom')
     await expect(withFileLock(file, async () => 'next')).resolves.toBe('next')
   })

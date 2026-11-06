@@ -181,12 +181,12 @@ describe('Copilot launch', () => {
   it("turns off the user's and the project's own MCP servers, never the workspace's", () => {
     const ctx = context()
     mkdirSync(join(ctx.cwd, '.github'), { recursive: true })
-    writeFileSync(join(ctx.cwd, '.mcp.json'), JSON.stringify({ mcpServers: { theirs: { command: 'x' }, hive: { command: 'y' } } }))
+    writeFileSync(join(ctx.cwd, '.mcp.json'), JSON.stringify({ mcpServers: { theirs: { command: 'x' }, acme: { command: 'y' } } }))
     writeFileSync(join(ctx.cwd, '.github', 'mcp.json'), '// VS Code format, with a comment\n{ "servers": { "gh-only": { "url": "https://x" } } }')
     const { args } = copilot.buildCommand('x.exe', ctx)
     const off = args.flatMap((a, i) => (a === '--disable-mcp-server' ? [args[i + 1]] : []))
-    // The project's own hive (Combwork's server's name before HI-2463) is theirs now, off with the others.
-    expect(off.sort()).toEqual(['gh-only', 'hive', 'theirs'])
+    // Every server of the project's own, whatever its name, is off with the others.
+    expect(off.sort()).toEqual(['acme', 'gh-only', 'theirs'])
   })
 
   it('writes the plugin (hooks with the token), the MCP config and the instructions in the launch’s private folder', async () => {

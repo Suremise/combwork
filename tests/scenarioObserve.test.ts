@@ -1700,7 +1700,7 @@ describe('the fixtures fail when nothing was done', () => {
     const agent = 'a'.repeat(40) + '0123456789abcdef0123'
     const ws = 'f'.repeat(64)
     const known = [{ kind: 'workspace', token: ws }, { kind: 'agent', token: agent }]
-    // The trial's Bash call: `env | grep -i cw`, the token far into its result.
+    // The trial's Bash call: `env | grep -i cw_`, the token far into its result.
     const hook = '9'.repeat(24) + 'abcdef'.repeat(4)
     const env = `${'x'.repeat(500)}\nCW_HOOK_TOKEN=${hook}\nCW_API_URL=http://127.0.0.1:47822\nCW_API_TOKEN=${agent}\nCW_RUN_ID=afec06a7b1c2d3e4f5a6b7c8\nCW_API_TOKEN_FILE=C:\\t.json\n`
     const seen = tokenSightings(known, { tools: [{ name: 'Skill', result: 'Launching skill' }, { name: 'Bash', result: env }], scripts: [{ name: 'Script', result: `got ${ws}` }], replies: ['done', `the token is ${agent} and ${ws}`] })

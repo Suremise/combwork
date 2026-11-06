@@ -1,5 +1,5 @@
 // A command's launcher (#1360; shared with cw-progress's isolated checks, #1435): a process that is put in a job on
-// Combwork's process supervisor, and recorded, before the command it runs exists. Node built-ins only: hive-progress runs
+// Combwork's process supervisor, and recorded, before the command it runs exists. Node built-ins only: cw-progress runs
 // outside the asar and may only require these and out/main/chunks.
 
 import { spawn, type ChildProcess } from 'child_process'

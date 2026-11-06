@@ -20,8 +20,8 @@ const HUNG_MS = 15_000
 const NONCE = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const NOW = Date.parse('2026-10-26T12:00:00.000Z')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
-const target = (o: Partial<RequestTarget> = {}): RequestTarget => ({ pid: 4242, startedAt: NOW - 3_600_000, exe: 'C:\\Programs\\Hive\\Hive.exe', now: NOW, seen: new Set(), ...o })
-const request = (o: Record<string, unknown> = {}): string => JSON.stringify({ v: 1, nonce: NONCE, pid: 4242, pidCreated: new Date(NOW - 3_600_000 + 800).toISOString(), exe: 'C:\\Programs\\Hive\\Hive.exe', reason: 'install', at: new Date(NOW - 2000).toISOString(), ...o })
+const target = (o: Partial<RequestTarget> = {}): RequestTarget => ({ pid: 4242, startedAt: NOW - 3_600_000, exe: 'C:\\Programs\\Combwork\\Combwork.exe', now: NOW, seen: new Set(), ...o })
+const request = (o: Record<string, unknown> = {}): string => JSON.stringify({ v: 1, nonce: NONCE, pid: 4242, pidCreated: new Date(NOW - 3_600_000 + 800).toISOString(), exe: 'C:\\Programs\\Combwork\\Combwork.exe', reason: 'install', at: new Date(NOW - 2000).toISOString(), ...o })
 
 describe("the installer's request to close (checkRequest)", () => {
   it('is taken when it names this process, its start, this copy, and is fresh', () => {
@@ -36,7 +36,7 @@ describe("the installer's request to close (checkRequest)", () => {
     ['another reason', request({ reason: 'update' }), /malformed/],
     ['for another process', request({ pid: 999 }), /another process/],
     ['for an earlier process with the same id', request({ pidCreated: new Date(NOW - 9_000_000).toISOString() }), /earlier process/],
-    ['for another copy of Combwork', request({ exe: 'C:\\Other\\Hive.exe' }), /another copy/],
+    ['for another copy of Combwork', request({ exe: 'C:\\Other\\Combwork.exe' }), /another copy/],
     ['stale', request({ at: new Date(NOW - 120_000).toISOString() }), /stale/]
   ])('is refused when %s', (_what, text, why) => {
     const r = checkRequest(text, target(), same)

@@ -1,5 +1,5 @@
 // Runs as checks (#1222, SPEC §16.13): a progress run that names a card (and, on Git, what was checked out) brackets its
-// command: what Combwork reads when it starts (before hive-progress runs the command) and when it finishes. Its end writes
+// command: what Combwork reads when it starts (before cw-progress runs the command) and when it finishes. Its end writes
 // `CheckRan` in the card's facts, counted only if every rule holds, else with why not:
 // - it was started as a check (`--check`) and reported the command configured for it when it was resolved, or its
 //   command is exactly a configured one (`notCheck`);
@@ -44,7 +44,7 @@ export interface CheckRunFor {
   /** The card's project's folder (its repository, for ancestry). */
   project: string
   platform: PlatformId
-  /** Git: what was checked out when it started, read by Hive (runLink), and the revision it names (the same). */
+  /** Git: what was checked out when it started, read by Combwork (runLink), and the revision it names (the same). */
   tested: string | null
   /** The check it was started as (`--check`), or null. */
   check: string | null
@@ -323,7 +323,7 @@ export function bracketFinished(run: ProgressRun): Promise<Recorded | null> {
 async function record(run: ProgressRun, b: Bracket): Promise<Recorded | null> {
   if (run.finishedAt === null || (run.state !== 'passed' && run.state !== 'failed' && run.state !== 'stopped')) return null
   if (b.ws.path !== b.workspacePath || !cardOf(b)) return null
-  // Its command as its reporter said (hive-progress: the check's command, or its command line); None's declared paths
+  // Its command as its reporter said (cw-progress: the check's command, or its command line); None's declared paths
   // as they are now: a list changed during the run is a new revision.
   const endPaths = b.for.platform === 'none' ? declaredPaths(b.ws, b.project, b.for.card) : undefined
   const ended = await checkEnd({ ...b.for, command: run.command }, b.start, { at: run.finishedAt, result: run.state, run: run.id, by: run.agentName, title: run.title, endPaths })
@@ -346,7 +346,7 @@ async function record(run: ProgressRun, b: Bracket): Promise<Recorded | null> {
   return { ...data, platform: b.for.platform, ...(gate ? { blocks: gate } : {}) }
 }
 
-/** Brackets read at resolve (before hive-progress starts the command), by the link it gave out, until their start. */
+/** Brackets read at resolve (before cw-progress starts the command), by the link it gave out, until their start. */
 const resolved = new Map<string, { b: Bracket; at: number }>()
 
 /** A bracket read when resolve gave out `linkId`: its start takes it (`takeResolved`) within LINK_TTL_MS. */

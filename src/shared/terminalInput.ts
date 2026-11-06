@@ -31,7 +31,7 @@ export function copyPasteKey(e: { key: string; ctrlKey: boolean; metaKey: boolea
 
 /**
  * Whether a key pressed in an agent's pane (`key`, as shortcuts write it: "Ctrl+Shift+P") is one of Combwork's shortcuts
- * rather than the CLI's: one bound in Hive (`bound`) that the CLI doesn't use itself (`reserved`). With every key going
+ * rather than the CLI's: one bound in Combwork (`bound`) that the CLI doesn't use itself (`reserved`). With every key going
  * to the CLI (#1292, Settings → Advanced: All keys go to the CLI), only the command palette's shortcut (`palette`)
  * stays Combwork's, so every command is still in reach: a two-step one ("Ctrl+K Ctrl+P") by its first key, which starts
  * Combwork's chord, then its second while that chord is pending (`pending`: its first key); any other key goes to the CLI.

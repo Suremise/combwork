@@ -1347,7 +1347,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
       </Tooltip>
       {!narrow && <PlaceMark project={project} a={a} />}
       {live?.hooksMissing ? (
-        // Its hooks aren't reaching Hive (#1336): its status may be wrong, so it says unknown; the project's banner over
+        // Its hooks aren't reaching Combwork (#1336): its status may be wrong, so it says unknown; the project's banner over
         // the panes has the whole note and Restart session for the focused agent.
         <Tooltip content={hooksMissingNote(live, tr)}>
           <span className="faint pane-status asks hooks-missing">{hooksMissingText(live, tr)}</span>

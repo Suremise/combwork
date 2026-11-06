@@ -6,14 +6,14 @@ import { slotCopyOf } from '../src/shared/slotDefaults'
 import { SLOT_COPY_DEFAULT } from '../src/shared/defaults'
 
 describe("a project's copied files and where they come from (slotCopyOf)", () => {
-  const levels = { global: { copy: 'hive.env' }, workspace: { copy: 'ws.env' } }
+  const levels = { global: { copy: 'global.env' }, workspace: { copy: 'ws.env' } }
 
   it('takes the nearest level that sets it: the project, its workspace, Combwork, then the default', () => {
     expect(slotCopyOf({ slots: { copy: 'p.env' }, worktreeCopy: 'old.env' }, levels)).toEqual({ value: 'p.env', origin: 'project' })
     // The project's own from before 1.0, after slots.copy.
     expect(slotCopyOf({ slots: {}, worktreeCopy: 'old.env' }, levels)).toEqual({ value: 'old.env', origin: 'project' })
     expect(slotCopyOf({ worktreeCopy: null }, levels)).toEqual({ value: 'ws.env', origin: 'workspace' })
-    expect(slotCopyOf({ worktreeCopy: null }, { global: levels.global })).toEqual({ value: 'hive.env', origin: 'global' })
+    expect(slotCopyOf({ worktreeCopy: null }, { global: levels.global })).toEqual({ value: 'global.env', origin: 'global' })
     expect(slotCopyOf({ worktreeCopy: null }, {})).toEqual({ value: SLOT_COPY_DEFAULT, origin: 'default' })
     expect(SLOT_COPY_DEFAULT).toBe('.env*')
   })
@@ -26,7 +26,7 @@ describe("a project's copied files and where they come from (slotCopyOf)", () =>
   })
 
   it("a level's own form (no project) inherits from the levels above it", () => {
-    expect(slotCopyOf(null, { global: { copy: 'hive.env' } })).toEqual({ value: 'hive.env', origin: 'global' })
+    expect(slotCopyOf(null, { global: { copy: 'global.env' } })).toEqual({ value: 'global.env', origin: 'global' })
     expect(slotCopyOf(null, { global: null, workspace: null })).toEqual({ value: SLOT_COPY_DEFAULT, origin: 'default' })
   })
 })

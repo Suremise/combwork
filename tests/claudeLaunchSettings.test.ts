@@ -9,9 +9,9 @@ import { tempDir } from './tempDir'
 const base = tempDir('cw-launch-settings-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
-const hive = () => ({
-  hooks: { Stop: [{ hooks: [{ type: 'http', url: 'hive-stop' }] }], SessionStart: [{ hooks: [{ type: 'command', command: 'hive-start' }] }] },
-  statusLine: { type: 'command', command: 'hive-status', padding: 0 }
+const ours = () => ({
+  hooks: { Stop: [{ hooks: [{ type: 'http', url: 'cw-stop' }] }], SessionStart: [{ hooks: [{ type: 'command', command: 'cw-start' }] }] },
+  statusLine: { type: 'command', command: 'cw-status', padding: 0 }
 })
 const NEEDS = { url: 'http://127.0.0.1:9/hook?run=r', envVar: 'CW_HOOK_TOKEN' }
 
@@ -79,13 +79,13 @@ describe("a --settings in a Claude Code agent's arguments (#330)", () => {
 
   it("adds what Combwork's hooks need to the user's HTTP hook allowlists, which Claude Code takes whole from this file", () => {
     // Restrictive lists: Combwork's URL and token variable added, the user's entries kept.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: ['https://hooks.example/*'], httpHookAllowedEnvVars: ['MY_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: ['https://hooks.example/*', NEEDS.url], httpHookAllowedEnvVars: ['MY_TOKEN', 'CW_HOOK_TOKEN'] })
+    expect(mergeLaunchSettings(ours(), { allowedHttpHookUrls: ['https://hooks.example/*'], httpHookAllowedEnvVars: ['MY_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: ['https://hooks.example/*', NEEDS.url], httpHookAllowedEnvVars: ['MY_TOKEN', 'CW_HOOK_TOKEN'] })
     // Empty lists (nothing allowed): only Combwork's.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: [], httpHookAllowedEnvVars: [] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
+    expect(mergeLaunchSettings(ours(), { allowedHttpHookUrls: [], httpHookAllowedEnvVars: [] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
     // Already allowed: unchanged, not repeated.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
+    expect(mergeLaunchSettings(ours(), { allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
     // Not set: not added (unset allows every URL and variable; setting one would block the user's other HTTP hooks).
-    const merged = mergeLaunchSettings(hive(), { env: {} }, NEEDS)
+    const merged = mergeLaunchSettings(ours(), { env: {} }, NEEDS)
     expect('allowedHttpHookUrls' in merged || 'httpHookAllowedEnvVars' in merged).toBe(false)
   })
 
@@ -96,19 +96,19 @@ describe("a --settings in a Claude Code agent's arguments (#330)", () => {
       statusLine: { type: 'command', command: 'theirs-status' },
       hooks: { Stop: [{ hooks: [{ type: 'command', command: 'theirs-stop' }] }], PostToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'theirs-post' }] }], Bad: 'x' }
     }
-    expect(mergeLaunchSettings(hive(), theirs, NEEDS)).toEqual({
+    expect(mergeLaunchSettings(ours(), theirs, NEEDS)).toEqual({
       env: { B: '2' },
       autoCompactWindow: 250000,
-      statusLine: hive().statusLine,
+      statusLine: ours().statusLine,
       hooks: {
-        Stop: [...hive().hooks.Stop, ...theirs.hooks.Stop],
-        SessionStart: hive().hooks.SessionStart,
+        Stop: [...ours().hooks.Stop, ...theirs.hooks.Stop],
+        SessionStart: ours().hooks.SessionStart,
         PostToolUse: theirs.hooks.PostToolUse
       }
     })
     // Hooks that aren't an object, or none: Combwork's own.
-    expect(mergeLaunchSettings(hive(), { hooks: [1] }, NEEDS).hooks).toEqual(hive().hooks)
-    expect(mergeLaunchSettings(hive(), null, NEEDS)).toEqual(hive())
+    expect(mergeLaunchSettings(ours(), { hooks: [1] }, NEEDS).hooks).toEqual(ours().hooks)
+    expect(mergeLaunchSettings(ours(), null, NEEDS)).toEqual(ours())
   })
 
   it('a launch passes one --settings, Combwork\'s file, holding Combwork\'s hooks and status line with the user\'s settings', async () => {
@@ -117,7 +117,7 @@ describe("a --settings in a Claude Code agent's arguments (#330)", () => {
     writeFileSync(join(base, 'mine.json'), JSON.stringify({ env: { B: '2' }, autoCompactWindow: 250000 }))
     const ctx = {
       projectPath: project, agentId: 'a1', executable: 'C:\\bin\\claude.exe', cwd: base, workspacePath: base, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--verbose', '--settings', 'mine.json'], hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: join(base, 'private-r'), guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false
+      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--verbose', '--settings', 'mine.json'], hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: join(base, 'private-r'), guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false
     }
     await claudeCode.prepareLaunch(ctx as never)
     const cmd = claudeCode.buildCommand(ctx.executable, ctx as never)

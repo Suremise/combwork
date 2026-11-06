@@ -22,7 +22,7 @@ export const B3 = agentActor('B3')
 export const R1 = agentActor('R1')
 export const R2 = agentActor('R2')
 
-const ID = ['-c', 'user.name=Combwork Test', '-c', 'user.email=test@hive.invalid']
+const ID = ['-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid']
 
 /**
  * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
@@ -59,8 +59,8 @@ export function commit(cwd: string, files: Record<string, string>, message: stri
 export function freshGitRepo(dir: string): string {
   mkdirSync(dir, { recursive: true })
   execFileSync('git', ['init', '-q', '-b', 'main', dir])
-  sh(dir, 'config', 'user.name', 'Hive Test')
-  sh(dir, 'config', 'user.email', 'test@hive.invalid')
+  sh(dir, 'config', 'user.name', 'Combwork Test')
+  sh(dir, 'config', 'user.email', 'test@example.invalid')
   sh(dir, 'config', 'core.autocrlf', 'false')
   commit(dir, { 'README.md': 'hello\n', 'src/a.txt': 'one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n' }, 'initial')
   return dir

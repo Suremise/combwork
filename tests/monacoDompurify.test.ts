@@ -15,7 +15,7 @@ const root = resolve(__dirname, '..')
 const monacoEsm = join(root, 'node_modules', 'monaco-editor', 'esm', 'vs', 'base', 'browser')
 const sanitize = join(monacoEsm, 'domSanitize.js')
 const monacosCopy = join(monacoEsm, 'dompurify', 'dompurify.js')
-const hives = join(root, 'node_modules', 'dompurify', 'dist', 'purify.es.mjs')
+const ours = join(root, 'node_modules', 'dompurify', 'dist', 'purify.es.mjs')
 /** The DOMPurify versions a module sets (`DOMPurify.version = '3.4.15'`): a copy's own, or a bundle's. */
 const versionsIn = (code: string): string[] => [...code.matchAll(/DOMPurify\.version\s*=\s*["'](\d+\.\d+\.\d+)["']/g)].map((m) => m[1])
 const versionOf = (file: string): string => versionsIn(readFileSync(file, 'utf8'))[0] ?? ''
@@ -35,7 +35,7 @@ describe("Monaco's DOMPurify is Combwork's (#1141)", () => {
 
   it("maps only domSanitize.js's import of Monaco's copy to Combwork's dompurify", () => {
     const plugin = monacoDompurify() as unknown as { resolveId: (s: string, i?: string) => string | null; load: (id: string) => null }
-    expect(plugin.resolveId('./dompurify/dompurify.js', sanitize)).toBe(hives)
+    expect(plugin.resolveId('./dompurify/dompurify.js', sanitize)).toBe(ours)
     expect(plugin.resolveId('./dompurify/dompurify.js', join(monacoEsm, 'markdownRenderer.js'))).toBeNull()
     expect(plugin.resolveId('./dom.js', sanitize)).toBeNull()
     expect(plugin.resolveId('./dompurify/dompurify.js')).toBeNull()
@@ -49,8 +49,8 @@ describe("Monaco's DOMPurify is Combwork's (#1141)", () => {
     writeFileSync(entry, `import { sanitizeHtml } from ${JSON.stringify(sanitize.split('\\').join('/'))}\nexport default sanitizeHtml\n`)
     const out = (await build({ root: dir, logLevel: 'silent', configFile: false, plugins: [monacoDompurify()], build: { write: false, minify: false, lib: { entry, formats: ['es'], fileName: 'out' } } })) as { output: { code?: string }[] }[]
     const code = out.flatMap((o) => o.output).map((c) => c.code ?? '').join('\n')
-    const hive = versionOf(hives)
-    expect(hive).toMatch(/^\d/)
-    expect(versionsIn(code)).toEqual([hive])
+    const own = versionOf(ours)
+    expect(own).toMatch(/^\d/)
+    expect(versionsIn(code)).toEqual([own])
   }, 60_000)
 })

@@ -76,7 +76,7 @@ export interface QueueRecent {
    * none, its merge's) to the outcome. Left out when nothing began for it, or old facts can't say.
    */
   tookMs?: number
-  /** merged by Hive (HI-1924, the window's model only): its push (G18), as recorded; left out where nothing is to say. */
+  /** merged by Combwork (HI-1924, the window's model only): its push (G18), as recorded; left out where nothing is to say. */
   push?: QueuePushState
 }
 
@@ -165,7 +165,7 @@ export interface QueueView {
   projectPath: string
   target: string
   paused: QueuePauseInfo | null
-  /** The profile of the Hive running this queue now ("Hive-Dev"; null: none runs it now). */
+  /** The profile of the Combwork running this queue now ("Combwork-Dev"; null: none runs it now). */
   runBy: string | null
   /** Whether this Combwork is the one running it now. */
   runHere: boolean

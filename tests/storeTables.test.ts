@@ -53,7 +53,7 @@ afterAll(() => {
 
 const LANE = {
   id: 'lane-1',
-  project: 'hive',
+  project: 'alpha',
   projectId: 'p-abc',
   name: 'P3 D',
   builder: { id: 'a-b6', name: 'HB6' },
@@ -74,7 +74,7 @@ const LANE = {
 }
 const WATCH = {
   id: 'w-1',
-  projectPath: 'D:\\ws\\hive',
+  projectPath: 'D:\\ws\\alpha',
   projectId: 'p-abc',
   agentId: 'a-b6',
   cond: { cards: [1220, 1220, 1212], changes: ['verdict', 'column'], column: 'passed' },
@@ -85,7 +85,7 @@ const WATCH = {
   limitAt: '2026-10-20T20:00:00.000Z',
   waitSeq: 4,
   on: { '1220': 'agent' },
-  watcherName: 'HB6 (hive)',
+  watcherName: 'HB6 (alpha)',
   fired: { line: '[CW] …', at: '2026-10-20T15:00:00.000Z', cards: [1220], delivery: 'm12' }
 }
 /** A bucket with a project named like Object's own properties, as the store keeps them (maps with no prototype). */
@@ -94,8 +94,8 @@ const bucket = (start: number) => {
   const part = (key: string) => ({ api: d({ [key]: { count: 2, ms: [1, 2] } }), mcp: d({}), guidance: d({ claude: { launches: 1 } }), catalog: d({}) })
   const projects = Object.create(null) as Record<string, unknown>
   Object.defineProperty(projects, '__proto__', { value: part('GET /v1/tasks'), enumerable: true, writable: true, configurable: true })
-  projects.hive = part('POST /v1/progress')
-  return { start, span: 'hour', projects, workspace: part('GET /v1/projects'), skills: { scans: { count: 0 }, hits: 1 }, dropped: 2, droppedBy: { hive: 2 }, series: 5 }
+  projects.alpha = part('POST /v1/progress')
+  return { start, span: 'hour', projects, workspace: part('GET /v1/projects'), skills: { scans: { count: 0 }, hits: 1 }, dropped: 2, droppedBy: { alpha: 2 }, series: 5 }
 }
 const roundTrip = (store: TableStore, doc: unknown) => {
   const def = TABLE_DEFS[store]
@@ -122,7 +122,7 @@ describe('entries as rows, and back (#1212)', () => {
   it("a project named __proto__ stays a project's name (no prototype is set), as the store's maps keep it", () => {
     const r = roundTrip('metrics', JSON.parse(JSON.stringify(bucket(0))))
     const projects = (r.back as { projects: Record<string, unknown> }).projects
-    expect(Object.keys(projects).sort()).toEqual(['__proto__', 'hive'])
+    expect(Object.keys(projects).sort()).toEqual(['__proto__', 'alpha'])
     expect(Object.getPrototypeOf(projects)).toBeNull()
   })
 

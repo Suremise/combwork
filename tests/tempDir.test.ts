@@ -81,7 +81,7 @@ describe('temp folders for tests (#448)', () => {
     const fallback = ALLOWED['e2e/runContext.cjs'][0]
     const refused = [
       "const d = mkdtempSync(join(tmpdir(), 'x-'))",
-      "const d = mkdtempSync(join(process.env.LOCALAPPDATA || os.tmpdir(), 'hive-bypass-'))",
+      "const d = mkdtempSync(join(process.env.LOCALAPPDATA || os.tmpdir(), 'cw-bypass-'))",
       "const d = fs.mkdtempSync(path.join(require('os').tmpdir(), 'x-'))",
       "import { tmpdir } from 'os'",
       'const { tmpdir } = await import(\'os\')',
@@ -126,13 +126,13 @@ describe('other names for a folder (tests/pathAliases.ts)', () => {
 
   it('shortPath gives null where there is no other name: every part already short, or no such path', () => {
     expect(shortPath(process.env.SystemRoot ?? 'C:\\Windows')).toBeNull()
-    expect(shortPath(join(tempRoot(), 'hive-no-such-folder-448', 'x'))).toBeNull()
+    expect(shortPath(join(tempRoot(), 'cw-no-such-folder-448', 'x'))).toBeNull()
   })
 
   it('shortPath gives null for a missing path under a folder that has a short name (#485: RUNNER~1 on the runner; skipped where the volume makes no short names)', (ctx) => {
     const long = dir('cw-short-path-parent-with-a-long-name-')
     if (shortPath(long) === null) return ctx.skip()
-    expect(shortPath(join(long, 'hive-no-such-folder-485'))).toBeNull()
+    expect(shortPath(join(long, 'cw-no-such-folder-485'))).toBeNull()
     expect(shortPath(join(long, 'no-such', 'x'))).toBeNull()
   })
 
@@ -226,7 +226,7 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
     const live = at(area, 'run-4002-abcdef', 2 * DAY)
     const recent = at(area, 'run-4003-abcdef', DAY - 60_000)
     const beforePids = at(area, 'run-Xy12Zq', 2 * DAY)
-    const other = at(area, 'hive-gitrepo-abcdef', 2 * DAY)
+    const other = at(area, 'cw-gitrepo-abcdef', 2 * DAY)
     const removed = pruneRunTemps((p) => nobody.protects(p), { now, area, isAlive: (pid) => pid === 4002 })
     expect(removed.sort()).toEqual([beforePids, ended].sort())
     expect([ended, live, recent, beforePids, other].map((d) => existsSync(d))).toEqual([false, true, true, false, true])
@@ -302,7 +302,7 @@ describe("each test file's temp folders go when it ends (#995)", () => {
     const b = tempDir('cw-made-')
     mkdirSync(join(b, 'deep', 'er'), { recursive: true })
     writeFileSync(join(b, 'deep', 'er', 'f.txt'), 'x')
-    const other = mkdtempSync(join(tempRoot(), 'hive-not-made-'))
+    const other = mkdtempSync(join(tempRoot(), 'cw-not-made-'))
     try {
       expect(removeTempDirs()).toEqual([])
       expect([existsSync(a), existsSync(b), existsSync(other)]).toEqual([false, false, true])

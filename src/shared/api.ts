@@ -456,7 +456,7 @@ export interface CombworkRequests {
   'project:openTerminal': (projectPath: string) => void
   /** What hiding, removing or deleting the project would touch (Project → Remove Project…). */
   'project:removalInfo': (projectPath: string) => ProjectRemovalInfo
-  /** Hides it, removes it from Hive (packing its workspace files into its folder) or deletes it (to the Recycle Bin). */
+  /** Hides it, removes it from Combwork (packing its workspace files into its folder) or deletes it (to the Recycle Bin). */
   'project:remove': (projectPath: string, how: ProjectRemoval) => { warnings: string[] }
   /** Projects hidden or removed from Combwork, and whether each folder is still in the workspace. */
   'project:hidden': () => (HiddenProject & { present: boolean })[]
@@ -570,7 +570,7 @@ export interface CombworkRequests {
   'session:retryInput': (projectPath: string, agentId: string, since: string) => 'clear' | 'blocked' | 'gone' | 'busy'
   'session:archive': (projectPath: string, sessionId: string, archived: boolean) => void
   'session:rename': (projectPath: string, sessionId: string, name: string) => void
-  /** Deletes a session that isn't running from Hive (its record and backups; the CLI's transcript stays). */
+  /** Deletes a session that isn't running from Combwork (its record and backups; the CLI's transcript stays). */
   'session:delete': (projectPath: string, sessionId: string) => void
   /** Archives, unarchives or deletes several sessions (a branch of the Sessions tab), each all or nothing; skips those in use. */
   'session:bulk': (projectPath: string, action: SessionBulkAction, sessionIds: string[]) => SessionBulkResult

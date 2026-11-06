@@ -104,7 +104,7 @@ describe('the option', () => {
 
   it("the agent watch takes a whole project's agents at the most, and more (the Assistant's span projects)", () => {
     expect(AGENT_WATCH_MAX_AGENTS).toBeGreaterThan(AGENT_LIMIT_MAX)
-    const watched = (n: number) => ({ agents: Array.from({ length: n }, (_, i) => ({ projectPath: 'C:\\ws\\hive', agentId: `a${i}`, name: `A${i}`, project: 'hive' })), ignoreBackground: false })
+    const watched = (n: number) => ({ agents: Array.from({ length: n }, (_, i) => ({ projectPath: 'C:\\ws\\alpha', agentId: `a${i}`, name: `A${i}`, project: 'alpha' })), ignoreBackground: false })
     expect(readSavedAgentCondition(watched(AGENT_WATCH_MAX_AGENTS))?.agents).toHaveLength(AGENT_WATCH_MAX_AGENTS)
     expect(readSavedAgentCondition(watched(AGENT_WATCH_MAX_AGENTS + 1))).toBeNull()
   })
@@ -121,11 +121,11 @@ describe('the option', () => {
 
 describe('Agents per project becomes Maximum agents', () => {
   it("a workspace's own: its workflow defaults for None and Git, where they don't set it", () => {
-    expect(migrateWorkspacePreferences({ advanced: { [AGENTS_PER_PROJECT]: 16, 'hive.other': 1 } })).toEqual({ advanced: { 'hive.other': 1 }, workflow: { none: { maxAgents: 16 }, git: { maxAgents: 16 } } })
+    expect(migrateWorkspacePreferences({ advanced: { [AGENTS_PER_PROJECT]: 16, 'cw.other': 1 } })).toEqual({ advanced: { 'cw.other': 1 }, workflow: { none: { maxAgents: 16 }, git: { maxAgents: 16 } } })
     expect(migrateWorkspacePreferences({ advanced: { [AGENTS_PER_PROJECT]: 16 }, workflow: { git: { maxAgents: 4 } } })).toEqual({ advanced: {}, workflow: { none: { maxAgents: 16 }, git: { maxAgents: 4 } } })
     // One it doesn't take goes, moving nothing.
     expect(migrateWorkspacePreferences({ advanced: { [AGENTS_PER_PROJECT]: 99 } })).toEqual({ advanced: {} })
-    const untouched = { advanced: { 'hive.other': 1 } }
+    const untouched = { advanced: { 'cw.other': 1 } }
     expect(migrateWorkspacePreferences(untouched)).toBe(untouched)
   })
 

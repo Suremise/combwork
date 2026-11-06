@@ -1,7 +1,7 @@
 import { promptKey } from './providers/turns'
 
 /**
- * Whether an agent's hooks are reaching Hive (#1336). Hive has no hooks-free mode (#1285): its hooks are how it knows what
+ * Whether an agent's hooks are reaching Combwork (#1336). Combwork has no hooks-free mode (#1285): its hooks are how it knows what
  * an agent does. What can still go wrong is hooks that stop arriving while Combwork thinks all is well (a CLI update changed
  * them, a managed policy turned them off, Combwork refused their token), which left a wrong status: ready while it worked,
  * a turn never over, lines typed into it that were never confirmed. This reads only what Combwork already has, no status of

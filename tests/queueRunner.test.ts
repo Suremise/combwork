@@ -606,7 +606,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(gone).toMatchObject({ ok: false, code: -1, notRun: 'ENOENT', err: expect.stringMatching(/ENOENT/) })
     expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job'])
     // The launcher starts and the command can't: the launcher says so by its nonce, and its record goes with it.
-    const none = await a.runner.run('check', 'no-such-command-hive-1360', [])
+    const none = await a.runner.run('check', 'no-such-command-cw-1360', [])
     expect(none).toMatchObject({ ok: false, code: -1, notRun: 'ENOENT', err: expect.stringMatching(/ENOENT/) })
     expect(none.err).not.toMatch(/notStarted/)
     await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })

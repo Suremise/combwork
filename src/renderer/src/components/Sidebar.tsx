@@ -305,7 +305,7 @@ function RailLabel({ text }: { text: string }) {
   return <span className={cx('rail-initials', text.length > 2 && `rail-initials-${Math.min(text.length, 4)}`)}>{text}</span>
 }
 
-/** Short label for the rail: the initials of a multi-word name ("web-dashboard" → "WD"), else its first two letters ("hive" → "Hi"). */
+/** Short label for the rail: the initials of a multi-word name ("web-dashboard" → "WD"), else its first two letters ("demo" → "De"). */
 export function projectInitials(name: string): string {
   const words = name
     .replace(/([a-z])([A-Z])/g, '$1 $2')

@@ -414,11 +414,11 @@ export function onBoardNotice(fn: (path: string, n: BoardNotice) => void): void 
 const M = {
   noWorkspace: msg({ id: 'board.error.noWorkspace', defaultMessage: 'No workspace is open', description: 'An error: the task board needs an open workspace, and there is none.' }),
   newer: msg({ id: 'board.error.newer', defaultMessage: 'This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.', description: "An error: the workspace's task board was saved by a newer Combwork, whose format this version doesn't know; cards can be read but not changed." }),
-  upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from Combwork 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to Hive 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
-  upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to Hive 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
+  upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from Combwork 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
+  upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
   stopAgentsFirst: msg({ id: 'board.error.stopAgentsFirst', defaultMessage: "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Combwork can't record them.", description: "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Combwork, so their sessions couldn't be recorded. Nothing was changed." }),
   inUse: msg({ id: 'board.error.inUse', defaultMessage: 'Another Combwork has this workspace open: close it first.', description: "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed." }),
-  noBackup: msg({ id: 'board.error.noBackup', defaultMessage: 'There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.', description: "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to Hive 1.0 is kept in the workspace." }),
+  noBackup: msg({ id: 'board.error.noBackup', defaultMessage: 'There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.', description: "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to 1.0 is kept in the workspace." }),
   unavailable: msg({ id: 'board.error.unavailable', defaultMessage: "The board couldn't be opened: {error}", description: "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were." })
 }
 
@@ -777,7 +777,7 @@ const writable = (db: Db): boolean => db.newer === null && !db.pending
 
 /** The folder of the board's copies (db.ts keeps the newest three, and the 1.0 group's copy for good). */
 const BACKUPS = 'backups'
-/** The family of the board's copies; the copy before the 1.0 upgrade is `hive-before-1.0-v<n>-<time>.db`. */
+/** The family of the board's copies; the copy before the 1.0 upgrade is `combwork-before-1.0-v<n>-<time>.db`. */
 const FAMILY = DB_FILE.replace(/\.db$/, '')
 /** Where Restore the 0.9 Board Backup keeps the 1.0 file it replaces: never pruned either. */
 const RESTORE_FAMILY = `${FAMILY}-before-restore`
@@ -2040,7 +2040,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
 
 /**
  * Help → Restore the 0.9 Board Backup… (SPEC §16.17): the board as it is now copied aside first (kept for good), then the
- * copy made before its upgrade to 1.0 put back in its place, and the board opened again: read-only in this Hive (its
+ * copy made before its upgrade to 1.0 put back in its place, and the board opened again: read-only in this Combwork (its
  * upgrade waiting again), writable for a 0.9 Hive. Nothing is deleted. Refused while another Combwork has the workspace open:
  * it would go on with the 1.0 file under the copy put back. Replies with the copy of the 1.0 board.
  */

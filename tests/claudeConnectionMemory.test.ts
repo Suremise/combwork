@@ -30,7 +30,7 @@ function connectionHome(name: string): { home: string; cliProjects: string } {
 
 describe("a project's memory folder name, as Claude Code makes it (2.1.312)", () => {
   it('turns every character but letters and digits into -', () => {
-    expect(memoryKey('D:\\Development\\HIVE\\hive')).toBe('D--Development-HIVE-hive')
+    expect(memoryKey('D:\\Development\\ACME\\acme')).toBe('D--Development-ACME-acme')
     expect(memoryKey('C:/work/my project.v2')).toBe('C--work-my-project-v2')
   })
 
@@ -125,7 +125,7 @@ describe("a Claude Code launch's settings on a connection (HI-1899)", () => {
     mkdirSync(cwd, { recursive: true })
     const ctx = {
       projectPath: cwd, agentId: 'a1', executable: 'C:\\bin\\claude.exe', cwd, workspacePath: cwd, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: over.extraArgs ?? [], hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: join(base, `${name}-private`), guidance: '', env: over.env ?? {}, allowBackgroundSessions: true, use200kContext: false
+      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: over.extraArgs ?? [], hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/cw/hook-auth/r.txt', privateDir: join(base, `${name}-private`), guidance: '', env: over.env ?? {}, allowBackgroundSessions: true, use200kContext: false
     }
     await claudeCode.prepareLaunch(ctx as never)
     return { cwd, settings: JSON.parse(readFileSync(join(ctx.privateDir, 'settings.json'), 'utf8')) }

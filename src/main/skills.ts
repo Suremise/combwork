@@ -240,7 +240,7 @@ async function machineSkills(cfg: WorkspaceConfig | null): Promise<SkillInfo[]> 
   return all
 }
 
-/** Skills that ship with Hive (resources/skills), kept up to date in each workspace (bundled.ts). */
+/** Skills that ship with Combwork (resources/skills), kept up to date in each workspace (bundled.ts). */
 export function bundledSkillsDir(): string {
   return bundledDir('skills')
 }

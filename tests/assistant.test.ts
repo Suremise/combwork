@@ -56,7 +56,7 @@ describe('Assistant settings', () => {
     expect(at({})).toBe(500000)
     expect(at({ compactSuggestTokens: 300000 })).toBe(300000)
     expect(at({ compactSuggestTokens: 0 })).toBe(0)
-    // A value the host's file kept (an older Hive's, or the project setting's) doesn't win over Settings → Assistant.
+    // A value the host's file kept (an older version's, or the project setting's) doesn't win over Settings → Assistant.
     expect(at({}, { compactSuggestTokens: 50000 })).toBe(500000)
     // Settings that lack it (a missing assistant section) still get the default.
     expect(compactThreshold(assistantProjectConfig(cfg(), {} as AppSettings), 200000)).toBe(500000)
@@ -109,7 +109,7 @@ describe('modes', () => {
       // How you work only where a mode has habits its skills don't own (HI-2010: Coordinator's are run-lanes' and coordinate-agents').
       expect(p.body, f).toMatch(/## Put first[\s\S]+(## How you work[\s\S]+)?## What you hand back/)
       // How to use Combwork's tools and what the Assistant may do are Combwork's (its rules and skills), not a mode's.
-      expect(`${p.body}\n${p.summary}`, f).not.toMatch(/(?:hive|cw)_\w+|as (?:Hive|Combwork) allows|you may|you can (add|start|stop)|permission/i)
+      expect(`${p.body}\n${p.summary}`, f).not.toMatch(/cw_\w+|as Combwork allows|you may|you can (add|start|stop)|permission/i)
     }
     // The ones that went are no longer shipped, and each has its mode among those that are.
     for (const [gone, mode] of Object.entries(RETIRED_PERSONAS)) {
@@ -153,7 +153,7 @@ describe('control', () => {
     expect(controlRules('look')).toMatch(/Look and advise/)
     expect(controlRules('look')).toMatch(/Never edit or create files[^.]*change the task board[^.]*start, stop or prompt agents, even if asked/)
     // With Change settings on, the ban leaves the settings line its say (HI-2227: Codex took the ban for settings too).
-    expect(controlRules('look')).not.toMatch(/changing a (?:Hive|Combwork) setting/)
+    expect(controlRules('look')).not.toMatch(/changing a Combwork setting/)
     expect(controlRules('look', true)).toMatch(/handovers is fine when the user asks, and so is changing a Combwork setting, as the next line says\.\n- Combwork's settings: change one \(cw_update_setting\)/)
     expect(controlRules('agents')).not.toMatch(/create projects/)
     expect(controlRules('projects')).toMatch(/create projects when the user asks/)

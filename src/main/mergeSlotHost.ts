@@ -139,7 +139,7 @@ function heldIn(workspacePath: string): SlotRecord[] {
 }
 
 /**
- * Where a hold Hive closed under belongs now (#508): its project's folder by its id (renamed or moved since, the whole
+ * Where a hold Combwork closed under belongs now (#508): its project's folder by its id (renamed or moved since, the whole
  * workspace too); one saved before ids, at its folder (under the workspace's folder now, if the workspace moved), or at
  * the project last opened there (project.json's lastPath, #146) when exactly one was. Null when it can't be known: its
  * project is gone, or another project has its folder (never told as that one's).

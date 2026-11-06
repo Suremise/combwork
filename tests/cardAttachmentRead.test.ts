@@ -141,8 +141,8 @@ describe("a card's attachment read through Combwork (HI-1751)", () => {
   it('only from its card\'s own folder: a junction at the card\'s folder, cards, attachments or .combwork, a linked file, or a name that is not plain, refused', async () => {
     const { w, root } = await workspace()
     const c = await cardWith(w, { 'a.txt': 'mine' })
-    const hive = join(root, 'p', '.combwork')
-    const levels = [folderOf(root, c.number), join(hive, 'attachments', 'cards'), join(hive, 'attachments'), hive]
+    const dotDir = join(root, 'p', '.combwork')
+    const levels = [folderOf(root, c.number), join(dotDir, 'attachments', 'cards'), join(dotDir, 'attachments'), dotDir]
     for (const level of levels) {
       // The real folder set aside, a junction to a copy elsewhere in its place (another project's, say). Each move tried
       // again while Windows says the folder is in use (HI-2348: under a full run's load, renaming .combwork failed with EPERM

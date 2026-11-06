@@ -1089,7 +1089,7 @@ export async function chooseMcpPlaces(server: Pick<McpServerInfo, 'name' | 'def'
   return !!r && !r.failed.length
 }
 
-/** "Hive Assistant", where a server is added. */
+/** The Combwork Assistant, as "the Assistant" where a server is added. */
 const MCP_ASSISTANT = msg({ id: 'mcp.where.assistantName', defaultMessage: 'the Assistant', description: 'Where an MCP server is added (HI-2059), in a list of places beside project names.' })
 
 // ---------------------------------------------------------------------------
@@ -1148,7 +1148,7 @@ export async function updateCatalogServer(row: Pick<McpCatalogRow, 'source' | 'n
   const ok = await confirm({
     title: tr(msg({ id: 'mcp.catalog.updateTitle', defaultMessage: 'Update {name} from {from} to {to}?', description: 'Title of the question before updating a catalogue server (HI-545). {from} and {to} are its versions.' }), { name: p.server.name, from: ex.version, to: p.server.version }),
     message: changed.length
-      ? tr(msg({ id: 'mcp.catalog.updateMessage', defaultMessage: '{where}: those places keep it, your values for its environment and headers too. What it runs changes (− now, + after):', description: 'The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added ("Added in hive", "Not added anywhere").' }), { where })
+      ? tr(msg({ id: 'mcp.catalog.updateMessage', defaultMessage: '{where}: those places keep it, your values for its environment and headers too. What it runs changes (− now, + after):', description: 'The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added ("Added in demo", "Not added anywhere").' }), { where })
       : tr(msg({ id: 'mcp.catalog.updateSame', defaultMessage: '{where}: those places keep it, your values for its environment and headers too. What it runs stays the same:', description: 'The question before updating a catalogue server (HI-545) whose command stays the same, above what it runs. {where} says where it is added.' }), { where }),
     list: changed.length ? changed : p.runs,
     detail: p.secretWarnings.join('\n') || undefined,
@@ -1281,7 +1281,7 @@ export async function deleteMcpServer(server: Pick<McpServerInfo, 'name' | 'def'
   const ok = await confirm({
     title: tr(msg({ id: 'actions.mcp.deleteTitle', defaultMessage: 'Delete MCP server?', description: 'Title of the question before deleting a workspace MCP server.' })),
     message: tr(msg({ id: 'actions.mcp.deleteMessage', defaultMessage: 'Move {name}.json to the Recycle Bin, with its folder if it was added from a .zip? Projects will no longer be able to use it.', description: "The question before deleting a workspace MCP server: its file ({name}.json) goes to the Recycle Bin (Windows' name for it)." }), { name }),
-    detail: added ? tr(msg({ id: 'actions.mcp.deleteAdded', defaultMessage: '{where}: deleting it removes it there too.', description: 'The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as "Added in hive and for the Combwork Assistant".' }), { where: mcpWhereText({ ...server, def: server.def ?? {} }, get().workspace?.projects ?? []) }) : undefined,
+    detail: added ? tr(msg({ id: 'actions.mcp.deleteAdded', defaultMessage: '{where}: deleting it removes it there too.', description: 'The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as "Added in demo and for the Combwork Assistant".' }), { where: mcpWhereText({ ...server, def: server.def ?? {} }, get().workspace?.projects ?? []) }) : undefined,
     confirmLabel: deleteLabel(),
     busyLabel: deletingLabel(),
     danger: true,
@@ -1869,7 +1869,7 @@ async function removeAllAgents_(path: string): Promise<void> {
 /** Removes a worktree agent together with its worktree and branch. */
 /**
  * Release Slot… (#1441): an agent's adopted worktree (its carried slot) no longer kept for it, asked first. The folder
- * and its branch stay; Hive lends it to new work once it is clean, and may rename it to a slot's name.
+ * and its branch stay; Combwork lends it to new work once it is clean, and may rename it to a slot's name.
  */
 export async function releaseCarriedSlot(path: string, agentId: string): Promise<void> {
   const a = agentOf(project(path), agentId)

@@ -17,7 +17,7 @@ export const STALE_MS = 3 * HEARTBEAT_MS
 
 export interface PresenceMarker {
   pid: number
-  /** The profile folder's name (Hive, Hive-Dev, a test profile's). */
+  /** The profile folder's name (Combwork, Combwork-Dev, a test profile's). */
   profile: string
   appVersion: string
   startedAt: string

@@ -38,9 +38,9 @@ describe('hardware acceleration at start (#676)', () => {
   })
 
   it('a restart starts Combwork as it was started, without the once-only --disable-gpu', () => {
-    expect(relaunchArgs(['C:\\Hive\\Hive.exe', '--disable-gpu', '--hidden'])).toEqual(['--hidden'])
+    expect(relaunchArgs(['C:\\Combwork\\Combwork.exe', '--disable-gpu', '--hidden'])).toEqual(['--hidden'])
     expect(relaunchArgs(['electron.exe', '.', '--DISABLE-GPU'])).toEqual(['.'])
-    expect(relaunchArgs(['Hive.exe'])).toEqual([])
+    expect(relaunchArgs(['Combwork.exe'])).toEqual([])
   })
 
   it('Copy Diagnostics says whether it is on, why not, and the GPU feature status', () => {

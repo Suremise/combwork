@@ -74,7 +74,7 @@ describe('the sentences built from parts are whole messages, and read as before 
     expect(say('window', true, 1)).toBe("Closing this window stops this workspace's session.")
     expect(say('allWindows', false, 4, 3)).toBe('Quitting closes all 3 windows and stops 4 running sessions, in every workspace.')
     expect(tr(m('shell.errorBoundary.named'), { view: 'progress' })).toBe("The Progress panel ran into a problem and couldn't be shown.")
-    expect(tr(m('shell.errorBoundary.named'), { view: 'hive' })).toBe("Combwork ran into a problem and couldn't be shown.")
+    expect(tr(m('shell.errorBoundary.named'), { view: 'combwork' })).toBe("Combwork ran into a problem and couldn't be shown.")
     expect(tr(m('shell.quit.busy'), { n: 1 })).toBe('An agent is in the middle of something.')
     expect(tr(m('shell.quit.title'), { how: 'allWindows', windows: 2 })).toBe('Quit Combwork and close all 2 windows?')
     expect(tr(m('shell.quit.now'), { action: 'saveAndQuit' })).toBe('Save and quit now')

@@ -194,7 +194,6 @@
   "project.header.agentsMenu": "Agents",
   "project.header.agentsMenuTip": "Actions on all the project's agents: start new sessions, archive and start new, or remove them",
   "project.header.archiveNew": "{many, select, yes {Archive and Start New ({count})} other {Archive and Start New}}",
-  "project.header.archiveNewTip": "{many, select, yes {{count, plural, one {Archive {agent}'s session and start a fresh one} other {Archive the sessions of the # agents that have one and start fresh ones}}} other {Archive the current session and start a fresh one}}",
   "project.header.carryOnManyTip": "{stopped, plural, =0 {Carry on {stalled, plural, one {the agent} other {the # agents}} a refused sign-in stopped (other running ones are left alone)} one {Resume the stopped agent and carry on {stalled, plural, one {the agent} other {the # agents}} a refused sign-in stopped (other running ones are left alone)} other {Resume the # stopped agents and carry on {stalled, plural, one {the agent} other {the # agents}} a refused sign-in stopped (other running ones are left alone)}}",
   "project.header.carryOnTip": "Carry on {agent}: its turn stopped when its sign-in expired",
   "project.header.inStatus": "· {count} of {total} agents",

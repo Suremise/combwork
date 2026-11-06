@@ -356,7 +356,7 @@ export class AdvancedStore {
     return this.fileErrorText ?? withValues(msg({ id: 'service.advanced.asIs', defaultMessage: '{problem}', description: "Why advanced.json can't be used, in English (kept from before Combwork translated it). Keep it as {problem} alone." }), { problem: this.fileError ?? '' })
   }
 
-  /** Help → Copy Diagnostics: how many overrides, which (Hive's names, no values), and which need a look. */
+  /** Help → Copy Diagnostics: how many overrides, which (Combwork's names, no values), and which need a look. */
   diagnostics(workspaces: (Record<string, unknown> | null)[]): string[] {
     const ids = Object.keys(this.values).filter((id) => advancedDef(id)).sort()
     const rows = ADVANCED_DEFS.map((d) => advancedRow(d, { values: this.values, madeFor: this.madeFor, workspace: null, cli: this.cli }))
@@ -398,7 +398,7 @@ export const workspaceDefs = (): AdvancedDef[] => ADVANCED_DEFS.filter((d) => d.
 
 /**
  * The longest a card wait or an agents wait holds a call (seconds): the advanced setting, kept a minute under Codex's
- * timeout for hive's tools so the reply always arrives in time.
+ * timeout for Combwork's tools so the reply always arrives in time.
  */
 export function waitMaxSeconds(kind: 'cards' | 'agents'): number {
   const own = advanced.number(kind === 'cards' ? 'cw.wait.cardMaxSeconds' : 'cw.wait.agentsMaxSeconds')

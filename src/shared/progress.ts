@@ -438,7 +438,7 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
 
 /**
  * Who ran a run, as the window shows it (#872): a name Combwork gave it (`defaultName`: "Script" for a script, "Agent" for
- * a kept run with no name, "Hive (merge queue)" for the queue's own runs, #1349, "Hive (slot <name>)" for a slot's warming,
+ * a kept run with no name, "Combwork (merge queue)" for the queue's own runs, #1349, "Combwork (slot <name>)" for a slot's warming,
  * #1429) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
  * too. The stored name stays English: agents read it through the Agent API and cw-progress.
  */

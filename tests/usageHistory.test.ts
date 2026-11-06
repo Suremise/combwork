@@ -62,7 +62,7 @@ describe('the usage history of a workspace', () => {
     mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     mkdirSync(join(p, '.combwork'), { recursive: true })
     writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
-    // An old Hive's usage-cache.json, which the history replaces.
+    // An older build's usage-cache.json, which the history replaces.
     mkdirSync(join(base, 'profile'), { recursive: true })
     writeFileSync(join(base, 'profile', 'usage-cache.json'), '{"version":"0.9.3","entries":[]}')
     cliLookup.mockImplementation(async (_pp, id) => (existsSync(cliFile(id)) ? { path: cliFile(id), provider: 'claude-code' as const } : null))

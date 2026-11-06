@@ -107,7 +107,7 @@ describe('Codex: when a person must act', () => {
       const { codex } = await import('../src/main/providers/codex/adapter')
       const ctx = {
         projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '',
-        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: 'C:/profile/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
       }
       const { args } = codex.buildCommand(ctx.executable, ctx)
       expect(args.join(' ')).toContain('tui.terminal_title=')
@@ -210,15 +210,15 @@ describe('Codex: when a person must act', () => {
     process.env.CODEX_HOME = home
     try {
       const ctx = {
-        projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: 'C:\\work\\HIVE.worktrees\\alpha\\slot-a', workspacePath: home, runId: 'r', sessionId: '',
-        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+        projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: 'C:\\work\\DEMO.worktrees\\alpha\\slot-a', workspacePath: home, runId: 'r', sessionId: '',
+        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: 'C:/profile/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
       }
       expect(advanced.get<boolean>('codex.trust.perLaunch')).toBe(true)
       const { args } = codex.buildCommand(ctx.executable, ctx)
       const i = args.findIndex((a) => a.startsWith('projects='))
-      // The inline table (a dotted -c key would split the path at "HIVE.worktrees"), its folder alone.
+      // The inline table (a dotted -c key would split the path at "DEMO.worktrees"), its folder alone.
       expect(args[i - 1]).toBe('-c')
-      expect(args[i]).toBe('projects={"C:\\\\work\\\\HIVE.worktrees\\\\alpha\\\\slot-a"={trust_level="trusted"}}')
+      expect(args[i]).toBe('projects={"C:\\\\work\\\\DEMO.worktrees\\\\alpha\\\\slot-a"={trust_level="trusted"}}')
       expect(await codex.connectionTrusts(home, [{ root: 'C:\\work\\alpha', git: true, short: false }, { root: null, git: true, short: false }])).toEqual([true, true])
       // Off: no -c of it, and trust read from the connection's own file.
       const real = advanced.get.bind(advanced)
@@ -245,7 +245,7 @@ describe('Codex: when a person must act', () => {
       const { codex } = await import('../src/main/providers/codex/adapter')
       const ctx = {
         projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--image', 'a.png', 'b.png'], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false,
+        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--image', 'a.png', 'b.png'], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: 'C:/profile/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false,
         initialPrompt: 'Work on card #12'
       }
       // Codex 0.162 reads a plain argument after "--image a.png" as another image; after "--" it is the prompt.
@@ -271,7 +271,7 @@ describe('Codex: when a person must act', () => {
       const mcpServers = { combwork: { command: 'node', args: ['cw-mcp.js'] }, gh: { command: 'npx', args: ['-y', 'gh-mcp'] }, api: { url: 'https://mcp.example.com' } }
       const ctx = {
         projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '',
-        resume: false, name: '', skills: [], mcpServers, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+        resume: false, name: '', skills: [], mcpServers, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: 'C:/profile/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
       }
       const server = (args: string[], name: string) => args.find((a) => a.startsWith(`mcp_servers.${name}=`))
       for (const permissionMode of [null, 'read-only', 'ask', 'approve-for-me', 'full-access']) {
@@ -503,8 +503,8 @@ describe('Codex skill copies', () => {
     const cwd = join(root, 'proj')
     const skills = join(cwd, '.agents', 'skills')
     // The user's own folder that happens to use the prefix.
-    mkdirSync(join(skills, 'hive-mine'), { recursive: true })
-    writeFileSync(join(skills, 'hive-mine', 'SKILL.md'), '# mine')
+    mkdirSync(join(skills, 'cw-mine'), { recursive: true })
+    writeFileSync(join(skills, 'cw-mine', 'SKILL.md'), '# mine')
     const { syncAgentsSkills } = await import('../src/main/providers/common')
     const sync = (list: { name: string; sourcePath: string }[]) => syncAgentsSkills({ cwd, skills: list } as never, 'Codex')
     await sync([{ name: 'deploy', sourcePath: src }])
@@ -516,7 +516,7 @@ describe('Codex skill copies', () => {
     // Disabled: Combwork's copy goes, the user's folder stays.
     await sync([])
     expect(existsSync(join(skills, 'cw-deploy'))).toBe(false)
-    expect(existsSync(join(skills, 'hive-mine', 'SKILL.md'))).toBe(true)
+    expect(existsSync(join(skills, 'cw-mine', 'SKILL.md'))).toBe(true)
   })
 })
 

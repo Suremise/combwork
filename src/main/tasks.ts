@@ -58,7 +58,7 @@ const BOARD_AGENT = {
 
 /**
  * The board's refusals (#846, E10b of #677) are CombworkErrors: the window reads them in its language, agents (the Agent API,
- * the hive tools) in English, exactly as before. A refusal's `kind` is set where it is the status its English always
+ * the cw_ tools) in English, exactly as before. A refusal's `kind` is set where it is the status its English always
  * gave (servers.ts `statusFor`); without one, the English still gives it. A column (`{column}`) is its key, and each
  * message chooses its words.
  */

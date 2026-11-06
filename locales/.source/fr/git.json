@@ -338,7 +338,6 @@
   "git.vc.offer.repositoryGone": "The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.",
   "git.vc.offer.switchGit": "Switch…",
   "git.vc.offer.switchNone": "Switch to None…",
-  "git.vc.otherTip": "Hive detects the version control in this folder. When it finds a different one, it offers to switch.",
   "git.vc.previewTip": "Git needs this folder to be a repository: Initialise repository… makes it one. Nothing changes until you do.",
   "git.vc.sections": "Version Control",
   "git.vc.step.cantSave": "This preset can’t be saved for the project:",

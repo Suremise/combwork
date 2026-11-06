@@ -524,7 +524,7 @@ describe('mayRead', () => {
   })
 
   it("a malformed source is nobody's", () => {
-    for (const bad of ['', 'session:', 'session:c:\\work\\alpha', 'session:c:\\work\\alpha#', 'hive:', 'other:x']) {
+    for (const bad of ['', 'session:', 'session:c:\\work\\alpha', 'session:c:\\work\\alpha#', 'combwork:', 'other:x']) {
       expect(parseSourceId(bad)).toBeNull()
       expect(mayRead({ kind: 'all' }, bad, wsOf)).toBe(false)
     }
@@ -581,8 +581,8 @@ describe('replies', () => {
   const source = { label: 'alpha · B1', kind: 'session', select: { agent: 'a-1', project: 'alpha' }, provider: 'claude-code', capturing: true, events: 2 }
 
   it('lists the sources a page at a time, with how to name each', () => {
-    const text = consoleSourcesText({ total: 2, offset: 0, sources: [source, { label: 'Combwork', kind: 'hive', select: { source: 'hive' }, capturing: false, events: 0 }] })
-    expect(text).toBe('alpha · B1 (claude-code): captured, 2 events [agent="a-1" project="alpha"]\nCombwork: not captured [source="hive"]')
+    const text = consoleSourcesText({ total: 2, offset: 0, sources: [source, { label: 'Combwork', kind: 'combwork', select: { source: 'combwork' }, capturing: false, events: 0 }] })
+    expect(text).toBe('alpha · B1 (claude-code): captured, 2 events [agent="a-1" project="alpha"]\nCombwork: not captured [source="combwork"]')
     // A name a display label cuts or masks is still given whole as the argument that reads it.
     const long = 'developer-console-capture-and-recording-contract-fixtures-project'
     expect(consoleSourcesText({ total: 1, offset: 0, sources: [{ ...source, label: long.slice(0, 40), select: { agent: 'a-9', project: long } }] })).toContain(`project="${long}"`)

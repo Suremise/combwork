@@ -6,7 +6,7 @@ import type { LaneInfo, LaneState, LiveSessionState, SessionStatus } from '../sr
 
 const live = (status: SessionStatus, more: Partial<LiveSessionState> = {}): Pick<LiveSessionState, 'status' | 'provider' | 'backgroundTasks' | 'mergeSlot'> => ({ status, provider: 'claude', ...more })
 
-const lane = (state: LaneState, builder = 'b1', reviewer = 'r1', project = 'hive'): LaneInfo => ({ id: 'lane-1', project, builder: { id: builder, name: 'B1' }, reviewer: { id: reviewer, name: 'R1' }, state }) as LaneInfo
+const lane = (state: LaneState, builder = 'b1', reviewer = 'r1', project = 'demo'): LaneInfo => ({ id: 'lane-1', project, builder: { id: builder, name: 'B1' }, reviewer: { id: reviewer, name: 'R1' }, state }) as LaneInfo
 
 describe('handOverNow', () => {
   it('lets an idle agent on no lane hand over now', () => {
@@ -32,10 +32,10 @@ describe('handOverNow', () => {
 
 describe('onRunningLane', () => {
   it("finds the agent as a running lane's builder or reviewer, in its project", () => {
-    expect(onRunningLane([lane('active')], 'hive', 'b1')).toBe(true)
-    expect(onRunningLane([lane('paused')], 'Hive', 'r1')).toBe(true)
-    expect(onRunningLane([lane('ended'), lane('abandoned')], 'hive', 'b1')).toBe(false)
+    expect(onRunningLane([lane('active')], 'demo', 'b1')).toBe(true)
+    expect(onRunningLane([lane('paused')], 'Demo', 'r1')).toBe(true)
+    expect(onRunningLane([lane('ended'), lane('abandoned')], 'demo', 'b1')).toBe(false)
     expect(onRunningLane([lane('active')], 'other', 'b1')).toBe(false)
-    expect(onRunningLane([lane('active')], 'hive', 'x9')).toBe(false)
+    expect(onRunningLane([lane('active')], 'demo', 'x9')).toBe(false)
   })
 })

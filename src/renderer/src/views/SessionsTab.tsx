@@ -1314,7 +1314,7 @@ const NO_CALLS_OPEN: ReadonlySet<number> = new Set()
 /** A command's exit code, as a badge says it (HI-2240: a Codex script's command). */
 const exitCodeText = (code: number): string => tr(msg({ id: 'sessions.tool.exitCode', defaultMessage: 'exit code {code}', description: "A badge on a command a Codex script ran, in a transcript (HI-2240): the exit code it ended with ({code}: a number such as 0 or 1, shown as it is). Lower case; keep it short." }), { code: String(code) })
 
-/** What kind of call a Codex script's call is, as its line counts it (HI-2240): an MCP server's (by server), or Hive's name for it. */
+/** What kind of call a Codex script's call is, as its line counts it (HI-2240): an MCP server's (by server), or Combwork's name for it. */
 const callKind = (c: TranscriptTool): string => (c.name.includes(' · ') ? `mcp:${c.name.split(' · ')[0]}` : c.name === 'Shell' ? 'command' : c.name === 'Edit' ? 'edit' : c.name === 'view_image' ? 'image' : 'other')
 
 /**

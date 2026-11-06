@@ -10,7 +10,7 @@ const PACKAGE = 'S-1-15-2-1430448594-2639229838-973813799-439329657-1197984847-4
 const BROKEN = `D:PAI(A;OICI;0x1200a9;;;${PACKAGE})(A;OICI;FA;;;SY)(A;OICI;FA;;;${USER})`
 const FIXED = `D:PAI(A;OICI;0x1200a9;;;AC)(A;OICI;0x1200a9;;;${PACKAGE})(A;OICI;FA;;;SY)(A;OICI;FA;;;${USER})`
 const USUAL = `D:AI(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;${USER})`
-const DIR = 'C:\\Users\\me\\AppData\\Local\\Programs\\Hive'
+const DIR = 'C:\\Users\\me\\AppData\\Local\\Programs\\Combwork'
 const ICU = join(DIR, 'icudtl.dat')
 const FOLDER = `grant ${DIR} *S-1-15-2-1:(OI)(CI)(RX)`
 

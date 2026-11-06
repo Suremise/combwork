@@ -8,7 +8,7 @@
  *   Copilot: its Stop blocked; Claude Code: context added to its Stop).
  * - **idleWakes** (`cw.inbox.idleWakes`): an idle agent is woken with a doorbell line, for every kind of item (a card
  *   loop's wakes, `loopWakes`, are one kind). Off, nothing is typed for what waits, and the pane's Deliver now types it
- *   once. A task given now (a card started on an agent, hive_send_task) isn't a wake: it is typed as it is asked for.
+ *   once. A task given now (a card started on an agent, cw_prompt_agent) isn't a wake: it is typed as it is asked for.
  *
  * None drops an item: off, it stays in the inbox, unread, with the overdue rules as before. Each is Settings → Advanced's
  * value, which a project can set its own of (`inboxCheckpoints`… in project.json: inherit, on or off); the Assistant's

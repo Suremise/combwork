@@ -266,7 +266,7 @@ describe('Git adapter', () => {
     expect(await G.lineHead(wt, 'cw/card')).toBe(main)
     expect(await G.lineHead(repo, 'cw/card')).toBe(sh(repo, 'rev-parse', 'refs/heads/cw/card'))
     // No such line (nor a folder named as a ref's prefix): git says, null.
-    const gone = await counted(async () => [await G.lineHead(repo, 'gone'), await G.lineHead(repo, 'hive')])
+    const gone = await counted(async () => [await G.lineHead(repo, 'gone'), await G.lineHead(repo, 'cw')])
     expect(gone.value).toEqual([null, null])
     expect(gone.ran).toHaveLength(2)
     // A ref file that doesn't name a commit: git's answer, not the file's.
@@ -383,8 +383,10 @@ describe('identity in one git, as `git config <key>` answers each (HI-2050)', ()
 
   it('set, repeated (the last), one or both missing, empty, a key with no value, a value with a newline', async () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
+    sh(repo, 'config', 'user.name', 'Demo Test')
+    sh(repo, 'config', 'user.email', 'test@example.invalid')
     await same(repo)
-    expect(await G.identity(repo)).toEqual({ name: 'Hive Test', email: 'test@hive.invalid' })
+    expect(await G.identity(repo)).toEqual({ name: 'Demo Test', email: 'test@example.invalid' })
     sh(repo, 'config', '--add', 'user.name', 'Second Name')
     await same(repo)
     expect(await G.identity(repo)).toMatchObject({ name: 'Second Name' })
@@ -393,7 +395,7 @@ describe('identity in one git, as `git config <key>` answers each (HI-2050)', ()
     sh(repo, 'config', '--unset-all', 'user.email')
     await same(repo)
     sh(repo, 'config', 'user.name', '')
-    sh(repo, 'config', 'user.email', 'e@hive.invalid')
+    sh(repo, 'config', 'user.email', 'e@example.invalid')
     await same(repo)
     // A key with no value, then a value with a newline in it (the config file's own escape).
     const file = configFile(repo)

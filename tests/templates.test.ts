@@ -685,7 +685,7 @@ describe('saving and loading templates', () => {
     // A copy to change: its agents, pairs and suggestion, with when it was made.
     const copy = await run(() => templates.duplicateTemplate(pair, { scope: 'project', project: beta }))
     expect([copy.scope, copy.name, copy.agents.map((a) => [a.name, a.role, a.provider]), copy.pairs, copy.suggestedPreset, !!copy.savedAt]).toEqual(['project', 'Pair', [['{key}-B{n}', 'builder', 'claude-code'], ['{key}-R{n}', 'reviewer', 'codex']], [{ builder: '{key}-B1', reviewer: '{key}-R1' }], 'pair', true])
-    const out = join(base, 'exports-hive')
+    const out = join(base, 'exports-pair')
     mkdirSync(out, { recursive: true })
     await run(() => templates.exportTemplate(pair, join(out, 'pair.json')))
     expect(JSON.parse(readFileSync(join(out, 'pair.json'), 'utf8'))).toMatchObject({ version: TEMPLATE_VERSION, name: 'Pair', layout: 'columns2', suggestedPreset: 'pair' })
@@ -718,7 +718,7 @@ describe('saving and loading templates', () => {
     expect(basename(file)).toBe('Solo act.combwork-template.json')
     await run(() => templates.exportTemplate({ scope: 'workspace', file: 'solo-act.json' }, file))
     const text = readFileSync(file, 'utf8')
-    expect(text).not.toMatch(/[A-Za-z]:\\\\|hive-templates-|"id"|lastSessionId|worktree"\s*:\s*\{|needsSetup/)
+    expect(text).not.toMatch(/[A-Za-z]:\\\\|cw-templates-|"id"|lastSessionId|worktree"\s*:\s*\{|needsSetup/)
     const exported = JSON.parse(text)
     // No agent's mode (its workflow's okBefore has a mode of its own).
     expect(JSON.stringify(exported.agents)).not.toMatch(/"mode"/)

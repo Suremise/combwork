@@ -473,7 +473,7 @@ describe('workflow scenarios, Git', () => {
   })
 
   it('S15: a commit authored with a personal email refuses submit with the fix', async () => {
-    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const e = pair({}, { identity: { name: 'Combwork Test', email: 'test@example.invalid' } })
     const card = e.wf.createCard({ title: 'Identity' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
@@ -484,31 +484,31 @@ describe('workflow scenarios, Git', () => {
 
   it("HI-2266: G12 on, git config corrected after it was turned on: commits with git's identity now pass, the saved copy's are refused naming git's", async () => {
     // G12's saved copy is the old typo; git config (the Git tab) has the corrected identity, as the commits do.
-    const e = pair({}, { identity: { name: 'Old Typo', email: 'typo@hive.invalid' } })
+    const e = pair({}, { identity: { name: 'Old Typo', email: 'typo@example.invalid' } })
     const card = e.wf.createCard({ title: 'Identity' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
     const folder = s.data!.folder as string
-    commit(folder, { 'x.txt': 'x\n' }, 'old', { email: 'typo@hive.invalid' })
+    commit(folder, { 'x.txt': 'x\n' }, 'old', { email: 'typo@example.invalid' })
     const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.identity')
-    expect(r.message).toContain('(test@hive.invalid)')
+    expect(r.message).toContain('(test@example.invalid)')
     sh(folder, 'commit', '-q', '--amend', '--no-edit', '--reset-author')
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
   })
 
   it('HI-2266: the guard reads git each time: an identity changed in git config between submissions is the one expected', async () => {
-    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const e = pair({}, { identity: { name: 'Combwork Test', email: 'test@example.invalid' } })
     const card = e.wf.createCard({ title: 'Identity' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
     commit(s.data!.folder as string, { 'x.txt': 'x\n' }, 'as configured')
-    sh(e.project, 'config', 'user.email', 'new@hive.invalid')
+    sh(e.project, 'config', 'user.email', 'new@example.invalid')
     const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.identity')
-    expect(r.message).toContain('(new@hive.invalid)')
+    expect(r.message).toContain('(new@example.invalid)')
   })
 
   it('HI-2266: G12 on with a saved copy, git with no identity for the project: refused as missing, never compared with the copy', async () => {
-    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const e = pair({}, { identity: { name: 'Combwork Test', email: 'test@example.invalid' } })
     const card = e.wf.createCard({ title: 'Identity' })
     const s = await e.wf.start(card.key, B1)
     moved(s)

@@ -283,7 +283,7 @@ export interface FactData {
    * preparation is owed, and a pass of Combwork's (after a restart too) does it.
    */
   SlotPrepared: { lease: string; line: string; revision: string }
-  /** Its builder's placement in the slot claimed by a Hive (its process), so two never place it; one gone is taken over. */
+  /** Its builder's placement in the slot claimed by a Combwork (its process), so two never place it; one gone is taken over. */
   PlacementClaimed: { lease: string; pid: number; started: number }
   /** Its builder given the card in the slot: typed in, or a new conversation started there; `delivery` the one made. */
   /** `resumed`: its builder's conversation bound to the lease, resumed with the card (HI-1746). */

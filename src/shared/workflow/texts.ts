@@ -44,7 +44,7 @@ export const APPROVE_NOTE = msg({ id: 'workflow.approveNote', defaultMessage: '{
 export const ROUND_CHOICE = msg({ id: 'workflow.roundChoice', defaultMessage: '{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}', description: "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces." })
 
 /**
- * What a platform couldn't read (§16.3.1), the {what} of "Hive couldn't read {what}" (workflow.refused.platform.unknown):
+ * What a platform couldn't read (§16.3.1), the {what} of "Combwork couldn't read {what}" (workflow.refused.platform.unknown):
  * each a noun phrase, the object of that sentence. Revisions are short ids, folders paths, branches names.
  */
 export const UNREADABLE = {

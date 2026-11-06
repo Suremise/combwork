@@ -103,7 +103,7 @@ describe("Codex: its terminal title (row 34)", () => {
 describe("Copilot: every MCP server's instructions (row 21)", () => {
   const instructions = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'combwork.instructions.md'), 'utf8')
 
-  it("shows the hive server's instructions with the switch on; off, Combwork's guidance comes as custom instructions instead", async () => {
+  it("shows the combwork server's instructions with the switch on; off, Combwork's guidance comes as custom instructions instead", async () => {
     const agent = context({ privateDir: join(base, 'private-on') })
     await copilot.prepareLaunch(agent)
     const on = copilot.buildCommand('C:\\bin\\copilot.exe', agent)
@@ -211,7 +211,7 @@ describe("Combwork's tools pre-approved (row 3)", () => {
     expect(claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args).toContain('--mcp-config')
   })
 
-  it('Copilot: hive (an agent) or the Assistant’s subset with the switch on, nothing with it off', async () => {
+  it('Copilot: combwork (an agent) or the Assistant’s subset with the switch on, nothing with it off', async () => {
     const allowTools = (ctx: LaunchContext): string[] => copilot.buildCommand('C:\\bin\\copilot.exe', ctx).args.filter((a) => a.startsWith('--allow-tool=combwork'))
     expect(allowTools(context())).toEqual(['--allow-tool=combwork'])
     expect(allowTools(assistant())).toEqual(['--allow-tool=combwork(cw_list_tasks)', '--allow-tool=combwork(cw_read_task)'])
@@ -258,7 +258,7 @@ describe("Codex: Combwork's tools pre-approved (row 3, #1174) and its own MCP se
   }
   afterEach(() => rmSync(join(home(), 'config.toml'), { force: true }))
 
-  it("approves the whole hive server for an agent, only the Assistant's trusted tools for it, and none with the switch off", async () => {
+  it("approves the whole combwork server for an agent, only the Assistant's trusted tools for it, and none with the switch off", async () => {
     expect(combworkTable(context())).toContain('default_tools_approval_mode="approve"')
     expect(combworkTable(context())).toContain('enabled=true')
     const assistant = combworkTable(context({ trustedCombworkTools: ['cw_list_tasks', 'cw_read_task'] }))!
@@ -282,9 +282,9 @@ describe("Codex: Combwork's tools pre-approved (row 3, #1174) and its own MCP se
 
 })
 
-// Codex merges Combwork's -c mcp_servers.hive={…} into the user's own [mcp_servers.hive] key by key (0.163.0, probed), so
+// Codex merges Combwork's -c mcp_servers.combwork={…} into the user's own [mcp_servers.combwork] key by key (0.163.0, probed), so
 // each key a native one sets gets Combwork's value, whatever the isolation switch, in the user's config or the project's.
-describe("Codex: Combwork's hive server over a native one of that name", () => {
+describe("Codex: Combwork's server over a native one of that name", () => {
   // The suite's own home, as beforeAll set it (read then, not as the module loads, when it isn't set yet: putting that
   // back would leave the string "undefined", a folder in the current one, for the tests after these).
   let homeBefore: string | undefined
@@ -306,7 +306,7 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
   afterEach(() => {
     process.env.CODEX_HOME = homeBefore
   })
-  /** Combwork's hive table as Codex is given it. */
+  /** Combwork's server table as Codex is given it. */
   const table = (ctx: LaunchContext): Record<string, any> => {
     const arg = codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.combwork='))!
     return parseToml(`combwork = ${arg.slice('mcp_servers.combwork='.length)}`).combwork as Record<string, any>
@@ -364,9 +364,9 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
     expect(outrankNativeCombwork([join(base, 'missing.toml')], {}, 'all', 'C:\\p')).toEqual({})
   })
 
-  // HI-2594: a native server named hive is the user's own like any other (the name isn't reserved after 1.1): turned off
+  // HI-2594: a native server of another name is the user's own like any other: turned off
   // with the user's other servers while isolation is on, loaded with them when it is off; their config isn't changed.
-  it('a native server named hive: off with the others under isolation, loaded with it off, its file untouched', async () => {
+  it('a native server of another name: off with the others under isolation, loaded with it off, its file untouched', async () => {
     for (const isolation of [true, false])
       for (const place of places) {
         await advanced.set(overrideId('codex', 'mcpIsolation'), isolation ? null : false)
@@ -376,10 +376,10 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
         const dir = place === 'home' ? process.env.CODEX_HOME : join(cwd, '.codex')
         mkdirSync(dir, { recursive: true })
         mkdirSync(cwd, { recursive: true })
-        const text = '[mcp_servers.hive]\ncommand = "node"\nargs = ["their-server.js"]\n'
+        const text = '[mcp_servers.theirs]\ncommand = "node"\nargs = ["their-server.js"]\n'
         writeFileSync(join(dir, 'config.toml'), text)
         const args = codex.buildCommand('C:\\bin\\codex.exe', context({ cwd })).args
-        expect(args.filter((a) => a === 'mcp_servers.hive.enabled=false'), `${place}, isolation ${isolation}`).toHaveLength(isolation ? 1 : 0)
+        expect(args.filter((a) => a === 'mcp_servers.theirs.enabled=false'), `${place}, isolation ${isolation}`).toHaveLength(isolation ? 1 : 0)
         expect(args.some((a) => a.startsWith('mcp_servers.combwork=')), `${place}, isolation ${isolation}`).toBe(true)
         expect(readFileSync(join(dir, 'config.toml'), 'utf8')).toBe(text)
       }
@@ -398,12 +398,12 @@ describe("Claude Code's and Copilot's own MCP servers (rows 4 and 6)", () => {
   it('Copilot: built-ins and the user’s servers off with the switch on; off, none disabled, Combwork’s by name least of all', async () => {
     const home = process.env.COPILOT_HOME!
     mkdirSync(home, { recursive: true })
-    writeFileSync(join(home, 'mcp-config.json'), JSON.stringify({ mcpServers: { mine: { command: 'node' }, hive: { command: 'node', args: ['native.js'] } } }))
+    writeFileSync(join(home, 'mcp-config.json'), JSON.stringify({ mcpServers: { mine: { command: 'node' }, theirs: { command: 'node', args: ['native.js'] } } }))
     try {
       const args = (): string[] => copilot.buildCommand('C:\\bin\\copilot.exe', context()).args
       expect(args()).toContain('--disable-builtin-mcps')
-      // A server of the user's named hive is theirs like any other (HI-2594): off with the others…
-      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual(['mine', 'hive'])
+      // A server of the user's is theirs like any other (HI-2594): off with the others…
+      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual(['mine', 'theirs'])
       await advanced.set(overrideId('copilot', 'mcpIsolation'), false)
       expect(args()).not.toContain('--disable-builtin-mcps')
       // …and with the switch off, none disabled.
@@ -608,7 +608,7 @@ describe("Combwork's guidance for agents (#1285, row 13)", () => {
     expect(advancedDef('codex.promptInput.timeoutSeconds')).toMatchObject({ group: 'codex', kind: 'number', default: 15, unit: 's', applies: 'sessions' })
   })
 
-  it('is a switch of its own under Combwork, on by default, taken by sessions started afterwards (e2e agentguidance checks the hive server it gives)', async () => {
+  it('is a switch of its own under Combwork, on by default, taken by sessions started afterwards (e2e agentguidance checks the combwork server it gives)', async () => {
     const { CW_GUIDANCE } = await import('../src/shared/advanced')
     expect(advancedDef(CW_GUIDANCE)).toMatchObject({ group: 'cw', kind: 'boolean', default: true, applies: 'sessions' })
   })

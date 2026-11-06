@@ -67,7 +67,7 @@ export interface RunnerConfig {
   target: string
   /** Where the project's Combwork worktrees go (`<workspace>.worktrees/<project>`): the runner's folder is made there. */
   root: string
-  /** This Hive's profile, as the panel names a runner ("run by Hive-Dev"). */
+  /** This Combwork's profile, as the panel names a runner ("run by Combwork-Dev"). */
   profile: string
   /** Runs a write under the lock its store needs (the app's boardWrite, as WorkflowConfig.locked); left out, as it is. */
   locked?: <T>(fn: () => T) => Promise<T>
@@ -902,8 +902,8 @@ export function queueFolderNeeded(wf: Workflow, target: string, busy?: () => boo
 }
 
 /**
- * A project leaving Hive (removed or deleted, #1360 item 5): this Hive's runners of it released, then its queue folders
- * removed with their records, except a living runner's of another Hive (that Hive releases its own) and one whose
+ * A project leaving Combwork (removed or deleted, #1360 item 5): this Combwork's runners of it released, then its queue folders
+ * removed with their records, except a living runner's of another Combwork (that one releases its own) and one whose
  * lease still has duties (processes not seen gone). Only folders named as the queue names them, in the project's
  * worktrees folder.
  */

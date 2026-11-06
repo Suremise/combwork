@@ -203,8 +203,8 @@ const M = {
   handOverMomentLost: msg({ id: 'session.handOver.momentLost', defaultMessage: '{agent} took the merge slot, started other work or changed while it wrote its handover, so its conversation wasn\'t ended. The handover "{handover}" is kept.', description: 'Handing an agent over to itself stopped before ending its conversation: while it wrote its handover it began merging (the merge slot), began other work (a task, a card loop\'s card) or restarted. {agent} is its name, {handover} the handover\'s path in the shared notes.' }),
   handOverBusy: msg({ id: 'session.handOver.busy', defaultMessage: '{agent} is busy. Hand over once it has finished.', description: "Hand Over to… is refused: the agent named is working. {agent} is the agent's name." }),
   switchEnded: msg({ id: 'session.mode.ended', defaultMessage: 'The session ended before Combwork could switch it to {mode}.', description: "Switching a running agent's permission mode failed: its session ended. {mode} is the mode's name." }),
-  needsInput: msg({ id: 'session.notice.needsInput', defaultMessage: '{agent} needs your input', description: "A notification's title: an agent waits for the user. {agent} is the agent (\"hive · B1\", or the project when it has one agent)." }),
-  finished: msg({ id: 'session.notice.finished', defaultMessage: '{agent} finished', description: "A notification's title: an agent's turn has ended. {agent} is the agent (\"hive · B1\", or the project when it has one agent)." }),
+  needsInput: msg({ id: 'session.notice.needsInput', defaultMessage: '{agent} needs your input', description: "A notification's title: an agent waits for the user. {agent} is the agent (\"demo · B1\", or the project when it has one agent)." }),
+  finished: msg({ id: 'session.notice.finished', defaultMessage: '{agent} finished', description: "A notification's title: an agent's turn has ended. {agent} is the agent (\"demo · B1\", or the project when it has one agent)." }),
   longConversation: msg({ id: 'session.notice.longConversation', defaultMessage: '{agent}: long conversation', description: "A notice's title: an agent's transcript has grown past the size set in Settings → Sessions. {agent} is the agent." })
 }
 
@@ -406,7 +406,7 @@ interface LiveSession {
    * the transcript is dropped if one came after the read began, as that hook says something newer (#475).
    */
   hooksSeen?: number
-  /** Whether its hooks are reaching Hive (#1336, hooksHealth.ts): what the check reads of the launch. */
+  /** Whether its hooks are reaching Combwork (#1336, hooksHealth.ts): what the check reads of the launch. */
   hooksWatch?: HooksWatch
   /**
    * Reading its transcript's turns (#1371, readTurns): which conversation and file, how far (a line's end), its first
@@ -431,7 +431,7 @@ interface LiveSession {
   /** When such a launch first became ready (or watching), in ms: its task is pending at most PENDING_MS from then (#721). */
   launchReadyAt?: number
   /**
-   * This launch was given Combwork's tools (the hive MCP server, #865): `connecting` until its server says the CLI has
+   * This launch was given Combwork's tools (the combwork MCP server, #865): `connecting` until its server says the CLI has
    * connected (POST /v1/launch/connected), and no line of Combwork's is typed meanwhile, at most cw.mcp.connectSeconds
    * from when it first became ready (readyAt), for a CLI that never connects it.
    */
@@ -556,12 +556,12 @@ interface LiveSession {
   launchEnv?: NodeJS.ProcessEnv
   /**
    * The dialect chain it speaks (dialects, HI-2443), pinned at its launch: what agent text says to it (the resolver
-   * below), and in hive-mcp.js and hive-progress.js through CW_DIALECT_FILE. `input`: what it was resolved from (its
+   * below), and in cw-mcp.js and cw-progress.js through CW_DIALECT_FILE. `input`: what it was resolved from (its
    * CLI, the real model ID it launched with, its pick), so the refresh can tell when its files would give another
    * (`key`) and show "restart to apply".
    */
   dialect?: PinnedDialect
-  /** When its latest hook reached Hive (ms, as it arrived). */
+  /** When its latest hook reached Combwork (ms, as it arrived). */
   lastHookAt?: number
   /** Its CLI's retry wait (HI-1972, checkRetry): a look under way, when it last looked, and the turn the wait shown is of. */
   retryLooking?: boolean
@@ -1293,7 +1293,7 @@ class SessionManager {
   }
   hookUrl = ''
   apiEnv: (projectPath: string, agentId: string) => Record<string, string> = () => ({})
-  /** Combwork's bin folder (hive-progress), first on each session's PATH; null until written, or when it couldn't be. */
+  /** Combwork's bin folder (cw-progress), first on each session's PATH; null until written, or when it couldn't be. */
   binDir: string | null = null
   combworkMcp: CombworkMcpProvider = () => null
   /** Combwork's guidance for agents (the combwork MCP server's instructions), for providers that need it at launch. */
@@ -1351,7 +1351,7 @@ class SessionManager {
 
   /**
    * Whether an agent's launch was given Combwork's tools and its CLI hasn't connected them yet (#865): a resumed Claude Code
-   * is ready at its SessionStart before its hive server has connected, and a doorbell typed then is a turn that can't
+   * is ready at its SessionStart before its combwork server has connected, and a doorbell typed then is a turn that can't
    * call cw_inbox. At most cw.mcp.connectSeconds from when it first became ready, for a CLI that never connects it
    * (its server failed to start, or MCP is off in it).
    */
@@ -1376,7 +1376,7 @@ class SessionManager {
   }
 
   /**
-   * Resolves once an agent's hive tools no longer hold its lines (#865 rounds 3 and 4): once combworkToolsWaiting, the gate
+   * Resolves once an agent's Combwork tools no longer hold its lines (#865 rounds 3 and 4): once combworkToolsWaiting, the gate
    * itself, is false. It is looked at again when the tools connect, the launch's state changes or it ends, the bound is
    * changed in Settings → Advanced, and when what is left of the bound from its ready runs out; never a frozen deadline.
    */
@@ -1699,7 +1699,7 @@ class SessionManager {
       }
     }
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
-    // it names some. Never one named as Combwork's own (a hand-made .combwork/mcp/hive.json): the CLIs pre-approve that one's tools.
+    // it names some. Never one named as Combwork's own (a hand-made .combwork/mcp/combwork.json): the CLIs pre-approve that one's tools.
     const forAgent = agent ?? projectAgents(pc)[0]
     // The Assistant gets the workspace's servers added for it (HI-1472, HI-2059: its view's MCP Servers, as a project's
     // MCP tab); never a project's.
@@ -2258,7 +2258,7 @@ class SessionManager {
 
     const mode = assistant ? (await this.assistantInstructions(projectPath, agent).catch(() => null))?.mode : undefined
     times.mark('assistantInstructions')
-    // A /rename in the CLI since the session was last named in Hive is the newer name: Hive takes it, and so passes
+    // A /rename in the CLI since the session was last named in Combwork is the newer name: Combwork takes it, and so passes
     // it back with --name rather than its own.
     let adopted: string | null = null
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
@@ -2854,7 +2854,7 @@ class SessionManager {
     l.titleAttention = adapter.titleAttention?.(info.version, ctx) ?? undefined
     l.turnScreen = adapter.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
-    // Whether its hooks reach Hive (#1336), and what can say why they don't.
+    // Whether its hooks reach Combwork (#1336), and what can say why they don't.
     l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook, adapter.transcriptTurns ? (adapter.turnsJoin ?? 'id') : null)
     l.hooksOffIn = adapter.hooksOffIn ? () => adapter.hooksOffIn!(ctx) : undefined
     l.newerThanTested = info.tested?.installed === 'newer'
@@ -5728,7 +5728,7 @@ class SessionManager {
     this.emitState(st)
   }
 
-  /** An agent's name as notices show it ("hive", or "hive · HB2" in a project with several). */
+  /** An agent's name as notices show it ("demo", or "demo · HB2" in a project with several). */
   agentLabel(projectPath: string, agentId: string): string {
     const st = this.liveFor(projectPath, agentId)
     return st ? this.label(st) : agentId
@@ -5746,7 +5746,7 @@ class SessionManager {
     return null
   }
 
-  /** "hive" for a project with one agent, "hive · Agent 2" when it has several. */
+  /** "demo" for a project with one agent, "demo · Agent 2" when it has several. */
   /** The running agent a developer console source is, or null (#698: the flight recorder's pattern trigger finds it here). */
   flightAgent(source: string): { projectPath: string; agentId: string; provider: string; label: () => string } | null {
     for (const l of this.live.values()) if (sessionSourceId(l.state.projectPath, l.state.agentId) === source) return { projectPath: l.state.projectPath, agentId: l.state.agentId, provider: l.state.provider, label: () => this.label(l.state) }
@@ -7124,7 +7124,7 @@ class SessionManager {
         .catch((e) => log.warn('chime: settings unavailable', e))
     }
     const notifyKind = NOTIFY_KIND[kind]
-    // Finishes that come together are told in one notice ("3 agents finished in hive"); a question is told at once.
+    // Finishes that come together are told in one notice ("3 agents finished in demo"); a question is told at once.
     if (kind === 'finished') {
       const { route, why } = this.routeWhy(projectPath, notifyKind)
       if (route === 'none') {
@@ -8046,7 +8046,7 @@ class SessionManager {
 
   /**
    * Archives, unarchives or deletes several sessions (a branch of the Sessions tab). Each is all or nothing, with the
-   * same checks as one at a time; those in use, running, open in another window or started outside Hive (nothing of
+   * same checks as one at a time; those in use, running, open in another window or started outside Combwork (nothing of
    * Combwork's to archive) are skipped and listed with why. The CLIs' own transcripts are never touched.
    */
   async bulk(projectPath: string, action: SessionBulkAction, sessionIds: string[]): Promise<SessionBulkResult> {
@@ -8203,7 +8203,7 @@ class SessionManager {
    * Purge… (#1138): removes what Combwork keeps of one of its sessions as the preview listed it (`listed`: its backups,
    * leftovers of them, its attachments folder, the old usage on its record). The session is reserved (nothing resumes it
    * meanwhile) with its backups locked, and checked again just before anything goes: not running or starting, its
-   * transcript not being read by Hive (nor shown, when its last copy goes), and its copies exactly those listed. What it used is recorded in the usage
+   * transcript not being read by Combwork (nor shown, when its last copy goes), and its copies exactly those listed. What it used is recorded in the usage
    * history first, so totals don't change. Backups that are its last copy (`lastCopy`: the CLI no longer has its
    * transcript, checked again) go with its record, all or nothing, as Delete does. `remove` removes a file (to the
    * Recycle Bin, or for good); `attachments` its listed attachments; `unchanged` throws when a listed file changed since. The CLI's own files are never touched.

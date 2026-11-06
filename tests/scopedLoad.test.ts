@@ -51,7 +51,7 @@ describe('one load at a time (#1646)', () => {
     const serial = oneAtATime()
     const h = held()
     let reruns = 0
-    const ask = (): void => serial.run('hive', h.start('hive'), () => {
+    const ask = (): void => serial.run('alpha', h.start('alpha'), () => {
       reruns++
       ask()
     })
@@ -76,7 +76,7 @@ describe('one load at a time (#1646)', () => {
     const serial = oneAtATime()
     const h = held()
     const taken: number[] = []
-    const ask = (): void => serial.run('hive', () => { const n = h.loads.length; return h.start('hive')().then(() => { taken.push(n) }) }, ask)
+    const ask = (): void => serial.run('alpha', () => { const n = h.loads.length; return h.start('alpha')().then(() => { taken.push(n) }) }, ask)
     for (let round = 0; round < 5; round++) {
       ask()
       ask()

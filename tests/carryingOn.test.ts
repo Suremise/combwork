@@ -49,7 +49,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     }
   })
   deliveries.setReadsInboxForTests(() => true)
-  const hive = { kind: 'combwork' as const, name: 'Combwork' }
+  const combwork = { kind: 'combwork' as const, name: 'Combwork' }
   /** What b1 has unread (queued, offered or uncertain: not received, not ended). */
   const unread = async (): Promise<string[]> => (await deliveries.deliveriesOf(alpha, 'b1')).filter((r) => ['queued', 'offered', 'uncertain'].includes(r.state)).map((r) => r.id)
   const setSwitches = async (on: Record<InboxSwitch, boolean>): Promise<void> => {
@@ -73,7 +73,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
         await setSwitches(c)
         // Working: an item arrives during a tool; the tool's end is a checkpoint.
         st.status = 'working'
-        const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Also cover the empty case.' })
+        const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: combwork, body: 'Also cover the empty case.' })
         const atTool = await noticeFor(live(), 'checkpoint')
         expect(atTool === null ? 'nothing' : 'told').toBe(c.checkpoints ? 'told' : 'nothing')
         if (c.checkpoints) expect(atTool).toContain(m.id)
@@ -99,8 +99,8 @@ describe('carrying on: the inbox switches (#1432)', async () => {
 
   it('idle wakes off: no kind of item is typed, a card event (a loop wake) included; it stays in the inbox, and Deliver Now types its line once', async () => {
     await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
-    const e = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1432, body: '#1432 is in Review.', source: 'loop', ref: '#1432' })
-    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Then #1434.' })
+    const e = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: combwork, card: 1432, body: '#1432 is in Review.', source: 'loop', ref: '#1432' })
+    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: combwork, body: 'Then #1434.' })
     await deliveries.offerAllForTests()
     expect(st.typed).toEqual([])
     expect(await unread()).toEqual([e.id, m.id])
@@ -117,7 +117,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
 
   it("idle wakes off: Deliver Now pressed while the tick's own try is under way still types its line", async () => {
     await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
-    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Then #1434.' })
+    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: combwork, body: 'Then #1434.' })
     const { deliverWaiting } = await import('../src/main/agentMessages')
     // The tick's try first (it types nothing with idle wakes off), Deliver Now while it runs.
     const [tick, asked] = await Promise.all([deliveries.offerNow(alpha, 'b1'), deliverWaiting(alpha, 'b1')])
@@ -133,7 +133,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     deliveries.registerSource('overtaken-as-typed', { refresh: async () => ({ body: `[CW] #1504 is in Review (${seq}).`, meta: { seq } }), holds: (r) => r.meta?.seq === seq })
     const { deliverWaiting } = await import('../src/main/agentMessages')
     // The card's arrival in Review updates its lane as the line is typed, once: made again from the board now, typed.
-    const e = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1504, body: '[CW] #1504 is in Review.', source: 'overtaken-as-typed', ref: '#1504' })
+    const e = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: combwork, card: 1504, body: '[CW] #1504 is in Review.', source: 'overtaken-as-typed', ref: '#1504' })
     let changes = 0
     st.during = () => {
       if (++changes === 1) seq++
@@ -144,7 +144,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     // Overtaken on every try: given up after a few, nothing typed, still unread.
     await deliveries.readInbox(alpha, 'b1')
     Object.assign(st, { status: 'ready', typed: [] })
-    const f = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1505, body: '[CW] #1505 is in Review.', source: 'overtaken-as-typed', ref: '#1505' })
+    const f = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: combwork, card: 1505, body: '[CW] #1505 is in Review.', source: 'overtaken-as-typed', ref: '#1505' })
     changes = 0
     st.during = () => {
       changes++
@@ -167,7 +167,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
           return null
         }
       })
-      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Pending wake.', source: 'switch-test' })
+      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: combwork, body: 'Pending wake.', source: 'switch-test' })
       return { m, refreshed: () => refreshed }
     }
     it("Settings' turned off as it is made", async () => {
@@ -190,7 +190,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     })
     it("Settings' turned off while its line is typed: its last key isn't pressed", async () => {
       await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
-      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Typed wake.' })
+      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: combwork, body: 'Typed wake.' })
       st.during = () => advanced.set(INBOX_SWITCH_ID.idleWakes, false)
       expect(await deliveries.offerNow(alpha, 'b1')).toBe(false)
       expect(st.typed).toEqual([])
@@ -204,7 +204,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
         const at = project.writes
         return { own: { inboxIdleWakes: project.own }, changed: () => project.writes !== at }
       })
-      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Typed wake.' })
+      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: combwork, body: 'Typed wake.' })
       // Between the line's first check and its last: Project Settings → Sessions → Wake an idle agent, Off.
       st.during = () => {
         project.own = 'off'
@@ -223,7 +223,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     it("a project's own on, Settings' turned off while it is typed: still typed (the project's own wins)", async () => {
       await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
       deliveries.setInboxProjectForTests(async () => ({ own: { inboxIdleWakes: 'on' }, changed: () => false }))
-      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Own on.' })
+      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: combwork, body: 'Own on.' })
       st.during = () => advanced.set(INBOX_SWITCH_ID.idleWakes, false)
       expect(await deliveries.offerNow(alpha, 'b1')).toBe(true)
       expect(st.typed).toHaveLength(1)
@@ -234,7 +234,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
   it("idle wakes off: Deliver Now pressed while a watch's line for the agent is being made waits for it, then types its own", async () => {
     await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
     const writer = await import('../src/main/lineWriter')
-    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Then #1442.' })
+    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: combwork, body: 'Then #1442.' })
     // A watch's line is being made for the agent for its first checks, then done.
     let asked = 0
     writer.onLineComing(() => ++asked <= 2)
@@ -248,7 +248,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     }
   })
 
-  it('idle wakes off: a task given now (a card started on a running agent, hive_send_task) is no wake, and is typed', async () => {
+  it('idle wakes off: a task given now (a card started on a running agent) is no wake, and is typed', async () => {
     await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
     const r = await deliveries.deliverNow(alpha, { agentId: 'b1', agentName: 'B1', conversation: st.sessionId, kind: 'task', from: { kind: 'user', name: 'the user' }, card: 7, body: 'Work on #7.', need: 'free' })
     expect(r?.state).toBe('offered')

@@ -150,7 +150,7 @@ function touchRows(info: ProjectRemovalInfo, how: ProjectRemoval): ItemRow[] {
   return rows
 }
 
-/** Project → Remove Project…: hide it, remove it from Hive (keeping its files), or delete it. */
+/** Project → Remove Project…: hide it, remove it from Combwork (keeping its files), or delete it. */
 export function RemoveProjectDialog() {
   const path = useStore((s) => s.removeProjectFor)
   const [info, setInfo] = useState<ProjectRemovalInfo | null>(null)

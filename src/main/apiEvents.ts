@@ -72,14 +72,14 @@ export function publicSessionState(s: LiveSessionState): Record<string, unknown>
   })
 }
 
-/** What a run whose title was made from its command line is called outside Hive (Darren's rule for #620). */
+/** What a run whose title was made from its command line is called outside Combwork (Darren's rule for #620). */
 export const COMMAND_TITLE = 'a command'
 
 /**
  * A progress run as the API gives it (GET /v1/progress and `progress-changed`): who runs what, how far, how long. Left
  * out: the command line (its arguments can hold a token or a prompt), the step's name, what it waits for, the summary
  * (a reporter's own text, which can quote output) and the log's path. Its title leaves Combwork only when it was given on
- * purpose (hive-progress --title, a reporter's or script's own); one made from the command line never does, nor any
+ * purpose (cw-progress --title, a reporter's or script's own); one made from the command line never does, nor any
  * part of it: the run is "a command", with `titleFromCommand: true`.
  */
 export function publicRun(r: ProgressRun): Record<string, unknown> {
@@ -119,8 +119,8 @@ export function publicRun(r: ProgressRun): Record<string, unknown> {
 }
 
 /**
- * Whether a run's title was made from its command line: its reporter says so (hive-progress without --title), or, for a
- * run that doesn't (an older hive-progress, a run kept from before this), the title begins as its command line does.
+ * Whether a run's title was made from its command line: its reporter says so (cw-progress without --title), or, for a
+ * run that doesn't (an older cw-progress, a run kept from before this), the title begins as its command line does.
  * The title and the command are each cut to their own length, so they are compared as far as both go, never whole.
  */
 function titleFromCommand(r: ProgressRun): boolean {

@@ -239,7 +239,7 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     const next = await t.lane('lane-next')
     expect('slot' in next && next.slot).not.toBe(first.slot)
 
-    const u = await setup('otherhive')
+    const u = await setup('second')
     const a = await u.lane('lane-old')
     if (!('slot' in a)) throw new Error(JSON.stringify(a))
     const l = u.leases('b1')[0]

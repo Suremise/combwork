@@ -27,12 +27,12 @@ function roundTrip(db: DatabaseSync, n: number, doc: Record<string, unknown>): s
   return JSON.stringify(composeCard(rows))
 }
 
-/** A card as Hive 0.9.3 saves it (saveCard's order). */
+/** A card as 0.9.3 saves it (saveCard's order). */
 const card = (n: number, more: Record<string, unknown> = {}): Record<string, unknown> => ({
   number: n,
   title: `Card ${n}`,
   description: 'What to do',
-  project: 'hive',
+  project: 'alpha',
   projectId: 'p-1',
   agent: 'a-1',
   agentName: 'B1',

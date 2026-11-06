@@ -281,7 +281,7 @@
   },
   "mcp.catalog.updateMessage": {
     "defaultMessage": "{where}: those places keep it, your values for its environment and headers too. What it runs changes (− now, + after):",
-    "description": "The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added (\"Added in hive\", \"Not added anywhere\")."
+    "description": "The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added (\"Added in demo\", \"Not added anywhere\")."
   },
   "mcp.catalog.updateSame": {
     "defaultMessage": "{where}: those places keep it, your values for its environment and headers too. What it runs stays the same:",

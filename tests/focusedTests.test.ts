@@ -1,4 +1,4 @@
-// The hive project's focused-test runner (HI-1367): scripts/focusedTests.mjs, which Combwork's merge queue runs as the
+// This repository's focused-test runner (HI-1367): scripts/focusedTests.mjs, which Combwork's merge queue runs as the
 // project's focused.run. Its pure parts: which ids it takes, and each test's result from Vitest's JSON report and the
 // e2e run record; and, on the command line, a list it can't use or ids it can't run (neither starts Vitest or a suite).
 import { spawnSync } from 'child_process'

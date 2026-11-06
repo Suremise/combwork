@@ -8,7 +8,7 @@
 // the slot (`op` on its row) from the write that starts it to the write that ends it: its token, kind and holder process
 // (pid and start). Every write it makes is fenced on its token (OpLost otherwise: it stops, writing nothing more and
 // touching nothing on disk), and nothing else starts an operation, lends, adopts or removes the slot while it is held.
-// Another Hive (or this one, for a token it no longer runs: a workspace closed and opened again) takes an operation
+// Another Combwork (or this one, for a token it no longer runs: a workspace closed and opened again) takes an operation
 // over only once its holder process is gone, and only after settling its job: a command an operation runs is recorded
 // (`job`, its job on the process supervisor) before it starts and cleared only once its processes are seen ended; until
 // then the slot isn't lent, also after the operation ended (a job that couldn't be emptied), and `refresh` settles it
@@ -20,7 +20,7 @@
 //   queue's, and `copies`) while the pool is under its size (the builders, at most the agent cap). It is handed over only
 //   once the operation has looked at it again (a free slot may have changed since it was released: dirty, a session or
 //   a process in it; then it is marked so and another is tried), made it if new (a detached worktree at the target's
-//   head, the project's copied files, its setup as one of Hive's runs, "Hive (slot slot-b)"), recreated it if gone, and
+//   head, the project's copied files, its setup as one of Combwork's runs, "Combwork (slot slot-b)"), recreated it if gone, and
 //   installed again when its lock files changed. A failed setup leaves it not ready, with the run's log: lending skips
 //   it. The same card asking again gets its lease only once the slot is ready (`warming` while another Combwork warms it).
 // - A carried lease (#1441: an agent's migrated worktree) protects its slot: never lent to anyone else, nor cleaned up,
@@ -161,7 +161,7 @@ export interface Slot {
   job: string | null
   /**
    * The session that writes in it now (#1434, agentFolders.ts): its run, the lease and agent it started under, and its
-   * Hive (pid and start). Reserved in the write that lets it start, cleared once it has exited: while it is set the slot
+   * Combwork (pid and start). Reserved in the write that lets it start, cleared once it has exited: while it is set the slot
    * isn't lent, adopted, taken by hand or removed, and its lease's end waits for it to drain.
    */
   writer: SlotWriter | null
@@ -623,7 +623,7 @@ export class SlotStore {
    * The slot an agent's own run still writes in, its lease ended (HI-1762: HB5's lane ended, its session still in its
    * turn in slot-a, and its next lane's start found no slot free), taken over by its next card or lane in one write: only
    * while the slot has no open lease, operation or job, is lent with no warm error, its writer is that agent's run `run`
-   * held by this Hive (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot, the writer
+   * held by this Combwork (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot, the writer
    * moves to it (the old lease's end then no longer owns the run: it stops nothing), and `also` (the caller's rebinding of
    * the run's conversations) runs in the same write. Null when it can't be now; nothing written.
    */
@@ -688,7 +688,7 @@ export class SlotStore {
    * A rename begun (#1441): in one write, the slot taken by a `remove`-kind operation (as `startRemoval`, only while it is
    * free and in state `from`) and its destination reserved: the next generic name no slot of the project has, no other
    * rename's intent has reserved, and whose folder under `root` is absent, recorded as the operation's intent (board_meta
-   * `slot_rename:<project>:<slot>`). Two renames, of two slots or in two Hives, so never share a destination. Null when
+   * `slot_rename:<project>:<slot>`). Two renames, of two slots or in two Combworks, so never share a destination. Null when
    * the slot isn't free now.
    */
   async startRename(name: string, from: SlotState, token: string, holder: Holder, root: string, tree: string): Promise<RenameIntent | null> {
@@ -1031,7 +1031,7 @@ export interface SlotRunEnd {
   settled: boolean
 }
 
-/** Runs a slot's command as one of Hive's runs ("Hive (slot slot-b)"), to its end, in its job; never throws. */
+/** Runs a slot's command as one of Combwork's runs ("Combwork (slot slot-b)"), to its end, in its job; never throws. */
 export type SlotRunner = (r: SlotRun) => Promise<SlotRunEnd>
 
 /** A project's slot options as they apply now: project.json's `slots`, else today's worktree settings. */

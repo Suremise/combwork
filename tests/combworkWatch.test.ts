@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { CombworkEvent } from '../src/shared/types'
 
-const base = tempDir('cw-hive-watch-')
+const base = tempDir('cw-combwork-watch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -27,7 +27,7 @@ afterAll(async () => {
 
 const events: string[] = []
 vi.spyOn(w, 'emit').mockImplementation((e: CombworkEvent) => void events.push(e.type))
-const hive = join(ws, '.combwork')
+const combwork = join(ws, '.combwork')
 /** Waits for an event of this type after `from` (the watch's events come a moment after the write). */
 const told = (type: string, from: number): Promise<void> => vi.waitFor(() => expect(events.slice(from)).toContain(type), { timeout: 10_000, interval: 50 })
 /** Writes `file` until an event of this type is told: a watch starts (or takes a new folder) a moment after it is asked to. */
@@ -45,22 +45,22 @@ const toldOnceWatched = (type: string, file: string): Promise<void> => {
 
 describe("a workspace's .combwork watch (HI-1797)", () => {
   it('tells a shared note, a skill and a modes folder made after it opened, and reads workspace.json again', async () => {
-    mkdirSync(join(hive, 'shared'), { recursive: true })
+    mkdirSync(join(combwork, 'shared'), { recursive: true })
     // The watch is up once a note's change is told.
-    await toldOnceWatched('notes-changed', join(hive, 'shared', 'note.md'))
+    await toldOnceWatched('notes-changed', join(combwork, 'shared', 'note.md'))
     let from = events.length
-    mkdirSync(join(hive, 'skills', 'mine'), { recursive: true })
-    writeFileSync(join(hive, 'skills', 'mine', 'SKILL.md'), '---\nname: mine\n---\n')
+    mkdirSync(join(combwork, 'skills', 'mine'), { recursive: true })
+    writeFileSync(join(combwork, 'skills', 'mine', 'SKILL.md'), '---\nname: mine\n---\n')
     await told('skills-changed', from)
     // A modes folder the workspace didn't have: its appearing is told, and its files from then on.
     from = events.length
-    mkdirSync(join(hive, 'personas'), { recursive: true })
+    mkdirSync(join(combwork, 'personas'), { recursive: true })
     await told('modes-changed', from)
-    await toldOnceWatched('modes-changed', join(hive, 'personas', 'old.md'))
+    await toldOnceWatched('modes-changed', join(combwork, 'personas', 'old.md'))
     // workspace.json changed outside Combwork: read again (it tells skills-changed).
     from = events.length
-    const cfg = JSON.parse(String(await import('fs').then((f) => f.readFileSync(join(hive, 'workspace.json'), 'utf8'))))
-    writeFileSync(join(hive, 'workspace.json'), JSON.stringify({ ...cfg, combworkWatchTest: 1 }))
+    const cfg = JSON.parse(String(await import('fs').then((f) => f.readFileSync(join(combwork, 'workspace.json'), 'utf8'))))
+    writeFileSync(join(combwork, 'workspace.json'), JSON.stringify({ ...cfg, combworkWatchTest: 1 }))
     await told('skills-changed', from)
   })
 
@@ -68,11 +68,11 @@ describe("a workspace's .combwork watch (HI-1797)", () => {
     // (The writes above have each been told: what they told was waited for.)
     const from = events.length
     for (let i = 0; i < 5; i++) {
-      writeFileSync(join(hive, 'combwork.db-wal-test'), 'x'.repeat(i))
-      writeFileSync(join(hive, 'combwork.db-journal'), 'x'.repeat(i))
+      writeFileSync(join(combwork, 'combwork.db-wal-test'), 'x'.repeat(i))
+      writeFileSync(join(combwork, 'combwork.db-journal'), 'x'.repeat(i))
     }
     // A change that is told, after them: once it is, the database files' changes have been seen (and told nothing).
-    writeFileSync(join(hive, 'shared', 'after.md'), 'after\n')
+    writeFileSync(join(combwork, 'shared', 'after.md'), 'after\n')
     await told('notes-changed', from)
     expect(events.slice(from).filter((e) => e !== 'notes-changed')).toEqual([])
   })

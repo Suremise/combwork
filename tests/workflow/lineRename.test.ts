@@ -2,7 +2,7 @@
 // a rename cut short after git's step (a pending rename, `pendingRename`) rather than take the old name for gone. Every
 // observation acts on the card's current line and cycle, checked under its write's lock: two Combworks recovering the same
 // rename at once, a restart, a repeat, a rename between an observer's read and its write, and a new cycle meanwhile
-// never leave a Gone: line or a HeadMoved of the old name. Real Git; two Workflows on one store stand in for two Hives.
+// never leave a Gone: line or a HeadMoved of the old name. Real Git; two Workflows on one store stand in for two Combworks.
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
@@ -46,7 +46,7 @@ function pending(wfs: Workflow[], from: string, to: string | null, before?: () =
 }
 
 describe("a card's line renamed by Repair (#1305)", () => {
-  it('two Hives recover the same cut-short rename at once: one LineRenamed, no Gone, no head of the old name', async () => {
+  it('two Combworks recover the same cut-short rename at once: one LineRenamed, no Gone, no head of the old name', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
     const other = e.another()
     const { card, line } = await started(e)
