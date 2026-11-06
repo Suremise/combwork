@@ -150,9 +150,12 @@ async function theForm(page, app, inv) {
     const running = page.locator('.project-row', { hasText: 'web' }).locator('.agent-count')
     for (const s of ['ready', 'working', 'waiting', 'working']) for (const a of ['b1', 'r1']) await status(a, s)
     // Main knows nothing of these made-up runs, so a workspace refresh meanwhile (a project.json write's) drops them: they
-    // go on reporting, as running agents do, until the row shows them (HI-1774: it raced that refresh).
+    // go on reporting, as running agents do, until the row shows them (HI-1774: it raced that refresh). The count is read
+    // without Playwright's wait (HI-2639): a refresh between count() and innerText() removed it, and innerText() then
+    // waited 30 s for it while nothing reported the runs again.
     const twoShown = !!(await lib.until(async () => {
-      if ((await running.count()) === 1 && (await running.innerText()).trim() === '2') return true
+      const shown = await running.allInnerTexts()
+      if (shown.length === 1 && shown[0].trim() === '2') return true
       for (const a of ['b1', 'r1']) await status(a, 'working')
       return false
     }, HUNG_MS))
