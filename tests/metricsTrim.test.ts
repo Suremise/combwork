@@ -177,7 +177,7 @@ describe('HI-2628: 30 days kept, trims logged, folds keep their totals', () => {
     for (let i = 0; i < 2050; i++) metrics.recordLaunch(metrics.metricsHandle(w), 'alpha', { ...launch, dialect: i.toString(16).padStart(16, '0') })
     const kept = () => {
       const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' } })
-      return { series: Object.values(r.projects).reduce((n, p) => n + p.guidance.length, 0), dropped: r.dropped }
+      return { series: Object.values(r.projects).reduce((k, p) => k + p.guidance.length, 0), dropped: r.dropped }
     }
     expect(kept()).toEqual({ series: saved.series, dropped: 50 })
     expect(metrics.metricsHandle(w)!.store.buckets[0].series).toBe(saved.series)
