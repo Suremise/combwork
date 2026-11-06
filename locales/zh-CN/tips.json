@@ -538,5 +538,7 @@
   "tips.workspaceNotes.text": "固定在“共享笔记”顶部的 Workspace notes 用来记录这台机器特有的内容，比如完整路径。每个智能体在启动时都会获得它，无论在哪个文件夹，所以不必写进已提交的 AGENTS.md。以项目名为标题的章节只属于该项目。",
   "tips.workspaceNotes.title": "让每个智能体都知道的本机笔记",
   "tips.modelSwitched.title": "使用其他模型的智能体会被标记",
-  "tips.modelSwitched.text": "如果智能体最终使用的模型不是其连接指定的（接近上限时 Codex 提议的更便宜模型，或 /model），它的页脚会用警告标记该模型，“活动”会显示“模型已更换”。重启智能体即可回到原模型。"
+  "tips.modelSwitched.text": "如果智能体最终使用的模型不是其连接指定的（接近上限时 Codex 提议的更便宜模型，或 /model），它的页脚会用警告标记该模型，“活动”会显示“模型已更换”。重启智能体即可回到原模型。",
+  "tips.waitingOnPurpose.title": "有意等待的卡片",
+  "tips.waitingOnPurpose.text": "进行中的卡片在等一个安静的时段，或等一个答复？右键单击它，选择“标记为等待中…”，并写明原因：在你取消标记或它离开进行中之前，Combwork 不再将其报告为停滞。其代理继续运行。"
 }

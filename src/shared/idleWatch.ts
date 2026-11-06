@@ -25,15 +25,16 @@ const T = {
 /** How long a lane's builder may only watch its own card with nothing waiting on it before the card is stalled. */
 export const IDLE_WATCH_STALL_MS = 5 * 60_000
 
-type IdleCard = Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked' | 'agent' | 'history'>
+type IdleCard = Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked' | 'agent' | 'history'> & Partial<Pick<TaskCard, 'waitingFor'>>
 
 /**
  * Whether nothing on the builder's own card waits on anyone else: in Doing (not submitted, so not in Review or later),
- * not blocked, the builder's, no design or follow-up posted for its reviewer's check still open (pendingStep), and no
- * request open for the user (`forYouOpen`: the card's For you items, any asker's). Combwork's existing state only.
+ * not blocked, not marked waiting on purpose (HI-2618: HB3 held HI-2590 for a quiet window), the builder's, no design or
+ * follow-up posted for its reviewer's check still open (pendingStep), and no request open for the user (`forYouOpen`:
+ * the card's For you items, any asker's). Combwork's existing state only.
  */
 export function nothingWaitsOn(card: IdleCard, builder: string, forYouOpen: boolean): boolean {
-  return !card.archived && !card.blocked && card.column === 'doing' && card.agent === builder && !forYouOpen && !pendingStep(card)
+  return !card.archived && !card.blocked && !card.waitingFor && card.column === 'doing' && card.agent === builder && !forYouOpen && !pendingStep(card)
 }
 
 /** The card watch's reply when the builder watches only such a card: what's wrong and what to do instead. */

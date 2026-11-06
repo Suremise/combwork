@@ -36,6 +36,7 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+<!-- old-name: begin baseline-run-records -->
 ## A known Codex habit (accepted for 1.0.0): Codex, fixtures v119–v120, 1 November 2026
 
 **assistant-card-question**, Codex 0 of 2 before and after HI-2265's fixes (and 0 of 3 on df1676127, HI-2190); Haiku
@@ -1445,3 +1446,4 @@ From real launches (`node tests/scenarios/measure.cjs`, with the fake CLIs; sour
 - **A resumed session measures the same as a new one.**
 - **The user's own skills reach project agents only**: the long catalog doesn't change the Assistant's size.
 - **The tool schemas are the largest fixed part.**
+<!-- old-name: end baseline-run-records -->

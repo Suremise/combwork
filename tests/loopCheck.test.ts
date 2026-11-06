@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { cardsInPlay, othersCards, owedCards, unwatched } from '../src/main/loopCheck'
 import { providerDescriptor } from '../src/shared/providers'
-import { backgroundTaskMinutes, builderJobOf, laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
+import { backgroundTaskMinutes, builderJobOf, laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason, reviewWaiter, laneReviewOwed } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 
 const card = (number: number, over: Partial<TaskCard> = {}): TaskCard => ({ number, title: `Card ${number}`, project: 'alpha', column: 'todo', agent: null, archived: false, labels: [], blockedBy: [], links: [], comments: [], history: [], ...over }) as unknown as TaskCard
@@ -192,6 +192,59 @@ describe('a card in Review its watching reviewer has not started on (#521)', () 
     const back = [...failed, h(600, 'HB2 (alpha)', 'Returned for review, round 2')]
     expect(reviewWaitReason(inReview({ history: back }), watchers, t0 + 600_000 + REVIEW_WAIT_STALL_MS - 1000)).toBeNull()
     expect(reviewWaitReason(inReview({ history: back }), watchers, t0 + 600_000 + REVIEW_WAIT_STALL_MS)).toBe("HR2 is watching #506 but hasn't started reviewing it: in Review for 15 min.")
+  })
+  describe('names the agent that owes the review, never a builder only watching it (HI-2636)', () => {
+    // HB1, another lane's builder, watches the card for Done; HR3 is the pool's reviewer given it, idle, with no watch.
+    const hb1 = { name: 'HB1', project: 'alpha', agentId: 'b1', cards: [506], status: 'watching' }
+    const hr3 = { name: 'HR3', project: 'alpha', agentId: 'r3', cards: [506], status: 'watching' }
+    const at = t0 + 20 * 60_000
+    const given = { agentId: 'r3', name: 'HR3', givenAt: new Date(t0 + 2 * 60_000).toISOString(), status: 'finished' }
+    it('a pool card: its given reviewer, watching or not, said as given', () => {
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, given)).toBe("#506 was given to HR3 to review 18 min ago, and it hasn't started reviewing it: in Review for 20 min.")
+      expect(reviewWaitReason(inReview(), [hb1, hr3], at, undefined, given)).toBe("#506 was given to HR3 to review 18 min ago, and it hasn't started reviewing it: in Review for 20 min.")
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, { ...given, status: 'working' })).toBe("#506 was given to HR3 to review 18 min ago, and it hasn't started reviewing it (it is working on something else): in Review for 20 min.")
+      // Given only just now (every reviewer was busy): its own wait first.
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, { ...given, givenAt: new Date(at - 60_000).toISOString() })).toBeNull()
+    })
+    it('a pool card nobody was given yet: no stall, whoever watches it', () => {
+      expect(reviewWaitReason(inReview(), [hb1, hr3], at, undefined, null)).toBeNull()
+    })
+    it("a lane's reviewer: only it, when it watches", () => {
+      const lane = { agentId: 'r3', name: 'HR3' }
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, lane)).toBeNull()
+      expect(reviewWaitReason(inReview(), [hb1, hr3], at, undefined, lane)).toBe("HR3 is watching #506 but hasn't started reviewing it: in Review for 20 min.")
+    })
+    it("a pool card given to HR3, another reviewer (HR2) only watching it: HR3, never HR2 (HR1's round 1)", () => {
+      const hr2 = { name: 'HR2', project: 'alpha', agentId: 'r2', cards: [506], status: 'watching' }
+      // Main's check: HR3 given it, said so; HR2's watch counts for nothing.
+      expect(reviewWaitReason(inReview(), [hr2], at, undefined, given)).toBe("#506 was given to HR3 to review 18 min ago, and it hasn't started reviewing it: in Review for 20 min.")
+      expect(reviewWaiter(inReview(), [hr2], given)).toBeNull()
+      // The window's (laneReviewOwed from its pool lane): HR3 when it watches, nobody otherwise, never HR2.
+      // The window's tr, as its message's id and agent: which text it picked, for whom.
+      const fakeTr = ((m: { id: string }, v: Record<string, unknown>) => `${m.id}:${v.agent}`) as never
+      const agents = [{ id: 'b1', name: 'HB1' }, { id: 'r2', name: 'HR2' }, { id: 'r3', name: 'HR3' }]
+      const pool = (name: string | null, current: number | null = 506) => ({ builder: 'b2', reviewer: null, poolReviewing: { card: current, name }, cards: [{ number: 506, column: 'review' }] })
+      const board = (lane: ReturnType<typeof pool>) => reviewWaitReason(inReview(), [hr2, hb1], at, fakeTr, laneReviewOwed(inReview(), lane, agents, true))
+      expect(laneReviewOwed(inReview(), pool('HR3'), agents, true)).toEqual({ agentId: 'r3', name: 'HR3' })
+      expect(board(pool('HR3'))).toBeNull()
+      expect(reviewWaitReason(inReview(), [hr2, hr3], at, fakeTr, laneReviewOwed(inReview(), pool('HR3'), agents, true))).toBe('board.stalled.reviewWait:HR3')
+      // Not given out yet, or its current card another: nobody.
+      expect(laneReviewOwed(inReview(), pool(null), agents, true)).toBeNull()
+      expect(laneReviewOwed(inReview(), pool('HR3', 507), agents, true)).toBeNull()
+      expect(board(pool(null))).toBeNull()
+      // In no lane: nobody with the rules on (the pool gives it out); a watcher that reviews with them off.
+      expect(laneReviewOwed(inReview(), null, agents, true)).toBeNull()
+      expect(laneReviewOwed(inReview(), null, agents, false)).toBeUndefined()
+      // A lane's own reviewer, as long as it is one of the project's agents.
+      expect(laneReviewOwed(inReview(), { builder: 'b2', reviewer: 'r3', cards: [] }, agents, true)).toEqual({ agentId: 'r3', name: 'HR3' })
+      expect(laneReviewOwed(inReview(), { builder: 'b2', reviewer: 'gone', cards: [] }, agents, true)).toBeNull()
+    })
+    it('nobody known to owe it: a watcher that may review, never a builder', () => {
+      const reviews = (id: string): boolean => id.startsWith('r')
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, undefined, reviews)).toBeNull()
+      expect(reviewWaitReason(inReview(), [hb1, hr3], at, undefined, undefined, reviews)).toBe("HR3 is watching #506 but hasn't started reviewing it: in Review for 20 min.")
+      expect(reviewWaiter(inReview(), [hb1, hr3], undefined, reviews)?.name).toBe('HR3')
+    })
   })
 })
 

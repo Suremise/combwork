@@ -1,5 +1,5 @@
 import { currentCard, idleKey, laneCardState } from './laneBar'
-import type { LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, TaskCard } from './types'
+import type { DueDeps, LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, TaskCard } from './types'
 import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
@@ -115,6 +115,21 @@ export interface LaneRecord {
    * given to the next free pooled reviewer. Kept with the lane (its row's `extra`).
    */
   pool?: true
+  /**
+   * Its due card's wait for the cards it depends on (HI-2618): an episode begins once Combwork sees that card due with one
+   * of them not Done (`waiting`, a new `id` each time), is claimed once none is open (`pending`: with the rules off, its
+   * builder is owed one readiness wake, made with a receipt in the deliveries' own transaction), and is checkpointed
+   * `sent`. Kept with the lane (its row's `extra`), changed only under the lanes' lock.
+   */
+  depEpisode?: DepEpisode
+}
+
+/** A lane's due card's dependency wait (HI-2618, LaneRecord.depEpisode). */
+export interface DepEpisode {
+  card: number
+  id: string
+  state: 'waiting' | 'pending' | 'sent'
+  at: string
 }
 
 // The limits and defaults (loopLimits.ts). A loop's rounds, wait and design check wait when its request doesn't say are
@@ -203,6 +218,8 @@ export interface LaneStartWait {
   agent: string
   /** `dependencies`: the card it waits for, by its key. */
   waitsFor?: string
+  /** `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in `blockedBy` order. */
+  waitingOn?: string[]
   /** `refused` (HI-2468): the slot its start was refused as held, and what holds it (as a lane waiting for a slot says it). */
   held?: LaneSlotHeld
 }
@@ -250,7 +267,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * (currentCard); an ended lane without its record has none. A card held elsewhere (HI-1821: another agent's, or, given
  * to none, another lane's: `owners`, main's owner lane by card) is never its current card nor why it waits.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false, dueDeps?: DueDeps | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null, { lane: rec.id, builder: rec.builder.id, owner: owners?.get(n) }), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -272,7 +289,12 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
   // one and nothing else says why the lane waits: never "active" with its card untouched and nothing said. Not a pause.
-  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && list.find((c) => c.number === current)?.column === 'todo' ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent, ...(startWait.waitsFor ? { waitsFor: startWait.waitsFor } : {}), ...(startWait.why === 'refused' && startWait.held ? heldStatus(startWait.held) : {}) } : null
+  const dueTodo = list.find((c) => c.number === current)?.column === 'todo'
+  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && dueTodo ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent, ...(startWait.waitsFor ? { waitsFor: startWait.waitsFor } : {}), ...(startWait.waitingOn?.length ? { waitingOn: startWait.waitingOn } : {}), ...(startWait.why === 'refused' && startWait.held ? heldStatus(startWait.held) : {}) } : null
+  // Its due card waiting for the cards it depends on (HI-2618, `dueDeps`: main's, from the board): a state said from the
+  // board itself, whatever the lane-start look last found (or with the rules off, where nothing looks), and before it.
+  const due = running(rec) && !unrecorded && dueDeps && dueDeps.card === current && dueTodo ? dueDeps : null
+  const depsWait = due && due.open.length ? { reason: 'startWait' as const, card: due.card, why: 'dependencies' as const, agent: rec.builder.name, waitsFor: due.open[0], waitingOn: due.open } : null
   // An agent still owed its new conversation (HI-2034, `freshStart`; its builder's first): said while Combwork waits for it
   // to be free, and before anything else but its hooks and its slot once no more is tried (the user retries it or ends
   // the lane). Not a pause.
@@ -281,7 +303,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const fresh = owed ? { reason: 'startWait' as const, card: current, why: 'fresh' as const, agent: freshName, ...(owed.blocked ? { freshBlocked: owed.blocked.why, ...(owed.blocked.message ? { freshWhy: owed.blocked.message } : {}) } : {}) } : null
   // Its workspace's team paused (HI-2081, `teamPaused`: main's): before anything else, as nothing of it moves until it resumes.
   const pausedTeam = running(rec) && !unrecorded && teamPaused ? { reason: 'teamPause' as const, card: current } : null
-  const status = running(rec) ? (pausedTeam ?? hooks ?? noSlot ?? (fresh?.freshBlocked ? fresh : null) ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? fresh ?? waitsStart ?? preparing) : null
+  const status = running(rec) ? (pausedTeam ?? hooks ?? noSlot ?? (fresh?.freshBlocked ? fresh : null) ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? fresh ?? depsWait ?? waitsStart ?? preparing) : null
   // Reviewed by the pool (#1443): who gave its current card's last verdict, and who reviews it now (#1446), by name.
   const now = rec.pool && running(rec) && current !== null ? facts?.get(current) : undefined
   const agentName = (id: string): string => names?.get(id) ?? (rec.builder.id === id ? rec.builder.name : id)
@@ -310,7 +332,8 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null,
     slot: running(rec) ? (slot?.slot ?? null) : null,
     slotInfo: running(rec) ? (slot?.info ?? null) : null,
-    ...(now ? { poolReview: { lastVerdict: now.lastVerdict ? { name: agentName(now.lastVerdict.reviewer), pass: now.lastVerdict.pass } : null, reviewing: now.reviewing ? agentName(now.reviewing) : null } } : {})
+    ...(now ? { poolReview: { lastVerdict: now.lastVerdict ? { name: agentName(now.lastVerdict.reviewer), pass: now.lastVerdict.pass } : null, reviewing: now.reviewing ? agentName(now.reviewing) : null } } : {}),
+    ...(due ? { dueDeps: due } : {})
   }
 }
 
@@ -437,7 +460,7 @@ const L = {
   freshFailed: agentMsg({ id: 'lane.status.fresh.failed', text: "{agent}'s new conversation didn't start ({why}): retry it from the lane's row, or end the lane", note: "An agent's new conversation for its lane (HI-2034) failed to launch; {why} is why, as recorded." }),
   freshFailedBare: agentMsg({ id: 'lane.status.fresh.failedBare', text: "{agent}'s new conversation didn't start (its start failed): retry it from the lane's row, or end the lane", note: "An agent's new conversation for its lane (HI-2034) failed to launch, with no reason recorded." }),
   freshWaits: agentMsg({ id: 'lane.status.fresh.waits', text: 'waiting: {agent} starts in a new conversation once it is free', note: 'An agent is owed a new conversation for its lane (HI-2034): Combwork launches it once the agent is free.' }),
-  startDependencies: agentMsg({ id: 'lane.status.start.dependencies', text: '{card} waits to start: it waits for {waitsFor} to merge', note: "A lane's next card waits for a card it depends on to be merged (HI-2129); {waitsFor} is that card's key." }),
+  startDependencies: agentMsg({ id: 'lane.status.start.dependencies', text: '{card} waits to start: it waits for {waitsFor} to merge', note: "A lane's next card waits for the cards it depends on to be merged (HI-2129, HI-2618); {waitsFor} is their keys, comma-separated." }),
   startWatching: agentMsg({ id: 'lane.status.start.watching', text: '{card} waits to start: {agent} is waiting on other work', note: "A lane's next card isn't started yet (HI-2029): its builder waits on a watch of other cards." }),
   startQueued: agentMsg({ id: 'lane.status.start.queued', text: "{card} waits to start: a line of Combwork's is on its way to {agent}", note: "A lane's next card isn't started yet (HI-2029): a line Combwork types is on its way to the builder." }),
   startFailed: agentMsg({ id: 'lane.status.start.failed', text: "{card} waits to start: {agent}'s last start failed", note: "A lane's next card isn't started yet (HI-2029): Combwork's last start of it on the builder failed." }),
@@ -538,7 +561,7 @@ export function laneStatusText(s: LaneStatus): string {
         if (s.freshBlocked === 'uncertain') return say(L.freshUncertain, { agent })
         return s.freshWhy !== undefined ? say(L.freshFailed, { agent, why: s.freshWhy }) : say(L.freshFailedBare, { agent })
       }
-      if (s.why === 'dependencies') return say(L.startDependencies, { card, waitsFor: s.waitsFor ?? say(L.aDependency) })
+      if (s.why === 'dependencies') return say(L.startDependencies, { card, waitsFor: s.waitingOn?.length ? s.waitingOn.join(', ') : (s.waitsFor ?? say(L.aDependency)) })
       if (s.why === 'refused' && s.slot && s.held) return say(L.startRefusedHeld, { card, slot: s.slot, held: s.held, heldBy: s.heldBy ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle), program: s.program ?? '', more: s.more ?? 0 })
       if (s.why === 'refused') return say(L.startRefused, { card })
       const agent = s.agent ?? say(L.itsBuilder)
@@ -620,7 +643,8 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000), ...(v.slotWait.stoppedOnly === true ? { stoppedOnly: true as const } : {}) } } : {}),
     ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
     ...(v.pool === true && !reviewer ? { pool: true as const } : {}),
-    ...(fresh ? { freshStart: fresh } : {})
+    ...(fresh ? { freshStart: fresh } : {}),
+    ...(v.state === 'active' && isObj(v.depEpisode) && whole(v.depEpisode.card, 1e9) && text(v.depEpisode.id, 64) && ['waiting', 'pending', 'sent'].includes(v.depEpisode.state as string) && time(v.depEpisode.at) ? { depEpisode: { card: v.depEpisode.card as number, id: v.depEpisode.id as string, state: v.depEpisode.state as DepEpisode['state'], at: v.depEpisode.at as string } } : {})
   }
 }
 

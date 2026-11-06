@@ -1010,5 +1010,11 @@
   "board.workQueue.stuckRef": "{target} est à",
   "board.workQueue.testing": "En test : {step}",
   "board.workQueue.unreadRef": "non lu",
-  "board.workflows": "Flux de travail"
+  "board.workflows": "Flux de travail",
+  "board.card.waitingMark": "En attente",
+  "board.card.waitingTip": "En attente : {reason} (marquée par {by}). Combwork ne la signale pas comme à l’arrêt en attendant.",
+  "board.dialog.waiting": "En attente",
+  "board.dialog.waitingPlaceholder": "Pourquoi elle attend exprès (vide : elle n’attend pas). Elle n’est pas signalée comme à l’arrêt ; son agent continue de tourner.",
+  "board.menu.clearWaiting": "Lever l’attente",
+  "board.menu.markWaiting": "Marquer comme en attente…"
 }

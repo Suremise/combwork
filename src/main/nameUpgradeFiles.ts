@@ -8,12 +8,12 @@ import HISTORY from './bundledHistory.json'
 const log = createLogger('nameUpgrade')
 
 /**
- * The names upgrade's rewrites of files Combwork keeps in a workspace (HI-2587, nameUpgrade.ts): text Hive wrote under
+ * The names upgrade's rewrites of files Combwork keeps in a workspace (HI-2587, nameUpgrade.ts): text 1.0 wrote under
  * its names, rewritten once to Combwork's. Each is pure on the text (`upgraded*`, null when nothing is old) and written
  * only when it changed, atomically; what it doesn't recognise as its own is left byte for byte.
  */
 
-/** The first line of the `.combwork/.gitignore` Hive wrote before 1.1, and Combwork's (workspace.ts BOARD_GITIGNORE). */
+/** The first line of the `.combwork/.gitignore` 1.0 wrote before 1.1, and Combwork's (workspace.ts BOARD_GITIGNORE). */
 const OLD_GITIGNORE_HEAD = "# The task board's database and what moving it from files left (added by Hive, #1017)" // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 const GITIGNORE_HEAD = "# The task board's database and what moving it from files left (added by Combwork, #1017)" // i18n-ignore: as above
 
@@ -24,7 +24,7 @@ const GITIGNORE_HEAD = "# The task board's database and what moving it from file
 export const NAMES_IGNORE = "# The names upgrade's record on this machine (HI-2587)\ncombwork-names.json\n" // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 
 /**
- * A `.combwork/.gitignore` Combwork or Hive wrote with Combwork's head, the board's lines for `combwork.db` and the names
+ * A `.combwork/.gitignore` Combwork or 1.0 wrote with Combwork's head, the board's lines for `combwork.db` and the names
  * upgrade's record kept out; null when it is someone else's (another first line) or has nothing old. Only whole lines
  * change, each ending kept.
  */
@@ -47,7 +47,7 @@ export function upgradedGitignore(text: string): string | null {
 }
 
 /**
- * The `.combwork/README.md` texts Hive and the 1.1 release candidates wrote (1.0's, still headed `.hive` after its
+ * The `.combwork/README.md` texts 1.0 and the 1.1 release candidates wrote (1.0's, still headed `.hive` after its
  * folder's move; HI-2462's; HI-2580's, naming `hive.db`): a README that is exactly one of them (either line ending) is
  * Combwork's own, never edited, and becomes `now` (WORKSPACE_README). Any other is the user's, left as it is.
  */
@@ -111,7 +111,7 @@ export const SET_ASIDE_DIR = 'tasks.set-aside'
 /**
  * The stub 0.9 to 1.0 left in a board's old cards' folder for older versions (#1017: `tasks/` with `board.json` and a
  * `README.txt`), at the upgrade (HI-2594, HR1's round 1: under the move's lock, after the other processes' refusal, as
- * every step is). No version writes one since 1.1, and nothing reads `tasks/` after this: the cards an older Hive saved
+ * every step is). No version writes one since 1.1, and nothing reads `tasks/` after this: the cards an older release saved
  * there (`<n>.json`) are set aside, intact, in `tasks.set-aside` as the board did at each open before (one whose very
  * content is there already isn't kept twice; another of a taken name is kept beside it under a name of its own), each
  * copied before it leaves the stub, then the stub's own two files go and the folder with them once empty. Only a stub:
@@ -160,7 +160,7 @@ export async function upgradeWorkspaceFiles(dir: string, readme: string): Promis
   return moveOldStub(dir)
 }
 
-/** Bundled skills Hive shipped under the name Combwork's now replaces (HI-2463): the old name, and the new one. */
+/** Bundled skills 1.0 shipped under the name Combwork's now replaces (HI-2463): the old name, and the new one. */
 export const RENAMED_SKILLS: Readonly<Record<string, string>> = { 'use-hive-api': 'use-cw-api' }
 
 /** What retireRenamedSkills looks with: tests give a failing one (HR1's round 1 on HI-2611). */
@@ -173,7 +173,7 @@ export interface RetireOps {
 }
 
 /**
- * The workspace's copy of a skill Hive shipped under its old name (RENAMED_SKILLS) goes while it is a version Hive
+ * The workspace's copy of a skill 1.0 shipped under its old name (RENAMED_SKILLS) goes while it is a version 1.0
  * shipped, never changed: the workspace's sync adds the new name's as it opens, so agents get the skill once. One the
  * user changed is theirs and stays. Its entry in `bundled.json` goes too. Afterwards there is nothing old, so this
  * happens once. `dir`: the workspace's `.combwork`. False (not settled: the upgrade's record isn't written, and the next

@@ -29,7 +29,7 @@ import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolde
  *
  * - **Ownership**: the move holds a lock across processes (repoLockCore's row, by token, pid and process start, in
  *   `<workspace>\.combwork-move.lock`, outside every folder that moves, kept for good), and refuses while another
- *   process's presence marker is fresh. The workspace's folder is renamed first: a Hive holding its board open makes
+ *   process's presence marker is fresh. The workspace's folder is renamed first: a 1.0 app holding its board open makes
  *   that fail before any project is touched.
  * - **State is on disk, never recorded beside it** (s65): before a host's `.hive` is renamed, a marker
  *   (`combwork-move-id`) is written in it, so it moves with the folder. A host has moved exactly when its `.combwork`
@@ -341,7 +341,7 @@ function warn(host: string, state: HostState): void {
 }
 
 /**
- * A `.hive` made again beside a moved `.combwork` (an older Hive opened it since): said once, left as it is. Only a
+ * A `.hive` made again beside a moved `.combwork` (an older release opened it since): said once, left as it is. Only a
  * warning, never a step (HI-2612): one that can't be looked at now is logged, not warned of, and nothing is recorded by it.
  */
 async function warnRecreated(hosts: Looked[]): Promise<void> {
@@ -403,7 +403,7 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
 }
 
 /**
- * A workspace just made (its `.combwork` new, nothing of Hive's in it): its names upgrade recorded done, under the move's
+ * A workspace just made (its `.combwork` new, nothing of 1.0's in it): its names upgrade recorded done, under the move's
  * lock and only with no other process present, as every write of the upgrade is (HR2's round 3). Not recorded (another
  * process there, the lock held): its next open looks again, under the lock. Never throws.
  */
@@ -474,7 +474,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       await moveTestHooks.after?.(`renamed:${kind}`)
     }
   }
-  // Then what is kept inside under Hive's names (HI-2587, nameUpgrade.ts), still under the lock and before anything of
+  // Then what is kept inside under the old names (HI-2587, nameUpgrade.ts), still under the lock and before anything of
   // the workspace is admitted.
   const projects = (await hostsOf(ws)).filter((h) => h.kind === 'project').map((h) => h.host)
   const setAside = async (cards: number): Promise<void> => (await import('./boardStore')).tellSetAside(ws, cards)

@@ -682,7 +682,7 @@
   "assistant.undo.ended": "通道已结束",
   "assistant.undo.error": "失败：{error}",
   "assistant.undo.failed": "无法撤销助手的更改",
-  "assistant.undo.field": "{field, select, title {标题} description {描述} labels {标签} blocked {受阻} blockedBy {受阻于} links {链接} agent {智能体} column {列} project {项目} created {卡片} cards {卡片} reviewer {评审者} rounds {轮次} waitMinutes {等待时间} name {名称} provider {提供方} connection {连接} model {模型} effort {推理强度} permissionMode {权限模式} use200kContext {上下文大小} mcpServers {MCP 服务器} lastSessionId {对话} value {值} removed {已移除的模型} run {启动} agents {智能体} layout {布局} workflow {工作流程选项} other {{field}}}",
+  "assistant.undo.field": "{field, select, title {标题} description {描述} labels {标签} blocked {受阻} blockedBy {受阻于} links {链接} agent {智能体} column {列} project {项目} waitingFor {等待} created {卡片} cards {卡片} reviewer {评审者} rounds {轮次} waitMinutes {等待时间} name {名称} provider {提供方} connection {连接} model {模型} effort {推理强度} permissionMode {权限模式} use200kContext {上下文大小} mcpServers {MCP 服务器} lastSessionId {对话} value {值} removed {已移除的模型} run {启动} agents {智能体} layout {布局} workflow {工作流程选项} other {{field}}}",
   "assistant.undo.final": "无法撤销",
   "assistant.undo.gone": "已不存在",
   "assistant.undo.kept": "已保留",

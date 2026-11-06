@@ -181,5 +181,10 @@
   "tasks.start.notGiven": "未能把 {card} 交给 {agent}：{why}。",
   "tasks.start.noteTooLong": "说明太长（最多 {max, number} 个字符）。",
   "tasks.start.reassigned": "在此期间 {card} 已{who, select, another {交给另一个智能体} other {取消指派}}。如果仍需处理，请重新开始。",
-  "tasks.start.userTyping": "用户刚刚在 {agent} 的终端中输入过内容，可能还在输入。请先询问用户。"
+  "tasks.start.userTyping": "用户刚刚在 {agent} 的终端中输入过内容，可能还在输入。请先询问用户。",
+  "tasks.error.waitingNotActive": "{card} 不在 {active} 中：只有 {active} 中的卡片才能标记为等待中。",
+  "tasks.error.waitingNotYours": "只有 {card} 自己的代理、用户或助手才能将其标记为等待中或取消标记。",
+  "tasks.error.waitingTooLong": "等待原因太长（最多 {max, number} 个字符）。",
+  "tasks.history.notWaiting": "不再等待",
+  "tasks.history.waiting": "等待中：{reason}"
 }

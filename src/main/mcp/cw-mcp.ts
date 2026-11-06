@@ -1127,6 +1127,8 @@ const tools: Tool[] = [
         links: cardsArg(say(T['updateTask.arg.links'])),
         context: contextArg,
         decision: { type: 'string', description: say(T['updateTask.arg.decision']) },
+        // HI-2618: its own card in Doing waits on purpose, with why ('' clears it); no description: the tools' budget (replysize).
+        waitingFor: { type: 'string' },
         attachments: attachmentsArg('comment'),
         ...(ASSISTANT
           ? {
@@ -1142,7 +1144,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'waitingFor', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\n${say(T['updateTask.reply.journalNote'])}` : text

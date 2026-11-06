@@ -13,7 +13,7 @@ import { upgradeProjectValues, upgradeWorkspaceValues } from './nameUpgradeValue
 
 /**
  * The one-way names upgrade (HI-2587, its design HI-2587/s15 with s20, s23 and s26): what 1.0 and the 1.1 release
- * candidates stored under Hive's names gets Combwork's, once, and nothing reads the old names afterwards. Each step looks
+ * candidates stored under the old names gets Combwork's, once, and nothing reads the old names afterwards. Each step looks
  * at its own item and changes only what is still old, so a 1.0.0 install, a partly converted RC2 and an upgrade
  * interrupted halfway all end in the same state.
  *
@@ -117,7 +117,7 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
   await step('files', o.stop, async () => {
     const cards = await upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README)
     if (cards) await o.setAside?.(cards)
-    // A bundled skill Hive shipped under its old name (HI-2463), before the workspace's sync adds the new one.
+    // A bundled skill 1.0 shipped under its old name (HI-2463), before the workspace's sync adds the new one.
     if (!(await retireRenamedSkills(dir))) settled = false
     // workspace.json's and the templates' stored values (HI-2598, nameUpgradeValues.ts), before its load reads them.
     if (!(await upgradeWorkspaceValues(ws))) settled = false

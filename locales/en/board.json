@@ -419,6 +419,14 @@
     "defaultMessage": "Stalled",
     "description": "Accessible name of a folded card's stalled mark (nobody is getting on with it)."
   },
+  "board.card.waitingMark": {
+    "defaultMessage": "Waiting",
+    "description": "Accessible name of a folded card's waiting mark (HI-2618: it waits on purpose)."
+  },
+  "board.card.waitingTip": {
+    "defaultMessage": "Waiting: {reason} (marked by {by}). Combwork doesn’t report it as stalled meanwhile.",
+    "description": "Tooltip on a card in Active that waits on purpose (HI-2618): why ({reason}, in the user's or an agent's own words) and who marked it ({by}: the user (\"You\"), the Assistant or an agent's name)."
+  },
   "board.card.workspace": {
     "defaultMessage": "workspace",
     "description": "Where a card that belongs to no project is (it is about the whole workspace): shown in place of a project's name on the card. Lower case."
@@ -1146,6 +1154,14 @@
   "board.dialog.tryAgain": {
     "defaultMessage": "Try Again",
     "description": "A board dialog's main button after it failed: does it again."
+  },
+  "board.dialog.waiting": {
+    "defaultMessage": "Waiting",
+    "description": "A field label in the card dialog, for a card in Active (HI-2618): why it waits on purpose (empty: it isn't). Not the same as Blocked."
+  },
+  "board.dialog.waitingPlaceholder": {
+    "defaultMessage": "Why it waits on purpose (empty: not waiting). It isn’t reported as stalled; its agent keeps running.",
+    "description": "Placeholder of the card dialog's Waiting box (HI-2618), for a card in Active: why it waits on purpose (held for a quiet window, an answer from someone). Combwork then doesn't report it as stalled, and nothing is stopped. Empty means it isn't waiting."
   },
   "board.dialog.write": {
     "defaultMessage": "Write",
@@ -2193,7 +2209,7 @@
   },
   "board.lanes.waitsDependency": {
     "defaultMessage": "{card} waits to start: it waits for {dependency} to merge",
-    "description": "Why a lane waits, in its header in the Progress panel (HI-2129): its card {card} (its key, such as HI-12) is due to start, but it depends on the card {dependency} (its key, such as HI-11), which isn't merged (Done) yet, and the project's workflow starts a card only once the cards it depends on are. Combwork starts it once that card is merged. The lane isn't paused."
+    "description": "Why a lane waits, in its header in the Progress panel (HI-2129): its card {card} (its key, such as HI-12) is due to start, but it depends on the cards {dependency} (their keys, such as HI-11, or HI-10, HI-11 and HI-12 as a list in the language: HI-2618), which aren't merged (Done) yet, and Combwork starts a card only once the cards it depends on are. Combwork starts it once the last of them is merged, or (with the workflow rules off) tells its builder. The lane isn't paused."
   },
   "board.lanes.waitsFresh": {
     "defaultMessage": "waiting: {agent} starts in a new conversation once it is free",
@@ -2247,9 +2263,17 @@
     "defaultMessage": "{card} {title} · {column} · Ctrl+click to open",
     "description": "The hover of a card number (#12) in a terminal: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words), its board column ({column}), and how to open it."
   },
+  "board.menu.clearWaiting": {
+    "defaultMessage": "Clear Waiting",
+    "description": "Menu item on a card in Active that waits on purpose (right-click, HI-2618): clears that mark, so Combwork reports it as stalled again if nobody gets on with it."
+  },
   "board.menu.delete": {
     "defaultMessage": "Delete…",
     "description": "Menu item on a card (right-click): deletes it after asking."
+  },
+  "board.menu.markWaiting": {
+    "defaultMessage": "Mark as Waiting…",
+    "description": "Menu item on a card in Active (right-click, HI-2618): opens the card's dialog to say why it waits on purpose (held for a quiet window, say), so Combwork doesn't report it as stalled meanwhile."
   },
   "board.menu.moveTo": {
     "defaultMessage": "Move to",

@@ -1,8 +1,8 @@
 # Runs inside the Sandbox as the user: runs an installer (or the uninstaller), waits for it, and records the result.
 #   install.ps1 -Exe <installer> -Arguments '/S' -Name <prefix> [-Uninstall]
-# Writes C:\out\<prefix>-run.json ({ exe, arguments, exitCode, seconds, hiveRunning, running }) and C:\out\<prefix>-state.json
-# (install-state.ps1). Both identities (HI-2460): Combwork (Programs\Combwork\Combwork.exe) and Hive Desktop before it
-# (Programs\Hive\Hive.exe). `running` names which one runs afterwards; `hiveRunning` is whether the one this installer
+# Writes C:\out\<prefix>-run.json ({ exe, arguments, exitCode, seconds, installedRunning, running }) and C:\out\<prefix>-state.json
+# (install-state.ps1). Both identities (HI-2460): Combwork (Programs\Combwork\Combwork.exe) and the 1.0 app before it
+# (`old`). `running` names which one runs afterwards; `installedRunning` is whether the one this installer
 # installs does (Combwork's when it is installed). The NSIS uninstaller returns at once and finishes from a copy of
 # itself, so with -Uninstall it waits (up to 120 s) until the install folder and the Installed-apps entry are gone.
 param(
@@ -14,7 +14,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $apps = @(
   @{ name = 'combwork'; exe = (Join-Path $env:LOCALAPPDATA 'Programs\Combwork\Combwork.exe'); key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\10a7595a-0e90-558c-b6b6-ae33bdd80748' },
-  @{ name = 'hive'; exe = (Join-Path $env:LOCALAPPDATA 'Programs\Hive\Hive.exe'); key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\35960567-b95c-520c-a9f1-e8bb85764724' }
+  # old-name: begin install-inputs
+  @{ name = 'old'; exe = (Join-Path $env:LOCALAPPDATA 'Programs\Hive\Hive.exe'); key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\35960567-b95c-520c-a9f1-e8bb85764724' }
+  # old-name: end install-inputs
 )
 # The uninstaller's own app: the one whose folder it is in.
 $own = $apps | Where-Object { (Split-Path -Parent $_.exe) -ieq (Split-Path -Parent $Exe) } | Select-Object -First 1
@@ -39,8 +41,8 @@ if (-not $Uninstall) {
     if (-not $running.Count) { Start-Sleep -Milliseconds 500 }
   }
 }
-$installed = if (Test-Path $apps[0].exe) { 'combwork' } else { 'hive' }
-$run = [ordered]@{ exe = $Exe; arguments = $Arguments; exitCode = $exitCode; seconds = $seconds; hiveRunning = ($running -contains $installed); running = $running }
+$installed = if (Test-Path $apps[0].exe) { 'combwork' } else { 'old' }
+$run = [ordered]@{ exe = $Exe; arguments = $Arguments; exitCode = $exitCode; seconds = $seconds; installedRunning = ($running -contains $installed); running = $running }
 [IO.File]::WriteAllText("C:\out\$Name-run.json", ($run | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
 & (Join-Path $PSScriptRoot 'install-state.ps1') -Out "C:\out\$Name-state.json"
 "exit $exitCode in $seconds s"

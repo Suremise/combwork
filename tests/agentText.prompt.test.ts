@@ -8,6 +8,7 @@ import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { laneBuilderSkill, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, taskPrompt } from '../src/shared/tasks'
 import { laneBrief, laneRules, type LaneBriefInput } from '../src/shared/laneBrief'
 import type { TaskCard } from '../src/shared/types'
+import { laneNextWaitReason } from '../src/main/cardStall'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 
@@ -71,6 +72,8 @@ function stalls(): { name: string; text: string | null }[] {
   for (const [minAgo, label] of [[40, 'minutes'], [120, 'hours'], [125, 'hours and minutes']] as const) {
     const r = { ...review, history: [{ at: at(minAgo), by: 'You', what: 'Moved to Review' }] }
     for (const w of [{}, { status: 'working' }, { silentMinutes: 25 }]) out.push({ name: `review wait ${label} ${JSON.stringify(w)}`, text: reviewWaitReason(r as never, [{ name: 'R1', project: 'alpha', agentId: 'r', cards: [9], ...w }], now) })
+    // HI-2636: given by the pool, idle or busy, its watch or none.
+    for (const status of ['finished', 'working']) out.push({ name: `review given ${label} ${status}`, text: reviewWaitReason(r as never, [], now, undefined, { agentId: 'r', name: 'R1', givenAt: at(minAgo - 1), status }) })
   }
   out.push({ name: 'no verdict', text: reviewVerdictWaitReason({ ...review, review: { agent: 'r', agentName: 'R1', since: at(60) } } as never, [{ name: 'R1', project: 'alpha', agentId: 'r', cards: [9], status: 'watching', watchSince: at(30) }], now) })
   out.push({
@@ -82,6 +85,16 @@ function stalls(): { name: string; text: string | null }[] {
         { name: 'R1', project: 'alpha', agentId: 'r', cards: [8], status: 'watching', watchSince: at(60) },
         { name: 'B1', project: 'alpha', agentId: 'b', cards: [9], status: 'watching', watchSince: at(60) }
       ],
+      now
+    )
+  })
+  // A lane's next card whose dependencies all went Done, not started since (HI-2618's DEPS_DONE; HI-2637).
+  out.push({
+    name: 'lane next, dependencies done',
+    text: laneNextWaitReason(
+      { number: 9, key: 'AL-2', column: 'todo', archived: false, blocked: null },
+      { builder: 'b', reviewer: 'r', state: 'active', startedAt: at(120), cards: [{ number: 8, key: 'AL-1', column: 'done', movedAt: at(90) }, { number: 9, key: 'AL-2', column: 'todo', movedAt: null }], due: { card: 9, open: [], readyAt: at(30) } } as never,
+      { name: 'B1', status: 'watching' },
       now
     )
   })

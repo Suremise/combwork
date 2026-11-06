@@ -358,6 +358,13 @@ export class WorkspaceService {
   get lifetime(): AbortSignal {
     return this.life.signal
   }
+  /**
+   * Which open this is (HI-2618): goes up as it opens and as it closes, so work captured in one open (a lane-start pass)
+   * can tell it is no longer the same, even when this service opens the same folder again.
+   */
+  get openGeneration(): number {
+    return this.generation
+  }
 
   get combworkDir(): string {
     if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })

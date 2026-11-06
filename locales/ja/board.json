@@ -1010,5 +1010,11 @@
   "board.workQueue.stuckRef": "{target}の位置",
   "board.workQueue.testing": "テスト中：{step}",
   "board.workQueue.unreadRef": "読み取れません",
-  "board.workflows": "ワークフロー"
+  "board.workflows": "ワークフロー",
+  "board.card.waitingMark": "待機中",
+  "board.card.waitingTip": "待機中：{reason}（{by} が設定）。この間、Combwork は停滞として報告しません。",
+  "board.dialog.waiting": "待機中",
+  "board.dialog.waitingPlaceholder": "意図的に待っている理由（空欄：待機なし）。停滞として報告されず、エージェントは動き続けます。",
+  "board.menu.clearWaiting": "待機を解除",
+  "board.menu.markWaiting": "待機中にする…"
 }

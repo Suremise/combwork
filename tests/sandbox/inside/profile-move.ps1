@@ -1,8 +1,8 @@
 # Runs inside the Sandbox as the user (HI-2602, scenario 11): the profile move the installer couldn't make, made by the
-# app at start (HI-2594, profileFolders.ts), with real installers, in order on one machine. Hive Desktop 1.0 is installed
+# app at start (HI-2594, profileFolders.ts), with real installers, in order on one machine. The 1.0 app is installed
 # already (the host's install.ps1, so an App Control refusal is NOT RUN there).
-#   11.1 Hive Desktop 1.0 run once, so its profile folders are its own; a mark put in each.
-#   11.2 A file in %LOCALAPPDATA%\Hive held open (as a stray process holds it) while the new installer runs: it installs
+#   11.1 The 1.0 app run once, so its profile folders are its own; a mark put in each.
+#   11.2 A file in 1.0's local profile folder held open (as a stray process holds it) while the new installer runs: it installs
 #        (exit 0), moves the roaming folder, and leaves the local one where it was, with its own record in it.
 #   11.3 Combwork started with the file still held: the start is refused, an error box naming both folders (screenshot
 #        s11-refused.png), exit 1; nothing made under Combwork's local name, the roaming folder as it was.
@@ -23,11 +23,14 @@ function Check([string]$id, [string]$name, [bool]$ok, $detail) {
   Save
 }
 
-$hiveExe = Join-Path $env:LOCALAPPDATA 'Programs\Hive\Hive.exe'
+# old-name: begin profile-move-inputs
+# The 1.0 app's exe and its profile folders, as its installer and the app leave them.
+$oldExe = Join-Path $env:LOCALAPPDATA 'Programs\Hive\Hive.exe'
+$roamOld = Join-Path $env:APPDATA 'Hive'
+$locOld = Join-Path $env:LOCALAPPDATA 'Hive'
+# old-name: end profile-move-inputs
 $combExe = Join-Path $env:LOCALAPPDATA 'Programs\Combwork\Combwork.exe'
-$roamHive = Join-Path $env:APPDATA 'Hive'
 $roamComb = Join-Path $env:APPDATA 'Combwork'
-$locHive = Join-Path $env:LOCALAPPDATA 'Hive'
 $locComb = Join-Path $env:LOCALAPPDATA 'Combwork'
 $mark = 'sandbox-mark.txt'
 $record = 'profile-move.json'
@@ -110,7 +113,7 @@ function ReadRecord([string]$dir) {
   try { return [IO.File]::ReadAllText($f) | ConvertFrom-Json } catch { return [pscustomobject]@{ unreadable = $_.Exception.Message } }
 }
 function Has([string]$dir, [string]$name = $mark) { Test-Path (Join-Path $dir $name) }
-function Folders { "roaming Hive $(Test-Path $roamHive), Combwork $(Test-Path $roamComb); local Hive $(Test-Path $locHive), Combwork $(Test-Path $locComb)" }
+function Folders { "roaming 1.0 $(Test-Path $roamOld), Combwork $(Test-Path $roamComb); local 1.0 $(Test-Path $locOld), Combwork $(Test-Path $locComb)" }
 # The screen, as the user sees it, into C:\out\<name>.png (the host collects it).
 function Shot([string]$name) {
   Add-Type -AssemblyName System.Windows.Forms, System.Drawing
@@ -129,28 +132,28 @@ function StartCombwork {
 }
 
 try {
-  # 11.1: Hive Desktop 1.0's own profile, as it made it: run once (its roaming log written, its window up), closed.
-  $p = Launch $hiveExe $null
-  WaitFor { (TitleOf $p) -and (Test-Path (Join-Path $roamHive 'logs')) } 'Hive Desktop running, its profile made'
-  CloseApp $p $hiveExe
-  New-Item -ItemType Directory -Force $locHive | Out-Null
-  foreach ($d in @($roamHive, $locHive)) { Set-Content (Join-Path $d $mark) 'kept across the move' }
-  Check '11.hive-profile' 'Hive Desktop 1.0 ran once: its profile folders are %APPDATA%\Hive and %LOCALAPPDATA%\Hive, no Combwork ones' ((Has $roamHive) -and (Has $locHive) -and -not (Test-Path $roamComb) -and -not (Test-Path $locComb)) (Folders)
+  # 11.1: the 1.0 app's own profile, as it made it: run once (its roaming log written, its window up), closed.
+  $p = Launch $oldExe $null
+  WaitFor { (TitleOf $p) -and (Test-Path (Join-Path $roamOld 'logs')) } 'the 1.0 app running, its profile made'
+  CloseApp $p $oldExe
+  New-Item -ItemType Directory -Force $locOld | Out-Null
+  foreach ($d in @($roamOld, $locOld)) { Set-Content (Join-Path $d $mark) 'kept across the move' }
+  Check '11.old-profile' 'The 1.0 app ran once: its profile folders are its own (roaming and local), no Combwork ones' ((Has $roamOld) -and (Has $locOld) -and -not (Test-Path $roamComb) -and -not (Test-Path $locComb)) (Folders)
 
   # 11.2: a file in the local folder held open while the new installer runs: it can't rename that folder.
-  $held = Holding 'local-profile' (Join-Path $locHive $mark)
+  $held = Holding 'local-profile' (Join-Path $locOld $mark)
   $i = Start-Process -FilePath $New -ArgumentList '/S' -PassThru
   $null = $i.Handle
   if (-not $i.WaitForExit(300000)) { throw 'the installer ran over 300 s' }
   $code = $i.ExitCode
   $res.facts.install = [ordered]@{ exitCode = $code; folders = (Folders) }
-  $res.facts.installerRecord = ReadRecord $locHive
-  Check '11.installer-held' "Installed (exit 0) with the local folder held: the roaming folder moved, the local one left as %LOCALAPPDATA%\Hive with the installer's record in it, no %LOCALAPPDATA%\Combwork" ($code -eq 0 -and (Test-Path $combExe) -and (Has $roamComb) -and -not (Test-Path $roamHive) -and (Has $locHive) -and -not (Test-Path $locComb) -and $res.facts.installerRecord.by -eq 'installer') "exit $code; $(Folders); record $($res.facts.installerRecord | ConvertTo-Json -Compress)"
+  $res.facts.installerRecord = ReadRecord $locOld
+  Check '11.installer-held' "Installed (exit 0) with the local folder held: the roaming folder moved, the local one left as 1.0's with the installer's record in it, no %LOCALAPPDATA%\Combwork" ($code -eq 0 -and (Test-Path $combExe) -and (Has $roamComb) -and -not (Test-Path $roamOld) -and (Has $locOld) -and -not (Test-Path $locComb) -and $res.facts.installerRecord.by -eq 'installer') "exit $code; $(Folders); record $($res.facts.installerRecord | ConvertTo-Json -Compress)"
   Save
 
   # 11.3: Combwork started with the file still held: refused, with its error box; nothing made in Combwork's name.
   $roamingBefore = Listing $roamComb
-  $localBefore = Listing $locHive
+  $localBefore = Listing $locOld
   $p = Launch $combExe 'C:\out\s11-refused-stderr.txt'
   WaitFor { $p.HasExited -or (TitleOf $p) } 'Combwork shows a window or ends'
   $title = TitleOf $p
@@ -159,10 +162,10 @@ try {
   CloseApp $p $combExe
   $res.facts.refusedExit = $p.ExitCode
   $res.facts.refusedStderr = $(try { [IO.File]::ReadAllText('C:\out\s11-refused-stderr.txt') } catch { "unread: $($_.Exception.Message)" })
-  Check '11.refused' "Started with the local folder held: the start is refused, an error box (`"...$refusedTitle`") naming the folder, then exit 1" ($title -like "*$refusedTitle*" -and $p.ExitCode -eq 1 -and $res.facts.refusedStderr.Contains($locHive)) "title '$title'; exit $($p.ExitCode); stderr $($res.facts.refusedStderr)"
+  Check '11.refused' "Started with the local folder held: the start is refused, an error box (`"...$refusedTitle`") naming the folder, then exit 1" ($title -like "*$refusedTitle*" -and $p.ExitCode -eq 1 -and $res.facts.refusedStderr.Contains($locOld)) "title '$title'; exit $($p.ExitCode); stderr $($res.facts.refusedStderr)"
   $roamingAfter = Listing $roamComb
-  $localAfter = Listing $locHive
-  Check '11.refused-unchanged' 'Nothing made under Combwork: no %LOCALAPPDATA%\Combwork, %LOCALAPPDATA%\Hive and %APPDATA%\Combwork as they were' (-not (Test-Path $locComb) -and $roamingAfter -eq $roamingBefore -and $localAfter -eq $localBefore) "$(Folders); roaming before [$roamingBefore] after [$roamingAfter]; local before [$localBefore] after [$localAfter]"
+  $localAfter = Listing $locOld
+  Check '11.refused-unchanged' 'Nothing made under Combwork: no %LOCALAPPDATA%\Combwork, 1.0''s local folder and %APPDATA%\Combwork as they were' (-not (Test-Path $locComb) -and $roamingAfter -eq $roamingBefore -and $localAfter -eq $localBefore) "$(Folders); roaming before [$roamingBefore] after [$roamingAfter]; local before [$localBefore] after [$localAfter]"
 
   # 11.4: let go, started again: the app moves the local folder itself, and checks the sign-ins once.
   LetGo $held
@@ -172,8 +175,8 @@ try {
   $rec = ReadRecord $locComb
   $res.facts.record = $rec
   $res.facts.recordBy = $rec.by
-  Check '11.moved' 'Let go, Combwork starts and moves %LOCALAPPDATA%\Hive to %LOCALAPPDATA%\Combwork with its data; both folders are Combwork''s, no Hive ones' ((Has $locComb) -and -not (Test-Path $locHive) -and (Has $roamComb) -and -not (Test-Path $roamHive)) (Folders)
-  Check '11.record' "The record of the move arrived with the local folder (v 1, by the installer or the app, from %LOCALAPPDATA%\Hive)" ($rec.v -eq 1 -and @('installer', 'app') -contains $rec.by -and $rec.from -eq $locHive) ($rec | ConvertTo-Json -Compress)
+  Check '11.moved' 'Let go, Combwork starts and moves 1.0''s local folder to %LOCALAPPDATA%\Combwork with its data; both folders are Combwork''s, none of 1.0''s' ((Has $locComb) -and -not (Test-Path $locOld) -and (Has $roamComb) -and -not (Test-Path $roamOld)) (Folders)
+  Check '11.record' "The record of the move arrived with the local folder (v 1, by the installer or the app, from 1.0's local folder)" ($rec.v -eq 1 -and @('installer', 'app') -contains $rec.by -and $rec.from -eq $locOld) ($rec | ConvertTo-Json -Compress)
   $first = (LogCount $checkLine) - $checks
   Check '11.sign-in-checked' 'The sign-in check after the move ran once at that start, and the record says it is done' ($first -eq 1 -and $rec.signInChecked -eq $true) "$first check line(s); record $($rec | ConvertTo-Json -Compress)"
   CloseApp $p $combExe
@@ -188,7 +191,7 @@ try {
 } catch {
   Check '11.error' 'The profile move checks ran without an error' $false $_.Exception.Message
 } finally {
-  foreach ($exe in @($hiveExe, $combExe)) { foreach ($x in ProcsOf $exe) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue } }
+  foreach ($exe in @($oldExe, $combExe)) { foreach ($x in ProcsOf $exe) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue } }
   if ($held -and -not $held.process.HasExited) { Set-Content $held.release 'go' -ErrorAction SilentlyContinue }
   Save
 }

@@ -682,7 +682,7 @@
   "assistant.undo.ended": "tor się zakończył",
   "assistant.undo.error": "niepowodzenie: {error}",
   "assistant.undo.failed": "Nie udało się cofnąć zmiany Asystenta",
-  "assistant.undo.field": "{field, select, title {tytuł} description {opis} labels {etykiety} blocked {blokada} blockedBy {karty blokujące} links {powiązania} agent {agent} column {kolumna} project {projekt} created {karta} cards {karty} reviewer {recenzent} rounds {rundy} waitMinutes {czas oczekiwania} name {nazwa} provider {dostawca} connection {połączenie} model {model} effort {wysiłek} permissionMode {tryb uprawnień} use200kContext {rozmiar kontekstu} mcpServers {serwery MCP} lastSessionId {rozmowa} value {wartość} removed {usunięte modele} run {uruchomienie} agents {agenci} layout {układ} workflow {opcje przepływu pracy} other {{field}}}",
+  "assistant.undo.field": "{field, select, title {tytuł} description {opis} labels {etykiety} blocked {blokada} blockedBy {karty blokujące} links {powiązania} agent {agent} column {kolumna} project {projekt} waitingFor {czekanie} created {karta} cards {karty} reviewer {recenzent} rounds {rundy} waitMinutes {czas oczekiwania} name {nazwa} provider {dostawca} connection {połączenie} model {model} effort {wysiłek} permissionMode {tryb uprawnień} use200kContext {rozmiar kontekstu} mcpServers {serwery MCP} lastSessionId {rozmowa} value {wartość} removed {usunięte modele} run {uruchomienie} agents {agenci} layout {układ} workflow {opcje przepływu pracy} other {{field}}}",
   "assistant.undo.final": "Nie da się cofnąć",
   "assistant.undo.gone": "już nie istnieje",
   "assistant.undo.kept": "Zachowano",

@@ -301,7 +301,7 @@ export const AREAS = [
   // Lanes (#483): the card loop registers its lane; replysize measures cw_lane; the Progress panel shows them (#484).
   { paths: ['src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/lineUpdates.ts'], suites: ['cardloop', 'lanestages', 'progresslanes', 'replysize'] },
   // HI-1990: Combwork starts a lane's next card once the one before it is Done: the suites whose lanes go on from a Done card.
-  { paths: ['src/main/laneStarts.ts'], suites: ['p4lane', 'p5lane', 'p6lane', 'p7lane', 'linecarried', 'reviewerpool', 'slotcards', 'slotswitches', 'slotupgrade', 'cardloop'] },
+  { paths: ['src/main/laneStarts.ts', 'src/main/laneDeps.ts'], suites: ['p4lane', 'p5lane', 'p6lane', 'p7lane', 'linecarried', 'reviewerpool', 'slotcards', 'slotswitches', 'slotupgrade', 'cardloop'] },
   // HI-2081: pausing the team before an update: its holds, what still runs, Install Now, the Assistants' authority.
   { paths: ['src/main/teamPause.ts', 'src/main/teamParked.ts', 'src/shared/teamPause.ts', 'src/renderer/src/teamPause.ts', 'src/renderer/src/components/TeamPause.tsx', 'tests/e2e/teampause.cjs'], suites: ['teampause', 'lanewatch', 'progresslanes'] },
   // P5's acceptance (#1358): S55's lane, the scenarios first proven in the app, one queue runner across copies of Combwork.

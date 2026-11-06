@@ -181,5 +181,10 @@
   "tasks.start.notGiven": "Nie przekazano karty {card} agentowi {agent}: {why}.",
   "tasks.start.noteTooLong": "Notatka jest za długa (limit znaków: {max, number}).",
   "tasks.start.reassigned": "W międzyczasie kartę {card} {who, select, another {przekazano innemu agentowi} other {odebrano jej agentowi}}. Rozpocznij ją ponownie, jeśli nadal jest do zrobienia.",
-  "tasks.start.userTyping": "Użytkownik przed chwilą pisał w terminalu agenta {agent} i może nadal tam pisać. Najpierw zapytaj użytkownika."
+  "tasks.start.userTyping": "Użytkownik przed chwilą pisał w terminalu agenta {agent} i może nadal tam pisać. Najpierw zapytaj użytkownika.",
+  "tasks.error.waitingNotActive": "{card} nie jest w {active}: tylko karta w {active} może zostać oznaczona jako czekająca.",
+  "tasks.error.waitingNotYours": "Tylko własny agent karty {card}, użytkownik lub Asystent może oznaczyć ją jako czekającą albo to wyłączyć.",
+  "tasks.error.waitingTooLong": "Powód czekania jest za długi (najwyżej {max, number} znaków).",
+  "tasks.history.notWaiting": "Już nie czeka",
+  "tasks.history.waiting": "Czeka: {reason}"
 }

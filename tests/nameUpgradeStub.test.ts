@@ -10,13 +10,18 @@ import { moveOldStub, SET_ASIDE_DIR } from '../src/main/nameUpgradeFiles'
 import { SET_ASIDE } from '../src/main/boardStore'
 import { tempDir } from './tempDir'
 
+// old-name: begin nameUpgradeStub-inputs
+/** The README of the stub as 0.9 and 1.0 wrote it. */
+const STUB_README = 'The task board moved to .hive/hive.db in Hive 0.9 (#1017).\r\n'
+// old-name: end nameUpgradeStub-inputs
+
 /** A workspace's `.combwork` with a board and the stub 1.0 left, holding `cards`. */
 function withStub(cards: Record<string, string>, o: { readme?: boolean; board?: boolean } = {}): string {
   const dir = join(tempDir('nameupgrade-stub-'), '.combwork')
   mkdirSync(join(dir, 'tasks'), { recursive: true })
   if (o.board !== false) writeFileSync(join(dir, 'combwork.db'), '')
   writeFileSync(join(dir, 'tasks', 'board.json'), '{"version":1,"next":9}')
-  if (o.readme !== false) writeFileSync(join(dir, 'tasks', 'README.txt'), 'The task board moved to .hive/hive.db in Hive 0.9 (#1017).\r\n')
+  if (o.readme !== false) writeFileSync(join(dir, 'tasks', 'README.txt'), STUB_README)
   for (const [f, t] of Object.entries(cards)) writeFileSync(join(dir, 'tasks', f), t)
   return dir
 }

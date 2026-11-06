@@ -68,6 +68,9 @@ const ERR = {
   needsTitle: msg({ id: 'tasks.error.needsTitle', defaultMessage: 'A card needs a title.', description: 'An error: a card was saved with an empty title.' }),
   unknownColumn: msg({ id: 'tasks.error.unknownColumn', defaultMessage: 'Unknown column "{column}": {choices}.', description: 'An error: {column} is not a column of the board; {choices} lists the column ids the call takes (hold, todo, doing… kept as they are).' }),
   archived: msg({ id: 'tasks.error.archived', defaultMessage: '{card} is archived. Only the user can bring it back.', description: 'An error: card {card} (its key, such as HI-12) is archived, so an agent or the Assistant cannot change it; only the user can bring it back from the archive.' }),
+  waitingNotYours: msg({ id: 'tasks.error.waitingNotYours', defaultMessage: "Only {card}'s own agent, the user or the Assistant can mark it waiting or clear that.", description: "An error, read by agents (HI-2618): an agent tried to mark card {card} (its key, such as HI-12) as waiting on purpose, or clear that mark, but the card isn't its own. A waiting card isn't reported as stalled." }),
+  waitingNotActive: msg({ id: 'tasks.error.waitingNotActive', defaultMessage: "{card} isn't in {active}: only a card in {active} can be marked waiting.", description: "An error (HI-2618): only a card in the stage {active} (the board's name for it, such as Active) can be marked as waiting on purpose; card {card} (its key, such as HI-12) is elsewhere." }),
+  waitingTooLong: msg({ id: 'tasks.error.waitingTooLong', defaultMessage: 'The waiting reason is too long (at most {max, number} characters).', description: "An error (HI-2618): the reason a card waits on purpose is longer than it may be; {max} is the most characters it takes." }),
   noCard: msg({ id: 'tasks.error.noCard', defaultMessage: 'There is no card {card}.', description: 'An error: there is no card {card} (its key, such as HI-12) that the caller may see.' }),
   cardsTooMany: msg({ id: 'tasks.error.cardsTooMany', defaultMessage: 'cards: at most {max, number} cards at once.', description: 'An error: a call listed more than {max} cards. "cards:" is the name of the call\'s field: keep it as it is.' }),
   cardsNotNumber: msg({ id: 'tasks.error.cardsNotNumber', defaultMessage: 'cards: "{value}" is not a card number', description: 'An error: {value} in the list of cards is not a card number. "cards:" is the name of the call\'s field: keep it as it is.' }),
@@ -146,6 +149,8 @@ const MAX_LABELS = 12
 const MAX_COMMENTS = 500
 const MAX_DECISIONS = 100
 const MAX_DECISION = 4000
+/** The longest reason a card waits on purpose (HI-2618), in characters. */
+const MAX_WAITING = 500
 /**
  * A new history entry's or comment's id, unique on its card (#224): two entries alike in time, author and words are
  * still two. Card watches count what they have seen by it; the Agent API's card views leave it out.
@@ -203,6 +208,9 @@ function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?
     ...(strs(raw.context).length ? { context: strs(raw.context).slice(0, MAX_CONTEXT) } : {}),
     ...problemsOf(raw.contextProblems),
     blocked: typeof raw.blocked === 'string' && raw.blocked.trim() ? raw.blocked : null,
+    // Waiting on purpose (HI-2618), as kept: a move out of Doing clears it where it is written (updateTaskAs), which reads
+    // it to say so, so it is kept whatever the column here (a runtime move has saved the new column first).
+    ...(raw.waitingFor && typeof raw.waitingFor.reason === 'string' && raw.waitingFor.reason.trim() && typeof raw.waitingFor.by === 'string' && typeof raw.waitingFor.at === 'string' ? { waitingFor: { reason: raw.waitingFor.reason, by: raw.waitingFor.by, at: raw.waitingFor.at } } : {}),
     blockedBy: nums(raw.blockedBy),
     links: nums(raw.links),
     comments: Array.isArray(raw.comments) ? raw.comments.filter((c) => c && typeof c.text === 'string') : [],
@@ -2417,6 +2425,31 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       const b = patch.blocked?.trim() ? text(patch.blocked.trim(), 1000, 'blockedReason') : null
       if (b !== card.blocked) said.push(b ? storedText(HISTORY.blocked, { reason: b }) : storedText(HISTORY.unblocked))
       card.blocked = b
+    }
+    if (patch.waitingFor !== undefined) {
+      // Marked or cleared (HI-2618): by its own agent, the user or the Assistant (a script with the workspace token too),
+      // never another project agent, who would silence this card's stalls.
+      if (actor.kind === 'agent' && actor.self && card.agent !== actor.self.agentId) throw new TaskPermissionError(withValues(ERR.waitingNotYours, { card: cardRef(n) }))
+      // A whole mark is undo's, put back as it was (who marked it, when); a string is a new one, by the caller, now.
+      const whole = patch.waitingFor && typeof patch.waitingFor === 'object' ? patch.waitingFor : null
+      const reason = (whole ? whole.reason : (patch.waitingFor as string | null))?.trim() ?? ''
+      if (reason.length > MAX_WAITING) throw combworkError(ERR.waitingTooLong, { max: MAX_WAITING }, { kind: 'invalid' })
+      if (reason) {
+        if (card.column !== 'doing') throw combworkError(ERR.waitingNotActive, { card: cardRef(n), active: stageName('active', await stageNamesOf(ws, card.project)) }, { kind: 'conflict' })
+        const mark = whole ? { reason, by: whole.by, at: whole.at } : { reason, by, at: new Date().toISOString() }
+        if (reason !== card.waitingFor?.reason || (whole && (whole.by !== card.waitingFor?.by || whole.at !== card.waitingFor?.at))) {
+          if (reason !== card.waitingFor?.reason) said.push(storedText(HISTORY.waiting, { reason }))
+          card.waitingFor = mark
+        }
+      } else if (card.waitingFor) {
+        delete card.waitingFor
+        said.push(storedText(HISTORY.notWaiting))
+      }
+    }
+    // Out of Doing however it went (submitted, put back, a verdict, moved on the board): its waiting mark goes with it.
+    if (card.waitingFor && card.column !== 'doing') {
+      delete card.waitingFor
+      said.push(storedText(HISTORY.notWaiting))
     }
     if (patch.blockedBy !== undefined) {
       card.blockedBy = await cardRefs(patch.blockedBy, n, 'blockedBy', scope, card.blockedBy)

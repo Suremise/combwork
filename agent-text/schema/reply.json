@@ -753,6 +753,11 @@
       "why": "plain"
     }
   },
+  "reply.row.waiting": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
   "reply.setting.changed": {
     "placeholders": {
       "path": "plain",

@@ -21,7 +21,7 @@ const sameFolder = (a, b) => typeof a === 'string' && typeof b === 'string' && a
 
 /**
  * The new workspace is set up: Combwork's GET /v1/status names it as its workspace and lists its Combwork skills, which it
- * replies with only once the open has brought the bundled skills and modes up to date (servers.ts hiveSkillsNow, which
+ * replies with only once the open has brought the bundled skills and modes up to date (servers.ts combworkSkillsNow, which
  * awaits the workspace's itemsUpToDate: workspace.ts's work after an open). `status` reads /v1/status. Gives the reply.
  */
 function workspaceSetUp(status, folder, ms = 60_000, every = 250) {

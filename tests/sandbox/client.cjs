@@ -1,5 +1,5 @@
 /**
- * A small stdio MCP client for the windows-sandbox server (the hive-mcp project's), as any MCP client uses it: the Sandbox
+ * A small stdio MCP client for the windows-sandbox server (the workspace's MCP servers project's), as any MCP client uses it: the Sandbox
  * checks start the server's server.js with Node and call its tools. Nothing of the server is imported. Node built-ins only.
  *   const srv = server(serverJs, env, { roots }); const r = await srv.call('sandbox_start', { ... }); await srv.close()
  */

@@ -1,4 +1,4 @@
-// The clean-install check's search (HI-2592, tests/sandbox/clean.cjs) and its report (report.cjs, scenario 9): "hive"
+// The clean-install check's search (HI-2592, tests/sandbox/clean.cjs) and its report (report.cjs, scenario 9): the old name
 // planted in each place it searches (file and folder names, text files, logs, a profile's database, the workspace's
 // .git, the registry, the agent's environment, the window's text, Copy Diagnostics and the export) is found with its
 // place and text, nothing else is, and app.asar's hits are counted but never fail the check.
@@ -22,6 +22,8 @@ const write = (file: string, data: string | Buffer): void => {
 }
 const places = (t: Json, category: string): string[] => t.places[category].hits.map((h: Json) => h.place)
 
+// The planted cases: the old name in each form and place the search must find, beside the ordinary words it passes.
+// old-name: begin sandboxClean-cases
 test('a hit: "hive" in any case, alone or joined (as HG1\'s sweep read it); not inside an ordinary word', () => {
   const hits = ['Hive', 'HIVE', 'hive_test', 'cw-hive-mcp', '.hive/', "Hive's", 'hiveGuidance', 'getHive()', 'CW_HIVE_X', 'Hive Desktop', 'hive.db', 'x/hive', '2hive', 'hives']
   for (const h of hits) assert.strictEqual(oldNameHits(h).length, 1, h)
@@ -226,6 +228,7 @@ test('the report: scenario 9 passes with no hits and notes app.asar\'s count; a 
   assert.match(md2, /\| window: Settings: general \| Start Hive at login \|/)
   assert.match(md2, /\| C:\\Users\\u\\AppData\\Roaming\\Combwork\\hive\.log \| hive\.log \|/)
 })
+// old-name: end sandboxClean-cases
 
 // The clean step (drive.cjs) drives Combwork's window, IPC and palette, and hands clean-scan.cjs its files: when one
 // changes, the check would fail only at the next release candidate. Checked here, so both are fixed together.

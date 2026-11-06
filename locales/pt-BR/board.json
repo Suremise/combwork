@@ -1010,5 +1010,11 @@
   "board.workQueue.stuckRef": "{target} está em",
   "board.workQueue.testing": "Testando agora: {step}",
   "board.workQueue.unreadRef": "não lido",
-  "board.workflows": "Fluxos de trabalho"
+  "board.workflows": "Fluxos de trabalho",
+  "board.card.waitingMark": "Aguardando",
+  "board.card.waitingTip": "Aguardando: {reason} (marcado por {by}). O Combwork não o marca como travado enquanto isso.",
+  "board.dialog.waiting": "Aguardando",
+  "board.dialog.waitingPlaceholder": "Por que aguarda de propósito (vazio: não aguarda). Não é marcado como travado; o agente continua rodando.",
+  "board.menu.clearWaiting": "Encerrar espera",
+  "board.menu.markWaiting": "Marcar como aguardando…"
 }

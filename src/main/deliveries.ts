@@ -248,7 +248,19 @@ interface Draft {
   commit?: () => void
   /** What `commit` threw in the save: given to the caller as it is (the Assistant's refusal), never as NotSaved. */
   refused?: unknown
+  /**
+   * A producer's receipt for the delivery this plan makes (HI-2618, createDeliveryOnce): checked and written in the save's
+   * own transaction, so a delivery with that key is made once, whatever happened to its row since.
+   */
+  once?: { key: string; at: string }
 }
+
+/** A delivery receipt's key in `store_meta` (HI-2618): `once:` and the producer's key. */
+const ONCE = 'once:'
+/** How long a receipt is kept (HI-2618): its producer never retries an obligation older than this (ONCE_RETRY_MS). */
+export const ONCE_KEEP_MS = 30 * 24 * 60 * 60_000
+/** A save finding its plan's receipt already written (HI-2618): that delivery was made, so nothing is saved. */
+class OnceTaken extends Error {}
 
 const stores = new Map<string, Store>()
 const loading = new Map<string, Promise<Store>>()
@@ -692,7 +704,22 @@ async function save(store: Store, d: Draft): Promise<void> {
   const changed = d.records.filter((r) => was.get(r.id) !== r) as unknown as Record<string, unknown>[]
   const removed = [...was.keys()].filter((id) => !now.has(id))
   let saved: ReturnType<typeof saveDeliveryChanges> = { written: new Map(), renamed: new Map() }
-  await saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => void (saved = saveDeliveryChanges(db, store.place.scope, { put: changed, removed, base: store.base })), { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
+  const once = d.once
+  await saveTable(
+    store.place.workspace,
+    'deliveries',
+    store.place.scope,
+    (db) => {
+      // Its receipt (HI-2618), read in this transaction against what is committed: one there means its delivery was made
+      // (by another pass, another Combwork, or before a restart), and nothing of this plan is saved.
+      if (once && storeValue(db, 'deliveries', store.place.scope, ONCE + once.key) !== null) throw new OnceTaken(once.key)
+      saved = saveDeliveryChanges(db, store.place.scope, { put: changed, removed, base: store.base })
+      // Receipts past their keeping go (their producers no longer retry them).
+      db.prepare("DELETE FROM store_meta WHERE store = 'deliveries' AND scope = ? AND substr(key, 1, 5) = ? AND json_extract(value, '$.at') < ?").run(store.place.scope, ONCE, new Date(Date.now() - ONCE_KEEP_MS).toISOString()) // agent-protocol: SQL
+    },
+    { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null, ...(once ? { [ONCE + once.key]: JSON.stringify({ at: once.at }) } : {}) },
+    guard
+  )
   for (const r of d.records) {
     const to = saved.renamed.get(r.id)
     if (!to) continue
@@ -996,6 +1023,55 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   if (hooks && isUnread(r)) store.hooks.set(r.id, hooks)
   show(store, nd.agentId)
   return r
+}
+
+/**
+ * Makes a delivery at most once for a producer's key (HI-2618), saved before this returns: its receipt (`once`) is
+ * written in the same transaction as its row, and a receipt already there makes nothing, however that delivery has fared
+ * since (received, acked, pruned). One of the same source and ref still live is that one (a retry after a crash between
+ * its making and its producer's own record of it). `made`: whether this call made it; `record`: it, the live one, or
+ * null when it was made earlier and isn't live now. Its other checks and refusals are createDelivery's.
+ */
+export async function createDeliveryOnce(host: string, nd: NewDelivery & { once: string }): Promise<{ record: DeliveryRecord | null; made: boolean }> {
+  if (nd.once.length > 300) throw new Error(say(T.badKey))
+  const { meta, agentName } = checkedNew(host, nd)
+  const store = await load(host)
+  try {
+    const out = await transact(store, (d) => {
+      const why = senderRefusal(nd.from)
+      if (why) throw new Error(say(T.notSent, { why }))
+      const live = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isLive(x)) : undefined
+      if (live) return { record: live, made: false }
+      const rec = addNew(d, nd, meta, agentName)
+      d.once = { key: nd.once, at: nowIso() }
+      d.after.push(() => log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} queued, once (${userText(nd.once)})`))
+      return { record: rec as DeliveryRecord | null, made: true }
+    })
+    show(store, nd.agentId)
+    return out
+  } catch (e) {
+    if (e instanceof NotSaved && e.cause instanceof OnceTaken) return { record: null, made: false }
+    throw e
+  }
+}
+
+/**
+ * Drops a host's delivery receipts whose key starts with `prefix` (HI-2618), all but `keep`: its producer can no longer
+ * retry them (an episode its lane has left). Saved before this returns.
+ */
+export async function dropDeliveryReceipts(host: string, prefix: string, keep?: string): Promise<void> {
+  const store = await load(host)
+  await locked(store, () =>
+    saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => {
+      db.prepare("DELETE FROM store_meta WHERE store = 'deliveries' AND scope = ? AND substr(key, 1, ?) = ? AND key <> ?").run(store.place.scope, ONCE.length + prefix.length, ONCE + prefix, ONCE + (keep ?? '')) // agent-protocol: SQL
+    })
+  )
+}
+
+/** Whether a host's delivery receipt for `key` is saved (HI-2618), read from its workspace's database. For tests. */
+export async function deliveryReceiptForTests(host: string, key: string): Promise<boolean> {
+  const store = await load(host)
+  return storeValue(workspaceDb(store.place.workspace).reader, 'deliveries', store.place.scope, ONCE + key) !== null
 }
 
 /** A new delivery's checks before anything is read: refused (an Error) as createDelivery says; its meta and name as kept. */

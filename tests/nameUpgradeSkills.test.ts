@@ -1,6 +1,6 @@
-// HI-2611: a bundled skill Hive shipped under its old name (use-hive-api, now use-cw-api, HI-2463) is removed by the
+// HI-2611: a bundled skill 1.0 shipped under its old name (now use-cw-api, HI-2463) is removed by the
 // names upgrade's files step (nameUpgradeFiles.ts retireRenamedSkills), not by every sync of the bundled items: a copy
-// Hive shipped, unchanged, goes with its entry in bundled.json; one the user changed stays; a second run does nothing.
+// 1.0 shipped, unchanged, goes with its entry in bundled.json; one the user changed stays; a second run does nothing.
 // Only a confirmed absence is gone: a copy or manifest it couldn't look at is left, unsettled, for the next open (HR1's
 // round 1). And a workspace an RC recorded done (version 3) runs it at its next open, once. swapOut's later checks
 // failing to read (SwapUnreadable, HI-2612), or a copy an earlier run left set aside, never record it done (HR2).
@@ -24,7 +24,11 @@ const failing = (p: unknown, call: string): string | undefined => {
   return f.code
 }
 
+// old-name: begin nameUpgradeSkills-inputs
+/** The skill 1.0 shipped under its old name, and its text as shipped: the upgrade's input. */
+const SKILL = 'use-hive-api'
 const OLD = "---\nname: use-hive-api\ndescription: Hive's HTTP API.\n---\n\nAs shipped.\n"
+// old-name: end nameUpgradeSkills-inputs
 const base = tempDir('nameupgrade-skills-')
 let mod: typeof import('../src/main/nameUpgradeFiles')
 let move: typeof import('../src/main/combworkMove')
@@ -32,11 +36,11 @@ let names: typeof import('../src/main/nameUpgrade')
 
 beforeAll(async () => {
   // The history this Combwork "shipped": the old skill as above.
-  const shipped = join(base, 'shipped', 'use-hive-api')
+  const shipped = join(base, 'shipped', SKILL)
   mkdirSync(shipped, { recursive: true })
   writeFileSync(join(shipped, 'SKILL.md'), OLD)
   const history = structuredClone(HISTORY) as Record<string, Record<string, string[]>>
-  history.skills['use-hive-api'] = [...(history.skills['use-hive-api'] ?? []), await contentHash(shipped)]
+  history.skills[SKILL] = [...(history.skills[SKILL] ?? []), await contentHash(shipped)]
   vi.resetModules()
   vi.doMock('../src/main/bundledHistory.json', () => ({ default: history }))
   vi.doMock('original-fs/promises', async () => {
@@ -60,22 +64,22 @@ let n = 0
 /** A workspace's `.combwork` with the old skill's copy (`text`) and a bundled.json that lists it. */
 function workspace(text: string): string {
   const dir = join(base, `ws-${++n}`, '.combwork')
-  mkdirSync(join(dir, 'skills', 'use-hive-api'), { recursive: true })
-  writeFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), text)
-  writeFileSync(join(dir, 'bundled.json'), JSON.stringify({ skills: { 'use-hive-api': { from: 'x' }, handover: { from: 'y' } }, modes: {}, dialects: {} }))
+  mkdirSync(join(dir, 'skills', SKILL), { recursive: true })
+  writeFileSync(join(dir, 'skills', SKILL, 'SKILL.md'), text)
+  writeFileSync(join(dir, 'bundled.json'), JSON.stringify({ skills: { [SKILL]: { from: 'x' }, handover: { from: 'y' } }, modes: {}, dialects: {} }))
   return dir
 }
 const manifest = (dir: string): { skills: Record<string, unknown> } => JSON.parse(readFileSync(join(dir, 'bundled.json'), 'utf8'))
 
-describe('a skill Hive shipped under its old name, retired by the names upgrade (HI-2611)', () => {
+describe('a skill 1.0 shipped under its old name, retired by the names upgrade (HI-2611)', () => {
   it('names the old skill and the one it ships as', () => {
-    expect(mod.RENAMED_SKILLS).toEqual({ 'use-hive-api': 'use-cw-api' })
+    expect(mod.RENAMED_SKILLS).toEqual({ [SKILL]: 'use-cw-api' })
   })
 
-  it("removes a copy Hive shipped, unchanged, and its manifest entry; a second run does nothing", async () => {
+  it("removes a copy 1.0 shipped, unchanged, and its manifest entry; a second run does nothing", async () => {
     const dir = workspace(OLD)
     expect(await mod.retireRenamedSkills(dir)).toBe(true)
-    expect(existsSync(join(dir, 'skills', 'use-hive-api'))).toBe(false)
+    expect(existsSync(join(dir, 'skills', SKILL))).toBe(false)
     expect(manifest(dir).skills).toEqual({ handover: { from: 'y' } })
     const before = readFileSync(join(dir, 'bundled.json'), 'utf8')
     expect(await mod.retireRenamedSkills(dir)).toBe(true)
@@ -85,8 +89,8 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
   it('keeps a copy the user changed, and its entry', async () => {
     const dir = workspace(`${OLD}\nMy own notes.\n`)
     expect(await mod.retireRenamedSkills(dir)).toBe(true)
-    expect(readFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), 'utf8')).toContain('My own notes.')
-    expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+    expect(readFileSync(join(dir, 'skills', SKILL, 'SKILL.md'), 'utf8')).toContain('My own notes.')
+    expect(manifest(dir).skills[SKILL]).toEqual({ from: 'x' })
   })
 
   it('does nothing in a workspace without it', async () => {
@@ -105,10 +109,10 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
     for (const ops of [{ lstat: async () => denied() }, { hash: async () => denied() }]) {
       const dir = workspace(OLD)
       expect(await mod.retireRenamedSkills(dir, ops)).toBe(false)
-      expect(existsSync(join(dir, 'skills', 'use-hive-api'))).toBe(true)
-      expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+      expect(existsSync(join(dir, 'skills', SKILL))).toBe(true)
+      expect(manifest(dir).skills[SKILL]).toEqual({ from: 'x' })
       expect(await mod.retireRenamedSkills(dir)).toBe(true)
-      expect(existsSync(join(dir, 'skills', 'use-hive-api'))).toBe(false)
+      expect(existsSync(join(dir, 'skills', SKILL))).toBe(false)
       expect(manifest(dir).skills).toEqual({ handover: { from: 'y' } })
     }
   })
@@ -116,8 +120,8 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
   it("a manifest it can't read is left as it is, unsettled; the next run drops the entry", async () => {
     const dir = workspace(OLD)
     expect(await mod.retireRenamedSkills(dir, { read: async () => denied() })).toBe(false)
-    expect(existsSync(join(dir, 'skills', 'use-hive-api'))).toBe(false)
-    expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+    expect(existsSync(join(dir, 'skills', SKILL))).toBe(false)
+    expect(manifest(dir).skills[SKILL]).toEqual({ from: 'x' })
     expect(await mod.retireRenamedSkills(dir)).toBe(true)
     expect(manifest(dir).skills).toEqual({ handover: { from: 'y' } })
   })
@@ -129,7 +133,7 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
     writeFileSync(join(dir, names.NAMES_DONE_FILE), JSON.stringify({ version: 3, at: '2026-11-01T00:00:00.000Z' }))
     expect(await names.workspaceNeeds(ws)).toBe(true)
     await move.moveFolders(ws)
-    expect(existsSync(join(dir, 'skills', 'use-hive-api'))).toBe(false)
+    expect(existsSync(join(dir, 'skills', SKILL))).toBe(false)
     expect(manifest(dir).skills).toEqual({ handover: { from: 'y' } })
     expect(JSON.parse(readFileSync(join(dir, names.NAMES_DONE_FILE), 'utf8')).version).toBe(names.NAMES_VERSION)
     expect(await names.workspaceNeeds(ws)).toBe(false)
@@ -151,7 +155,7 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
     }
     expect(JSON.parse(readFileSync(join(dir, names.NAMES_DONE_FILE), 'utf8')).version).toBe(3)
     await move.moveFolders(ws)
-    expect(existsSync(join(dir, 'skills', 'use-hive-api'))).toBe(false)
+    expect(existsSync(join(dir, 'skills', SKILL))).toBe(false)
     expect(JSON.parse(readFileSync(join(dir, names.NAMES_DONE_FILE), 'utf8')).version).toBe(names.NAMES_VERSION)
   })
 
@@ -159,9 +163,9 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
   // at any of those is put back, but isn't the user's change: the record stays at 3, and the next open retires it.
   // `pass`: the reads of SKILL.md let through before the failing one, at its place (the first is the hash) or aside.
   const LATER = [
-    { check: 'the check before it moves', at: /[\\/]use-hive-api[\\/]SKILL\.md$/, pass: 1 },
-    { check: 'the first check once moved aside', at: /\.use-hive-api\.cw-old-[^\\/]+[\\/]SKILL\.md$/, pass: 0 },
-    { check: 'the last check once moved aside', at: /\.use-hive-api\.cw-old-[^\\/]+[\\/]SKILL\.md$/, pass: 1 }
+    { check: 'the check before it moves', at: new RegExp(String.raw`[\\/]${SKILL}[\\/]SKILL\.md$`), pass: 1 },
+    { check: 'the first check once moved aside', at: new RegExp(String.raw`\.${SKILL}\.cw-old-[^\\/]+[\\/]SKILL\.md$`), pass: 0 },
+    { check: 'the last check once moved aside', at: new RegExp(String.raw`\.${SKILL}\.cw-old-[^\\/]+[\\/]SKILL\.md$`), pass: 1 }
   ]
   const record = (dir: string): number => JSON.parse(readFileSync(join(dir, names.NAMES_DONE_FILE), 'utf8')).version
   const atV3 = (): { dir: string; ws: string } => {
@@ -180,9 +184,9 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
         } finally {
           faults.length = 0
         }
-        expect(readFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), 'utf8')).toBe(OLD)
-        expect(readdirSync(join(dir, 'skills'))).toEqual(['use-hive-api'])
-        expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+        expect(readFileSync(join(dir, 'skills', SKILL, 'SKILL.md'), 'utf8')).toBe(OLD)
+        expect(readdirSync(join(dir, 'skills'))).toEqual([SKILL])
+        expect(manifest(dir).skills[SKILL]).toEqual({ from: 'x' })
         expect(record(dir)).toBe(3)
         expect(await names.workspaceNeeds(ws)).toBe(true)
         await move.moveFolders(ws)
@@ -195,7 +199,7 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
 
   it('a copy an earlier run left set aside (its put-back failed): put back and retired before the record is written', async () => {
     const { dir, ws } = atV3()
-    renameSync(join(dir, 'skills', 'use-hive-api'), join(dir, 'skills', '.use-hive-api.cw-old-1-1'))
+    renameSync(join(dir, 'skills', SKILL), join(dir, 'skills', `.${SKILL}.cw-old-1-1`))
     await move.moveFolders(ws)
     expect(readdirSync(join(dir, 'skills'))).toEqual([])
     expect(manifest(dir).skills).toEqual({ handover: { from: 'y' } })
@@ -205,16 +209,16 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
   for (const code of ['EACCES', 'EPERM', 'EIO']) {
     it(`${code} putting back a copy an earlier run left set aside: nothing removed or recorded; released, the next open finishes`, async () => {
       const { dir, ws } = atV3()
-      const aside = join(dir, 'skills', '.use-hive-api.cw-old-1-1')
-      renameSync(join(dir, 'skills', 'use-hive-api'), aside)
-      faults.push({ match: /\.use-hive-api\.cw-old-1-1$/, code, pass: 0, call: 'rename' })
+      const aside = join(dir, 'skills', `.${SKILL}.cw-old-1-1`)
+      renameSync(join(dir, 'skills', SKILL), aside)
+      faults.push({ match: new RegExp(String.raw`\.${SKILL}\.cw-old-1-1$`), code, pass: 0, call: 'rename' })
       try {
         await move.moveFolders(ws)
       } finally {
         faults.length = 0
       }
-      expect(readdirSync(join(dir, 'skills'))).toEqual(['.use-hive-api.cw-old-1-1'])
-      expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+      expect(readdirSync(join(dir, 'skills'))).toEqual([`.${SKILL}.cw-old-1-1`])
+      expect(manifest(dir).skills[SKILL]).toEqual({ from: 'x' })
       expect(record(dir)).toBe(3)
       await move.moveFolders(ws)
       expect(readdirSync(join(dir, 'skills'))).toEqual([])
@@ -228,27 +232,27 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
   for (const code of ['EACCES', 'EPERM', 'EIO']) {
     it(`${code} hashing a set-aside copy whose place the user's edit filled: left aside, not recorded; released, removed, the edit kept`, async () => {
       const { dir, ws } = atV3()
-      const aside = join(dir, 'skills', '.use-hive-api.cw-old-1-1')
-      renameSync(join(dir, 'skills', 'use-hive-api'), aside)
+      const aside = join(dir, 'skills', `.${SKILL}.cw-old-1-1`)
+      renameSync(join(dir, 'skills', SKILL), aside)
       const mine = `${OLD}\nMy own notes.\n`
-      mkdirSync(join(dir, 'skills', 'use-hive-api'))
-      writeFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), mine)
-      faults.push({ match: /\.use-hive-api\.cw-old-1-1[\\/]SKILL\.md$/, code, pass: 0 })
+      mkdirSync(join(dir, 'skills', SKILL))
+      writeFileSync(join(dir, 'skills', SKILL, 'SKILL.md'), mine)
+      faults.push({ match: new RegExp(String.raw`\.${SKILL}\.cw-old-1-1[\\/]SKILL\.md$`), code, pass: 0 })
       try {
         await move.moveFolders(ws)
         expect(faults[0].pass).toBe(0)
       } finally {
         faults.length = 0
       }
-      expect(readdirSync(join(dir, 'skills')).sort()).toEqual(['.use-hive-api.cw-old-1-1', 'use-hive-api'])
+      expect(readdirSync(join(dir, 'skills')).sort()).toEqual([`.${SKILL}.cw-old-1-1`, SKILL])
       expect(readFileSync(join(aside, 'SKILL.md'), 'utf8')).toBe(OLD)
-      expect(readFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), 'utf8')).toBe(mine)
+      expect(readFileSync(join(dir, 'skills', SKILL, 'SKILL.md'), 'utf8')).toBe(mine)
       expect(record(dir)).toBe(3)
       expect(await names.workspaceNeeds(ws)).toBe(true)
       await move.moveFolders(ws)
-      expect(readdirSync(join(dir, 'skills'))).toEqual(['use-hive-api'])
-      expect(readFileSync(join(dir, 'skills', 'use-hive-api', 'SKILL.md'), 'utf8')).toBe(mine)
-      expect(manifest(dir).skills['use-hive-api']).toEqual({ from: 'x' })
+      expect(readdirSync(join(dir, 'skills'))).toEqual([SKILL])
+      expect(readFileSync(join(dir, 'skills', SKILL, 'SKILL.md'), 'utf8')).toBe(mine)
+      expect(manifest(dir).skills[SKILL]).toEqual({ from: 'x' })
       expect(record(dir)).toBe(names.NAMES_VERSION)
     })
   }
@@ -258,9 +262,9 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
   for (const code of ['EACCES', 'EPERM', 'EIO']) {
     it(`${code} looking at its place as a failed check puts it back: left aside, not recorded; released, retired`, async () => {
       const { dir, ws } = atV3()
-      const place = join(dir, 'skills', 'use-hive-api')
+      const place = join(dir, 'skills', SKILL)
       const atPlace = { test: (p: string): boolean => p.toLowerCase() === place.toLowerCase() }
-      faults.push({ match: /\.use-hive-api\.cw-old-[^\\/]+[\\/]SKILL\.md$/, code, pass: 0, arms: () => void faults.push({ match: atPlace, code, pass: 0, call: 'lstat' }) })
+      faults.push({ match: new RegExp(String.raw`\.${SKILL}\.cw-old-[^\\/]+[\\/]SKILL\.md$`), code, pass: 0, arms: () => void faults.push({ match: atPlace, code, pass: 0, call: 'lstat' }) })
       try {
         await move.moveFolders(ws)
         expect(faults).toHaveLength(2)
@@ -269,7 +273,7 @@ describe('a skill Hive shipped under its old name, retired by the names upgrade 
       }
       const left = readdirSync(join(dir, 'skills'))
       expect(left).toHaveLength(1)
-      expect(left[0]).toMatch(/^\.use-hive-api\.cw-old-/)
+      expect(left[0]).toMatch(new RegExp(String.raw`^\.${SKILL}\.cw-old-`))
       expect(readFileSync(join(dir, 'skills', left[0], 'SKILL.md'), 'utf8')).toBe(OLD)
       expect(record(dir)).toBe(3)
       await move.moveFolders(ws)

@@ -1132,7 +1132,7 @@
     "description": "At the top of the Performance page, when measurements were lost."
   },
   "performance.coverage.evicted": {
-    "defaultMessage": "History up to {when} was removed to keep the metrics file under its size limit: nothing before then is available.",
+    "defaultMessage": "History up to {when} was removed to keep the performance history under its size limit: nothing before then is available.",
     "description": "At the top of the Performance page. {when} is a date and time."
   },
   "performance.coverage.full": {

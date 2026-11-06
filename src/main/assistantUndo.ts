@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
-import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, WorkflowForm } from '../shared/types'
+import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, TaskWaiting, WorkflowForm } from '../shared/types'
 import { AGENT_FIELDS, CARD_FIELDS, CONNECTION_ID, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
 import * as assistant from './assistantControl'
 import { boardWrite } from './boardStore'
@@ -278,6 +278,10 @@ function setCardField(patch: TaskPatch, field: CardField, v: Value): void {
       break
     case 'blocked':
       patch.blocked = (v as string | null) ?? ''
+      break
+    // Its waiting mark as it was (HI-2618): whole, who marked it and when kept; none clears it.
+    case 'waitingFor':
+      patch.waitingFor = v ? (v as unknown as TaskWaiting) : null
       break
     case 'agent':
       patch.agent = (v as string | null) ?? ''

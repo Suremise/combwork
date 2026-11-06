@@ -1,8 +1,8 @@
-// HI-2587: the board's file renamed hive.db → combwork.db at a workspace's open (boardFileMove.ts; the design is the
+// HI-2587: the board's file renamed from 1.0's name to combwork.db at a workspace's open (boardFileMove.ts; the design is the
 // card's, HI-2587/s15 with s20, s23 and s26). Real SQLite files in WAL mode: a fresh workspace needs nothing; a 1.0 or
 // RC2 board moves whole, its log folded in first; a crash at each point of the move (after the checkpoint, after the
 // rename, after part of the clean-up) finishes at the next open with every card there; a log still holding changes
-// refuses the rename; both names keep combwork.db and leave hive.db as it is; a leftover log holding data is never
+// refuses the rename; both names keep combwork.db and leave the old file as it is; a leftover log holding data is never
 // deleted, kept beside combwork.db and refusing the open, again and again, while there is no board file at all; and the
 // board's copies in backups/ take the new family. A child process killed halfway leaves a board the next open finishes.
 import { spawn } from 'child_process'
@@ -22,6 +22,8 @@ vi.mock('../src/main/events', async (orig) => ({
 
 const { boardFileNeeded, boardMoveTestHooks, moveBoardFile, NEW_DB_FILE, OLD_DB_FILE } = await import('../src/main/boardFileMove')
 const { checkpointFile } = await import('../src/main/combworkMoveWorker')
+/** The old board file's name without `.db`: its backups' family. */
+const OLD_STEM = OLD_DB_FILE.replace(/\.db$/, '')
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
 const base = tempDir('boardfilemove-')
@@ -93,7 +95,7 @@ describe('the board file move', () => {
     expect(await boardFileNeeded(dir)).toBe(true)
     await moveBoardFile(dir, checkpoint)
     expect(titles(join(dir, NEW_DB_FILE))).toEqual(CARDS)
-    expect(readdirSync(dir).filter((f) => f.startsWith('hive'))).toEqual([])
+    expect(readdirSync(dir).filter((f) => f.startsWith(OLD_STEM))).toEqual([])
     expect(await boardFileNeeded(dir)).toBe(false)
   })
 
@@ -113,7 +115,7 @@ describe('the board file move', () => {
       expect(await boardFileNeeded(dir)).toBe(true)
       await moveBoardFile(dir, checkpoint)
       expect(titles(join(dir, NEW_DB_FILE))).toEqual(CARDS)
-      expect(readdirSync(dir).filter((f) => f.startsWith('hive'))).toEqual([])
+      expect(readdirSync(dir).filter((f) => f.startsWith(OLD_STEM))).toEqual([])
     })
   }
 
@@ -129,7 +131,7 @@ describe('the board file move', () => {
     expect(existsSync(join(dir, NEW_DB_FILE))).toBe(false)
   })
 
-  it('both names: combwork.db is used, hive.db and its sidecars left byte for byte, a warning', async () => {
+  it('both names: combwork.db is used, the old file and its sidecars left byte for byte, a warning', async () => {
     const dir = oldBoard()
     copyFileSync(join(dir, OLD_DB_FILE), join(dir, NEW_DB_FILE))
     writeFileSync(join(dir, `${OLD_DB_FILE}-wal`), 'old log')
@@ -164,7 +166,7 @@ describe('the board file move', () => {
       expect(readFileSync(join(dir, `${OLD_DB_FILE}-wal`)).equals(log)).toBe(true)
       expect(existsSync(join(dir, NEW_DB_FILE))).toBe(false)
     }
-    // Put back as hive.db beside its log: the move folds the log in, and the cards only in it arrive.
+    // Put back under the old name beside its log: the move folds the log in, and the cards only in it arrive.
     copyFileSync(aside, join(dir, OLD_DB_FILE))
     await moveBoardFile(dir, checkpoint)
     expect(titles(join(dir, NEW_DB_FILE))).toEqual(CARDS)
@@ -174,7 +176,7 @@ describe('the board file move', () => {
     const dir = oldBoard()
     const b = join(dir, 'backups')
     mkdirSync(b, { recursive: true })
-    const names = ['hive-v12-2026-01-01T00-00-00-000Z.db', 'hive-before-1.0-v9-2026-01-01T00-00-00-000Z.db', 'hive-before-restore-v12-2026-01-01T00-00-00-000Z.db', 'usage-v3-2026-01-01T00-00-00-000Z.db']
+    const names = [`${OLD_STEM}-v12-2026-01-01T00-00-00-000Z.db`, `${OLD_STEM}-before-1.0-v9-2026-01-01T00-00-00-000Z.db`, `${OLD_STEM}-before-restore-v12-2026-01-01T00-00-00-000Z.db`, 'usage-v3-2026-01-01T00-00-00-000Z.db']
     for (const f of names) writeFileSync(join(b, f), f)
     await moveBoardFile(dir, checkpoint)
     expect(readdirSync(b).sort()).toEqual(['combwork-before-1.0-v9-2026-01-01T00-00-00-000Z.db', 'combwork-before-restore-v12-2026-01-01T00-00-00-000Z.db', 'combwork-v12-2026-01-01T00-00-00-000Z.db', 'usage-v3-2026-01-01T00-00-00-000Z.db'])
@@ -213,7 +215,7 @@ m.moveBoardFile(dir, async (f) => w.checkpointFile({ kind: 'checkpoint', file: f
       await vi.waitFor(() => expect(readFileSync(out, 'utf8')).toContain(`stopped ${point}`), WAIT)
       await moveBoardFile(dir, checkpoint)
       expect(titles(join(dir, NEW_DB_FILE))).toEqual(CARDS)
-      expect(readdirSync(dir).filter((f) => f.startsWith('hive'))).toEqual([])
+      expect(readdirSync(dir).filter((f) => f.startsWith(OLD_STEM))).toEqual([])
     })
   }
 })

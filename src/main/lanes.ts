@@ -6,7 +6,8 @@ import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole } from '../shared/workflow/roles'
 import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
-import type { CombworkErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
+import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
+import { columnSince } from '../shared/tasks'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
@@ -515,7 +516,58 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // Each running lane's cards' owner lanes (HI-1821): a card given to no agent is the lane's that owns it.
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws))))
+  const deps = await dueDepsOf(ws, lanes, cards)
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null)))
+}
+
+/**
+ * Each running lane's due card's dependencies (HI-2618, LaneInfo.dueDeps), from the board: its first card not Done, in
+ * Todo, with `blockedBy`, where Combwork waits for them (the rules off: a lane is bookkeeping and its builder starts
+ * it; on: only under the start's rule that they be Done, else Combwork starts it regardless). The ones not Done by key,
+ * and once none is, when the last of them went Done (their history's move into Done). laneView says it only for its
+ * current card.
+ */
+async function dueDepsOf(ws: WorkspaceService, lanes: readonly LaneRecord[], cards: Map<string, Map<number, TaskCard | null>>): Promise<Map<string, DueDeps>> {
+  const out = new Map<string, DueDeps>()
+  if (!ws.path) return out
+  const due = new Map<string, TaskCard>()
+  for (const l of lanes) {
+    if (!running(l)) continue
+    const mine = cards.get(l.id)
+    const next = l.cards.map((n) => mine?.get(n) ?? null).find((c) => !!c && c.column !== 'done')
+    if (next && next.column === 'todo' && next.blockedBy.length) due.set(l.id, next)
+  }
+  if (!due.size) return out
+  const deps = await cardsNow(ws, [...new Set([...due.values()].flatMap((c) => c.blockedBy))])
+  const rulesOn = rulesEnforced()
+  for (const [id, c] of due) {
+    const l = lanes.find((x) => x.id === id)!
+    const wf = await (await import('./workflow/service')).workflowFor(ws, join(ws.path, l.project)).catch(() => null)
+    if (rulesOn && !startWaitsForDependencies(wf, c.number)) continue
+    const found = c.blockedBy.map((n) => deps.get(n) ?? null).filter((d): d is TaskCard => !!d)
+    // By key as the workflow names its cards (the board's key where it can't).
+    const keyOf = (d: TaskCard): string => {
+      try {
+        return wf?.store.card(d.number).key ?? d.key ?? `#${d.number}`
+      } catch {
+        return d.key ?? `#${d.number}`
+      }
+    }
+    const open = found.filter((d) => d.column !== 'done').map(keyOf)
+    const doneAt = found.map((d) => columnSince(d) ?? '').filter(Boolean).sort()
+    out.set(id, { card: c.number, open, readyAt: open.length || !doneAt.length ? null : doneAt.at(-1)! })
+  }
+  return out
+}
+
+/** Whether card n's rules start it only once the cards it depends on are Done (`start.dependenciesIntegrated`); unknown: no. */
+function startWaitsForDependencies(wf: Awaited<ReturnType<typeof import('./workflow/service')['workflowFor']>> | null, n: number): boolean {
+  try {
+
+    return !!wf && wf.rulesetOf(wf.store.card(n)).guards.start.includes('start.dependenciesIntegrated')
+  } catch {
+    return false
+  }
 }
 
 /**

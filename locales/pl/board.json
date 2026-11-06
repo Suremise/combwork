@@ -1010,5 +1010,11 @@
   "board.workQueue.stuckRef": "{target} wskazuje na",
   "board.workQueue.testing": "Trwa testowanie: {step}",
   "board.workQueue.unreadRef": "nie odczytano",
-  "board.workflows": "Przepływy pracy"
+  "board.workflows": "Przepływy pracy",
+  "board.card.waitingMark": "Czeka",
+  "board.card.waitingTip": "Czeka: {reason} (oznaczył(a): {by}). Combwork nie zgłasza jej w tym czasie jako utkniętej.",
+  "board.dialog.waiting": "Czeka",
+  "board.dialog.waitingPlaceholder": "Dlaczego celowo czeka (puste: nie czeka). Nie jest zgłaszana jako utknięta; jej agent dalej działa.",
+  "board.menu.clearWaiting": "Zakończ czekanie",
+  "board.menu.markWaiting": "Oznacz jako czekającą…"
 }

@@ -538,5 +538,7 @@
   "tips.workspaceNotes.text": "Workspace notes, fixada no topo de Notas compartilhadas, é para o que vale nesta máquina, como um caminho completo. Todo agente a recebe ao iniciar, em qualquer pasta, então isso não precisa ir para um AGENTS.md commitado. Uma seção com o nome de um projeto é só desse projeto.",
   "tips.workspaceNotes.title": "Notas sobre esta máquina para cada agente",
   "tips.modelSwitched.title": "Um agente em outro modelo fica marcado",
-  "tips.modelSwitched.text": "Se um agente acabar em outro modelo diferente do que a conexão deu (a oferta do Codex de um modelo mais barato perto do seu limite, ou /model), o rodapé marca o modelo com um aviso e Atividade mostra Modelo trocado. Reinicie o agente para voltar."
+  "tips.modelSwitched.text": "Se um agente acabar em outro modelo diferente do que a conexão deu (a oferta do Codex de um modelo mais barato perto do seu limite, ou /model), o rodapé marca o modelo com um aviso e Atividade mostra Modelo trocado. Reinicie o agente para voltar.",
+  "tips.waitingOnPurpose.title": "Um cartão que aguarda de propósito",
+  "tips.waitingOnPurpose.text": "Um cartão em Fazendo espera um momento tranquilo ou uma resposta? Clique nele com o botão direito, Marcar como aguardando…, e diga por quê: o Combwork deixa de marcá-lo como travado até você encerrar a espera ou ele sair de Fazendo. O agente continua rodando."
 }

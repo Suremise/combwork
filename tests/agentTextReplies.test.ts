@@ -91,7 +91,9 @@ function replies(): { name: string; text: string }[] {
   const rows = [
     ...['ready', 'finished', 'background', 'waiting', 'watching', 'signin', 'working'].map((status) => row({ agent: { name: 'Coder', status, backgroundTasks: 2 } })),
     row({ agent: { name: 'Coder', status: 'working', backgroundTasks: 1 }, labels: ['decision'], blocked: 'pending reason', blockedBy: [13, 60], elsewhere: [60], stalled: 'x', reviewing: { name: 'Codex', stalled: 'x' }, comments: 1 }),
-    row({ column: 'review', reviewing: { name: 'Codex' }, comments: 3 })
+    row({ column: 'review', reviewing: { name: 'Codex' }, comments: 3 }),
+    // A card in Doing waiting on purpose (HI-2618's reply.row.waiting; HI-2637).
+    row({ column: 'doing', agent: { name: 'Coder', status: 'watching', backgroundTasks: 0 }, waitingFor: 'x' })
   ]
   add('list', R.taskListText(rows))
   add('list page', R.taskListText(Array.from({ length: 250 }, () => row({})), { offset: 10 }))

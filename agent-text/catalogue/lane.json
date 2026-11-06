@@ -433,7 +433,7 @@
   },
   "lane.status.start.dependencies": {
     "text": "{card} waits to start: it waits for {waitsFor} to merge",
-    "note": "A lane's next card waits for a card it depends on to be merged (HI-2129); {waitsFor} is that card's key."
+    "note": "A lane's next card waits for the cards it depends on to be merged (HI-2129, HI-2618); {waitsFor} is their keys, comma-separated."
   },
   "lane.status.start.failed": {
     "text": "{card} waits to start: {agent}'s last start failed",

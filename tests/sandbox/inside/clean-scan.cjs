@@ -2,8 +2,8 @@
  * Runs inside the Sandbox, as the user, with the host's Node (HI-2592, the clean-install check, scenario 9):
  *   C:\tools\node\node.exe C:\tools\combwork-tests\sandbox\inside\clean-scan.cjs baseline <prefix>   before the install
  *   C:\tools\node\node.exe C:\tools\combwork-tests\sandbox\inside\clean-scan.cjs scan <prefix>       after drive.cjs clean
- * baseline keeps what HKCU says of "hive" before anything is installed (C:\out\<prefix>-reg-before.txt), so the scan
- * counts only what the install and the app added. scan searches every place of ../clean.cjs CATEGORIES for "hive" and
+ * baseline keeps what HKCU says of the old name before anything is installed (C:\out\<prefix>-reg-before.txt), so the scan
+ * counts only what the install and the app added. scan searches every place of ../clean.cjs CATEGORIES for the old name and
  * writes C:\out\<prefix>-scan.json ({ places: { <id>: { scanned, count, hits, unread, why? } }, asar, skipped, at }; skipped: what couldn't be read, which fails its place), which
  * the host's report turns into checks (report.cjs, clean.cjs cleanChecks). What the driver kept for it: C:\out\<prefix>.json
  * (its facts: the workspace and the export's folder), <prefix>-window.json, -diagnostics.txt and -agent-env.txt.
@@ -29,7 +29,11 @@ const run = (file, args) => {
 }
 const ps = (cmd) => run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd])
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) } catch { return null } }
-const hkcuOldName = () => run('reg.exe', ['query', 'HKCU', '/f', 'hive', '/s'])
+// old-name: begin clean-scan-inputs
+/** The old name, as reg.exe searches HKCU for it (the clean-install check's term, ../clean.cjs oldNameHits). */
+const OLD_NAME = 'hive'
+// old-name: end clean-scan-inputs
+const hkcuOldName = () => run('reg.exe', ['query', 'HKCU', '/f', OLD_NAME, '/s'])
 
 function scan() {
   const t = tally()
@@ -58,7 +62,7 @@ function scan() {
   for (const s of shortcuts) scanText(t, 'shortcuts', s.file, JSON.stringify(s))
   if (!shortcuts.length) why.shortcuts = 'no shortcut starts Combwork'
 
-  // The registry: the app's own keys whole, wherever they are, and anything new in HKCU that names "hive".
+  // The registry: the app's own keys whole, wherever they are, and anything new in HKCU that names the old name.
   const keys = [
     `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${COMBWORK_GUID}`,
     `HKCU\\Software\\${COMBWORK_GUID}`,

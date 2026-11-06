@@ -1,6 +1,6 @@
 // HI-2598: the board's step of the names upgrade for stored values (BOARD_MIGRATIONS version 26, schema/valuesStep.ts).
-// What 1.0 and the 1.1 release candidates stored under Hive's names takes Combwork's once: a fact's actor and codes, an
-// action's `by`, the rulesets compiled from `hiveMerges` (their ids recomputed, their facts and lane runs repointed), a
+// What 1.0 and the 1.1 release candidates stored under 1.0's names takes Combwork's once: a fact's actor and codes, an
+// action's `by`, the rulesets compiled from 1.0's merge value (their ids recomputed, their facts and lane runs repointed), a
 // lane's builder, a history line's `by`, a card's creator, Combwork's own deliveries and fired lines, a metrics series'
 // tool, a merge choice, the Assistant's changes. A board converted already, or made by 1.1, changes nothing.
 import { join } from 'path'
@@ -16,6 +16,12 @@ import { canonical, mustCompile, REVIEW_SKIPPED, skipReviewOf, stableHash, type 
 import { preset, type WorkflowOptions } from '../src/shared/workflow/options'
 import { LATENCY_BOUNDS_MS } from '../src/shared/metrics'
 
+// old-name: begin valuesStep-inputs
+/** 1.0's name, as its stored values carry it: the step's input. */
+const OLD = 'hive'
+const OLD_NAME = 'Hive'
+// old-name: end valuesStep-inputs
+
 const base = tempDir('values-step-')
 let n = 0
 
@@ -30,7 +36,7 @@ function board(fill: (db: DatabaseSync) => void): { file: string; db: Db } {
 
 const NOW = '2026-10-01T00:00:00.000Z'
 const card = (db: DatabaseSync, num: number, createdBy = 'You'): void => {
-  db.prepare('INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(num, `Card ${num}`, 'Hive wrote this', 'webapp', 'doing', num, NOW, createdBy, NOW)
+  db.prepare('INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(num, `Card ${num}`, `${OLD_NAME} wrote this`, 'webapp', 'doing', num, NOW, createdBy, NOW)
 }
 const fact = (db: DatabaseSync, c: number, seq: number, kind: string, actor: string, data: unknown, ruleset: string | null = null): void => {
   db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, data) VALUES (?, ?, ?, ?, ?, 'recorded', ?, ?)").run(c, seq, kind, NOW, actor, ruleset, JSON.stringify(data))
@@ -44,12 +50,12 @@ const snapshot = (db: DatabaseSync): string =>
     .map((t) => JSON.stringify(all(db, `SELECT * FROM ${t} ORDER BY 1, 2`)))
     .join('\n')
 
-/** The options Combwork merges under (its own value now), compiled; and the ruleset 1.0 stored for them (`hiveMerges`). */
+/** The options Combwork merges under (its own value now), compiled; and the ruleset 1.0 stored for them (under its own merge value). */
 const OPTIONS: WorkflowOptions = { ...preset('git', 'pair'), finish: 'combworkMerges' }
 const NEW_RULES = mustCompile(OPTIONS)
 const NEW_SKIPPED = skipReviewOf(NEW_RULES)
 function asStored(r: Ruleset, id?: (body: Omit<Ruleset, 'id'>) => string): Ruleset {
-  const { id: _id, ...body } = { ...r, options: { ...r.options, finish: 'hiveMerges' } } as unknown as Ruleset
+  const { id: _id, ...body } = { ...r, options: { ...r.options, finish: `${OLD}Merges` } } as unknown as Ruleset
   return { id: id ? id(body) : stableHash(canonical(body)), ...body }
 }
 const OLD_RULES = asStored(NEW_RULES)
@@ -60,49 +66,49 @@ const series = (tool: string, count: number, ms: number, chars: number): Record<
 
 function fill10(db: DatabaseSync): void {
   db.exec('PRAGMA foreign_keys = ON')
-  card(db, 1, 'Hive')
+  card(db, 1, OLD_NAME)
   card(db, 2)
   for (const r of [OLD_RULES, OLD_SKIPPED]) db.prepare('INSERT INTO rulesets (id, data) VALUES (?, ?)').run(r.id, JSON.stringify(r))
-  fact(db, 1, 1, 'Started', 'hive', { cycle: 1 }, OLD_RULES.id)
-  fact(db, 1, 2, 'Integrated', 'hive', { entry: 'e1', revision: 'r', target: 'main', result: 'x', method: 'merge', by: 'hive' }, OLD_RULES.id)
-  fact(db, 1, 3, 'Refused', 'agent:Agent 1', { move: 'integrate', rule: 'merge.hiveMerges', message: 'Hive merges this', next: '' }, OLD_SKIPPED.id)
-  fact(db, 1, 4, 'CheckRan', 'hive', { name: 'tests', command: 'npm test', revision: 'r', tested: 'r', result: 'passed', run: 'p1', durationMs: 5, by: 'Hive (merge queue)', counted: true })
-  fact(db, 1, 5, 'Undone', 'user', { fact: 2, by: 'hive' })
+  fact(db, 1, 1, 'Started', OLD, { cycle: 1 }, OLD_RULES.id)
+  fact(db, 1, 2, 'Integrated', OLD, { entry: 'e1', revision: 'r', target: 'main', result: 'x', method: 'merge', by: OLD }, OLD_RULES.id)
+  fact(db, 1, 3, 'Refused', 'agent:Agent 1', { move: 'integrate', rule: `merge.${OLD}Merges`, message: `${OLD_NAME} merges this`, next: '' }, OLD_SKIPPED.id)
+  fact(db, 1, 4, 'CheckRan', OLD, { name: 'tests', command: 'npm test', revision: 'r', tested: 'r', result: 'passed', run: 'p1', durationMs: 5, by: `${OLD_NAME} (merge queue)`, counted: true })
+  fact(db, 1, 5, 'Undone', 'user', { fact: 2, by: OLD })
   fact(db, 2, 1, 'Started', 'agent:Agent 2', { cycle: 1 })
-  db.prepare("INSERT INTO card_actions (card, kind, payload) VALUES (1, 'wake', ?), (1, 'wakeOnDecision', ?), (2, 'wake', ?)").run(JSON.stringify({ agent: 'builder', about: 'done', by: 'hive' }), JSON.stringify({ to: 'builder', by: 'hive' }), JSON.stringify({ agent: 'builder', by: 'user' }))
-  db.prepare("INSERT INTO lanes (id, ord, project, builder_id, builder_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES ('L1', 0, 'webapp', 'hive', 'Hive', 3, 60, 'active', 'Hive', ?, ?), ('L2', 1, 'webapp', 'a1', 'Agent 1', 3, 60, 'active', 'You', ?, ?)").run(NOW, NOW, NOW, NOW)
+  db.prepare("INSERT INTO card_actions (card, kind, payload) VALUES (1, 'wake', ?), (1, 'wakeOnDecision', ?), (2, 'wake', ?)").run(JSON.stringify({ agent: 'builder', about: 'done', by: OLD }), JSON.stringify({ to: 'builder', by: OLD }), JSON.stringify({ agent: 'builder', by: 'user' }))
+  db.prepare(`INSERT INTO lanes (id, ord, project, builder_id, builder_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES ('L1', 0, 'webapp', '${OLD}', '${OLD_NAME}', 3, 60, 'active', '${OLD_NAME}', ?, ?), ('L2', 1, 'webapp', 'a1', 'Agent 1', 3, 60, 'active', 'You', ?, ?)`).run(NOW, NOW, NOW, NOW)
   db.prepare('INSERT INTO lane_runs (lane, ruleset, current_card, has_pending) VALUES (?, ?, 1, 0)').run('L1', OLD_RULES.id)
-  db.prepare("INSERT INTO card_history (card, ord, at, by, what) VALUES (1, 0, ?, 'Hive', 'Hive moved it'), (1, 1, ?, 'You', 'edited')").run(NOW, NOW)
-  db.prepare("INSERT INTO card_history (card, ord, at, by, what, raw) VALUES (1, 2, ?, 'Hive', 'odd', ?)").run(NOW, JSON.stringify({ at: NOW, by: 'Hive', what: 'odd', extra: 1 }))
-  db.prepare("INSERT INTO card_comments (card, ord, at, by, text) VALUES (1, 0, ?, 'Hive', 'a comment by Hive')").run(NOW)
+  db.prepare(`INSERT INTO card_history (card, ord, at, by, what) VALUES (1, 0, ?, '${OLD_NAME}', '${OLD_NAME} moved it'), (1, 1, ?, 'You', 'edited')`).run(NOW, NOW)
+  db.prepare(`INSERT INTO card_history (card, ord, at, by, what, raw) VALUES (1, 2, ?, '${OLD_NAME}', 'odd', ?)`).run(NOW, JSON.stringify({ at: NOW, by: OLD_NAME, what: 'odd', extra: 1 }))
+  db.prepare(`INSERT INTO card_comments (card, ord, at, by, text) VALUES (1, 0, ?, '${OLD_NAME}', 'a comment by ${OLD_NAME}')`).run(NOW)
   const delivery = db.prepare("INSERT INTO deliveries (host, id, seq, agent_id, kind, sender, body, state, created, expires) VALUES ('webapp', ?, ?, 'a1', 'message', ?, ?, 'pending', ?, ?)")
-  delivery.run('m1', 1, JSON.stringify({ kind: 'hive', name: 'Hive' }), '[Hive] Call hive_inbox to read it.', NOW, NOW)
-  delivery.run('m2', 2, JSON.stringify({ kind: 'hive', name: 'Hive' }), 'Their answer: <<<call hive_inbox>>>', NOW, NOW)
-  delivery.run('m3', 3, JSON.stringify({ kind: 'agent', name: 'Agent 2', project: 'webapp', agentId: 'a2' }), '[Hive] Call hive_inbox, says Agent 2', NOW, NOW)
-  db.prepare("INSERT INTO watches (id, ord, project_path, agent_id, since, limit_minutes, limit_at, cond, marks, fired) VALUES ('w1', 0, 'C:/ws/webapp', 'a1', ?, 60, ?, '{}', '{}', ?)").run(NOW, NOW, JSON.stringify({ line: '[Hive] HI-1 moved: see hive_read_task', at: NOW, cards: [1] }))
+  delivery.run('m1', 1, JSON.stringify({ kind: OLD, name: OLD_NAME }), `[${OLD_NAME}] Call ${OLD}_inbox to read it.`, NOW, NOW)
+  delivery.run('m2', 2, JSON.stringify({ kind: OLD, name: OLD_NAME }), `Their answer: <<<call ${OLD}_inbox>>>`, NOW, NOW)
+  delivery.run('m3', 3, JSON.stringify({ kind: 'agent', name: 'Agent 2', project: 'webapp', agentId: 'a2' }), `[${OLD_NAME}] Call ${OLD}_inbox, says Agent 2`, NOW, NOW)
+  db.prepare("INSERT INTO watches (id, ord, project_path, agent_id, since, limit_minutes, limit_at, cond, marks, fired) VALUES ('w1', 0, 'C:/ws/webapp', 'a1', ?, 60, ?, '{}', '{}', ?)").run(NOW, NOW, JSON.stringify({ line: `[${OLD_NAME}] HI-1 moved: see ${OLD}_read_task`, at: NOW, cards: [1] }))
   db.prepare("INSERT INTO watches (id, ord, project_path, agent_id, since, limit_minutes, limit_at, cond, marks, fired) VALUES ('w2', 1, 'C:/ws/webapp', 'a2', ?, 60, ?, '{}', '{}', ?)").run(NOW, NOW, JSON.stringify({ line: LONG_LINE, at: NOW, cards: [1] }))
   db.prepare("INSERT INTO metrics_buckets (span, start, series, skills) VALUES ('hour', 0, 3, '{}')").run()
   const s = db.prepare("INSERT INTO metrics_series (span, start, part, family, key, data) VALUES ('hour', 0, ?, ?, ?, ?)")
-  s.run('', 'mcp', 'hive_inbox agent compact ok', JSON.stringify(series('hive_inbox', 2, 10, 100)))
-  s.run('', 'mcp', 'hive_nothing agent compact ok', JSON.stringify(series('hive_nothing', 1, 1, 1)))
+  s.run('', 'mcp', `${OLD}_inbox agent compact ok`, JSON.stringify(series(`${OLD}_inbox`, 2, 10, 100)))
+  s.run('', 'mcp', `${OLD}_nothing agent compact ok`, JSON.stringify(series(`${OLD}_nothing`, 1, 1, 1)))
   s.run('webapp', 'api', 'GET /v1/x agent ok', '{}')
-  db.prepare("INSERT INTO board_meta (key, value) VALUES ('workflow:webapp:mergeChoice', ?), ('workflow:api:mergeChoice', ?)").run(JSON.stringify({ style: 'merge', commitMessage: 'hive', at: NOW, pending: false }), JSON.stringify({ style: 'squash', commitMessage: 'conventional', at: NOW, pending: false }))
-  const change = db.prepare("INSERT INTO assistant_changes (id, grp, grp_at, at, kind, act, what, project, target) VALUES (?, 'g', ?, ?, ?, 'x', 'Hive changed it', 'webapp', ?)")
-  change.run('c1', NOW, NOW, 'setting', 'agentApi.provideHiveMcp')
-  change.run('c2', NOW, NOW, 'setting', 'advanced.hive.showDeveloperFeatures')
-  change.run('c3', NOW, NOW, 'setting', 'workspace.advanced.claude-code.override.preApproveHiveTools')
+  db.prepare("INSERT INTO board_meta (key, value) VALUES ('workflow:webapp:mergeChoice', ?), ('workflow:api:mergeChoice', ?)").run(JSON.stringify({ style: 'merge', commitMessage: OLD, at: NOW, pending: false }), JSON.stringify({ style: 'squash', commitMessage: 'conventional', at: NOW, pending: false }))
+  const change = db.prepare(`INSERT INTO assistant_changes (id, grp, grp_at, at, kind, act, what, project, target) VALUES (?, 'g', ?, ?, ?, 'x', '${OLD_NAME} changed it', 'webapp', ?)`)
+  change.run('c1', NOW, NOW, 'setting', `agentApi.provide${OLD_NAME}Mcp`)
+  change.run('c2', NOW, NOW, 'setting', `advanced.${OLD}.showDeveloperFeatures`)
+  change.run('c3', NOW, NOW, 'setting', `workspace.advanced.claude-code.override.preApprove${OLD_NAME}Tools`)
   change.run('c4', NOW, NOW, 'setting', 'workflow.git.finish')
   change.run('c5', NOW, NOW, 'agent', null)
   const value = db.prepare("INSERT INTO assistant_change_values (change, field, side, ord, path, type, text) VALUES (?, ?, ?, ?, ?, 'text', ?)")
-  value.run('c4', 'value', 'old', 0, '', 'hiveMerges')
+  value.run('c4', 'value', 'old', 0, '', `${OLD}Merges`)
   value.run('c4', 'value', 'new', 0, '', 'agentMerges')
-  value.run('c5', 'workflow', 'old', 1, 'finish', 'hiveMerges')
-  value.run('c5', 'workflow', 'old', 2, 'commitMessage', 'hive')
-  value.run('c5', 'workflow', 'old', 3, 'title', 'hive')
+  value.run('c5', 'workflow', 'old', 1, 'finish', `${OLD}Merges`)
+  value.run('c5', 'workflow', 'old', 2, 'commitMessage', OLD)
+  value.run('c5', 'workflow', 'old', 3, 'title', OLD)
 }
 
 /** A fired line just under the cap a watch's line is read with: the note would take it over, so it is left out. */
-const LONG_LINE = `[Hive] see hive_read_task ${'x'.repeat(WAKE_MAX_BYTES - 40)}`
+const LONG_LINE = `[${OLD_NAME}] see ${OLD}_read_task ${'x'.repeat(WAKE_MAX_BYTES - 40)}`
 
 describe("the board's values step", () => {
   it('is version 26, the 1.0 group\'s last', () => {
@@ -126,7 +132,7 @@ describe("the board's values step", () => {
     expect(all(w, "SELECT actor FROM card_facts WHERE card = 1 ORDER BY seq").map((r) => r.actor)).toEqual(['combwork', 'combwork', 'agent:Agent 1', 'combwork', 'user'])
     const data = (seq: number): Record<string, unknown> => json(one(w, 'SELECT data FROM card_facts WHERE card = 1 AND seq = ?', seq).data)
     expect(data(2).by).toBe('combwork')
-    expect(data(3)).toEqual({ move: 'integrate', rule: 'merge.combworkMerges', message: 'Hive merges this', next: '' })
+    expect(data(3)).toEqual({ move: 'integrate', rule: 'merge.combworkMerges', message: `${OLD_NAME} merges this`, next: '' })
     expect(data(4).by).toBe('Combwork (merge queue)')
     expect(data(5).by).toBe('combwork')
     // Actions.
@@ -134,51 +140,51 @@ describe("the board's values step", () => {
     // Lanes, history, creators.
     expect(one(w, "SELECT builder_id, builder_name, started_by FROM lanes WHERE id = 'L1'")).toEqual({ builder_id: 'combwork', builder_name: 'Combwork', started_by: 'Combwork' })
     expect(one(w, "SELECT builder_id, builder_name, started_by FROM lanes WHERE id = 'L2'")).toEqual({ builder_id: 'a1', builder_name: 'Agent 1', started_by: 'You' })
-    expect(all(w, 'SELECT by, what FROM card_history WHERE card = 1 ORDER BY ord')).toEqual([{ by: 'Combwork', what: 'Hive moved it' }, { by: 'You', what: 'edited' }, { by: 'Combwork', what: 'odd' }])
+    expect(all(w, 'SELECT by, what FROM card_history WHERE card = 1 ORDER BY ord')).toEqual([{ by: 'Combwork', what: `${OLD_NAME} moved it` }, { by: 'You', what: 'edited' }, { by: 'Combwork', what: 'odd' }])
     expect(json(one(w, 'SELECT raw FROM card_history WHERE card = 1 AND ord = 2').raw)).toEqual({ at: NOW, by: 'Combwork', what: 'odd', extra: 1 })
-    expect(all(w, 'SELECT created_by, description FROM cards ORDER BY number')).toEqual([{ created_by: 'Combwork', description: 'Hive wrote this' }, { created_by: 'You', description: 'Hive wrote this' }])
+    expect(all(w, 'SELECT created_by, description FROM cards ORDER BY number')).toEqual([{ created_by: 'Combwork', description: `${OLD_NAME} wrote this` }, { created_by: 'You', description: `${OLD_NAME} wrote this` }])
     // A comment is prose: its `by` is left.
     // A comment's author takes Combwork's name; its text is kept as written.
-    expect(one(w, 'SELECT by, text FROM card_comments WHERE card = 1')).toEqual({ by: 'Combwork', text: 'a comment by Hive' })
+    expect(one(w, 'SELECT by, text FROM card_comments WHERE card = 1')).toEqual({ by: 'Combwork', text: `a comment by ${OLD_NAME}` })
     // Deliveries: Combwork's own sender and text; another's untouched; text quoted kept.
     const d = (id: string): Record<string, unknown> => one(w, 'SELECT sender, body FROM deliveries WHERE id = ?', id)
     expect(json(d('m1').sender)).toEqual({ kind: 'combwork', name: 'Combwork' })
-    expect(d('m1').body).toBe(`[CW] Call hive_inbox to read it. ${renamedNote()}`)
+    expect(d('m1').body).toBe(`[CW] Call ${OLD}_inbox to read it. ${renamedNote()}`)
     expect(json(d('m2').sender)).toEqual({ kind: 'combwork', name: 'Combwork' })
-    expect(d('m2').body).toBe('Their answer: <<<call hive_inbox>>>')
-    expect(d('m3')).toEqual({ sender: JSON.stringify({ kind: 'agent', name: 'Agent 2', project: 'webapp', agentId: 'a2' }), body: '[Hive] Call hive_inbox, says Agent 2' })
+    expect(d('m2').body).toBe(`Their answer: <<<call ${OLD}_inbox>>>`)
+    expect(d('m3')).toEqual({ sender: JSON.stringify({ kind: 'agent', name: 'Agent 2', project: 'webapp', agentId: 'a2' }), body: `[${OLD_NAME}] Call ${OLD}_inbox, says Agent 2` })
     // A watch's fired line.
     expect(json(one(w, "SELECT fired FROM watches WHERE id = 'w2'").fired).line).toBe(`[CW] ${LONG_LINE.slice(7)}`)
-    expect(json(one(w, "SELECT fired FROM watches WHERE id = 'w1'").fired)).toEqual({ line: `[CW] HI-1 moved: see hive_read_task ${renamedNote()}`, at: NOW, cards: [1] })
+    expect(json(one(w, "SELECT fired FROM watches WHERE id = 'w1'").fired)).toEqual({ line: `[CW] HI-1 moved: see ${OLD}_read_task ${renamedNote()}`, at: NOW, cards: [1] })
     // Metrics: a known tool renamed (key and tool), one that isn't a tool kept.
     expect(all(w, "SELECT part, family, key FROM metrics_series ORDER BY part, family, key")).toEqual([
       { part: '', family: 'mcp', key: 'cw_inbox agent compact ok' },
-      { part: '', family: 'mcp', key: 'hive_nothing agent compact ok' },
+      { part: '', family: 'mcp', key: `${OLD}_nothing agent compact ok` },
       { part: 'webapp', family: 'api', key: 'GET /v1/x agent ok' }
     ])
     expect(json(one(w, "SELECT data FROM metrics_series WHERE key = 'cw_inbox agent compact ok'").data)).toEqual(series('cw_inbox', 2, 10, 100))
     // The merge choice.
     expect(json(one(w, "SELECT value FROM board_meta WHERE key = 'workflow:webapp:mergeChoice'").value).commitMessage).toBe('combwork')
     expect(json(one(w, "SELECT value FROM board_meta WHERE key = 'workflow:api:mergeChoice'").value).commitMessage).toBe('conventional')
-    // The Assistant's changes: setting ids, option values (not another member that happens to be 'hive'), lines kept.
+    // The Assistant's changes: setting ids, option values (not another member that happens to hold the old value), lines kept.
     expect(all(w, 'SELECT id, target, what FROM assistant_changes ORDER BY id')).toEqual([
-      { id: 'c1', target: 'agentApi.provideCombworkMcp', what: 'Hive changed it' },
-      { id: 'c2', target: 'advanced.cw.showDeveloperFeatures', what: 'Hive changed it' },
-      { id: 'c3', target: 'workspace.advanced.claude-code.override.preApproveCombworkTools', what: 'Hive changed it' },
-      { id: 'c4', target: 'workflow.git.finish', what: 'Hive changed it' },
-      { id: 'c5', target: null, what: 'Hive changed it' }
+      { id: 'c1', target: 'agentApi.provideCombworkMcp', what: `${OLD_NAME} changed it` },
+      { id: 'c2', target: 'advanced.cw.showDeveloperFeatures', what: `${OLD_NAME} changed it` },
+      { id: 'c3', target: 'workspace.advanced.claude-code.override.preApproveCombworkTools', what: `${OLD_NAME} changed it` },
+      { id: 'c4', target: 'workflow.git.finish', what: `${OLD_NAME} changed it` },
+      { id: 'c5', target: null, what: `${OLD_NAME} changed it` }
     ])
     expect(all(w, 'SELECT change, side, path, text FROM assistant_change_values ORDER BY change, side, ord')).toEqual([
       { change: 'c4', side: 'new', path: '', text: 'agentMerges' },
       { change: 'c4', side: 'old', path: '', text: 'combworkMerges' },
       { change: 'c5', side: 'old', path: 'finish', text: 'combworkMerges' },
       { change: 'c5', side: 'old', path: 'commitMessage', text: 'combwork' },
-      { change: 'c5', side: 'old', path: 'title', text: 'hive' }
+      { change: 'c5', side: 'old', path: 'title', text: OLD }
     ])
     db.close()
   })
 
-  it("rehashes a ruleset compiled from hiveMerges to the id compile() gives now, its skipped one's too, and repoints what names them", () => {
+  it("rehashes a ruleset compiled from 1.0's merge value to the id compile() gives now, its skipped one's too, and repoints what names them", () => {
     const { db } = board(fill10)
     const w = db.writer
     // As compile() and skipReviewOf() make them today, from the converted options.
@@ -236,13 +242,13 @@ describe("the board's values step", () => {
 
 describe('its pieces', () => {
   it("merges two series as metrics.ts adds a saved one", () => {
-    expect(mergeMcpSeries(series('cw_x', 1, 4, 3), series('hive_x', 2, 9, 5))).toEqual({ ...series('cw_x', 3, 13, 8), maxMs: 9, histogram: (series('cw_x', 3, 0, 0).histogram as number[]) })
+    expect(mergeMcpSeries(series('cw_x', 1, 4, 3), series(`${OLD}_x`, 2, 9, 5))).toEqual({ ...series('cw_x', 3, 13, 8), maxMs: 9, histogram: (series('cw_x', 3, 0, 0).histogram as number[]) })
     expect(mergeMcpSeries({ bad: true }, series('cw_x', 1, 1, 1))).toEqual(series('cw_x', 1, 1, 1))
   })
 
   it("maps settings' ids, leaving others", () => {
-    expect(upgradedSettingId('agentApi.provideHiveMcp')).toBe('agentApi.provideCombworkMcp')
-    expect(upgradedSettingId('advanced.codex.override.preApproveHiveTools')).toBe('advanced.codex.override.preApproveCombworkTools')
+    expect(upgradedSettingId(`agentApi.provide${OLD_NAME}Mcp`)).toBe('agentApi.provideCombworkMcp')
+    expect(upgradedSettingId(`advanced.codex.override.preApprove${OLD_NAME}Tools`)).toBe('advanced.codex.override.preApproveCombworkTools')
     expect(upgradedSettingId('advanced.cw.showDeveloperFeatures')).toBe('advanced.cw.showDeveloperFeatures')
     expect(upgradedSettingId('general.theme')).toBe('general.theme')
   })

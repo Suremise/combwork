@@ -623,7 +623,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
   const segments = fitSegments(cards, max, tr, fmt.list)
   const pair = lanePair(l)
   // Why it waits (#1279, from #1270's status): said in its header instead of just "paused", and in its accessible name.
-  const why = l.status && !l.frozen ? laneWaitText(l.status, (n) => cardLabelOf({ tasks }, n), tr) : null
+  const why = l.status && !l.frozen ? laneWaitText(l.status, (n) => cardLabelOf({ tasks }, n), tr, (items) => fmt.list(items)) : null
   // Its queued list change (HI-2151), under its cards in the Lanes tab (`all`: every lane, to say where a card moves).
   const change = all ? queuedChange(l, all) : null
   const queued = change ? queuedChangeText(change, (n) => cardLabelOf({ tasks }, n), tr, fmt.list) : null

@@ -1,14 +1,14 @@
 // Which profile folders this run uses (HI-2461, SPEC §4.3): Combwork's (`%APPDATA%\Combwork`, `%LOCALAPPDATA%\Combwork`;
-// a dev build's `Combwork-Dev`), the only ones it runs on (HI-2594). The installer moves Hive's folders from before
+// a dev build's `Combwork-Dev`), the only ones it runs on (HI-2594). The installer moves 1.0's folders from before
 // (`Hive`, `Hive-Dev`) to them with the app closed (HI-2460); where that didn't happen (its rename failed, or a dev
 // build), the names upgrade's profile step does it here, at start, before anything reads the profile (index.ts, before
-// userData is set), each of the two on its own and by the installer's rule: one rename, only while Hive's is a folder and
+// userData is set), each of the two on its own and by the installer's rule: one rename, only while 1.0's is a folder and
 // Combwork's is confirmed absent, never a copy or a delete. A move it can't make refuses the start, naming both folders:
-// a blank Combwork profile made in its place would win at every later start, and Hive's data would look lost.
+// a blank Combwork profile made in its place would win at every later start, and 1.0's data would look lost.
 //
 // A folder is missing only when the system says so (ENOENT, ENOTDIR). One that can't be looked at (no permission, an
-// I/O error) is never taken for missing: Combwork's is used then, as the profile Hive would make, and the reason kept for
-// the log; Hive's that can't be looked at, Combwork's missing, refuses the start. Nothing here logs (the logger writes
+// I/O error) is never taken for missing: Combwork's is used then, as the profile 1.0 would make, and the reason kept for
+// the log; 1.0's that can't be looked at, Combwork's missing, refuses the start. Nothing here logs (the logger writes
 // into the profile): the choice carries what to log once it is set.
 
 import { renameSync, rmSync, statSync, writeFileSync } from 'original-fs'
@@ -42,7 +42,7 @@ export const MOVE_RECORD = 'profile-move.json'
 export interface ProfileChoice {
   /** The folder this run uses: Combwork's. */
   use: string
-  /** Hive's folder this start moved to it (the names upgrade), if it did. */
+  /** 1.0's folder this start moved to it (the names upgrade), if it did. */
   movedFrom?: string
   /** Why Combwork's folder was used without knowing whether it is there (it couldn't be looked at), for the log. */
   unreadable?: string
@@ -61,10 +61,10 @@ export class ProfileMoveRefused extends Error {
 
 /**
  * The folder to use in `parent` (`%APPDATA%` or `%LOCALAPPDATA%`): `current` (Combwork's) when it is a folder, or a new
- * profile when neither is there. Hive's `legacy` folder, Combwork's confirmed missing, is renamed to it first: in the
+ * profile when neither is there. 1.0's `legacy` folder, Combwork's confirmed missing, is renamed to it first: in the
  * local folder (`record`), with the installer's record put in it before the rename (`by: "app"`), so it arrives with the
  * folder or not at all and the sign-in check runs at the first window, as after the installer's move. Throws
- * ProfileMoveRefused when Hive's can't be looked at or moved (a Hive still running holds it, a file has Combwork's name).
+ * ProfileMoveRefused when 1.0's can't be looked at or moved (a 1.0 app still running holds it, a file has Combwork's name).
  */
 export function chooseProfile(parent: string, legacy: string, current: string, o: { record?: boolean; fs?: ProfileFs } = {}): ProfileChoice {
   const fs = o.fs ?? nodeFs

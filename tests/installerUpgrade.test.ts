@@ -1,5 +1,5 @@
-// The Combwork installer's upgrade from Hive Desktop (HI-2460, build/legacyUpgrade.ps1, run by installer.nsh's
-// customInit): closing and checking what runs, removing Hive Desktop through its own uninstaller, its Launch at login,
+// The Combwork installer's upgrade from the 1.0 app (HI-2460, build/legacyUpgrade.ps1, run by installer.nsh's
+// customInit): closing and checking what runs, removing the 1.0 app through its own uninstaller, its Launch at login,
 // and moving the profile folders with the installer's record (HI-2461's contract). Against stand-ins only: a registry key
 // of the test's own under HKCU\Software\combwork-test, a fake uninstaller (a copy of Node running a script), stand-in apps
 // (Node named Combwork.exe), and profile folders in the test's temp folder. Nothing real is read or changed.
@@ -16,12 +16,18 @@ const SCRIPT = join(__dirname, '..', 'build', 'legacyUpgrade.ps1')
 const root = join(process.env.SystemRoot ?? 'C:\\Windows')
 const ps = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const psEnv = powershellEnv()
+// old-name: begin installerUpgrade-inputs
+/** The 1.0 app's product name, its exe, and its profile folders' name: what the script looks for and moves. */
+const OLD_APP = 'Hive Desktop'
+const OLD_EXE = 'Hive.exe'
+const OLD_PROFILE = 'Hive'
+// old-name: end installerUpgrade-inputs
 const KEY = `HKCU:\\Software\\combwork-test\\installer-upgrade-${randomUUID()}`
 
 /** A PowerShell command, run to its end: its output. */
 const pwsh = (command: string): string => spawnSync(ps, ['-NoProfile', '-NonInteractive', '-Command', command], { env: psEnv, windowsHide: true, timeout: HUNG_MS, encoding: 'utf8' }).stdout
 
-/** The fake uninstaller's script: removes Hive.exe from its folder (_?=) and the uninstall key, or fails as asked. */
+/** The fake uninstaller's script: removes the old exe from its folder (_?=) and the uninstall key, or fails as asked. */
 const UNINSTALL = `
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process')
 const args = process.argv.slice(2)
@@ -31,7 +37,7 @@ const at = args.findIndex((a) => a.startsWith('_?='))
 const dir = at < 0 ? '' : args.slice(at).join(' ').slice(3)
 const mode = fs.readFileSync(path.join(dir, 'mode.txt'), 'utf8').trim()
 if (mode === 'fail') process.exit(2)
-fs.rmSync(path.join(dir, 'Hive.exe'), { force: true })
+fs.rmSync(path.join(dir, '${OLD_EXE}'), { force: true })
 if (mode !== 'leave-entry') execFileSync('reg', ['delete', process.env.CW_TEST_UNINSTALL_KEY, '/f'], { stdio: 'ignore' })
 process.exit(0)
 `
@@ -55,16 +61,16 @@ function fixture(name: string): Fixture {
   return f
 }
 
-/** Hive Desktop "installed" in `<fixture>\Programs\Hive Desktop Test` (a path with spaces), its records under the fixture's key. */
+/** The 1.0 app "installed" in `<fixture>\Programs\<its name> Test` (a path with spaces), its records under the fixture's key. */
 function installOld(f: Fixture, mode: 'ok' | 'fail' | 'leave-entry' | 'elsewhere' = 'ok'): string {
-  const old = join(f.install, '..', 'Hive Desktop Test')
+  const old = join(f.install, '..', `${OLD_APP} Test`)
   mkdirSync(old, { recursive: true })
-  writeFileSync(join(old, 'Hive.exe'), 'stand-in')
+  writeFileSync(join(old, OLD_EXE), 'stand-in')
   writeFileSync(join(old, 'mode.txt'), mode)
   writeFileSync(join(old, 'fake-uninstall.cjs'), UNINSTALL)
   const unDir = mode === 'elsewhere' ? join(f.work, 'other') : old
   mkdirSync(unDir, { recursive: true })
-  const un = join(unDir, 'Uninstall Hive Desktop.exe')
+  const un = join(unDir, `Uninstall ${OLD_APP}.exe`)
   if (!existsSync(un)) copyFileSync(process.execPath, un)
   const uninstallKey = `${f.key}\\uninstall`
   pwsh(`New-Item -Path '${f.key}\\install' -Force | Out-Null; Set-ItemProperty -LiteralPath '${f.key}\\install' -Name InstallLocation -Value '${old}'; New-Item -Path '${uninstallKey}' -Force | Out-Null; Set-ItemProperty -LiteralPath '${uninstallKey}' -Name UninstallString -Value '"${un}" "${join(old, 'fake-uninstall.cjs')}"'`)
@@ -81,7 +87,7 @@ function upgrade(f: Fixture, extra: string[] = []): { code: number | null; out: 
   return { code: r.status, out: r.stdout }
 }
 
-const profile = (parent: string, name = 'Hive'): string => {
+const profile = (parent: string, name = OLD_PROFILE): string => {
   const p = join(parent, name)
   mkdirSync(p, { recursive: true })
   writeFileSync(join(p, 'config.json'), '{"kept":true}')
@@ -89,7 +95,7 @@ const profile = (parent: string, name = 'Hive'): string => {
 }
 const record = (folder: string) => JSON.parse(readFileSync(join(folder, 'profile-move.json'), 'utf8')) as Record<string, unknown>
 
-describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)', () => {
+describe('the installer upgrades from the 1.0 app (legacyUpgrade.ps1, HI-2460)', () => {
   beforeAll(() => {
     dir = tempDir('cw-installer-upgrade-')
   })
@@ -105,6 +111,14 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
     expect(r.out).toContain('previous installation: none')
     expect(readdirSync(f.appData)).toEqual([])
     expect(readdirSync(f.local)).toEqual([])
+    // A clean install's log names no old app or folder (HI-2632): the script's lines, and the installer's own after it.
+    expect(r.out).toContain('roaming: no earlier profile to move')
+    expect(r.out).toContain('local: no earlier profile to move')
+    expect(r.out).not.toMatch(new RegExp(OLD_PROFILE, 'i'))
+    const nsh = readFileSync(join(__dirname, '..', 'build', 'installer.nsh'), 'utf8')
+    const logged = /nsExec::ExecToLog[^\n]*legacyUpgrade\.ps1[^\n]*\r?\n\s*Pop \$0\r?\n(?:\s*;[^\n]*\r?\n)*\s*(DetailPrint [^\n]*)/.exec(nsh)
+    expect(logged?.[1]).toBeTruthy()
+    expect(logged?.[1]).not.toMatch(new RegExp(OLD_PROFILE, 'i'))
   })
 
   it('moves both folders, the record only in the local one, with HI-2461\'s fields', () => {
@@ -115,10 +129,13 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
     expect(r.code, r.out).toBe(0)
     expect(readdirSync(f.appData)).toEqual(['Combwork'])
     expect(readdirSync(f.local)).toEqual(['Combwork'])
+    // A real move is still reported with its folders.
+    expect(r.out).toContain(`roaming: moved ${join(f.appData, OLD_PROFILE)} to ${join(f.appData, 'Combwork')}`)
+    expect(r.out).toContain(`local: moved ${join(f.local, OLD_PROFILE)} to ${join(f.local, 'Combwork')}`)
     expect(readFileSync(join(f.appData, 'Combwork', 'config.json'), 'utf8')).toBe('{"kept":true}')
     expect(existsSync(join(f.appData, 'Combwork', 'profile-move.json'))).toBe(false)
     const rec = record(join(f.local, 'Combwork'))
-    expect(rec).toMatchObject({ v: 1, from: join(f.local, 'Hive'), by: 'installer' })
+    expect(rec).toMatchObject({ v: 1, from: join(f.local, OLD_PROFILE), by: 'installer' })
     expect(new Date(String(rec.movedAt)).toISOString()).toBe(rec.movedAt)
     // UTF-8 without a BOM, as the app reads it.
     expect(readFileSync(join(f.local, 'Combwork', 'profile-move.json'))[0]).toBe(0x7b)
@@ -140,9 +157,9 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
     writeFileSync(join(f.local, 'Combwork'), 'a file')
     const r = upgrade(f)
     expect(r.code, r.out).toBe(0)
-    expect(readdirSync(f.appData).sort()).toEqual(['Combwork', 'Hive'])
-    expect(readdirSync(f.local).sort()).toEqual(['Combwork', 'Hive'])
-    // No record is put into a folder that isn't moved... except into Hive's, which only travels with its own rename.
+    expect(readdirSync(f.appData).sort()).toEqual(['Combwork', OLD_PROFILE])
+    expect(readdirSync(f.local).sort()).toEqual(['Combwork', OLD_PROFILE])
+    // No record is put into a folder that isn't moved... except into the old one, which only travels with its own rename.
     expect(existsSync(join(f.appData, 'Combwork', 'profile-move.json'))).toBe(false)
   })
 
@@ -152,7 +169,7 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
     const r = upgrade(f, ['-NewName', 'Comb|work'])
     expect(r.code, r.out).toBe(0)
     expect(r.out).toMatch(/local: .* is unknown/)
-    expect(readdirSync(f.local)).toEqual(['Hive'])
+    expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
   })
 
   it('a file held open in the local folder: not moved, both left, the record waiting in Combwork\'s folder; the next run moves it with that record', async () => {
@@ -172,7 +189,7 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
     }
     expect(first.code, first.out).toBe(0)
     expect(first.out).toContain("couldn't be moved")
-    expect(readdirSync(f.local)).toEqual(['Hive'])
+    expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
     const waiting = record(local)
     expect(waiting).toMatchObject({ v: 1, by: 'installer' })
     const again = upgrade(f)
@@ -198,20 +215,20 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
     const r = upgrade(f)
     expect(r.code, r.out).toBe(0)
     expect(r.out).toContain("couldn't be put in")
-    expect(readdirSync(f.local)).toEqual(['Hive'])
+    expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
     expect(existsSync(join(local, 'profile-move.json'))).toBe(false)
   })
 
-  it('removes Hive Desktop through its own uninstaller (its data kept), then its own Launch at login only, then moves', () => {
+  it('removes the 1.0 app through its own uninstaller (its data kept), then its own Launch at login only, then moves', () => {
     const f = fixture('remove')
     const old = installOld(f)
     profile(f.appData)
     profile(f.local)
-    const exe = join(old, 'Hive.exe')
-    pwsh(`New-Item -Path '${f.key}\\run' -Force | Out-Null; Set-ItemProperty -LiteralPath '${f.key}\\run' -Name 'electron.app.Hive Desktop' -Value '"${exe}" --hidden'; Set-ItemProperty -LiteralPath '${f.key}\\run' -Name 'electron.app.Other' -Value '"${join(old, 'Other.exe')}" --hidden'; Set-ItemProperty -LiteralPath '${f.key}\\run' -Name 'Unquoted' -Value '${exe} --x'`)
+    const exe = join(old, OLD_EXE)
+    pwsh(`New-Item -Path '${f.key}\\run' -Force | Out-Null; Set-ItemProperty -LiteralPath '${f.key}\\run' -Name 'electron.app.${OLD_APP}' -Value '"${exe}" --hidden'; Set-ItemProperty -LiteralPath '${f.key}\\run' -Name 'electron.app.Other' -Value '"${join(old, 'Other.exe')}" --hidden'; Set-ItemProperty -LiteralPath '${f.key}\\run' -Name 'Unquoted' -Value '${exe} --x'`)
     const r = upgrade(f)
     expect(r.code, r.out).toBe(0)
-    expect(r.out).toContain('hive desktop: removed')
+    expect(r.out).toContain(`${OLD_APP.toLowerCase()}: removed`)
     const args = JSON.parse(readFileSync(join(f.seen, 'args.json'), 'utf8')) as string[]
     expect(args.slice(0, 3)).toEqual(['/S', '/KEEP_APP_DATA', '--updated'])
     expect(args.slice(3).join(' ')).toBe(`_?=${old}`)
@@ -222,7 +239,7 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
   })
 
   for (const [mode, why] of [['fail', 'exit 2'], ['leave-entry', 'uninstall entry still there'], ['elsewhere', "isn't in"]] as const) {
-    it(`Hive Desktop not removed (${mode}): stops (6), the profile folders untouched`, () => {
+    it(`The 1.0 app not removed (${mode}): stops (6), the profile folders untouched`, () => {
       const f = fixture(`not-removed-${mode}`)
       installOld(f, mode)
       profile(f.appData)
@@ -230,9 +247,9 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
       const r = upgrade(f)
       expect(r.code, r.out).toBe(6)
       expect(r.out).toContain(why)
-      expect(readdirSync(f.appData)).toEqual(['Hive'])
-      expect(readdirSync(f.local)).toEqual(['Hive'])
-      expect(existsSync(join(f.local, 'Hive', 'profile-move.json'))).toBe(false)
+      expect(readdirSync(f.appData)).toEqual([OLD_PROFILE])
+      expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
+      expect(existsSync(join(f.local, OLD_PROFILE, 'profile-move.json'))).toBe(false)
     })
   }
 
@@ -240,11 +257,11 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
   for (const [what, rows, code] of [
     ["a same-name process whose executable can't be read", () => [{ Name: 'Combwork.exe', ExecutablePath: null, CommandLine: null, ProcessId: 424242 }], 5],
     ["this exe with an unreadable command line (counts as its main process)", (f: Fixture) => [{ Name: 'Combwork.exe', ExecutablePath: join(f.install, 'Combwork.exe'), CommandLine: null, ProcessId: 424243 }], 5],
-    ["Hive Desktop's exe whose path can't be read", () => [{ Name: 'Hive.exe', ExecutablePath: null, CommandLine: null, ProcessId: 424244 }], 5],
+    ["the 1.0 app's exe whose path can't be read", () => [{ Name: OLD_EXE, ExecutablePath: null, CommandLine: null, ProcessId: 424244 }], 5],
     ['another installation of the same name, positively elsewhere', () => [{ Name: 'Combwork.exe', ExecutablePath: 'C:\\Elsewhere\\Combwork\\Combwork.exe', CommandLine: '"C:\\Elsewhere\\Combwork\\Combwork.exe"', ProcessId: 424245 }], 0],
     ["this exe's Chromium helper (--type=)", (f: Fixture) => [{ Name: 'Combwork.exe', ExecutablePath: join(f.install, 'Combwork.exe'), CommandLine: `"${join(f.install, 'Combwork.exe')}" --type=renderer`, ProcessId: 424246 }], 0]
   ] as const) {
-    it(`${what}: ${code === 5 ? 'stops (5), Hive Desktop and the profile folders untouched' : 'goes on'}`, () => {
+    it(`${what}: ${code === 5 ? 'stops (5), the 1.0 app and the profile folders untouched' : 'goes on'}`, () => {
       const f = fixture(`identity-${randomUUID().slice(0, 8)}`)
       const old = installOld(f)
       profile(f.appData)
@@ -255,17 +272,17 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
       expect(r.code, r.out).toBe(code)
       if (code === 5) {
         expect(r.out).toContain('still running:')
-        expect(existsSync(join(old, 'Hive.exe'))).toBe(true)
+        expect(existsSync(join(old, OLD_EXE))).toBe(true)
         expect(existsSync(join(f.seen, 'args.json'))).toBe(false)
-        expect(readdirSync(f.appData)).toEqual(['Hive'])
-        expect(readdirSync(f.local)).toEqual(['Hive'])
+        expect(readdirSync(f.appData)).toEqual([OLD_PROFILE])
+        expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
       } else {
         expect(readdirSync(f.local)).toEqual(['Combwork'])
       }
     })
   }
 
-  it('Combwork still running (on Hive\'s folders, HI-2461\'s fallback): stops (5), nothing changed', async () => {
+  it('Combwork still running (on the old folders, HI-2461\'s fallback): stops (5), nothing changed', async () => {
     const f = fixture('running')
     profile(f.appData)
     profile(f.local)
@@ -279,8 +296,8 @@ describe('the installer upgrades from Hive Desktop (legacyUpgrade.ps1, HI-2460)'
       const r = upgrade(f)
       expect(r.code, r.out).toBe(5)
       expect(r.out).toContain('still running: running')
-      expect(readdirSync(f.appData)).toEqual(['Hive'])
-      expect(readdirSync(f.local)).toEqual(['Hive'])
+      expect(readdirSync(f.appData)).toEqual([OLD_PROFILE])
+      expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
     } finally {
       app.kill()
     }

@@ -1,11 +1,12 @@
 /**
  * The clean-install check's search (HI-2592): Darren, 5 Nov 2026, "the app is clean when there is no reference to hive
  * anywhere on a clean install". Used inside the Sandbox by inside/clean-scan.cjs (this checkout's tests folder is mapped
- * there read-only) and on the host by report.cjs, and unit-tested in tests/sandboxClean.test.ts. Node built-ins only.
+ * there read-only) and on the host by report.cjs, and unit-tested in tests/sandboxClean.test.ts. Node built-ins only,
+ * and the tests folder's own oldNameMatch.cjs.
  *
- * A hit is "hive" in any case, as a whole word or joined to other text, as HG1's sweep read it (HI-2578): Hive, HIVE,
- * hive_, hive-, .hive, Hive's, hiveGuidance, getHive, CW_HIVE. Not a hit: "hive" inside an ordinary word, where it
- * follows a letter in the same case (archive, ARCHIVE, chives, beehive).
+ * A hit is what the repository's guard counts one (HI-2633: one matcher, tests/oldNameMatch.cjs): the name in any case,
+ * as a whole word or joined to anything. Not a hit: only the ordinary words that hold its letters (archive in all its
+ * forms, chive, chives, beehive).
  *
  * Where it searches (CATEGORIES): file and folder names and text files under the install folder, the profile folders
  * and the workspace (logs apart), the shortcuts, the registry, the agent's environment, the window's text, Copy
@@ -14,6 +15,8 @@
  */
 const fs = require('fs')
 const path = require('path')
+// The repository's guard's matcher (HI-2633): both find the same hits.
+const { nameHits } = require('../oldNameMatch.cjs')
 
 /** Each place searched: its id (the report's check is 9.no-old-name-<id>) and what it is, for the report. */
 const CATEGORIES = [
@@ -38,16 +41,7 @@ const CHUNK = 8 * 1024 * 1024
 function oldNameHits(text) {
   const s = String(text ?? '')
   const out = []
-  // old-name: begin clean-install-detector
-  const re = /hive/gi
-  // old-name: end clean-install-detector
-  for (let m; (m = re.exec(s)); ) {
-    const before = s[m.index - 1] ?? ''
-    // Inside a word: lower-case after any letter (archive, chives), or upper-case after an upper-case letter (ARCHIVE).
-    // A capital after a lower-case letter is a join (getHive), and so is anything after a digit, _, -, . or space.
-    if (/[a-z]/i.test(before) && (m[0][0] === 'h' || /[A-Z]/.test(before))) continue
-    out.push({ at: m.index, match: m[0], text: lineAround(s, m.index, m[0].length) })
-  }
+  for (const m of nameHits(s)) out.push({ at: m.at, match: m.match, text: lineAround(s, m.at, m.match.length) })
   return out
 }
 

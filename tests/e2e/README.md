@@ -91,11 +91,11 @@ at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Combwork
 The guard: when a suite ends, each packaged Combwork's `combwork.log` must show no `[updates] Checking for update` since it
 was started, or the suite fails, naming the lines. The Sandbox checks run with their network off.
 
-Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's `Programs\Hive`): `lib.cjs` refuses it and any exe
+Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's folder there under the old name): `lib.cjs` refuses it and any exe
 outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `CW_E2E_V09` and `CW_EXE`. And
-children of the run context get no `%APPDATA%\Combwork\bin` or `Combwork-Dev\bin` (nor 1.0's `Hive\bin`, `Hive-Dev\bin`) on their PATH (an agent session has them):
+children of the run context get no `%APPDATA%\Combwork\bin` or `Combwork-Dev\bin` (nor 1.0's, under the old name) on their PATH (an agent session has them):
 those `cw-progress` shims run the installed exe. A `cw-progress` run seen in a process list is itself
-`Programs\Combwork\Combwork.exe` (1.0's `Programs\Hive\Hive.exe`; as Node, no window), not the app.
+`Programs\Combwork\Combwork.exe` (or 1.0's, under the old name; as Node, no window), not the app.
 
 **Several at once.** Suites run four at a time (`--jobs N` for another number; `--jobs 1` runs them one after
 another). Each gets its own profile, folders and Agent API port: the runner sets `CW_E2E_PORT` and `CW_API_PORT`,
@@ -435,21 +435,21 @@ npm run e2e -- i18nshots                 # as part of a run (the full set, or --
 
 ### The installer on a clean machine: the Sandbox checks
 
-The e2e suites test the app on this machine. The **Sandbox checks** (`tests/sandbox`, #538; moved from the hive-mcp
+The e2e suites test the app on this machine. The **Sandbox checks** (`tests/sandbox`, #538; moved from the combwork-mcp
 repo in HI-2298) test the **installer** on a clean Windows in Windows Sandbox:
 a fresh install and first launch, the first run with no CLIs (#474), a CLI appearing while Combwork runs (#472), an upgrade
 from the previous release with its settings kept, uninstall, and a new workspace. Then the rename's acceptance test
 (scenario 9, `--only clean`, HI-2592): a clean install used as a new user would (first run, Claude Code on and an
 account, a workspace with a git project, an agent started briefly, a card, Settings, Copy Diagnostics, Export Board,
-quit), then searched for "hive" in any case, alone or joined (`tests/sandbox/clean.cjs`): file and folder names and
+quit), then searched for the old name in any case, alone or joined (`tests/sandbox/clean.cjs`): file and folder names and
 text files in the install folder, `%APPDATA%\Combwork`, `%LOCALAPPDATA%\Combwork` and the workspace (`.git` too), the
-logs, the shortcuts, the registry (the app's keys whole, and every HKCU entry naming "hive" that wasn't there before
+logs, the shortcuts, the registry (the app's keys whole, and every HKCU entry naming it that wasn't there before
 the install), the agent's environment (`set` in its session), the window's text on each page visited, the Copy
 Diagnostics text and the exported board. It passes with no hit; each hit is listed with its place and text. app.asar is
 the one exception: its hits (the upgrade code that knows the 1.0 names) are counted in the report, never failed. Its git
 project uses this machine's Git for Windows, mapped read-only (`--git <its folder>`, by default the one on the PATH).
 Then the profile move the installer couldn't make (scenario 11, `--only profile-move`, HI-2602;
-`tests/sandbox/inside/profile-move.ps1`): Hive Desktop 1.0 installed and run once, a file in `%LOCALAPPDATA%\Hive` held
+`tests/sandbox/inside/profile-move.ps1`): 1.0 installed and run once, a file in its local profile folder held
 open while the new installer runs (it moves the roaming folder and leaves the local one, its record in it), Combwork
 started with the file still held (refused, with its error box, nothing made under Combwork's name), then let go and
 started again (it moves the folder itself, its record arriving with it, and checks the sign-ins once: not again at the
@@ -463,10 +463,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   upgrade start; `--repo` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
   <a 1.1 release candidate's installer>` adds scenario 10, the upgrade from that RC, so the names upgrade, HI-2587, is
   checked from 1.0.0 and from an RC alike: pass it for 1.1's release candidates). It drives the
-  hive-mcp project's **windows-sandbox MCP server** over stdio as any MCP client does, starting its own copy of it, so
+  mcp project's **windows-sandbox MCP server** over stdio as any MCP client does, starting its own copy of it, so
   it needs no MCP registration: `--server <its server.js>` (or `WSB_SERVER`), else the copy Combwork installed from the MCP
   catalogue in the workspace holding `--repo` (`<workspace>\.combwork\mcp\windows-sandbox`), else a combwork-mcp checkout
-  beside it (`<hive>\..\mcp\servers\windows-sandbox`). The server keeps its run folders in
+  beside it (`<repo>\..\mcp\servers\windows-sandbox`). The server keeps its run folders in
   `%LOCALAPPDATA%\combwork-test\sandbox`.
 - **What's where:** the runner (`checks.cjs`) maps this checkout's `tests` folder and `playwright-core` read-only into
   the Sandbox, so the scripts that run inside (`tests/sandbox/inside`: the installer runs, the install record and the
@@ -481,15 +481,15 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   `--wait-min 30`. It never stops a Sandbox it didn't start.
 - **By hand** (an agent working in a Sandbox through the `windows-sandbox` MCP tools): Combwork turns MCP servers on per
   project, not per agent, so until it can give a server to chosen agents only (#537), the server is on only in a
-  release-testing project that holds just the release-testing agent (the hive-mcp repo's
+  release-testing project that holds just the release-testing agent (the combwork-mcp repo's
   `servers/windows-sandbox/RELEASE-TESTING.md`).
 - **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227): `upgradelane` and `boardupgrade` run inside the
   Sandbox against two installs, with `CW_E2E_V09` a copy of the installed 0.9 and `CW_EXE` a copy of the new
-  build installed over it (copies, as `lib.cjs` never starts an installed copy: `Programs\Combwork`, or before 1.1 `Programs\Hive`). With `CW_EXE` set,
+  build installed over it (copies, as `lib.cjs` never starts an installed copy: `Programs\Combwork`, or 1.0's). With `CW_EXE` set,
   `lib.launch` starts that packaged exe instead of the dev build, saying so in the suite's log; `boardupgrade`'s
   step 8 needs an unpackaged build's upgrade hold, so it says NOT RUN there. The Sandbox maps Node, Git and the checkout
   read-only as tool folders; #1227's card has the script.
-  The 0.9 build hands the fake Claude Code its names from before 1.1 (`HIVE_*` variables, a `hive` server, `hive_*`
+  The 0.9 build hands the fake Claude Code its names from before 1.1 (the old-prefix variables, server and
   tools): only `upgradelane`'s 0.9 profile runs the fake in old-release mode (`lib.fakeClaude(…, { oldRelease: true })`,
   `fake-claude/fake-claude-old-release.cmd`, `fake-claude/oldRelease.cjs`, HI-2614). Every other launch is current, and
   the fakes refuse those names there, so no current suite passes on them.
@@ -669,7 +669,7 @@ Once a suite has ended, however it ended (passed, failed, timed out, killed), th
 copies it recorded (`folderProcesses.cjs` `endCopies`); and each run's start, before it takes a lane, ends the copies
 an earlier run recorded in the lanes no running runner holds, started before it looked (`leftCopies.mjs`). Only what
 was recorded, and only while it is still the process recorded (pid and start time): never by name (the installed Combwork
-is `Combwork.exe` too, an installed 1.0 `Hive.exe`) or by reading command lines, which can't be read reliably. What only looks like a copy there (a
+is `Combwork.exe` too, an installed 1.0's has the old name) or by reading command lines, which can't be read reliably. What only looks like a copy there (a
 profile flag naming the lane's folder) with no record (a record not made before its suite was killed, a run from
 before records) is listed in the run's output with its pid and command line, for you to look at, and left running.
 `harnessleftovers` checks all of it with real copies.
@@ -754,7 +754,7 @@ Start from an existing suite and use `lib.cjs`:
 - in a real-CLI suite, `cliStep(name, { session }, fn)` around each step that waits on the CLI answering, with
   `checked(ok)` in the suite's `check` (above: how an environment failure there becomes a SKIP).
 
-**Slow or failing calls** (unpackaged builds only): `CW_TEST_SLOW_IPC="tasks:start=2000,git:diff=3000*1"` delays those IPC calls (`*n`: only the first n) and `CW_TEST_FAIL_IPC="git:status*1"` makes them fail; `CW_TEST_BLOCK_IPC="app:info=1500*1"` holds the main process that long in them, a stall the log's busy warning names (`stalls`, #1109, with `CW_TEST_STALL_QUIET_MS` shortening the minute between warnings). Combwork reads them again when they change, so a suite can set them in the main process while it runs (`app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = '…' })`). `busy`, `changes` and `loadfail` use them. `CW_TEST_SLOW_DETECT="claude-code=12000"` holds that provider's detection at start, so another answers first, and `CW_TEST_DETECT_WAIT_MS` shortens how long a launch waits for detection before it is refused (`providerdetect`, #506); a test launch that holds one can't use `lib.launch`, whose `appReady` waits for every provider. `CW_TEST_SILENT_MS` shortens how long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown (five minutes; `turnledger`, #648). `CW_TEST_FLIGHT_AFTER_MS` shortens how long the flight recorder waits after a trigger before it writes its capture (ten seconds; `flightrecorder`, #698). `CW_TEST_QUEUE_RETURNS` makes the window's merge queue model list fewer returns (50; the rest are counted), so a suite passes that bound with a few cards; read at each listing, so a suite can set them in main as it goes (`progressqueue`, #1356). `CW_TEST_PROFILE_CHOOSE=<folder>` (with `CW_USER_DATA` set, which it then overrides) chooses the profile folders (HI-2461, SPEC §4.3) in `<folder>\appdata` and `<folder>\localappdata` instead of the real ones: `Combwork-Dev` there, else `Hive-Dev` moved to it at start (the names upgrade, HI-2594), and the accounts in the local choice.
+**Slow or failing calls** (unpackaged builds only): `CW_TEST_SLOW_IPC="tasks:start=2000,git:diff=3000*1"` delays those IPC calls (`*n`: only the first n) and `CW_TEST_FAIL_IPC="git:status*1"` makes them fail; `CW_TEST_BLOCK_IPC="app:info=1500*1"` holds the main process that long in them, a stall the log's busy warning names (`stalls`, #1109, with `CW_TEST_STALL_QUIET_MS` shortening the minute between warnings). Combwork reads them again when they change, so a suite can set them in the main process while it runs (`app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = '…' })`). `busy`, `changes` and `loadfail` use them. `CW_TEST_SLOW_DETECT="claude-code=12000"` holds that provider's detection at start, so another answers first, and `CW_TEST_DETECT_WAIT_MS` shortens how long a launch waits for detection before it is refused (`providerdetect`, #506); a test launch that holds one can't use `lib.launch`, whose `appReady` waits for every provider. `CW_TEST_SILENT_MS` shortens how long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown (five minutes; `turnledger`, #648). `CW_TEST_FLIGHT_AFTER_MS` shortens how long the flight recorder waits after a trigger before it writes its capture (ten seconds; `flightrecorder`, #698). `CW_TEST_QUEUE_RETURNS` makes the window's merge queue model list fewer returns (50; the rest are counted), so a suite passes that bound with a few cards; read at each listing, so a suite can set them in main as it goes (`progressqueue`, #1356). `CW_TEST_PROFILE_CHOOSE=<folder>` (with `CW_USER_DATA` set, which it then overrides) chooses the profile folders (HI-2461, SPEC §4.3) in `<folder>\appdata` and `<folder>\localappdata` instead of the real ones: `Combwork-Dev` there, else 1.0's dev profile moved to it at start (the names upgrade, HI-2594), and the accounts in the local choice.
 
 **Restarting Combwork** (unpackaged builds only, #676): Settings → Advanced's **Restart Combwork** quits and starts Combwork again. With `CW_TEST_RELAUNCH_LOG=<file>`, a test copy writes the relaunch it would make to that file as a JSON line (`{ args }`) instead of making it, so no copy of Combwork outlives its suite (`hwaccel`).
 

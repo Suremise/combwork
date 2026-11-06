@@ -1,7 +1,7 @@
 // The merge queue after the 1.0 upgrade, in one session (#1621): a workspace whose board 0.9 left opens in the dev build,
 // read-only and asked first. Opening it, the steps that need a board taking writes (the merge queues, the cards' and
-// projects' ids and keys, ending reviews, archiving) skip it quietly: the log has no "no such table" nor "This board is
-// from Hive 0.9" from them. The user says Upgrade; then, with no restart, a card approved under "Combwork merges" is merged
+// projects' ids and keys, ending reviews, archiving) skip it quietly: the log has no "no such table" nor its line that the
+// board is from 0.9 from them. The user says Upgrade; then, with no restart, a card approved under "Combwork merges" is merged
 // by the queue (Done, Integrated by Combwork, the target at it). HI-1694: the window shows the upgrade and the steps after it
 // as they go, nothing runs against the board meanwhile ("no such table", "readonly"), and the log times each step.
 // The first merge waits for the merge style and commit message, which the upgrade left to the user (HI-1697): asked under
@@ -30,14 +30,20 @@ const check = (name, ok, extra = '') => {
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
 const dbFile = path.join(fx.ws, '.combwork', 'combwork.db')
+// old-name: begin queueupgrade-inputs
+/** 0.9's schema_version column, as its board has it. */
+const OLD_VERSION_COL = 'hive_version'
+/** The log line of a step that ran against a 0.9 board (its text names the old release). */
+const OLD_BOARD_LINE = /This board is from Hive 0\.9/
+// old-name: end queueupgrade-inputs
 
-/** The workspace's board as Hive 0.9.3 left it: its two schema steps, no cards. */
+/** The workspace's board as 0.9.3 left it: its two schema steps, no cards. */
 function board09() {
   fs.mkdirSync(path.dirname(dbFile), { recursive: true })
   const db = new DatabaseSync(dbFile)
   try {
     db.exec(`
-      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, hive_version TEXT NOT NULL) STRICT;
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, ${OLD_VERSION_COL} TEXT NOT NULL) STRICT;
       CREATE TABLE cards (
         number     INTEGER PRIMARY KEY,
         doc        TEXT NOT NULL,
@@ -59,7 +65,7 @@ function board09() {
       CREATE TABLE store_meta (store TEXT NOT NULL, scope TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (store, scope, key)) STRICT, WITHOUT ROWID;
     `)
     const at = new Date().toISOString()
-    const put = db.prepare('INSERT INTO schema_version (version, name, applied_at, hive_version) VALUES (?, ?, ?, ?)')
+    const put = db.prepare(`INSERT INTO schema_version (version, name, applied_at, ${OLD_VERSION_COL}) VALUES (?, ?, ?, ?)`)
     put.run(1, 'cards', at, '0.9.3')
     put.run(2, 'store_rows', at, '0.9.3')
   } finally {
@@ -131,8 +137,8 @@ const log = () => {
     check("…the window told the upgrade's steps, with the workspace's name, then that they ended", toldSteps.join() === 'upgrade,adoption,slots,' && told.slice(0, 3).every((p) => p.name === name), JSON.stringify(told))
     const STEP_TEXT = { upgrade: 'Upgrading its board.', adoption: 'Adopting its cards and projects…', slots: "Adopting its agents' worktrees as slots…" }
     check("…having shown each, as far as it was painted, under the workspace's name", shown.length > 0 && shown.every((s) => s.text.includes(`Upgrading ${name} to Combwork 1.0`) && s.text.includes(STEP_TEXT[s.step] ?? '\0')), shown.map((s) => `${s.step}: ${s.text}`).join(' | '))
-    const skipped = log().split(/\r?\n/).filter((l) => /\[(WARN|ERROR)\]/.test(l) && /no such table|This board is from Hive 0\.9|readonly database|Could not save the performance metrics|bringing builders/.test(l))
-    check('while it waited, nothing failed on the read-only board (no "no such table", "readonly", nor "This board is from Hive 0.9")', skipped.length === 0, skipped.join(' | '))
+    const skipped = log().split(/\r?\n/).filter((l) => /\[(WARN|ERROR)\]/.test(l) && new RegExp(`no such table|${OLD_BOARD_LINE.source}|readonly database|Could not save the performance metrics|bringing builders`).test(l))
+    check('while it waited, nothing failed on the read-only board (no "no such table", "readonly", nor that the board is from 0.9)', skipped.length === 0, skipped.join(' | '))
     const timed = log().split(/\r?\n/).filter((l) => /schema step|\[workspace\] opening |upgraded the board/.test(l))
     check("the log times the upgrade's steps and the opening's (HI-1694)", timed.some((l) => /took \d+ schema step\(s\) in \d+ ms, its copy before them \d+ ms: .*sessions and deliveries in tables \d+ ms/.test(l)) && timed.some((l) => /upgraded the board of .* to 1\.0 \(from v2\) in \d+ ms/.test(l)) && timed.some((l) => /opening .*: slots took \d+ ms; \d+ ms in all/.test(l)), timed.join(' | '))
 

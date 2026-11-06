@@ -1010,5 +1010,11 @@
   "board.workQueue.stuckRef": "{target} 位于",
   "board.workQueue.testing": "正在测试：{step}",
   "board.workQueue.unreadRef": "未读取",
-  "board.workflows": "工作流程"
+  "board.workflows": "工作流程",
+  "board.card.waitingMark": "等待中",
+  "board.card.waitingTip": "等待中：{reason}（由 {by} 标记）。在此期间 Combwork 不会将其报告为停滞。",
+  "board.dialog.waiting": "等待中",
+  "board.dialog.waitingPlaceholder": "为什么有意等待（留空：不在等待）。它不会被报告为停滞；其代理继续运行。",
+  "board.menu.clearWaiting": "结束等待",
+  "board.menu.markWaiting": "标记为等待中…"
 }

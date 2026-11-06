@@ -1010,5 +1010,11 @@
   "board.workQueue.stuckRef": "{target} está en",
   "board.workQueue.testing": "Probando ahora: {step}",
   "board.workQueue.unreadRef": "no leído",
-  "board.workflows": "Flujos de trabajo"
+  "board.workflows": "Flujos de trabajo",
+  "board.card.waitingMark": "En espera",
+  "board.card.waitingTip": "En espera: {reason} (marcada por {by}). Combwork no la marca como estancada mientras tanto.",
+  "board.dialog.waiting": "En espera",
+  "board.dialog.waitingPlaceholder": "Por qué espera a propósito (vacío: no espera). No se marca como estancada; su agente sigue funcionando.",
+  "board.menu.clearWaiting": "Quitar la espera",
+  "board.menu.markWaiting": "Marcar como en espera…"
 }
