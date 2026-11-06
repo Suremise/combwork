@@ -117,14 +117,15 @@ setLaneStartWaits(laneStartWait)
  * (`start.dependenciesIntegrated`, Dependencies must be Done); null otherwise, or when its workflow can't be read (its
  * start then says why). One Done but not yet in n's target is left to the start's own refusal (`refused`).
  */
-async function dependencyWait(ws: WorkspaceService, projectPath: string, n: number): Promise<string | null> {
+async function dependencyWait(ws: WorkspaceService, projectPath: string, n: number): Promise<string[] | null> {
   const wf = await (await import('./workflow/service')).workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return null
   try {
     const card = wf.store.card(n)
     if (!card.blockedBy.length || !wf.rulesetOf(card).guards.start.includes('start.dependenciesIntegrated')) return null
-    const first = card.blockedBy.find((id) => !wf.laneDone(id))
-    return first === undefined ? null : wf.store.card(first).key
+    // Every one not Done (HI-2618: "waiting on HI-2610, HI-2611 and HI-2612"), in its blockedBy order.
+    const open = card.blockedBy.filter((id) => !wf.laneDone(id)).map((id) => wf.store.card(id).key)
+    return open.length ? open : null
   } catch {
     return null
   }
@@ -151,8 +152,11 @@ function stillDue(ws: WorkspaceService, path: string, lane: { id: string; projec
   return !!v && v.builder.id === lane.builder.id && laneStartDue(v)?.number === n
 }
 
-/** For tests: awaited just before each start, once it is decided (a lane changing while a start is on its way); the queued line's hold. */
-export const laneStartsTestHooks: { beforeStart: ((lane: string, n: number) => Promise<void>) | null } = { beforeStart: null }
+/**
+ * For tests: awaited just before each start, once it is decided (a lane changing while a start is on its way); the queued
+ * line's hold. `midPass` (HI-2618): awaited inside each look, after its first await (others read the lanes meanwhile).
+ */
+export const laneStartsTestHooks: { beforeStart: ((lane: string, n: number) => Promise<void>) | null; midPass?: (() => Promise<void>) | null } = { beforeStart: null, midPass: null }
 
 /**
  * Looks at a workspace's running lanes and starts each next card whose builder is free. Each start is decided again just
@@ -162,41 +166,85 @@ export const laneStartsTestHooks: { beforeStart: ((lane: string, n: number) => P
 export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
   const path = ws.path
   if (!path) return
-  for (const k of [...waiting.keys()]) if (k.startsWith(`${path.toLowerCase()}#`)) waiting.delete(k)
-  const before = JSON.stringify([...waits].filter(([k]) => k.startsWith(`${path.toLowerCase()}#`)))
-  for (const k of [...waits.keys()]) if (k.startsWith(`${path.toLowerCase()}#`)) waits.delete(k)
+  const fence = passFence(ws, path)
+  // What this look finds, kept aside until it is complete (HI-2618): the published waits stay the last complete look's
+  // meanwhile, never cleared while its awaits run (a lane watch reading then saw HB6's HI-2616 waiting on nothing).
+  const found: PassFound = { waits: new Map(), waiting: new Map() }
+  let complete = false
   try {
     // The team paused (HI-2081): no card started, no new conversation launched; its lanes show it as their pause. The
     // pause's end changes the lanes (team-pause-changed), which looks again.
-    if (teamPauseOf(ws)) return
-    // An agent owed its new conversation is launched with the rules off too (HR1 on HI-2034: Start Lane owes it either
-    // way); only Combwork's own card starts need them.
-    await freshPass(ws, path)
-    if (await lanesEnforced()) await lookAt(ws, path)
+    if (!teamPauseOf(ws)) {
+      // An agent owed its new conversation is launched with the rules off too (HR1 on HI-2034: Start Lane owes it either
+      // way); only Combwork's own card starts need them.
+      await freshPass(ws, path)
+      await laneStartsTestHooks.midPass?.()
+      const enforced = await lanesEnforced()
+      if (enforced) await lookAt(ws, path, found, fence)
+      // Its due cards' dependency waits (HI-2618), the rules on or off: an episode each, and with the rules off one
+      // readiness wake once the last of them lands.
+      await (await import('./laneDeps')).settleDepEpisodes(ws, enforced, fence)
+    }
+    complete = true
   } finally {
-    // The lanes' statuses follow what this look found (the window and the lane watch read them).
-    if (JSON.stringify([...waits].filter(([k]) => k.startsWith(`${path.toLowerCase()}#`))) !== before) laneViewsChanged(ws)
+    // The lanes' statuses follow what this look found (the window and the lane watch read them), published in one step,
+    // and only from a complete look still of this open of the workspace and not overtaken by a later one.
+    if (complete && fence.current()) publish(path, found, ws)
   }
+}
+
+/** What one look finds (HI-2618): its lanes' start waits and the builders whose next card waits, published together. */
+interface PassFound {
+  waits: Map<string, LaneStartWait>
+  waiting: Map<string, number>
+}
+
+/**
+ * A look's fence (HI-2618): taken as it begins, still current only while its workspace is the same open at the same
+ * folder (`openGeneration`: a close and a reopen by the same service is another open) and no later look has begun.
+ */
+export interface PassFence {
+  current(): boolean
+}
+const passes = new Map<string, number>()
+function passFence(ws: WorkspaceService, path: string): PassFence {
+  const k = path.toLowerCase()
+  const seq = (passes.get(k) ?? 0) + 1
+  passes.set(k, seq)
+  const gen = ws.openGeneration
+  return { current: () => ws.path?.toLowerCase() === k && ws.openGeneration === gen && passes.get(k) === seq }
+}
+
+/** A complete look's waits replace its workspace's, in one synchronous step; its lanes changed when they differ. */
+function publish(path: string, found: PassFound, ws: WorkspaceService): void {
+  const prefix = `${path.toLowerCase()}#`
+  const mine = (m: Map<string, unknown>): string => JSON.stringify([...m].filter(([k]) => k.startsWith(prefix)))
+  const before = mine(waits)
+  for (const m of [waits, waiting] as Map<string, unknown>[]) for (const k of [...m.keys()]) if (k.startsWith(prefix)) m.delete(k)
+  for (const [k, v] of found.waits) waits.set(k, v)
+  for (const [k, v] of found.waiting) waiting.set(k, v)
+  if (mine(waits) !== before) laneViewsChanged(ws)
 }
 
 /** Whether a lane's builder is owed its new conversation (HI-2034), as kept now: its cards wait for it, never the old one. */
 const builderOwed = (ws: WorkspaceService, id: string): boolean => freshStartsNow(ws, id).some((f) => f.role === 'builder')
 
-async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
+async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fence: PassFence): Promise<void> {
   for (const lane of await listLanes(ws)) {
+    if (!fence.current()) return
     const next = laneStartDue(lane)
     // A lane waiting for a slot (none was free as it started) has its stopped agents started once one is lent (slotCards'
     // pass), which keeps the wait until they are launched (HR1 on HI-2029: a `stoppedOnly` one too): its status says it
     // waits for a slot, and Combwork's start comes after.
     if (!next || laneWaitsForSlot(ws, lane.id) || builderOwed(ws, lane.id)) continue
     const projectPath = join(path, lane.project)
-    waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
-    const wait = (why: LaneStartWhy, waitsFor?: string, held?: LaneSlotHeld | null): void => void waits.set(waitKey(path, lane.id), { card: next.number, why, agent: lane.builder.name, ...(waitsFor ? { waitsFor } : {}), ...(held ? { held } : {}) })
+    found.waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
+    const wait = (why: LaneStartWhy, waitsFor?: string, held?: LaneSlotHeld | null, waitingOn?: string[]): void => void found.waits.set(waitKey(path, lane.id), { card: next.number, why, agent: lane.builder.name, ...(waitsFor ? { waitsFor } : {}), ...(waitingOn?.length ? { waitingOn } : {}), ...(held ? { held } : {}) })
     // HI-2129: a card its rules won't start before the cards it depends on are Done waits for them, whatever its builder
     // does meanwhile (watching one of them, as HB5 did): its start comes once they are, and the lane says what it waits on.
     const dep = await dependencyWait(ws, projectPath, next.number)
     if (dep) {
-      wait('dependencies', dep)
+      wait('dependencies', dep[0], null, dep)
       continue
     }
     // Its start launching its agents (HI-2029): never started under it, as the builder's status then says (starting).
@@ -218,13 +266,13 @@ async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
     const triedAt = Date.now()
     try {
       await laneStartsTestHooks.beforeStart?.(lane.id, next.number)
-      if (!stillDue(ws, path, lane, next.number)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log
+      if (!fence.current() || !stillDue(ws, path, lane, next.number)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log
       log.info(`Lane ${lane.id}: starting #${next.number} on ${userText(lane.builder.name)} in ${userText(lane.project)}${prev ? ` (#${prev.number} is Done)` : ''}`)
       await inWorkspace(ws, () => startTask(next.number, { kind: 'agent', agentId: lane.builder.id }, CW_LANE_START, note, undefined, (now) => {
-        if (!stillDue(ws, path, lane, next.number, now)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log
+        if (!fence.current() || !stillDue(ws, path, lane, next.number, now)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log
       }))
       tried.delete(key)
-      waiting.delete(builderKey(path, lane.project, lane.builder.id))
+      found.waiting.delete(builderKey(path, lane.project, lane.builder.id))
     } catch (e) {
       // Nothing to try again: the next look decides from the lane as it is then.
       if (e instanceof LaneChanged || (e instanceof Error && e.cause instanceof LaneChanged)) {
@@ -330,6 +378,8 @@ let started = false
 export function startLaneStarts(): void {
   if (started) return
   started = true
+  // Its readiness wakes' source (HI-2618), offered and refreshed by the deliveries.
+  void import('./laneDeps').then((m) => m.startLaneDeps())
   onCombworkEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'lanes-changed') {
       const ws = openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())

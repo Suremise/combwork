@@ -3948,6 +3948,19 @@ export interface LaneInfo {
    * reviews it now, by name; absent for other lanes, or with no current card.
    */
   poolReview?: { lastVerdict: { name: string; pass: boolean } | null; reviewing: string | null }
+  /**
+   * A running lane's due card (in Todo, its next) that depends on other cards, where Combwork waits for them (HI-2618:
+   * the rules off, or its start's rule that they be Done): the ones not Done yet by key (`open`, in `blockedBy` order),
+   * and when the last of them went Done once none is open (`readyAt`, from the board's history). Absent otherwise.
+   */
+  dueDeps?: DueDeps
+}
+
+/** A lane's due card's dependencies (LaneInfo.dueDeps, HI-2618). */
+export interface DueDeps {
+  card: number
+  open: string[]
+  readyAt: string | null
 }
 
 /**
@@ -4021,6 +4034,8 @@ export interface LaneStatus {
   why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
   waitsFor?: string
+  /** startWait `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in its `blockedBy` order. */
+  waitingOn?: string[]
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
   freshBlocked?: 'timeout' | 'uncertain' | 'failed'
   freshWhy?: string
