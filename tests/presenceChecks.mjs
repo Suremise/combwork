@@ -5,7 +5,8 @@
 //
 // - existsSync, by any name (imported under another, `fs.existsSync`, `fs['existsSync']`): it answers false for access
 //   denied or a held file as for an absence. Use fsPresence's present()/lstatOrNull().
-// - Each `catch` clause, and the function given to `.catch(f)` or as `.then(ok, f)`'s second:
+// - Each `catch` clause, and the function given to `.catch(f)` or as `.then(ok, f)`'s second (dotted, optional or in
+//   brackets: `p['catch'](f)`; a method named only at run time, `p[name](f)`, is a finding of its own):
 //   1. a rethrow: its body (a block) ends in `throw`, with no return, continue or break anywhere in it;
 //   2. for `.catch`/`.then`, a call of fsPresence's ifAbsent(): its callee resolved by the parser's scopes to the import
 //      from src/main/fsPresence (a parameter, local, named function expression, class or catch binding of that name
@@ -91,9 +92,18 @@ function calleeName(c) {
   c = bare(c)
   if (!c) return ''
   if (c.type === 'Identifier') return c.name
-  if (isMember(c)) return `${calleeName(c.object)}.${c.computed ? (c.property.type === 'StringLiteral' ? c.property.value : '?') : c.property.name}`
+  if (isMember(c)) return `${calleeName(c.object)}.${memberName(c) ?? '?'}`
   if (isCall(c)) return `${calleeName(c.callee)}()`
   return '?'
+}
+
+/** A member's property name: `p.catch`, `p?.catch`, `p['catch']`, ``p[`catch`]``; null when it is known only at run time. */
+function memberName(m) {
+  if (!m.computed) return m.property.name ?? null
+  const k = bare(m.property)
+  if (k.type === 'StringLiteral') return k.value
+  if (k.type === 'TemplateLiteral' && !k.expressions.length) return k.quasis[0].value.cooked
+  return null
 }
 
 /** Whether a block is a rethrow: it ends in `throw`, and nothing in it returns, continues or breaks. */
@@ -172,10 +182,12 @@ export function presenceFindings(file, src) {
       out.push(finding(file, src, n, parents, 'existsSync'))
     }
     if (n.type === 'CatchClause' && !rethrows(n.body)) out.push(finding(file, src, n, parents, 'catch: not a rethrow'))
-    if (isCall(n) && isMember(n.callee) && !n.callee.computed) {
-      const m = n.callee.property.name
+    if (isCall(n) && isMember(n.callee)) {
+      const m = memberName(n.callee)
       if (m === 'catch' && n.arguments[0]) handler(n.arguments[0], n, parents, '.catch')
       if (m === 'then' && n.arguments[1]) handler(n.arguments[1], n, parents, '.then')
+      // A method named only at run time (`p[name](f)`) could be either: a finding, like any handler the rule can't name.
+      if (m === null && n.arguments.length) out.push(finding(file, src, n, parents, 'a call by a computed name'))
     }
   })
   return out.sort((x, y) => x.at - y.at)

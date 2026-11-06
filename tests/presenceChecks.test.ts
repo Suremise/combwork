@@ -59,6 +59,19 @@ describe('the presence-check rule (HI-2617)', () => {
     fails('const quiet = (e) => { throw e }\nawait x().catch(quiet)', HANDLER('.catch'))
   })
 
+  it("holds .catch and .then however the call names them: dotted, optional, in brackets (HR2's round 5)", () => {
+    fails("const r = await readFile(p)['catch'](() => null)", HANDLER('.catch'))
+    fails("const r = await readFile(p)['then'](ok, () => true)", HANDLER('.then'))
+    fails('const r = await readFile(p)[`catch`](() => null)', HANDLER('.catch'))
+    fails('const r = await readFile(p)?.catch(() => null)', HANDLER('.catch'))
+    fails("const r = await readFile(p)?.['catch'](() => null)", HANDLER('.catch'))
+    ok("const r = await readFile(p)['catch']((e) => { throw e })")
+    ok("import { ifAbsent } from './fsPresence'\nconst r = await readFile(p)['catch'](ifAbsent(null))")
+    ok("import { ifAbsent } from './fsPresence'\nconst r = await readFile(p)['then'](ok, ifAbsent(null))")
+    // A method named only at run time could be either: a finding of its own.
+    fails("const m = 'catch'\nconst r = await readFile(p)[m](() => null)", 'a call by a computed name')
+  })
+
   it("fails the reviewers' probes of rounds 1 to 3 the same way: none is read, so none is accepted", () => {
     for (const src of [
       "try { readFileSync(p) } catch (e) { if (e.code === 'ENOENT') throw e; return null }",
@@ -139,6 +152,13 @@ describe('presence checks in the repository (HI-2617)', () => {
     const planted = `${readRepo('src/main/nameUpgrade.ts')}\nexport const planted = (p: string): boolean => existsSync(p)\n`
     const { findings, problems } = checkPresence({ scope: ['src/main/nameUpgrade.ts'], read: () => planted, exceptions: exceptions().filter((e) => e.file === 'src/main/nameUpgrade.ts') })
     expect(findings.map((f: Finding) => f.rule)).toEqual(['existsSync'])
+    expect(problems).toEqual([])
+  })
+
+  it("fails .catch and .then in brackets planted in a file of its scope (HR2's round 5)", () => {
+    const planted = `${readRepo('src/main/nameUpgrade.ts')}\nexport async function probeCatch(p: string): Promise<unknown> { return readFile(p)['catch'](() => null) }\nexport async function probeThen(p: string): Promise<unknown> { return readFile(p)['then'](() => false, () => true) }\n`
+    const { findings, problems } = checkPresence({ scope: ['src/main/nameUpgrade.ts'], read: () => planted, exceptions: exceptions().filter((e) => e.file === 'src/main/nameUpgrade.ts') })
+    expect(findings.map((f: Finding) => `${f.fn} ${f.rule}`)).toEqual([`probeCatch ${HANDLER('.catch')}`, `probeThen ${HANDLER('.then')}`])
     expect(problems).toEqual([])
   })
 
