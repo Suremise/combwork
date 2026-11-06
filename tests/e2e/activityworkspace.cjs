@@ -8,7 +8,8 @@
 // now in every project; a status change alone never finds a card's agents again or reads the session lists beyond their
 // cadence. A card whose builder went on to its next card (its session's record keeping this one) has nobody on it. A
 // card's Activity whose agents come back after the window went elsewhere (another view, another workspace) doesn't open
-// (HR5's round 1: activity:cardAgents made slow, CW_TEST_SLOW_IPC). Both themes. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile,
+// (HR5's round 1: activity:cardAgents held until the window went elsewhere, CW_TEST_HOLD_IPC; HI-2652: a delay lost the race
+// to another workspace opening under load). Both themes. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile,
 // workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -57,7 +58,7 @@ const AGENTS = [
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_SLOW_IPC: 'activity:cardAgents=2500', ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const shots = path.join(lib.WORK, 'activityworkspace-shots')
   fs.rmSync(shots, { recursive: true, force: true })
@@ -170,12 +171,20 @@ const AGENTS = [
     await page.mouse.move(5, 5)
     await shoot('2-for-card-dark')
     // Another view chosen while its agents are found: it doesn't open over it.
+    // Its agents' lookup is held in main (CW_TEST_HOLD_IPC) from the click until the window shows the other view, so it
+    // comes back after, whatever the load.
     const settled = () => page.evaluate(() => ({ ...window.__cwCardActivity }))
+    const holdLookup = (on) => app.evaluate((_e, v) => (v ? (process.env.CW_TEST_HOLD_IPC = 'activity:cardAgents') : delete process.env.CW_TEST_HOLD_IPC), on)
+    const lookupHeld = async () => !!(await until(async () => (await app.evaluate(() => globalThis.__cwHeldIpc?.['activity:cardAgents'] ?? 0)) >= 1, HUNG_MS))
     const s0 = await settled()
     await page.locator('.activity-btn[aria-label="Task Board"]').click()
     await card.click()
+    await holdLookup(true)
     await page.locator('.dialog[role="dialog"]').getByRole('button', { name: 'Activity', exact: true }).click()
+    check('…its agents being found (held)', await lookupHeld())
     await page.locator('.activity-btn[aria-label="Projects"]').click()
+    await until(async () => (await page.locator('.activity-btn[aria-label="Projects"].active').count()) === 1, HUNG_MS)
+    await holdLookup(false)
     check('another view chosen while its agents are found: Activity stays shut', !!(await until(async () => (await settled()).settled > s0.settled, HUNG_MS)) && (await settled()).dropped === s0.dropped + 1 && (await page.locator('.activity-workspace').count()) === 0, JSON.stringify([s0, await settled()]))
     // A card its builder went on from (in Review, HB1 building Alpha card now), on HB1's running session's record as a
     // card loop's session keeps it: nobody on it now.
@@ -284,10 +293,23 @@ const AGENTS = [
     const s1 = await settled()
     await page.locator('.activity-btn[aria-label="Task Board"]').click()
     await card.click()
+    await holdLookup(true)
     await page.locator('.dialog[role="dialog"]').getByRole('button', { name: 'Activity', exact: true }).click()
-    await inv('workspace:open', otherWs)
+    check('…its agents being found (held) as the other workspace opens', await lookupHeld())
+    await lib.openWorkspace(inv, page, otherWs, HUNG_MS)
+    await holdLookup(false)
     check('another workspace opened while its agents are found: Activity stays shut there', !!(await until(async () => (await settled()).settled > s1.settled, HUNG_MS)) && (await settled()).dropped === s1.dropped + 1 && (await page.locator('.activity-for-card').count()) === 0 && (await page.evaluate(() => document.title)).includes('activityworkspace-other-ws'), JSON.stringify([s1, await settled()]))
-    await lib.openWorkspace(inv, page, ws)
+    await lib.openWorkspace(inv, page, ws, HUNG_MS)
+    // The other order (HI-2652): its agents found before the other workspace opens, it opens here, and nothing of it is
+    // in the other workspace's window.
+    await page.locator('.activity-btn[aria-label="Task Board"]').click()
+    await until(async () => (await card.count()) === 1, HUNG_MS)
+    await card.click()
+    await page.locator('.dialog[role="dialog"]').getByRole('button', { name: 'Activity', exact: true }).click()
+    check("its agents found first: the card's Activity opens in its own workspace", !!(await until(async () => (await page.locator('.activity-for-card').count()) === 1, HUNG_MS)))
+    await lib.openWorkspace(inv, page, otherWs, HUNG_MS)
+    check("…and the other workspace opened after shows none of it", (await page.locator('.activity-for-card').count()) === 0, String(await page.locator('.activity-for-card').count()))
+    await lib.openWorkspace(inv, page, ws, HUNG_MS)
     for (const [p, id] of [[beta, 'hb1'], [home, 'assistant']]) await inv('session:stop', p, id).catch(() => undefined)
   } finally {
     await app.close().catch(() => undefined)
